@@ -3058,13 +3058,15 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: 
     // Only apply to static constructors — instance methods (str.slice, vec.len) must
     // keep their own return type, not inherit the function's generic return type.
     if is_static and self.expected_type > 0:
-        let et_tk = self.sema.get_type_kind(self.expected_type)
+        let expected_resolved = self.sema.resolve_alias(self.expected_type)
+        let et_tk = self.sema.get_type_kind(expected_resolved)
         if et_tk == TypeKind.TY_GENERIC_INST:
-            ret_type = self.expected_type
+            ret_type = expected_resolved as i32
     // If ret_type is still a base struct (not generic instance) for a static
     // constructor, try to resolve from the NodeKind.NK_INDEX receiver (Vec[i32]).
     if is_static:
-        let ret_tk = self.sema.get_type_kind(ret_type)
+        let ret_resolved = if ret_type != 0: self.sema.resolve_alias(ret_type) else: 0
+        let ret_tk = self.sema.get_type_kind(ret_resolved)
         if ret_type == 0 or ret_type == self.sema.ty_void or ret_tk == TypeKind.TY_STRUCT:
             // Try resolving generic instance from NodeKind.NK_INDEX receiver (e.g. Vec[i32])
             if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
@@ -3072,7 +3074,8 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: 
                 if gi_type > 0:
                     ret_type = gi_type
         // Re-check after NodeKind.NK_INDEX resolution
-        let ret_tk2 = self.sema.get_type_kind(ret_type)
+        let ret_resolved2 = if ret_type != 0: self.sema.resolve_alias(ret_type) else: 0
+        let ret_tk2 = self.sema.get_type_kind(ret_resolved2)
         if ret_type == 0 or ret_type == self.sema.ty_void or ret_tk2 == TypeKind.TY_STRUCT:
             self.mark_unsupported()
     let result_local = self.new_temp(ret_type)

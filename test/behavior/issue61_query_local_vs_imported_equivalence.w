@@ -1,0 +1,22 @@
+//! expect-stdout: ok
+
+use issue61_queries.builtins
+use issue61_queries.cache_keys
+use issue61_queries.long_names
+use issue61_queries.ordering
+use issue61_queries.receivers
+use issue61_queries.samples
+
+fn local_forward_score() -> i32:
+    let state = sample_state()
+    let lookup = sample_lookup()
+    var total = builtin_score(state, lookup)
+    total = total + alias_and_temporary_score(state)
+    total = total + cache_key_score()
+    total = total + long_name_score()
+    total
+
+fn main:
+    assert(local_forward_score() == 127)
+    assert(local_forward_score() == forward_score())
+    print("ok")
