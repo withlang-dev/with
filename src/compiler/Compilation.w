@@ -237,6 +237,23 @@ fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_
     let _ = ("rm -f " ++ obj_path) |> with_system
     bin_path
 
+fn Compilation.emit_object_to_path(self: Compilation, source_path: str, obj_path: str) -> str:
+    let output_dir = link_stage_dirname(obj_path)
+    let _ = ("mkdir -p " ++ output_dir) |> with_system
+
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+    if not self.ensure_codegen_mir(pool):
+        return ""
+    let active_pool: AstPool = self.active_pool(pool)
+    let opt_level = self.config.opt_level
+    let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info)
+    if backend_rc != 0:
+        let _ = ("rm -f " ++ obj_path) |> with_system
+        return ""
+    obj_path
+
 fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_path: str) -> str:
     if bin_path.len() == 0:
         return self.build_binary(source_path)

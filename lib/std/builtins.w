@@ -13,7 +13,7 @@ extern fn with_eprint(s: str) -> void
 extern fn with_write(s: str) -> void
 extern fn with_ewrite(s: str) -> void
 extern fn with_panic(msg: str, file: str, line: i32) -> void
-extern fn int_to_string(n: i32) -> str
+extern fn with_i32_to_str(n: i32) -> str
 
 /// Print a string to stdout without a trailing newline.
 pub fn print(s: str) -> void:

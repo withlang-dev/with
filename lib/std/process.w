@@ -1,12 +1,13 @@
 // std.process — Process utility functions
 //
-// Provides process-level operations wrapping C stdlib.
+// Provides process-level operations via the runtime interface.
+// No c_import — uses with_* runtime functions.
 
 use std.collections
 
-extern fn exit(code: i32) -> void
-extern fn getpid() -> i32
-extern fn system(cmd: *const i8) -> i32
+extern fn rt_exit(code: i32) -> void
+extern fn with_getpid() -> i32
+extern fn with_system(cmd: str) -> i32
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_getenv_str(name: str) -> str
@@ -17,15 +18,15 @@ extern fn with_str_len(s: str) -> i64
 
 /// Exit the process with the given status code.
 pub fn exit_code(code: i32) -> void:
-    exit(code)
+    rt_exit(code)
 
 /// Execute a shell command. Returns the exit status.
 pub fn system_cmd(cmd: str) -> i32:
-    system(cmd as *const i8)
+    with_system(cmd)
 
 /// Get the current process ID.
 pub fn pid -> i32:
-    getpid()
+    with_getpid()
 
 /// Get command-line arguments as a Vec of strings.
 pub fn args -> Vec[str]:
@@ -58,8 +59,8 @@ pub fn command(cmd: str) -> Command:
 
 /// Run the command. Returns the exit status.
 fn Command.run(self: Command) -> i32:
-    system(self.cmd as *const i8)
+    with_system(self.cmd)
 
 /// Run the command and return its exit status.
 fn Command.status(self: Command) -> i32:
-    system(self.cmd as *const i8)
+    with_system(self.cmd)

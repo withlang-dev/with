@@ -89,7 +89,7 @@ impl Eq for i64 =
 
 impl Debug for i32 =
     fn debug_str(self: i32) -> str:
-        int_to_string(self)
+        with_i32_to_str(self)
 
 impl Debug for bool =
     fn debug_str(self: bool) -> str:

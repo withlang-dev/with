@@ -1,11 +1,12 @@
 // std.time — Time utility functions
 //
-// Provides basic time operations wrapping C stdlib functions.
+// Provides time operations via the runtime interface.
+// No c_import — uses with_* runtime functions.
 
 extern fn with_time_now() -> i64
 extern fn with_clock_nanos() -> i64
-extern fn usleep(usecs: i32) -> i32
-extern fn clock() -> i64
+extern fn with_nanosleep(ns: i64) -> i32
+extern fn with_usleep(usecs: i32) -> i32
 
 /// A duration in milliseconds.
 type Duration = i32
@@ -37,16 +38,16 @@ pub fn now -> i64:
 
 /// Sleep for the given number of seconds (blocking).
 pub fn sleep_secs(secs: i32) -> i32:
-    usleep(secs * 1000000)
+    with_nanosleep(secs as i64 * 1000000000)
 
 /// Sleep for a Duration (async-compatible).
 pub async fn sleep(d: Duration) -> i32:
-    usleep(d * 1000)
+    with_nanosleep(d as i64 * 1000000)
 
 /// Get monotonic time in nanoseconds (for benchmarking).
 pub fn now_ns() -> i64:
     with_clock_nanos()
 
-/// Get CPU clock ticks (for basic benchmarking).
+/// Get monotonic clock ticks in nanoseconds.
 pub fn clock_ticks -> i64:
-    clock()
+    with_clock_nanos()

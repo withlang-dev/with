@@ -1,6 +1,8 @@
 // std.signal — minimal signal constants and helpers.
+//
+// No c_import — uses with_* runtime functions.
 
-extern fn raise(sig: i32) -> i32
+extern fn with_raise(sig: i32) -> i32
 
 /// SIGINT signal number (interrupt, Ctrl+C).
 pub fn sigint -> i32:
@@ -16,4 +18,4 @@ pub fn sigkill -> i32:
 
 /// Send a signal to the current process.
 pub fn raise_signal(sig: i32) -> i32:
-    raise(sig)
+    with_raise(sig)

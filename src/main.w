@@ -215,6 +215,7 @@ fn run_cli(argc: i32) -> i32:
     let no_std = cli_has_flag(argc, "--no-std") or cli_has_flag(argc, "--freestanding")
     let alloc_mode = cli_has_flag(argc, "--alloc")
     let emit_c_mode = cli_has_flag(argc, "--emit-c")
+    let emit_obj_mode = cli_has_flag(argc, "--emit-obj")
     let prelude_mode = cli_prelude_mode(argc)
     let deterministic_mode = cli_has_flag(argc, "--deterministic")
     let dump_tokens_flag = cli_has_flag(argc, "--dump-tokens")
@@ -234,7 +235,7 @@ fn run_cli(argc: i32) -> i32:
         return run_run_command(cli_command(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info)
 
     if cli_command(argc) == "build":
-        return run_build_command(source, opt_level, no_std, alloc_mode, emit_c_mode, output, prelude_mode, debug_info)
+        return run_build_command(source, opt_level, no_std, alloc_mode, emit_c_mode, emit_obj_mode, output, prelude_mode, debug_info)
     if cli_command(argc) == "run":
         if emit_c_mode:
             with_eprint("error: '--emit-c' is only supported with 'build'")
@@ -390,7 +391,7 @@ fn cleanup_binary_artifacts(bin_path: str):
     let _ = ("rm -f " ++ bin_path) |> with_system
     let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
 
-fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, emit_obj_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
     if source_file == "":
         with_eprint("error: 'build' requires a source file argument")
         return 1
@@ -406,6 +407,16 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
         with_eprint("emitted C: " ++ c_path)
         with_eprint("compile with zig cc (example):")
         with_eprint("  zig cc -target <triple> -I runtime " ++ c_path ++ " runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_<arch>.s -o <output>")
+        comp.print_warnings()
+        return 0
+    if emit_obj_mode:
+        var obj_path = output_path
+        if obj_path == "":
+            obj_path = link_stage_output_path_for_source(source_file) ++ ".o"
+        let result = comp.emit_object_to_path(source_file, obj_path)
+        if result == "":
+            with_eprint("error: build failed")
+            return 1
         comp.print_warnings()
         return 0
     let bin_path = comp.build_binary_to_path(source_file, output_path)

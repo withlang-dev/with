@@ -3175,6 +3175,16 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     if effective_name != "main":
         wl_set_linkage(function, wl_internal_linkage())
 
+    // @[c_export] overrides internal linkage to external for C/linker visibility
+    let cc_sym = self.pool.fn_meta_tp_start(meta)
+    if cc_sym != 0:
+        let cc_name = self.intern.resolve(cc_sym)
+        if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
+            wl_set_linkage(function, 0)
+            let export_name = cc_name.slice(9, cc_name.len() as i64)
+            if export_name.len() > 0 and export_name != effective_name:
+                wl_set_value_name(function, export_name)
+
     // Apply attributes
     if (flags / FnFlags.INLINE) % 2 == 1:
         wl_add_fn_attr(self.context, function, "alwaysinline")

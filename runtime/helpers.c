@@ -793,6 +793,104 @@ int64_t with_time_now(void) {
     return (int64_t)time(NULL);
 }
 
+// ---- FmtBuffer (f-string formatting via buffer) ----
+
+typedef struct {
+    char *ptr;
+    int64_t len;
+    int64_t cap;
+} WithFmtBuffer;
+
+void *with_fmt_buf_new(void) {
+    WithFmtBuffer *b = (WithFmtBuffer *)calloc(1, sizeof(WithFmtBuffer));
+    if (!b) return NULL;
+    b->cap = 64;
+    b->len = 0;
+    b->ptr = (char *)malloc(64);
+    return b;
+}
+
+static void fmt_buf_grow_p(WithFmtBuffer *b, int64_t needed) {
+    if (b->len + needed <= b->cap) return;
+    int64_t new_cap = b->cap * 2;
+    if (new_cap < b->len + needed) new_cap = b->len + needed;
+    char *new_ptr = (char *)realloc(b->ptr, (size_t)new_cap);
+    if (!new_ptr) return;
+    b->ptr = new_ptr;
+    b->cap = new_cap;
+}
+
+static void fmt_buf_append_p(WithFmtBuffer *b, const char *data, int64_t len) {
+    fmt_buf_grow_p(b, len);
+    memcpy(b->ptr + b->len, data, (size_t)len);
+    b->len += len;
+}
+
+void with_fmt_buf_write_str(void *handle, with_str s) {
+    WithFmtBuffer *b = (WithFmtBuffer *)handle;
+    if (s.ptr && s.len > 0) {
+        fmt_buf_append_p(b, s.ptr, s.len);
+    }
+}
+
+void with_fmt_buf_write_i64(void *handle, int64_t val) {
+    WithFmtBuffer *b = (WithFmtBuffer *)handle;
+    char tmp[24];
+    int len = snprintf(tmp, sizeof(tmp), "%lld", (long long)val);
+    fmt_buf_append_p(b, tmp, len);
+}
+
+void with_fmt_buf_write_f64(void *handle, double val) {
+    WithFmtBuffer *b = (WithFmtBuffer *)handle;
+    char tmp[64];
+    int len = snprintf(tmp, sizeof(tmp), "%g", val);
+    fmt_buf_append_p(b, tmp, len);
+}
+
+void with_fmt_buf_write_bool(void *handle, int32_t val) {
+    WithFmtBuffer *b = (WithFmtBuffer *)handle;
+    if (val) fmt_buf_append_p(b, "true", 4);
+    else fmt_buf_append_p(b, "false", 5);
+}
+
+void with_fmt_buf_write_char(void *handle, uint8_t c) {
+    WithFmtBuffer *b = (WithFmtBuffer *)handle;
+    fmt_buf_grow_p(b, 1);
+    b->ptr[b->len++] = (char)c;
+}
+
+void with_fmt_buf_write_i64_spec(void *handle, int64_t val, int32_t is_unsigned,
+                                  int64_t flags, int32_t width, int32_t precision, int32_t mode) {
+    with_str s = with_fmt_int_spec(val, is_unsigned, flags, width, precision, mode);
+    with_fmt_buf_write_str(handle, s);
+}
+
+void with_fmt_buf_write_f64_spec(void *handle, double val, int64_t flags,
+                                  int32_t width, int32_t precision, int32_t mode) {
+    with_str s = with_fmt_f64_spec(val, flags, width, precision, mode);
+    with_fmt_buf_write_str(handle, s);
+}
+
+void with_fmt_buf_write_str_spec(void *handle, with_str val, int64_t flags,
+                                  int32_t width, int32_t precision) {
+    with_str s = with_fmt_str_spec(val, flags, width, precision);
+    with_fmt_buf_write_str(handle, s);
+}
+
+void with_fmt_buf_write_debug(void *handle, with_str val) {
+    with_str s = with_fmt_str_debug(val);
+    with_fmt_buf_write_str(handle, s);
+}
+
+with_str with_fmt_buf_finish(void *handle) {
+    WithFmtBuffer *b = (WithFmtBuffer *)handle;
+    fmt_buf_grow_p(b, 1);
+    b->ptr[b->len] = '\0';
+    with_str out = { b->ptr, b->len };
+    free(b);  // free the FmtBuffer struct (data lives on in the str)
+    return out;
+}
+
 // ---- Process helpers ----
 
 // Command-line argument count.

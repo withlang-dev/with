@@ -16,15 +16,17 @@
 //   s.split(delim)  → Vec[str] — split by delimiter
 //
 // This module provides additional utility functions.
+// No c_import — uses with_* runtime functions.
 
 use std.collections
-use c_import("string.h")
 extern fn with_lines_out(out: *void, s: str) -> void
 extern fn with_parse_i64(s: str) -> i64
+extern fn with_str_len(s: str) -> i64
+extern fn with_str_eq(a: str, b: str) -> i32
 
 /// String length (same as `s.len()`).
 pub fn string_len(s: str) -> i64:
-    strlen(s as *const i8) as i64
+    with_str_len(s)
 
 /// StrView length helper.
 pub fn view_len(v: &str) -> i64:
@@ -40,11 +42,24 @@ pub fn view_eq(a: &str, b: &str) -> bool:
 
 /// Compare two strings for equality. Returns true if equal.
 pub fn string_eq(a: str, b: str) -> bool:
-    strcmp(a as *const i8, b as *const i8) == 0
+    with_str_eq(a, b) != 0
 
 /// Compare two strings lexicographically. Returns negative, 0, or positive.
 pub fn string_cmp(a: str, b: str) -> i32:
-    strcmp(a as *const i8, b as *const i8)
+    // Byte-by-byte comparison
+    let al = a.len()
+    let bl = b.len()
+    let min_len = if al < bl: al else: bl
+    var i: i64 = 0
+    while i < min_len:
+        let ca = a.byte_at(i)
+        let cb = b.byte_at(i)
+        if ca != cb:
+            return ca - cb
+        i = i + 1
+    if al < bl: return -1
+    if al > bl: return 1
+    0
 
 /// Returns true if the character code is alphabetic (A-Z, a-z).
 pub fn is_alpha(c: i32) -> bool:
