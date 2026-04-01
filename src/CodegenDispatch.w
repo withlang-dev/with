@@ -23,6 +23,7 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
             return
     let body_idx = self.mir_input.find_body(fn_sym)
     if body_idx >= 0:
+        self.mir_current_body_idx = body_idx
         let body = self.mir_input.bodies.get(body_idx as i64)
         if body.lowering_failed == 0 and body.block_count() > 0:
             if self.debug_mir_codegen_enabled():
@@ -4737,6 +4738,9 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     if llvm_intrinsic_result:
         return true
     let call_val = wl_build_call(self.builder, call_ft, actual_callee, vec_data_i64(&args), actual_arg_count)
+    // Mark mutual tail calls so LLVM can optimize them
+    if self.mir_emit_mutual_tail_call != 0 and call_val != 0:
+        wl_set_tail_call(call_val)
     let ret_ty = wl_get_return_type(call_ft)
     if ret_ty != wl_void_type(self.context):
         if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
@@ -4839,7 +4843,16 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
         return true
 
     if tk == TermKind.TK_CALL:
-        return self.mir_emit_call_term(body, d0, d1, d2, d3)
+        // Check if this is a mutual tail call (marked by mutual TCO pass).
+        // The packed key is body_idx * 10000 + bb, stored in mir_input.mutual_tail_calls.
+        let mtc_key = self.mir_current_body_idx * 10000 + bb
+        for mti in 0..self.mir_input.mutual_tail_calls.len() as i32:
+            if self.mir_input.mutual_tail_calls.get(mti as i64) == mtc_key:
+                self.mir_emit_mutual_tail_call = 1
+                break
+        let call_ok = self.mir_emit_call_term(body, d0, d1, d2, d3)
+        self.mir_emit_mutual_tail_call = 0
+        return call_ok
 
     if tk == TermKind.TK_DROP_AND_GOTO:
         if d0 < 0 or d0 >= body.place_locals.len() as i32:

@@ -3123,13 +3123,21 @@ fn Sema.verify_tail_position(self: Sema, node: i32, fn_sym: i32, in_tail: i32):
         return
     let kind = self.ast.kind(node)
 
-    // Recursive call: check it's in tail position
+    // Recursive call or mutual @[tailrec] call: check it's in tail position
     if kind == NodeKind.NK_CALL:
         let callee = self.ast.get_data0(node)
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
             let callee_sym = self.ast.get_data0(callee)
+            // Self-recursive call
             if callee_sym == fn_sym and in_tail == 0:
                 self.emit_error("recursive call is not in tail position (function is @[tailrec])", node)
+            // Mutual call to another @[tailrec] function
+            if callee_sym != fn_sym and in_tail == 0:
+                if self.fn_decl_nodes.contains(callee_sym):
+                    let callee_node = self.fn_decl_nodes.get(callee_sym).unwrap()
+                    let callee_flags = self.ast.get_data2(callee_node)
+                    if (callee_flags / FnFlags.TAILREC) % 2 == 1:
+                        self.emit_error("call to @[tailrec] function is not in tail position", node)
         // Check args are NOT in tail position
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)

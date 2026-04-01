@@ -237,6 +237,8 @@ extern fn wl_build_insert_value(b: i64, agg: i64, val: i64, idx: i32) -> i64
 
 // Builder: call
 extern fn wl_build_call(b: i64, fn_ty: i64, f: i64, args_ptr: i64, cnt: i32) -> i64
+extern fn wl_set_tail_call(call_inst: i64) -> void
+extern fn wl_set_musttail_call(call_inst: i64) -> void
 
 // Misc
 extern fn wl_instruction_erase(v: i64) -> void
@@ -356,6 +358,8 @@ type Codegen {
 
     // Current function state
     current_ret_type: i64,
+    mir_emit_mutual_tail_call: i32,
+    mir_current_body_idx: i32,
     current_function: i64,
     current_function_name_sym: i32,
     current_method_owner_sym: i32,
@@ -737,6 +741,8 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         sema: Sema.init(InternPool.init(), DiagnosticList.init(), AstPool.new()),
         sema_symbol_texts: Vec.new(),
         current_ret_type: 0,
+        mir_emit_mutual_tail_call: 0,
+        mir_current_body_idx: 0,
         current_function: 0,
         current_function_name_sym: 0,
         current_method_owner_sym: 0,

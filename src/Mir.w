@@ -263,6 +263,9 @@ type MirModule {
     bodies: Vec[MirBody],
     body_fn_syms: Vec[i32],
     body_index_by_fn_sym: HashMap[i32, i32],
+    // Mutual tail call markers: packed as (body_idx * 10000 + bb).
+    // Codegen checks this to set LLVM tail call attribute.
+    mutual_tail_calls: Vec[i32],
     // Snapshot of sema type tables at lowering time.
     // MirLower takes sema by value; its Vec reallocs can free
     // the shared buffer that the caller's sema copy points to.
@@ -282,6 +285,7 @@ fn MirModule.init -> MirModule:
         bodies: Vec.new(),
         body_fn_syms: Vec.new(),
         body_index_by_fn_sym: HashMap.new(),
+        mutual_tail_calls: Vec.new(),
         sema_type_kinds: Vec.new(),
         sema_type_d0: Vec.new(),
         sema_type_d1: Vec.new(),
