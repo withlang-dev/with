@@ -3178,6 +3178,10 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
                     let asm_in_val = self.mir_intrinsic_arg(body, args_id, asm_ii)
                     asm_input_vals.push(asm_in_val)
                     asm_param_tys.push(wl_type_of(asm_in_val))
+                // Read-write constraint ("+r"): infer return type from the
+                // input value type when no explicit output type was given.
+                if asm_has_output and asm_out_type_node == 0 and asm_input_vals.len() > 0:
+                    asm_ret_ty = wl_type_of(asm_input_vals.get(0))
             let asm_fn_ty = wl_function_type(asm_ret_ty, vec_data_i64(&asm_param_tys), asm_param_tys.len() as i32, 0)
             let asm_val = wl_get_inline_asm(asm_fn_ty, asm_tmpl, asm_constr, if asm_is_volatile: 1 else: 0, 0)
             let asm_call_result = wl_build_call(self.builder, asm_fn_ty, asm_val, vec_data_i64(&asm_input_vals), asm_input_vals.len() as i32)
