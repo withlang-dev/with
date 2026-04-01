@@ -267,6 +267,36 @@ pub fn rt_access_impl(path: *const u8, mode: i32) -> i32:
 
 // ── Environment ─────────────────────────────────────────────────
 
+// ── System info ─────────────────────────────────────────────────
+
+type RtSysInfo:
+    cpu_cores: i32
+    memory_total: i64
+    page_size: i64
+
+extern fn sysctlbyname(name: *const u8, oldp: *mut u8, oldlenp: *mut i64, newp: *const u8, newlen: i64) -> i32
+
+@[c_export("rt_sysinfo")]
+pub fn rt_sysinfo_impl(out: *mut RtSysInfo) -> i32:
+    // CPU cores: sysctl hw.logicalcpu
+    var cores: i32 = 0
+    var cores_len: i64 = 4
+    let _ = sysctlbyname("hw.logicalcpu" as *const u8, &cores as *mut u8, &mut cores_len, 0 as *const u8, 0)
+    (*out).cpu_cores = if cores > 0: cores else: 1
+
+    // Total memory: sysctl hw.memsize
+    var memsize: i64 = 0
+    var memsize_len: i64 = 8
+    let _ = sysctlbyname("hw.memsize" as *const u8, &memsize as *mut u8, &mut memsize_len, 0 as *const u8, 0)
+    (*out).memory_total = memsize
+
+    // Page size: sysconf(_SC_PAGESIZE)
+    let ps = sysconf(29)  // _SC_PAGESIZE = 29 on darwin
+    (*out).page_size = ps
+    0
+
+// ── Environment ─────────────────────────────────────────────────
+
 @[c_export("rt_getenv")]
 pub fn rt_getenv_impl(name: *const u8) -> *const u8:
     getenv(name)

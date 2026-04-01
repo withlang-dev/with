@@ -22,10 +22,11 @@ extern fn rt_clock_ns() -> i64
 extern fn rt_getenv(name: *const u8) -> *const u8
 extern fn rt_store_args(argc: i32, argv: *const *const u8)
 
-// Sleep + process + signal extras (provided by platform backend)
+// Sleep + process + signal + sysinfo extras (provided by platform backend)
 extern fn rt_nanosleep(ns: i64) -> i32
 extern fn rt_getpid() -> i32
 extern fn rt_raise(sig: i32) -> i32
+extern fn rt_sysinfo(out: *mut u8) -> i32
 
 // Filesystem extras (provided by platform backend)
 extern fn rt_mkdir(path: *const u8, mode: i32) -> i32
@@ -2376,3 +2377,8 @@ pub fn sysinfo_arch() -> str:
 @[c_export("with_sysinfo_hostname")]
 pub fn sysinfo_hostname() -> str:
     make_str("localhost" as *const u8, 9)
+
+// rt_sysinfo wrapper — fills {cpu_cores: i32, memory_total: i64, page_size: i64}
+@[c_export("with_sysinfo")]
+pub fn sysinfo_impl(out: *mut u8) -> i32:
+    rt_sysinfo(out)
