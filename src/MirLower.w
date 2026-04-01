@@ -315,9 +315,9 @@ fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
     if type_arg2_node != 0:
         arg2_type = self.resolve_type_arg_node(type_arg2_node)
     // Look up TypeKind.TY_GENERIC_INST from sema cache (created by Sema.check_index)
-    var cache_key = f"{base_sym}:{arg_type}"
+    var cache_key: i64 = base_sym as i64 * 31 + arg_type as i64
     if arg2_type > 0:
-        cache_key = f"{cache_key}:{arg2_type}"
+        cache_key = cache_key * 31 + arg2_type as i64
     if self.sema.generic_inst_cache.contains(cache_key):
         return self.sema.generic_inst_cache.get(cache_key).unwrap()
     0
@@ -949,8 +949,8 @@ fn MirBuilder.try_resolve_module_const_type(self: MirBuilder, sym: i32) -> i32:
             continue
         if self.ast.get_data0(decl) != sym:
             continue
-        if self.sema.typed_binding_types.contains(decl):
-            return self.sema.typed_binding_types.get(decl).unwrap() as i32
+        if self.sema.typed_binding_types.contains(decl as i32):
+            return self.sema.typed_binding_types.get(decl as i32).unwrap() as i32
         let flags = self.ast.get_data2(decl)
         let type_extra_packed = flags / 4
         if type_extra_packed > 0:
@@ -1288,8 +1288,8 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
         // Match the qualified and shorthand variant lowering paths:
         // payloadless discriminant enums materialize as repr-backed int constants.
         let vl_resolved = self.sema.resolve_alias(vl_decl_ty)
-        let vl_is_disc_enum = self.sema.disc_repr_types.contains(vl_resolved)
-        if vl_is_disc_enum and not self.sema.disc_has_payload.contains(vl_resolved):
+        let vl_is_disc_enum = self.sema.disc_repr_types.contains(vl_resolved as i32)
+        if vl_is_disc_enum and not self.sema.disc_has_payload.contains(vl_resolved as i32):
             let vl_disc_val = if self.sema.disc_values.contains(sym): self.sema.disc_values.get(sym).unwrap() else: vl_variant_idx
             return self.int_const_operand(vl_disc_val as i64, vl_result_ty)
         let vl_fields: Vec[i32] = Vec.new()
@@ -3676,8 +3676,8 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                         let fa_disc_tag = if self.sema.disc_values.contains(fa_qual_sym): self.sema.disc_values.get(fa_qual_sym).unwrap() else: fa_var_idx
                         // Plain enums are always lowered as full aggregate values.
                         // Only payloadless discriminant enums lower to their repr integer.
-                        let fa_is_disc_enum = self.sema.disc_repr_types.contains(fa_resolved)
-                        if not fa_is_disc_enum or self.sema.disc_has_payload.contains(fa_resolved):
+                        let fa_is_disc_enum = self.sema.disc_repr_types.contains(fa_resolved as i32)
+                        if not fa_is_disc_enum or self.sema.disc_has_payload.contains(fa_resolved as i32):
                             let fa_fields: Vec[i32] = Vec.new()
                             let fa_names: Vec[i32] = Vec.new()
                             let fa_fid = self.body.new_agg_fields(fa_fields, fa_names)
@@ -3693,8 +3693,8 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                         if fa_var_tid == fa_resolved:
                             let fa_var_idx2 = self.sema.variant_lookup.get(fa_field).unwrap()
                             let fa_disc_tag2 = if self.sema.disc_values.contains(fa_field): self.sema.disc_values.get(fa_field).unwrap() else: fa_var_idx2
-                            let fa_is_disc_enum2 = self.sema.disc_repr_types.contains(fa_resolved)
-                            if not fa_is_disc_enum2 or self.sema.disc_has_payload.contains(fa_resolved):
+                            let fa_is_disc_enum2 = self.sema.disc_repr_types.contains(fa_resolved as i32)
+                            if not fa_is_disc_enum2 or self.sema.disc_has_payload.contains(fa_resolved as i32):
                                 let fa_fields2: Vec[i32] = Vec.new()
                                 let fa_names2: Vec[i32] = Vec.new()
                                 let fa_fid2 = self.body.new_agg_fields(fa_fields2, fa_names2)
@@ -4052,8 +4052,8 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 let vs_disc_val = self.sema.disc_values.get(vs_name_sym).unwrap()
                 if vs_arg_count == 0:
                     let vs_resolved = self.sema.resolve_alias(vs_result_ty)
-                    let vs_is_disc_enum = self.sema.disc_repr_types.contains(vs_resolved)
-                    if not vs_is_disc_enum or self.sema.disc_has_payload.contains(vs_resolved):
+                    let vs_is_disc_enum = self.sema.disc_repr_types.contains(vs_resolved as i32)
+                    if not vs_is_disc_enum or self.sema.disc_has_payload.contains(vs_resolved as i32):
                         let vs_de_fields: Vec[i32] = Vec.new()
                         let vs_de_names: Vec[i32] = Vec.new()
                         let vs_de_fid = self.body.new_agg_fields(vs_de_fields, vs_de_names)
@@ -4493,12 +4493,12 @@ fn optimize_mutual_tail_calls(mir_mod: &mut MirModule, tailrec_syms: Vec[i32]):
             j = j + 1
         i = i + 1
 
-fn mark_mutual_tail_calls(mir_mod: &mut MirModule, body_idx: i32, target_sym: i32):
-    let body = mir_mod.bodies.get(body_idx as i64)
+fn mark_mutual_tail_calls(bodies: &mut Vec[MirBody], body_idx: i32, target_sym: i32):
+    let body = bodies.get(body_idx as i64)
     let bb_count = body.block_count()
     for bb in 0..bb_count:
         if mir_is_tail_call_to(&body, bb, target_sym):
-            mir_mod.mutual_tail_calls.push(body_idx * 10000 + bb)
+            body.mutual_tail_bbs.push(bb)
 
 fn transform_mutual_pair(mir_mod: &mut MirModule, idx_a: i32, idx_b: i32, fn_a: i32, fn_b: i32):
     // Transform each function into a trampoline that contains both bodies
@@ -4548,5 +4548,5 @@ fn transform_mutual_pair(mir_mod: &mut MirModule, idx_a: i32, idx_b: i32, fn_a: 
     // This delegates the actual optimization to LLVM, which is correct
     // and handles edge cases (register allocation, stack frame cleanup).
     // We just need to mark the calls.
-    mark_mutual_tail_calls(mir_mod, idx_a, fn_b)
-    mark_mutual_tail_calls(mir_mod, idx_b, fn_a)
+    mark_mutual_tail_calls(&mut mir_mod.bodies, idx_a, fn_b)
+    mark_mutual_tail_calls(&mut mir_mod.bodies, idx_b, fn_a)

@@ -826,10 +826,10 @@ fn ComptimeEvaluator.eval_disc_variant_sym(self: ComptimeEvaluator, diags: &mut 
         return self.unsupported(diags, node)
     let enum_tid = self.sema.variant_type_ids.get(sym).unwrap()
     let enum_resolved = self.sema.resolve_alias(enum_tid as TypeId)
-    if not self.sema.disc_repr_types.contains(enum_resolved) or self.sema.disc_has_payload.contains(enum_resolved):
+    if not self.sema.disc_repr_types.contains(enum_resolved as i32) or self.sema.disc_has_payload.contains(enum_resolved as i32):
         return self.unsupported(diags, node)
     let disc = if self.sema.disc_values.contains(sym): self.sema.disc_values.get(sym).unwrap() else: self.sema.variant_lookup.get(sym).unwrap()
-    let repr_ty = self.sema.disc_repr_types.get(enum_resolved).unwrap()
+    let repr_ty = self.sema.disc_repr_types.get(enum_resolved as i32).unwrap()
     comptime_control_value(comptime_value_int(self.node_type_or(node, repr_ty), disc as i64))
 
 fn ComptimeEvaluator.eval_ident(self: ComptimeEvaluator, diags: &mut DiagnosticList, node: i32) -> ComptimeControl:

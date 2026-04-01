@@ -359,7 +359,6 @@ type Codegen {
     // Current function state
     current_ret_type: i64,
     mir_emit_mutual_tail_call: i32,
-    mir_current_body_idx: i32,
     current_function: i64,
     current_function_name_sym: i32,
     current_method_owner_sym: i32,
@@ -742,7 +741,6 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         sema_symbol_texts: Vec.new(),
         current_ret_type: 0,
         mir_emit_mutual_tail_call: 0,
-        mir_current_body_idx: 0,
         current_function: 0,
         current_function_name_sym: 0,
         current_method_owner_sym: 0,
