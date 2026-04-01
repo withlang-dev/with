@@ -3927,6 +3927,35 @@ fn Sema.substitute_method_return_for_generic_inst(self: Sema, gi_tid: i32, type_
         td_tp_count = self.ast.get_extra(epos + 2)
     self.resolve_generic_return_type_node(ret_node, td_tp_start, td_tp_count)
 
+fn Sema.builtin_method_requires_mutable_receiver(self: Sema, type_name_sym: i32, field: i32) -> i32:
+    let _ = self
+    if type_name_sym == self.syms.vec:
+        if field == self.syms.push or field == self.syms.set_i32 or field == self.syms.remove or field == self.syms.clear or field == self.syms.pop:
+            return 1
+    if type_name_sym == self.syms.hashmap:
+        if field == self.syms.insert or field == self.syms.remove or field == self.syms.clear:
+            return 1
+    if type_name_sym == self.syms.hashset:
+        if field == self.syms.insert or field == self.syms.remove or field == self.syms.clear:
+            return 1
+    0
+
+fn Sema.is_shared_ref_like_receiver(self: Sema, recv_ty: i32) -> i32:
+    if recv_ty == 0:
+        return 0
+    let resolved = self.resolve_alias(recv_ty as TypeId)
+    let tk = self.get_type_kind(resolved)
+    if tk != TypeKind.TY_REF and tk != TypeKind.TY_PTR:
+        return 0
+    if self.get_type_d1(resolved) != 0:
+        return 0
+    1
+
+fn Sema.emit_builtin_mutable_receiver_error(self: Sema, type_name_sym: i32, field: i32, node: i32):
+    let owner_name = self.pool_resolve(type_name_sym)
+    let method_name = self.pool_resolve(field)
+    self.emit_error("method '" ++ owner_name ++ "." ++ method_name ++ "' requires a mutable receiver", node)
+
 fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
     let expr = self.ast.get_data0(callee)
     let field = self.ast.get_data1(callee)
@@ -3995,6 +4024,17 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
     if resolved_tk0 == TypeKind.TY_PTR or resolved_tk0 == TypeKind.TY_REF:
         recv_type = self.resolve_alias(self.get_type_d0(recv_type) as TypeId)
     let type_name_sym = self.get_type_name(recv_type)
+    if type_name_sym != 0:
+        if self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0:
+            if self.is_shared_ref_like_receiver(obj_type as i32) != 0:
+                self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
+                return 0
+            if self.ast.kind(expr) == NodeKind.NK_UNARY and self.ast.get_data0(expr) == UnaryOp.UOP_DEREF:
+                let deref_ty = self.resolve_alias(self.check_expr(self.ast.get_data1(expr)) as TypeId)
+                let deref_tk = self.get_type_kind(deref_ty)
+                if (deref_tk == TypeKind.TY_PTR or deref_tk == TypeKind.TY_REF) and self.get_type_d1(deref_ty) == 0:
+                    self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
+                    return 0
 
     // Static enum variant constructor: Shape.Rect(1, 2), Option[i32].Some(1)
     if self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0:
