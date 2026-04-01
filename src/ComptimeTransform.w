@@ -729,6 +729,11 @@ fn ct_clone_tree_with_subst(pool: &mut AstPool, node: i32, subst_sym: i32, subst
         let body = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), source, body, pool.get_data2(node), pool.literal_suffix(node))
 
+    if kind == NodeKind.NK_WITH_IMPLICIT:
+        let wi_source = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let wi_body = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), wi_source, wi_body, pool.get_data2(node), pool.literal_suffix(node))
+
     if kind == NodeKind.NK_LET_ELSE:
         let value = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
         let else_body = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
@@ -1039,6 +1044,11 @@ fn ct_transform_expr(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, i
         return node
 
     if kind == NodeKind.NK_WITH_EXPR:
+        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data0(node)))
+        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data1(node)))
+        return node
+
+    if kind == NodeKind.NK_WITH_IMPLICIT:
         pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data0(node)))
         pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data1(node)))
         return node

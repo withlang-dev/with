@@ -2,8 +2,6 @@
 //! expect-stdout: first: 1
 //! expect-stdout: 1 to 3
 //! expect-stdout: ok
-extern fn print(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
 fn main:
     let arr = [1, 2, 3]

@@ -2277,6 +2277,42 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> NodeId:
             lhs = self.pool.add_node(NodeKind.NK_RANGE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 1)
         else:
             lhs = self.pool.add_node(NodeKind.NK_BINARY, self.pool.get_start(lhs), self.prev_end(), op_code, lhs, rhs)
+            // Chained comparisons: a < b < c → (a < b) and (b < c)
+            if op_code >= BinaryOp.OP_LT and op_code <= BinaryOp.OP_GTE:
+                var last_cmp = lhs  // track the latest comparison node
+                var chain_info = self.infix_op()
+                while chain_info != 0:
+                    let chain_prec = chain_info / 1000
+                    let chain_op = chain_info % 1000
+                    if chain_op < BinaryOp.OP_LT or chain_op > BinaryOp.OP_GTE:
+                        break
+                    if chain_prec < min_prec:
+                        break
+                    // Extract shared operand (RHS of last comparison)
+                    let shared = self.pool.get_data2(last_cmp)
+                    // If shared is non-trivial, introduce a temporary
+                    let shared_kind = self.pool.kind(shared)
+                    var shared_ref: NodeId = shared as NodeId
+                    var let_node: NodeId = 0 as NodeId
+                    if shared_kind != NodeKind.NK_IDENT and shared_kind != NodeKind.NK_INT_LIT and shared_kind != NodeKind.NK_FLOAT_LIT and shared_kind != NodeKind.NK_BOOL_LIT:
+                        let tmp_name = f"__chain_{self.pos}"
+                        let tmp_sym = self.intern.intern(tmp_name)
+                        let_node = self.pool.add_node(NodeKind.NK_LET_BINDING, self.pool.get_start(shared), self.pool.get_end(shared), tmp_sym, shared, 0)
+                        shared_ref = self.pool.add_node(NodeKind.NK_IDENT, self.pool.get_start(shared), self.pool.get_end(shared), tmp_sym, 0, 0)
+                        // Update previous comparison RHS to use the tmp
+                        self.pool.set_data2(last_cmp, shared_ref)
+                    self.advance()
+                    self.skip_newlines()
+                    let chain_rhs = self.parse_precedence(chain_prec + 1)
+                    let new_cmp = self.pool.add_node(NodeKind.NK_BINARY, self.pool.get_start(shared_ref), self.prev_end(), chain_op, shared_ref, chain_rhs)
+                    lhs = self.pool.add_node(NodeKind.NK_BINARY, self.pool.get_start(lhs), self.prev_end(), BinaryOp.OP_AND, lhs, new_cmp)
+                    last_cmp = new_cmp
+                    // Wrap in block with let binding if we introduced a temp
+                    if let_node != 0:
+                        let blk_extra = self.pool.extra_len()
+                        self.pool.add_extra(let_node)
+                        lhs = self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(lhs), self.prev_end(), blk_extra, 1, lhs)
+                    chain_info = self.infix_op()
 
     lhs
 
@@ -2318,6 +2354,11 @@ fn Parser.infix_op(self: Parser) -> i32:
     if t == TokenKind.TK_PERCENT: return 12 * 1000 + BinaryOp.OP_MOD
     if t == TokenKind.TK_STAR_WRAP: return 12 * 1000 + BinaryOp.OP_MUL_WRAP
     if t == TokenKind.TK_STAR_SAT: return 12 * 1000 + BinaryOp.OP_MUL_SAT
+    // @ operator for matmul — distinguish from @[annotation] by checking next token
+    if t == TokenKind.TK_AT:
+        if self.pos + 1 < self.tokens.len():
+            if self.tokens.get_tag(self.pos + 1) != TokenKind.TK_L_BRACKET:
+                return 12 * 1000 + BinaryOp.OP_MATMUL
     0
 
 // ── Primary expression ──────────────────────────────────────────
@@ -2969,17 +3010,28 @@ fn Parser.parse_call(self: Parser, callee: i32) -> NodeId:
     self.advance()  // consume (
     self.skip_newlines()
     var args: Vec[i32] = Vec.new()
+    var arg_names: Vec[i32] = Vec.new()  // 0 = positional, sym = named
+    var has_named = 0
+    var seen_named = 0
     if self.peek() != TokenKind.TK_R_PAREN:
         while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
-            // Named argument: name: value → skip the name label
+            // Named argument: name: value
+            var arg_name_sym = 0
             if self.peek() == TokenKind.TK_IDENT:
                 let save = self.pos
+                let name_sym = self.intern_current()
                 self.advance()
                 if self.peek() == TokenKind.TK_COLON:
                     self.advance()
                     self.skip_newlines()
+                    arg_name_sym = name_sym
+                    has_named = 1
+                    seen_named = 1
                 else:
                     self.pos = save
+            if arg_name_sym == 0 and seen_named == 1:
+                self.emit_error("positional argument cannot follow named argument")
+            arg_names.push(arg_name_sym)
             let outer_it = self.saw_implicit_it
             let outer_depth = self.implicit_it_depth
             self.saw_implicit_it = 0
@@ -3023,6 +3075,13 @@ fn Parser.parse_call(self: Parser, callee: i32) -> NodeId:
                 continue
         self.pool.add_extra(arg as i32)
     let call_node = self.pool.add_node(NodeKind.NK_CALL, self.pool.get_start(callee), self.prev_end(), callee, extra_start, arg_count)
+
+    // Store named argument info if any
+    if has_named != 0:
+        let names_start = self.pool.extra_len()
+        for ni in 0..arg_count:
+            self.pool.add_extra(arg_names.get(ni as i64))
+        self.pool.set_call_named_args(call_node, names_start)
 
     if placeholder_count == 0:
         return call_node
@@ -3141,8 +3200,15 @@ fn Parser.parse_struct_literal(self: Parser, lhs: i32) -> NodeId:
 fn Parser.parse_index_or_slice(self: Parser, lhs: i32) -> NodeId:
     self.advance()  // consume [
     self.skip_newlines()
+
+    // Multi-index detection: if first token is ':' or '...', it's multi-index
+    if self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_DOT_DOT_DOT:
+        return self.parse_multi_index(lhs)
+
     let index = self.parse_index_expr()
     self.skip_newlines()
+
+    // Slice: a[start..end]
     if self.peek() == TokenKind.TK_DOT_DOT:
         self.advance()
         self.skip_newlines()
@@ -3152,15 +3218,151 @@ fn Parser.parse_index_or_slice(self: Parser, lhs: i32) -> NodeId:
             self.skip_newlines()
         self.expect(TokenKind.TK_R_BRACKET)
         return self.pool.add_node(NodeKind.NK_SLICE, self.pool.get_start(lhs), self.prev_end(), lhs, index, end_expr)
-    // Support two-arg subscript for HashMap[K, V].new() syntax
-    var second: NodeId = 0 as NodeId
+
+    // After first expr: if followed by ':' (slice notation) then multi-index
+    if self.peek() == TokenKind.TK_COLON:
+        return self.parse_multi_index_with_first(lhs, index, 1)
+
+    // Comma-separated: check if multi-index or two-arg subscript
     if self.peek() == TokenKind.TK_COMMA:
+        let save = self.pos
         self.advance()
         self.skip_newlines()
-        second = self.parse_index_expr()
+        // If next is ':' or '...', definitely multi-index
+        if self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_DOT_DOT_DOT:
+            self.pos = save
+            return self.parse_multi_index_with_first(lhs, index, 0)
+        // Parse second element and check for another comma or colon
+        let second = self.parse_index_expr()
+        self.skip_newlines()
+        if self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_COMMA:
+            // 3+ dimensions or second has slice → multi-index
+            self.pos = save
+            return self.parse_multi_index_with_first(lhs, index, 0)
+        // Just two elements — existing HashMap[K,V] / two-arg subscript
+        self.expect(TokenKind.TK_R_BRACKET)
+        return self.pool.add_node(NodeKind.NK_INDEX, self.pool.get_start(lhs), self.prev_end(), lhs, index, second)
+
+    self.expect(TokenKind.TK_R_BRACKET)
+    self.pool.add_node(NodeKind.NK_INDEX, self.pool.get_start(lhs), self.prev_end(), lhs, index, 0 as NodeId)
+
+fn Parser.parse_single_index_spec(self: Parser) -> NodeId:
+    let start = self.current_start()
+    // Ellipsis: ...
+    if self.peek() == TokenKind.TK_DOT_DOT_DOT:
+        self.advance()
+        return self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), 0, 0, INDEX_ELLIPSIS * INDEX_KIND_SHIFT)
+    // newaxis check
+    if self.peek() == TokenKind.TK_IDENT:
+        let sym = self.intern_current()
+        if self.intern.resolve(sym) == "newaxis":
+            self.advance()
+            return self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), 0, 0, INDEX_NEWAXIS * INDEX_KIND_SHIFT)
+    // Starts with ':' → slice with absent start
+    if self.peek() == TokenKind.TK_COLON:
+        self.advance()
+        self.skip_newlines()
+        // '::step'
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+            self.skip_newlines()
+            let step = self.parse_index_expr()
+            return self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), 0, 0, step as i32 + INDEX_SLICE * INDEX_KIND_SHIFT)
+        // ':' alone or ':stop' or ':stop:step'
+        if self.peek() == TokenKind.TK_COMMA or self.peek() == TokenKind.TK_R_BRACKET:
+            return self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), 0, 0, INDEX_SLICE * INDEX_KIND_SHIFT)
+        let stop = self.parse_index_expr()
+        self.skip_newlines()
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+            self.skip_newlines()
+            let step = self.parse_index_expr()
+            return self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), 0, stop, step as i32 + INDEX_SLICE * INDEX_KIND_SHIFT)
+        return self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), 0, stop, INDEX_SLICE * INDEX_KIND_SHIFT)
+    // Starts with expr → scalar or slice with start
+    let expr = self.parse_index_expr()
+    self.skip_newlines()
+    if self.peek() != TokenKind.TK_COLON:
+        return self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), expr, 0, INDEX_SCALAR * INDEX_KIND_SHIFT)
+    // expr: → slice with start
+    self.advance()
+    self.skip_newlines()
+    if self.peek() == TokenKind.TK_COLON:
+        self.advance()
+        self.skip_newlines()
+        let step = self.parse_index_expr()
+        return self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), expr, 0, step as i32 + INDEX_SLICE * INDEX_KIND_SHIFT)
+    if self.peek() == TokenKind.TK_COMMA or self.peek() == TokenKind.TK_R_BRACKET:
+        return self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), expr, 0, INDEX_SLICE * INDEX_KIND_SHIFT)
+    let stop = self.parse_index_expr()
+    self.skip_newlines()
+    if self.peek() == TokenKind.TK_COLON:
+        self.advance()
+        self.skip_newlines()
+        let step = self.parse_index_expr()
+        return self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), expr, stop, step as i32 + INDEX_SLICE * INDEX_KIND_SHIFT)
+    self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), expr, stop, INDEX_SLICE * INDEX_KIND_SHIFT)
+
+fn Parser.parse_multi_index(self: Parser, base: i32) -> NodeId:
+    let specs: Vec[i32] = Vec.new()
+    while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
+        specs.push(self.parse_single_index_spec() as i32)
+        self.skip_newlines()
+        if self.peek() == TokenKind.TK_COMMA:
+            self.advance()
+            self.skip_newlines()
+        else:
+            break
+    self.expect(TokenKind.TK_R_BRACKET)
+    let extra_start = self.pool.extra_len()
+    let count = specs.len() as i32
+    for i in 0..count:
+        self.pool.add_extra(specs.get(i as i64))
+    self.pool.add_node(NodeKind.NK_MULTI_INDEX, self.pool.get_start(base), self.prev_end(), base, extra_start, count)
+
+fn Parser.parse_multi_index_with_first(self: Parser, base: i32, first_expr: NodeId, has_colon: i32) -> NodeId:
+    // First spec already partially parsed: we have first_expr, possibly followed by ':'
+    let start = self.pool.get_start(first_expr)
+    let specs: Vec[i32] = Vec.new()
+    if has_colon != 0:
+        // first_expr: ... → slice starting at first_expr
+        self.advance()  // consume ':'
+        self.skip_newlines()
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+            self.skip_newlines()
+            let step = self.parse_index_expr()
+            specs.push(self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), first_expr, 0, step as i32 + INDEX_SLICE * INDEX_KIND_SHIFT) as i32)
+        else if self.peek() == TokenKind.TK_COMMA or self.peek() == TokenKind.TK_R_BRACKET:
+            specs.push(self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), first_expr, 0, INDEX_SLICE * INDEX_KIND_SHIFT) as i32)
+        else:
+            let stop = self.parse_index_expr()
+            self.skip_newlines()
+            if self.peek() == TokenKind.TK_COLON:
+                self.advance()
+                self.skip_newlines()
+                let step = self.parse_index_expr()
+                specs.push(self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), first_expr, stop, step as i32 + INDEX_SLICE * INDEX_KIND_SHIFT) as i32)
+            else:
+                specs.push(self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), first_expr, stop, INDEX_SLICE * INDEX_KIND_SHIFT) as i32)
+    else:
+        // No colon: first_expr is a scalar index spec
+        specs.push(self.pool.add_node(NodeKind.NK_INDEX_SPEC, start, self.prev_end(), first_expr, 0, INDEX_SCALAR * INDEX_KIND_SHIFT) as i32)
+    // Continue parsing remaining specs after comma
+    self.skip_newlines()
+    while self.peek() == TokenKind.TK_COMMA:
+        self.advance()
+        self.skip_newlines()
+        if self.peek() == TokenKind.TK_R_BRACKET:
+            break
+        specs.push(self.parse_single_index_spec() as i32)
         self.skip_newlines()
     self.expect(TokenKind.TK_R_BRACKET)
-    self.pool.add_node(NodeKind.NK_INDEX, self.pool.get_start(lhs), self.prev_end(), lhs, index, second)
+    let extra_start = self.pool.extra_len()
+    let count = specs.len() as i32
+    for i in 0..count:
+        self.pool.add_extra(specs.get(i as i64))
+    self.pool.add_node(NodeKind.NK_MULTI_INDEX, self.pool.get_start(base), self.prev_end(), base, extra_start, count)
 
 fn Parser.parse_index_expr(self: Parser) -> NodeId:
     self.parse_precedence(6)
@@ -3753,6 +3955,11 @@ fn Parser.parse_for(self: Parser, label: i32) -> NodeId:
         return self.poisoned_expr()
     self.skip_newlines()
     let iterable = self.parse_expr()
+
+    // For-comprehension: if followed by ';', parse as monadic chaining
+    if self.peek() == TokenKind.TK_SEMICOLON:
+        return self.parse_for_comprehension(start, binding, iterable)
+
     if self.peek() == TokenKind.TK_COLON:
         self.advance()
     let body = self.parse_block_or_expr()
@@ -3799,6 +4006,99 @@ fn Parser.parse_for(self: Parser, label: i32) -> NodeId:
         self.pos = save_pos
 
     for_node
+
+// For-comprehension: for x in a; y in b(x): yield f(x, y)
+// Desugars to nested match on Option (Some/None).
+fn Parser.parse_for_comprehension(self: Parser, start: i32, first_binding: i32, first_expr: NodeId) -> NodeId:
+    // Collect all bindings: Vec of (binding_sym, source_expr)
+    let bind_syms: Vec[i32] = Vec.new()
+    let bind_exprs: Vec[i32] = Vec.new()
+    // 0 = binding, 1 = guard
+    let bind_kinds: Vec[i32] = Vec.new()
+    bind_syms.push(first_binding)
+    bind_exprs.push(first_expr as i32)
+    bind_kinds.push(0)
+
+    while self.peek() == TokenKind.TK_SEMICOLON:
+        self.advance()
+        self.skip_newlines()
+        // Guard: if expr
+        if self.peek() == TokenKind.TK_KW_IF:
+            self.advance()
+            self.skip_newlines()
+            let guard_expr = self.parse_expr()
+            bind_syms.push(0)
+            bind_exprs.push(guard_expr as i32)
+            bind_kinds.push(1)
+            continue
+        // Binding: ident in expr
+        let bsym = self.expect_ident()
+        if self.expect(TokenKind.TK_KW_IN) == 0:
+            return self.poisoned_expr()
+        self.skip_newlines()
+        let bexpr = self.parse_expr()
+        bind_syms.push(bsym)
+        bind_exprs.push(bexpr as i32)
+        bind_kinds.push(0)
+
+    if self.peek() == TokenKind.TK_COLON:
+        self.advance()
+    self.skip_newlines()
+
+    // Check for yield keyword
+    var has_yield = 0
+    if self.peek() == TokenKind.TK_KW_YIELD:
+        has_yield = 1
+        self.advance()
+        self.skip_newlines()
+
+    let body_expr = self.parse_block_or_expr()
+
+    // Build nested match from inside out
+    let some_sym = self.intern.intern("Some")
+    let none_sym = self.intern.intern("None")
+
+    // Innermost: wrap body in Some(body) if yield
+    var inner: NodeId = body_expr
+    if has_yield != 0:
+        // Some(body_expr) — construct as a call to Some
+        let some_callee = self.pool.add_node(NodeKind.NK_IDENT, start, start, some_sym, 0, 0)
+        let some_extra = self.pool.extra_len()
+        self.pool.add_extra(body_expr)
+        inner = self.pool.add_node(NodeKind.NK_CALL, start, self.prev_end(), some_callee, some_extra, 1)
+
+    // Build nested matches from last binding to first
+    var bi = bind_syms.len() as i32 - 1
+    while bi >= 0:
+        let bkind = bind_kinds.get(bi as i64)
+        if bkind == 1:
+            // Guard: if guard_expr: inner else: None
+            let guard_expr = bind_exprs.get(bi as i64)
+            let none_node = self.pool.add_node(NodeKind.NK_VARIANT_SHORTHAND, start, start, none_sym, 0, 0)
+            inner = self.pool.add_node(NodeKind.NK_IF_EXPR, start, self.prev_end(), guard_expr, inner, none_node)
+        else:
+            // Binding: match source: Some(sym) => inner, None => None
+            let source = bind_exprs.get(bi as i64)
+            let bsym = bind_syms.get(bi as i64)
+            // Build Some(bsym) pattern — use NK_PAT_IDENT for correct binding
+            let bind_pat = self.pool.add_node(NodeKind.NK_PAT_IDENT, start, start, bsym, 0, 0)
+            let pat_extra = self.pool.extra_len()
+            self.pool.add_extra(bind_pat)
+            let some_pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, start, some_sym, pat_extra, 1)
+            // Build Some arm: Some(bsym) => inner
+            let some_arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, start, self.prev_end(), some_pat, inner, 0)
+            // Build None pattern
+            let none_pat = self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, start, start, none_sym, 0, 0)
+            // Build None arm: None => None
+            let none_body = self.pool.add_node(NodeKind.NK_VARIANT_SHORTHAND, start, start, none_sym, 0, 0)
+            let none_arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, start, self.prev_end(), none_pat, none_body, 0)
+            // Build match
+            let arms_extra = self.pool.extra_len()
+            self.pool.add_extra(some_arm)
+            self.pool.add_extra(none_arm)
+            inner = self.pool.add_node(NodeKind.NK_MATCH, start, self.prev_end(), source, arms_extra, 2)
+        bi = bi - 1
+    inner
 
 fn Parser.parse_labeled_loop(self: Parser) -> NodeId:
     let start = self.current_start()
@@ -4426,6 +4726,23 @@ fn Parser.parse_with_expr(self: Parser) -> NodeId:
     let start = self.current_start()
     self.advance()
     self.skip_newlines()
+    // New syntax: with name(expr): body → NK_WITH_IMPLICIT
+    if self.peek() == TokenKind.TK_IDENT:
+        let save = self.pos
+        let binding_name = self.intern_current()
+        self.advance()
+        if self.peek() == TokenKind.TK_L_PAREN:
+            self.advance()
+            self.skip_newlines()
+            let source = self.parse_expr()
+            self.skip_newlines()
+            self.expect(TokenKind.TK_R_PAREN)
+            if self.peek() == TokenKind.TK_COLON:
+                self.advance()
+            let body = self.parse_block_or_expr()
+            return self.pool.add_node(NodeKind.NK_WITH_IMPLICIT, start, self.prev_end(), source, body, binding_name)
+        self.pos = save
+    // Existing syntax: with expr as name: body
     self.suppress_as = 1
     let source = self.parse_expr()
     self.suppress_as = 0
@@ -5002,9 +5319,17 @@ fn Parser.parse_param_list(self: Parser) -> i32:
             break
 
         var type_node: NodeId = 0 as NodeId
+        var extra_flags = 0
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
             self.skip_newlines()
+            // Check for 'implicit' keyword before type
+            if self.peek() == TokenKind.TK_IDENT:
+                let maybe_implicit = self.intern_current()
+                if self.intern.resolve(maybe_implicit) == "implicit":
+                    extra_flags = FN_PARAM_FLAG_IMPLICIT
+                    self.advance()
+                    self.skip_newlines()
             type_node = self.parse_type_expr()
 
         // Default value
@@ -5018,7 +5343,7 @@ fn Parser.parse_param_list(self: Parser) -> i32:
 
         params.push(name)
         params.push(type_node as i32)
-        params.push(param_flags)
+        params.push(param_flags + extra_flags)
         default_nodes.push(default_node)
         self.pool.add_fn_param_pattern_value(param_pattern)
         pattern_count = pattern_count + 1

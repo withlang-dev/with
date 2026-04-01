@@ -1,5 +1,4 @@
 //! expect-error: impl missing required associated type 'Item'
-extern fn print(s: str) -> void
 
 trait Container =
     type Item

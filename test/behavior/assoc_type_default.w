@@ -1,5 +1,4 @@
 //! expect-stdout: ok
-extern fn print(s: str) -> void
 
 trait Transform =
     type Output = i32

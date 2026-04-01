@@ -1339,6 +1339,17 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
                     let sig = self.sema.get_sig(method_sym)
                     if sig >= 0:
                         return self.lower_method_bin_op(lhs_expr, rhs_expr, method_sym, node)
+    // Reversed-operand dispatch: try RHS type
+    if rhs_ty != 0:
+        if rhs_tk == TypeKind.TY_STRUCT:
+            let rhs_method_name = mir_op_method_name(op)
+            if rhs_method_name.len() > 0:
+                let rhs_type_name_sym = self.sema.get_type_d0(rhs_resolved)
+                if rhs_type_name_sym != 0:
+                    let rhs_method_sym = self.sema.pool_lookup_symbol(self.sema.pool_resolve(rhs_type_name_sym) ++ "." ++ rhs_method_name)
+                    let rhs_sig = self.sema.get_sig(rhs_method_sym)
+                    if rhs_sig >= 0:
+                        return self.lower_method_bin_op(lhs_expr, rhs_expr, rhs_method_sym, node)
     let saved_expected = self.expected_type
     if self.is_bare_none(lhs_expr) and (rhs_tk == TypeKind.TY_PTR or rhs_tk == TypeKind.TY_REF):
         self.expected_type = rhs_ty
@@ -1406,6 +1417,7 @@ fn mir_op_method_name(op: i32) -> str:
     if op == 8: return "gt"     // BinaryOp.OP_GT
     if op == 9: return "le"     // BinaryOp.OP_LTE
     if op == 10: return "ge"    // BinaryOp.OP_GTE
+    if op == 28: return "matmul" // BinaryOp.OP_MATMUL
     ""
 
 fn MirBuilder.lower_method_bin_op(self: MirBuilder, lhs_expr: i32, rhs_expr: i32, method_sym: i32, node: i32) -> i32:
@@ -1574,6 +1586,11 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
             self.assign_operand_to_place(p, op, self.ast.get_start(node))
             return p
         return self.lower_index(self.ast.get_data0(node), self.ast.get_data1(node))
+
+    if kind == NodeKind.NK_MULTI_INDEX:
+        // Multi-dimensional indexing: fall back to AST codegen for now
+        self.mark_unsupported()
+        return self.place_for_local(0)
 
     if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_DEREF:
         return self.lower_deref(self.ast.get_data1(node))
@@ -1918,29 +1935,7 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
     let next_payload = self.body.new_operand(OperandKind.OK_COPY, next_place)
     self.assign_operand_to_place(item_place, next_payload, self.ast.get_start(iter_expr))
 
-    if pat_or_sym > 0 and pat_or_sym < self.ast.node_count():
-        let pk = self.ast.kind(pat_or_sym)
-        if pk >= NodeKind.NK_PAT_WILDCARD and pk <= NodeKind.NK_PAT_SLICE:
-            let _ = self.lower_pattern(pat_or_sym, item_place)
-        else:
-            let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
-            self.bind_local(pat_or_sym, bind_local)
-            self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(body_expr))
-            if self.sema.is_copy(elem_ty) == 0:
-                self.schedule_drop(bind_local, DropKind.DK_VALUE)
-            let bind_place = self.place_for_local(bind_local)
-            let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
-            self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(body_expr))
-    else:
-        if pat_or_sym != 0:
-            let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
-            self.bind_local(pat_or_sym, bind_local)
-            self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(body_expr))
-            if self.sema.is_copy(elem_ty) == 0:
-                self.schedule_drop(bind_local, DropKind.DK_VALUE)
-            let bind_place = self.place_for_local(bind_local)
-            let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
-            self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(body_expr))
+    self.bind_for_element(pat_or_sym, item_place, elem_ty, body_expr)
 
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
@@ -1948,6 +1943,23 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
     self.pop_loop()
     self.switch_to(exit_bb)
     self.unit_operand()
+
+fn MirBuilder.bind_for_element(self: MirBuilder, pat_or_sym: i32, item_place: i32, elem_ty: i32, body_expr: i32):
+    // Bind loop variable: supports both simple identifiers and pattern destructuring
+    if pat_or_sym > 0 and pat_or_sym < self.ast.node_count():
+        let pk = self.ast.kind(pat_or_sym)
+        if pk >= NodeKind.NK_PAT_WILDCARD and pk <= NodeKind.NK_PAT_SLICE:
+            let _ = self.lower_pattern(pat_or_sym, item_place)
+            return
+    if pat_or_sym != 0:
+        let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
+        self.bind_local(pat_or_sym, bind_local)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(body_expr))
+        if self.sema.is_copy(elem_ty) == 0:
+            self.schedule_drop(bind_local, DropKind.DK_VALUE)
+        let bind_place = self.place_for_local(bind_local)
+        let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
+        self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(body_expr))
 
 fn MirBuilder.lower_for_range(self: MirBuilder, pat_or_sym: i32, range_node: i32, body_expr: i32) -> i32:
     // for i in start..end  →  counter = start; while counter < end: body; counter += 1
@@ -1999,13 +2011,7 @@ fn MirBuilder.lower_for_range(self: MirBuilder, pat_or_sym: i32, range_node: i32
 
     // Body: bind loop variable = counter, execute body
     self.switch_to(body_bb)
-    if pat_or_sym != 0:
-        let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
-        self.bind_local(pat_or_sym, bind_local)
-        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(body_expr))
-        let bind_place = self.place_for_local(bind_local)
-        let cur_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
-        self.assign_operand_to_place(bind_place, cur_op, self.ast.get_start(body_expr))
+    self.bind_for_element(pat_or_sym, counter_place, elem_ty, body_expr)
 
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
@@ -2073,12 +2079,11 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, pat_or_sym: i32, iter_expr: i32,
     let idx_place = self.body.new_index_place(slice_place, counter_local, 0)
     let elem_op = self.body.new_operand(OperandKind.OK_COPY, idx_place)
 
-    if pat_or_sym != 0:
-        let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
-        self.bind_local(pat_or_sym, bind_local)
-        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(body_expr))
-        let bind_place = self.place_for_local(bind_local)
-        self.assign_operand_to_place(bind_place, elem_op, self.ast.get_start(body_expr))
+    // Materialize element into a temp so pattern destructuring has a place to read from
+    let elem_local = self.new_temp(elem_ty)
+    let elem_place = self.place_for_local(elem_local)
+    self.assign_operand_to_place(elem_place, elem_op, self.ast.get_start(body_expr))
+    self.bind_for_element(pat_or_sym, elem_place, elem_ty, body_expr)
 
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
@@ -2160,13 +2165,7 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, b
     self.switch_to(get_after_bb)
 
     // Bind loop variable
-    if pat_or_sym != 0:
-        let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
-        self.bind_local(pat_or_sym, bind_local)
-        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(body_expr))
-        let bind_place = self.place_for_local(bind_local)
-        let elem_op = self.body.new_operand(OperandKind.OK_COPY, elem_place)
-        self.assign_operand_to_place(bind_place, elem_op, self.ast.get_start(body_expr))
+    self.bind_for_element(pat_or_sym, elem_place, elem_ty, body_expr)
 
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
@@ -2709,23 +2708,33 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
     let sig_idx = self.call_sig_for_expr(fn_expr)
 
     let args: Vec[i32] = Vec.new()
-    for i in 0..arg_exprs_count:
-        let arg_node = self.ast.get_extra(arg_exprs_start + i)
-        args.push(self.lower_call_arg(arg_node, sig_idx, i))
+    // Use sema-resolved arg order for named-arg calls
+    if self.sema.has_resolved_call_args(node) != 0:
+        let resolved_count = self.sema.get_resolved_call_arg_count(node)
+        for i in 0..resolved_count:
+            let arg_node = self.sema.get_resolved_call_arg(node, i)
+            if arg_node != 0:
+                args.push(self.lower_call_arg(arg_node, sig_idx, i))
+            else:
+                args.push(self.unit_operand())
+    else:
+        for i in 0..arg_exprs_count:
+            let arg_node = self.ast.get_extra(arg_exprs_start + i)
+            args.push(self.lower_call_arg(arg_node, sig_idx, i))
 
-    // Fill in default parameter values for missing arguments
-    if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT:
-        let callee_sym = self.ast.get_data0(fn_expr)
-        if self.sema.fn_decl_nodes.contains(callee_sym):
-            let fn_node = self.sema.fn_decl_nodes.get(callee_sym).unwrap()
-            let meta = self.ast.find_fn_meta(fn_node)
-            if meta >= 0:
-                let param_start = self.ast.fn_meta_param_start(meta)
-                let param_count = self.ast.fn_meta_param_count(meta)
-                for di in arg_exprs_count..param_count:
-                    let def_node = self.ast.get_fn_param_default(param_start, di)
-                    if def_node != 0:
-                        args.push(self.lower_call_arg(def_node, sig_idx, di))
+        // Fill in default parameter values for missing arguments
+        if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT:
+            let callee_sym = self.ast.get_data0(fn_expr)
+            if self.sema.fn_decl_nodes.contains(callee_sym):
+                let fn_node = self.sema.fn_decl_nodes.get(callee_sym).unwrap()
+                let meta = self.ast.find_fn_meta(fn_node)
+                if meta >= 0:
+                    let param_start = self.ast.fn_meta_param_start(meta)
+                    let param_count = self.ast.fn_meta_param_count(meta)
+                    for di in arg_exprs_count..param_count:
+                        let def_node = self.ast.get_fn_param_default(param_start, di)
+                        if def_node != 0:
+                            args.push(self.lower_call_arg(def_node, sig_idx, di))
 
     let args_id = self.body.new_call_args(args)
     let result_local = self.new_temp(ret_type_id)
@@ -3817,6 +3826,12 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         if name != 0:
             return self.lower_with_binding(name, source, body, self.ast.get_start(node))
         return self.lower_with_form1(source, body)
+
+    if kind == NodeKind.NK_WITH_IMPLICIT:
+        let wi_source = self.ast.get_data0(node)
+        let wi_body = self.ast.get_data1(node)
+        let wi_name = self.ast.get_data2(node)
+        return self.lower_with_binding(wi_name, wi_source, wi_body, self.ast.get_start(node))
 
     if kind == NodeKind.NK_STRUCT_LIT:
         let sl_fields_start = self.ast.get_data1(node)

@@ -1,6 +1,4 @@
 //! expect-stdout: 012124
-extern fn print(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
 enum NotFlags: i32 { A | B | C }
 

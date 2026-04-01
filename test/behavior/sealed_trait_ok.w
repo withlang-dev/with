@@ -1,5 +1,4 @@
 //! expect-stdout: ok
-extern fn print(s: str) -> void
 
 @[sealed]
 trait Shape =

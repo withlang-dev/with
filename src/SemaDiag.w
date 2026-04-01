@@ -162,6 +162,7 @@ fn typed_expr_kind_name(kind: i32) -> str:
     if kind == NodeKind.NK_DEFER: return "defer_expr"
     if kind == NodeKind.NK_ERRDEFER: return "errdefer_expr"
     if kind == NodeKind.NK_WITH_EXPR: return "with_expr"
+    if kind == NodeKind.NK_WITH_IMPLICIT: return "with_implicit"
     if kind == NodeKind.NK_RECORD_UPDATE: return "record_update"
     if kind == NodeKind.NK_YIELD: return "yield_expr"
     if kind == NodeKind.NK_COMPTIME: return "comptime_expr"
@@ -758,6 +759,11 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return out
 
+    if kind == NodeKind.NK_WITH_IMPLICIT:
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
     if kind == NodeKind.NK_RECORD_UPDATE:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
@@ -1005,6 +1011,11 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
         return
 
     if kind == NodeKind.NK_WITH_EXPR:
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NodeKind.NK_WITH_IMPLICIT:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return

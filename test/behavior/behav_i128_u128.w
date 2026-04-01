@@ -1,5 +1,4 @@
 //! expect-stdout: ok
-extern fn print(s: str) -> void
 
 fn main() -> i32:
     let x: i128 = 1

@@ -2,7 +2,6 @@
 
 // Tests: locale-independent formatting (decimal point stays '.')
 
-extern fn int_to_string(n: i32) -> str
 
 fn test_int_format_locale:
     // Integer formatting must produce consistent decimal output

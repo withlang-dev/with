@@ -1,5 +1,4 @@
 //! expect-stdout: errdefer-2errdefer-1defer-2defer-1done
-extern fn print(s: str) -> void
 
 enum MyResult { Ok(i32) | Err(str) }
 

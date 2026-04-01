@@ -4,6 +4,10 @@
 // them with intrinsic semantics later, but name resolution should happen
 // through imports, not through hardcoded undefined-name allowlists.
 
+// Opaque C void type for pointer interop (void * → *mut c_void).
+// Provided here so c_import users don't depend on symbol scoping.
+pub type c_void = opaque
+
 extern fn with_println_str(s: str) -> void
 extern fn with_println_i32(n: i32) -> void
 extern fn with_println_i64(n: i64) -> void
@@ -14,6 +18,8 @@ extern fn with_write(s: str) -> void
 extern fn with_ewrite(s: str) -> void
 extern fn with_panic(msg: str, file: str, line: i32) -> void
 extern fn with_i32_to_str(n: i32) -> str
+extern fn with_i64_to_str(n: i64) -> str
+extern fn with_bool_to_str(b: bool) -> str
 
 /// Print a string to stdout without a trailing newline.
 pub fn print(s: str) -> void:
@@ -57,3 +63,32 @@ pub fn require(cond: bool, msg: str) -> void:
 pub fn check(cond: bool, msg: str) -> void:
     if not cond:
         with_panic(msg, "", 0)
+
+// ── ToString trait and impls ────────────────────────────────────
+
+pub trait ToString =
+    fn to_string(self: &Self) -> str
+
+impl ToString for i32 =
+    fn to_string(self: &i32) -> str:
+        with_i64_to_str(*self as i64)
+
+impl ToString for i64 =
+    fn to_string(self: &i64) -> str:
+        with_i64_to_str(*self)
+
+impl ToString for u32 =
+    fn to_string(self: &u32) -> str:
+        with_i64_to_str(*self as i64)
+
+impl ToString for u64 =
+    fn to_string(self: &u64) -> str:
+        with_i64_to_str(*self as i64)
+
+impl ToString for bool =
+    fn to_string(self: &bool) -> str:
+        with_bool_to_str(*self)
+
+// Generic free function — call as int_to_string(x) for any numeric type.
+pub fn int_to_string(n: i64) -> str:
+    with_i64_to_str(n)

@@ -1,5 +1,4 @@
 //! expect-stdout: cleanupdone
-extern fn print(s: str) -> void
 
 enum MyResult { Ok(i32) | Err(str) }
 

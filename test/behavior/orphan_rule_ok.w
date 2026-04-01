@@ -1,5 +1,4 @@
 //! expect-stdout: ok
-extern fn print(s: str) -> void
 
 // Local trait, foreign type (i32) — OK
 trait Describable =

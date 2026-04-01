@@ -2,8 +2,6 @@
 //! expect-stdout: move 10 20
 //! expect-stdout: write hello
 //! expect-stdout: ok
-extern fn print(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
 enum Msg: i32:
     Quit = 0

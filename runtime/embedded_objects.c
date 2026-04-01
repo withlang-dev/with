@@ -27,6 +27,10 @@ int32_t with_extract_runtime_obj(with_str name, with_str path) {
         data = fiber_o; len = fiber_o_len;
     } else if (MATCH(name, "fiber_asm.o")) {
         data = fiber_asm_o; len = fiber_asm_o_len;
+    } else if (MATCH(name, "rt_core.o")) {
+        data = rt_core_o; len = rt_core_o_len;
+    } else if (MATCH(name, "rt_darwin_aarch64.o")) {
+        data = rt_darwin_aarch64_o; len = rt_darwin_aarch64_o_len;
     }
 
     if (data == NULL || len == 0) return 1;

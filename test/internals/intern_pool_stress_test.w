@@ -3,7 +3,6 @@
 use compiler.foundation.Ids
 use compiler.foundation.InternPool
 
-extern fn int_to_string(n: i32) -> str
 
 fn symbol_name(i: i32) -> str:
     "sym_" ++ int_to_string(i)
