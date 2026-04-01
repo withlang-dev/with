@@ -3729,21 +3729,35 @@ fn Parser.parse_asm_expr(self: Parser) -> NodeId:
     let input_exprs: Vec[NodeId] = Vec.new()
     var first_constraint = true
     // Section 1: outputs
+    var rw_output_sym: i32 = 0  // read-write output variable symbol
     if self.peek() == TokenKind.TK_COLON:
         self.advance()
         // Parse output: ident("constraint") -> type
+        //   or read-write: ident("+r") ident  (same variable as input+output)
         if self.peek() == TokenKind.TK_IDENT and self.peek() != TokenKind.TK_COLON:
-            self.advance()  // consume output name (e.g. "out")
+            let out_name_sym = self.intern_current()
+            self.advance()
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
                 if self.peek() == TokenKind.TK_STRING_LIT:
                     let out_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
                     let out_reg = strip_string_token_text(out_raw)
-                    constraints_str = "={" ++ out_reg ++ "}"
+                    // Read-write constraint: "+r" passes through directly.
+                    // The variable is both input and output.
+                    if out_reg.len() > 1 and out_reg.byte_at(0) == 43:  // '+'
+                        constraints_str = out_reg
+                        rw_output_sym = out_name_sym
+                    else:
+                        constraints_str = "={" ++ out_reg ++ "}"
                     first_constraint = false
                     self.advance()
                 self.expect(TokenKind.TK_R_PAREN)
-            if self.peek() == TokenKind.TK_ARROW:
+            if rw_output_sym != 0:
+                // Read-write: the variable is the output, infer type as i64,
+                // and add the variable as an implicit input expression.
+                has_output = true
+                flags = flags | 2
+            else if self.peek() == TokenKind.TK_ARROW:
                 self.advance()
                 output_type_node = self.parse_type_expr()
                 has_output = true
@@ -3784,6 +3798,10 @@ fn Parser.parse_asm_expr(self: Parser) -> NodeId:
                     if self.peek() == TokenKind.TK_COMMA:
                         self.advance()
     self.expect(TokenKind.TK_R_PAREN)
+    // For read-write constraints: add the variable as an implicit input
+    if rw_output_sym != 0:
+        let rw_ident = self.pool.add_node(NodeKind.NK_IDENT, start, self.prev_end(), rw_output_sym, 0, 0)
+        input_exprs.push(rw_ident)
     let constr_sym = self.intern.intern(constraints_str)
     // Store input expressions and output type in extras
     let extra_start = self.pool.extra_len()
