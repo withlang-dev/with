@@ -334,10 +334,10 @@ fn Sema.dump_typed_module(self: Sema) -> str:
 
         if kind == NodeKind.NK_LET_DECL:
             let name = self.safe_symbol_text(self.ast.get_data0(decl))
-            let has_resolved = self.typed_binding_types.contains(decl) and self.typed_binding_types.get(decl).unwrap() != 0
+            let has_resolved = self.typed_binding_types.contains(decl as i32) and self.typed_binding_types.get(decl as i32).unwrap() != 0
             if has_resolved:
-                let ty = self.typed_binding_types.get(decl).unwrap()
-                let is_mut = if self.typed_binding_muts.contains(decl): self.typed_binding_muts.get(decl).unwrap() else: 0
+                let ty = self.typed_binding_types.get(decl as i32).unwrap()
+                let is_mut = if self.typed_binding_muts.contains(decl as i32): self.typed_binding_muts.get(decl as i32).unwrap() else: 0
                 out = out ++ "  let " ++ name
                 if is_mut != 0:
                     out = out ++ " (mut)"
@@ -477,10 +477,10 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
 
         if kind == NodeKind.NK_LET_DECL:
             let name = self.safe_symbol_text(self.ast.get_data0(decl))
-            let has_resolved = self.typed_binding_types.contains(decl) and self.typed_binding_types.get(decl).unwrap() != 0
+            let has_resolved = self.typed_binding_types.contains(decl as i32) and self.typed_binding_types.get(decl as i32).unwrap() != 0
             if has_resolved:
-                let ty = self.typed_binding_types.get(decl).unwrap()
-                let is_mut = if self.typed_binding_muts.contains(decl): self.typed_binding_muts.get(decl).unwrap() else: 0
+                let ty = self.typed_binding_types.get(decl as i32).unwrap()
+                let is_mut = if self.typed_binding_muts.contains(decl as i32): self.typed_binding_muts.get(decl as i32).unwrap() else: 0
                 with_write("  let ")
                 with_write(name)
                 if is_mut != 0:

@@ -23,7 +23,6 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
             return
     let body_idx = self.mir_input.find_body(fn_sym)
     if body_idx >= 0:
-        self.mir_current_body_idx = body_idx
         let body = self.mir_input.bodies.get(body_idx as i64)
         if body.lowering_failed == 0 and body.block_count() > 0:
             if self.debug_mir_codegen_enabled():
@@ -4354,7 +4353,14 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 if gc_recv_type == 0 and gc_mir_count > 0:
                     let gc_recv_op = body.call_arg_operands.get(gc_mir_start as i64)
                     gc_recv_type = self.mir_operand_sema_type(body, gc_recv_op)
-                let gc_intrinsic = self.classify_generic_call_intrinsic(gc_recv_type, gc_method_sym)
+                // Unwrap reference/pointer to get the underlying type for dispatch.
+                // When the receiver is &mut Vec[T], we need to dispatch on Vec[T].
+                var gc_recv_type_unwrapped = gc_recv_type
+                if gc_recv_type_unwrapped > 0:
+                    let gc_recv_tk = self.mir_input.mir_get_type_kind(self.mir_input.mir_resolve_alias(gc_recv_type_unwrapped))
+                    if gc_recv_tk == TypeKind.TY_REF or gc_recv_tk == TypeKind.TY_PTR:
+                        gc_recv_type_unwrapped = self.mir_input.mir_get_type_d0(self.mir_input.mir_resolve_alias(gc_recv_type_unwrapped))
+                let gc_intrinsic = self.classify_generic_call_intrinsic(gc_recv_type_unwrapped, gc_method_sym)
                 if gc_intrinsic != MirIntrinsic.MIR_INTRINSIC_NONE:
                     return self.mir_emit_intrinsic_call(body, gc_intrinsic, args_id, dest_place, next_bb)
                 let gc_method_name = self.intern.resolve(gc_method_sym)
@@ -4363,7 +4369,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                     let gc_recv_op = body.call_arg_operands.get(gc_mir_start as i64)
                     let gc_recv_val = self.mir_eval_operand(body, gc_recv_op, 0)
                     let gc_recv_ty = wl_type_of(gc_recv_val)
-                    var gc_recv_type_sym = self.mir_struct_sym_from_sema_type(gc_recv_type)
+                    var gc_recv_type_sym = self.mir_struct_sym_from_sema_type(gc_recv_type_unwrapped)
                     if gc_recv_type_sym == 0:
                         gc_recv_type_sym = self.find_struct_type_by_llvm(gc_recv_ty)
                     // Generic struct method: receiver is monomorphized generic struct
@@ -4843,11 +4849,9 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
         return true
 
     if tk == TermKind.TK_CALL:
-        // Check if this is a mutual tail call (marked by mutual TCO pass).
-        // The packed key is body_idx * 10000 + bb, stored in mir_input.mutual_tail_calls.
-        let mtc_key = self.mir_current_body_idx * 10000 + bb
-        for mti in 0..self.mir_input.mutual_tail_calls.len() as i32:
-            if self.mir_input.mutual_tail_calls.get(mti as i64) == mtc_key:
+        // Check if this is a mutual tail call (marked by mutual TCO pass)
+        for mti in 0..body.mutual_tail_bbs.len() as i32:
+            if body.mutual_tail_bbs.get(mti as i64) == bb:
                 self.mir_emit_mutual_tail_call = 1
                 break
         let call_ok = self.mir_emit_call_term(body, d0, d1, d2, d3)
