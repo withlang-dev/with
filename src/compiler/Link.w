@@ -160,6 +160,16 @@ fn link_stage_find_runtime_object_path(name: str) -> str:
         return tmp_path
     ""
 
+fn link_stage_make_archive(obj_path: str) -> str:
+    // Wrap a .o file in a .a archive so the linker treats it as a library
+    // (only pulling in symbols that aren't already defined).
+    let ar_path = obj_path ++ ".a"
+    let cmd = "ar rcs " ++ ar_path ++ " " ++ obj_path
+    let rc = with_system(cmd)
+    if rc == 0:
+        return ar_path
+    ""
+
 fn link_stage_should_use_rt_core(obj_path: str) -> bool:
     // Use the libc-free runtime for user programs that don't need LLVM bridge
     // or c_import. The compiler itself (which needs wl_* symbols) always uses
@@ -263,8 +273,9 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
     let needs_helpers_runtime = link_stage_object_needs_helpers_runtime(obj_path)
     if needs_helpers_runtime != 0:
         let use_rt_core = link_stage_should_use_rt_core(obj_path)
+        let needs_llvm = link_stage_object_needs_llvm_bridge(obj_path)
         if use_rt_core:
-            // Use libc-free runtime for user programs
+            // Pure With program (no c_import) — rt_core.o only
             let rt_core_path = link_stage_find_runtime_object_path("rt_core.o")
             if rt_core_path.len() == 0:
                 with_eprint("error: missing rt_core.o")
@@ -275,8 +286,10 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 with_eprint("error: missing rt_darwin_aarch64.o")
                 return false
             extras.push(rt_platform_path)
-        else:
-            // Use libc-backed runtime for compiler and c_import programs
+        else if needs_llvm:
+            // Compiler build (lld path) — helpers.o + support_runtime.o only.
+            // lld doesn't tolerate duplicate symbols, and the compiler doesn't
+            // need rt_core.o (helpers.o provides its entire runtime).
             let support_runtime_path = link_stage_find_runtime_object_path("support_runtime.o")
             if support_runtime_path.len() == 0:
                 with_eprint("error: missing runtime/support_runtime.o")
@@ -287,6 +300,32 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 with_eprint("error: missing runtime/helpers.o")
                 return false
             extras.push(helpers_path)
+        else:
+            // User program with c_import (cc/Apple ld64 path) — rt_core.o first,
+            // then helpers as archive. Apple's ld64 resolves archives correctly:
+            // rt_core.o definitions win, helpers.a fills in C-only symbols.
+            let rt_core_path = link_stage_find_runtime_object_path("rt_core.o")
+            if rt_core_path.len() == 0:
+                with_eprint("error: missing rt_core.o")
+                return false
+            extras.push(rt_core_path)
+            let rt_platform_path = link_stage_find_runtime_object_path("rt_darwin_aarch64.o")
+            if rt_platform_path.len() == 0:
+                with_eprint("error: missing rt_darwin_aarch64.o")
+                return false
+            extras.push(rt_platform_path)
+            let support_runtime_path = link_stage_find_runtime_object_path("support_runtime.o")
+            if support_runtime_path.len() == 0:
+                with_eprint("error: missing runtime/support_runtime.o")
+                return false
+            let helpers_path = link_stage_find_runtime_object_path("helpers.o")
+            if helpers_path.len() == 0:
+                with_eprint("error: missing runtime/helpers.o")
+                return false
+            let support_ar = link_stage_make_archive(support_runtime_path)
+            let helpers_ar = link_stage_make_archive(helpers_path)
+            extras.push(if support_ar.len() > 0: support_ar else: support_runtime_path)
+            extras.push(if helpers_ar.len() > 0: helpers_ar else: helpers_path)
 
     // Link libcurl when HTTP functions are used (package management)
     let undef_syms = link_stage_undefined_symbols_for_object(obj_path)
