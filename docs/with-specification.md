@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v6.5
+# The With Programming Language — Specification v6.6
 
 **Status:** Reference specification for prototype implementation
 **Positioning:** Systems programming that feels like a modern language.
@@ -56,10 +56,10 @@ the tricky parts internally, and if you hit a genuine edge case,
 async fn handle_signup(req: HttpRequest, db: &Database) -> Result[HttpResponse, ApiError]:
     let body = req.json[SignupRequest]() ?? return Err(.InvalidJson)
 
-    if not body.email.is_valid() then
+    if not body.email.is_valid():
         return Err(.ValidationError("Invalid email format"))
 
-    if db.find_user(body.email).await?.is_some() then
+    if db.find_user(body.email).await?.is_some():
         return Err(.ValidationError("Email already exists"))
 
     let email = body.email
@@ -188,17 +188,33 @@ With prioritizes joy. The common case should be effortless:
   is expected. If it implements the trait, just pass it. (§3.9)
 - **Comprehensions** — `[x * x for x in 0..10]` builds a list.
   Obviously it allocates. That's fine. (§13.6)
+- **Short-circuit `for` comprehensions** — `for user in get_user(id);
+  profile in get_profile(user): yield profile.name` chains `Option`
+  and `Result` without pyramid-shaped `match` nests. (§13.6a)
+- **Pattern `for` loops** — `for (key, value) in map:` and
+  `for Some(item) in optional_items:` destructure directly in the
+  loop header. (§13.5)
 - **Iterators just work** — hold two items, zip, peek. The compiler
   is smart about stdlib iterators. (§13.2)
 - **`with` infers guards** — `with lock.read() as data:` — the
   compiler knows it's a guard from the type. No keyword. (§7.1)
+- **Implicit contexts** — `with context(default_device()): sin(x)`
+  wires `implicit` parameters from lexical scope. (§7.3a)
 - **C functions just call** — `c_import` functions are callable
   directly. No `unsafe {}` wrapper on every FFI call. (§16.1)
 - **Postfix `.await`** — chains naturally with `?` and `|>` (§14.5)
 - **Pipeline operator** — `data |> filter(it.active) |> map(it.name)` (§12)
+- **Named arguments** — `connect("localhost", port: 8080)` can mix
+  positional and named arguments, and defaults can be skipped by name. (§9.1a)
+- **Chained comparisons** — `0 < x < 1` evaluates interior terms once
+  and reads like the math you meant. (§4.2.7)
 - **Membership test** — `if x in [1, 2, 3]:` and `if x not in banned:`
   — reads like English, works on any collection, optimized for
   literals (§9.9)
+- **Multi-dimensional indexing** — `tensor[2:5, :, newaxis]` is
+  trait-driven syntax, not a special built-in container. (§11.7)
+- **`@` operator** — `a @ b` reads as matrix multiplication and lowers
+  through trait dispatch like other operators. (§4.2.2, §11.7)
 - **Field shorthand** — `User { name, email }` when variable names
   match field names (§4.3)
 - **Default field values** — `ServerConfig { port: 9090 }` omits
@@ -767,11 +783,18 @@ a - b       // subtraction
 a * b       // multiplication
 a / b       // division (integer: truncates toward zero)
 a % b       // remainder (sign follows dividend, like C)
+a @ b       // matrix multiplication / generalized matmul
 -a          // unary negation
 ```
 
 All arithmetic operators work on all integer types (`i8`–`i64`,
 `u8`–`u64`) and floating point types (`f32`, `f64`).
+
+`@` is a distinct infix operator at the same precedence level as
+`*`, `/`, and `%`. It is intended for matrix multiplication and
+generalized tensor products. Primitive numeric types do not provide
+built-in `@`; user-defined types participate through the `MatMul`
+operator trait (§11.7).
 
 #### 4.2.3 Integer Overflow
 
@@ -1044,6 +1067,42 @@ This catches a class of silent data corruption bugs inherited from
 C. The `as` keyword signals that the programmer understands the
 conversion may lose data. Signed-to-unsigned and unsigned-to-signed
 conversions also require `as`, even at the same width.
+
+#### 4.2.7 Comparison Operators and Chaining
+
+```
+a == b
+a != b
+a < b
+a <= b
+a > b
+a >= b
+```
+
+Ordered comparisons (`<`, `<=`, `>`, `>=`) may be chained:
+
+```
+let valid = 0.0 < x < 1.0
+let in_range = lo <= x <= hi
+let sorted = a < b < c < d
+```
+
+`a < b < c` is equivalent to `(a < b) and (b < c)`, except each
+interior operand is evaluated exactly once. When an interior operand
+is non-trivial, the compiler introduces a hidden temporary:
+
+```
+left() < mid() < right()
+// equivalent to:
+let __cmp_tmp = mid()
+left() < __cmp_tmp and __cmp_tmp < right()
+```
+
+Only ordered comparisons chain. Equality and membership operators do
+not: `a == b == c` and `x in y in z` are compile errors. Chained
+comparisons require each pairwise comparison to produce `bool`. If a
+type wants elementwise or non-boolean comparison results, write the
+pairwise comparisons explicitly and combine them yourself.
 
 ### 4.3 Structs
 
@@ -1627,9 +1686,15 @@ implement `Iter[T]` for integer types and `Contains[T]` for ordered
 types, making them usable in `for` loops, slicing, pattern matching,
 and membership tests.
 
+Ranges are ordinary first-class values: they can be stored in
+variables, passed to functions, and returned like any other value.
+
 ```
 for i in 0..n:
     process(i)
+
+let window = 100..200
+publish_window(window)
 
 let slice = data[2..5]         // elements at index 2, 3, 4
 
@@ -2087,7 +2152,7 @@ performance-critical loops.
 ## 7. `with` — Scoped Access
 
 `with` is the language's central construct. It means: **access this
-value within this scope.** It appears in four forms, all expressing
+value within this scope.** It appears in five forms, all expressing
 the same idea — bounded, explicit interaction with data.
 
 | Form | Meaning | Appears in |
@@ -2095,6 +2160,7 @@ the same idea — bounded, explicit interaction with data.
 | `with as name:` | Guarded access (lock, arena, file) | Concurrent/resource code |
 | `with value as mut name:` | Scoped mutation (builder pattern) | Initialization, configuration |
 | `with expr as name:` | Scoped binding (named temporary) | Pipelines, intermediate values |
+| `with name(expr):` | Scoped implicit context | Allocators, devices, loggers, ambient config |
 | `{ expr with field: val }` | Record update (functional copy) | Data transformation |
 
 ### 7.1 Form 1: Guarded Access
@@ -2249,6 +2315,43 @@ This is lightweight. It is equivalent to a `let` binding inside an
 anonymous block, but reads more naturally in expression chains and
 avoids name leakage.
 
+### 7.3a Form 3a: Implicit Context
+
+`with name(expr):` introduces an **implicit context binding**. Any
+function parameter declared with the `implicit` modifier may be
+filled from the innermost matching implicit context in scope.
+
+```
+fn sin(x: &Array, ctx: implicit &Context) -> Array: ...
+
+with context(default_device()):
+    let y = sin(x)                // ctx resolved implicitly
+    let z = a @ b                 // implicit context applies here too
+    let w = sin(x, ctx: other)    // explicit argument overrides implicit
+```
+
+Implicit resolution is **lexical and type-based**:
+
+- Positional arguments are matched first.
+- Named arguments are matched second.
+- Unfilled `implicit` parameters are searched from the innermost
+  enclosing `with name(expr):` block outward.
+- Remaining omitted parameters may then be filled from defaults.
+
+Additional rules:
+
+- Auto-ref applies during implicit lookup, so `Context` and `&Context`
+  compose naturally with existing call ergonomics.
+- A function may not declare two `implicit` parameters of the same
+  type.
+- An `implicit` parameter may not also have a default value.
+- Inner implicit contexts shadow outer contexts of the same type.
+- Closures capture the implicit contexts visible at their definition
+  site, just like ordinary lexical bindings.
+
+The identifier in `with name(expr):` is descriptive. Resolution is
+driven by type, not by the identifier text.
+
 ### 7.4 Form 4: Record Update
 
 Functional immutable update of struct fields. Defined in §4.3 and
@@ -2270,6 +2373,8 @@ The `with` block form is determined by the **type** of the
 expression:
 
 ```
+with name(expr):                  →  introduce implicit context for body
+
 // If expr implements Scoped → guarded access
 with lock.read() as data:          →  expr.enter(data => body)
 with store.write() as mut data:    →  expr.enter_mut(data => body)
@@ -2472,9 +2577,10 @@ Standard library types that carry `@[no_await_guard]`: `MutexGuard`,
 apply this annotation to any guard type that blocks shared access
 while held.
 
-Forms 2 and 3 (`with expr as mut name:` and `with expr as name:`
-on non-`Scoped` types) are unaffected — they desugar to plain
-`let`/`var` blocks with no guard to hold.
+Forms 2, 3, and 3a (`with expr as mut name:`, `with expr as name:`,
+and `with name(expr):`) are unaffected — they do not create a guard
+value and therefore introduce no `@[no_await_guard]` obligation by
+themselves.
 
 **Clone at boundary:**
 
@@ -2592,29 +2698,52 @@ fn double(x: i32) -> i32: x * 2         // args + return type
 fn log(msg: str): print(msg)           // args, returns Unit
 ```
 
-### 9.1a Default Function Parameters
+### 9.1a Named Arguments, Default Parameters, and Implicit Parameters
 
-Parameters may have default values, specified with `= expr` after the type annotation:
+Function parameters may be passed positionally or by name. Parameters
+may declare a default value with `= expr`, and may declare an
+`implicit` modifier to request resolution from an enclosing
+`with name(expr):` scope (§7.3a).
+
+```
+fn connect(host: str, port: u16, timeout: i32 = 30) -> Connection
+fn sin(x: &Array, ctx: implicit &Context) -> Array
+
+connect("localhost", 8080, 60)
+connect("localhost", port: 8080)
+connect(timeout: 60, host: "localhost", port: 8080)
+
+with context(default_device()):
+    sin(x)
+    sin(x, ctx: fallback_device)
+```
+
+**Rules:**
+
+- Positional arguments must come before named arguments.
+- A parameter may not be specified more than once.
+- Named arguments must match parameter names exactly.
+- Named arguments may appear in any order relative to one another.
+- Default parameters may be omitted positionally only from the end of
+  the parameter list, or skipped arbitrarily when the caller uses
+  named arguments.
+- Default expressions are evaluated at the call site on every call
+  where the argument is omitted.
+- Call resolution order is: positional arguments, named arguments,
+  implicit parameters, then defaults.
+- `extern fn` values, closure values, and placeholder-based partial
+  application calls do not support named arguments.
+- A function may not declare two `implicit` parameters of the same
+  type, and an `implicit` parameter may not also have a default.
 
 ```
 fn greet(name: str, greeting: str = "Hello"):
     print(f"{greeting}, {name}!")
 
-greet("Alice")              // greeting defaults to "Hello"
-greet("Bob", "Hey")         // explicit override
-```
-
-**Rules:**
-- Default parameters must appear after all non-default parameters.
-- Default expressions are evaluated at the call site, not at the definition site.
-- Only literal values and `__FILE__`/`__LINE__` are allowed as default expressions (phase 1).
-- The compiler fills in missing trailing arguments from defaults at code generation time.
-
-```
-fn assert_eq(left: i32, right: i32, file: str = __FILE__, line: u32 = __LINE__):
-    if left != right:
-        print(f"assertion failed at {file}:{line}")
-        abort()
+greet("Alice")                  // greeting defaults to "Hello"
+greet("Bob", "Hey")             // explicit positional override
+greet(name: "Cara")             // named + default
+greet(greeting: "Hi", name: "Dae")
 ```
 
 ### 9.1b `const` Declarations
@@ -2648,8 +2777,10 @@ are always inlined.
 
 ### 9.2 Tail Call Optimization
 
-Functions marked `@[tailrec]` are guaranteed to compile to loops.
-If the function is not tail-recursive, the compiler rejects it.
+Tail calls may be optimized even without annotations. `@[tailrec]`
+turns that optimization into a guarantee: if the compiler cannot
+eliminate stack growth for the annotated recursive calls, it rejects
+the program.
 
 ```
 @[tailrec]
@@ -2659,9 +2790,33 @@ fn factorial(n: Int, acc: Int) -> Int:
         _ => factorial(n - 1, n * acc)
 ```
 
-Mutual tail recursion supported when all functions in the cycle are
-marked `@[tailrec]`. Non-tail-position recursive calls in a
-`@[tailrec]` function are compile errors.
+Tail position means:
+
+- The final expression of a function body
+- The final expression of a block already in tail position
+- Both branches of an `if`/`else` already in tail position
+- Every arm of a `match` already in tail position
+
+The following are **not** tail position:
+
+- Any call followed by additional work (`1 + recur(...)`, field access,
+  method call, etc.)
+- Loop bodies
+- Calls with an active `defer` or `errdefer`
+- Calls that leave a `Drop`-implementing local live across the call
+
+```
+@[tailrec]
+fn bad(n: Int) -> Int:
+    if n <= 0: 0
+    else: 1 + bad(n - 1)        // compile error: not tail position
+```
+
+Self-recursive `@[tailrec]` functions must compile to a loop or
+equivalent frame-reusing form. Mutual tail recursion is permitted
+only when every function in the cycle is annotated `@[tailrec]` and
+the compiler can verify the cycle without stack growth; otherwise the
+program is ill-formed.
 
 ### 9.3 Closures
 
@@ -2720,18 +2875,34 @@ the one way.
 
 ### 9.4 Partial Application
 
-Functions can be partially applied with `_` as placeholder:
+Functions can be partially applied with `_` placeholders inside a call
+argument list:
 
 ```
 fn add(a: i32, b: i32) -> i32: a + b
 let add5 = add(5, _)        // fn(i32) -> i32
 add5(3)                      // 8
 
+let pair = make_pair(_, 10, _)   // fn(T0, T2) -> Pair
+pair("x", true)
+
 values |> map(clamp(0, 255, _))
 ```
 
 Currying is not automatic. Partial application via `_` is the explicit,
 controlled equivalent.
+
+**Rules:**
+
+- `_` is a placeholder only inside a call argument list.
+- A placeholder call with `N` placeholders produces a closure taking
+  `N` arguments in left-to-right placeholder order.
+- Non-placeholder arguments are captured into the generated closure.
+- `_` in callee position is an error.
+- `add(5)` is an ordinary wrong-argument-count error, not partial
+  application.
+- Placeholder calls use positional arguments only; named arguments are
+  not permitted in the same call.
 
 ### 9.5 Extension Blocks
 
@@ -3197,9 +3368,10 @@ expr in expr       → bool
 expr not in expr   → bool
 ```
 
-`in` is a binary operator at the same precedence level as comparison
-operators (`==`, `!=`). Like comparisons, it is non-associative —
-`a in b in c` is a compile error.
+`in` is a binary operator at the same precedence level as equality
+operators (`==`, `!=`). It is non-associative — `a in b in c` is a
+compile error. Ordered comparisons (`<`, `<=`, `>`, `>=`) may chain;
+see §4.2.7.
 
 **Operator precedence** (low to high):
 
@@ -3208,14 +3380,14 @@ operators (`==`, `!=`). Like comparisons, it is non-associative —
 | 1 | `or` | Left |
 | 2 | `and` | Left |
 | 3 | `==`, `!=`, `in`, `not in` | Non-associative |
-| 4 | `<`, `>`, `<=`, `>=` | Non-associative |
+| 4 | `<`, `>`, `<=`, `>=` | Chained |
 | 5 | `\|>` (pipeline) | Left |
 | 6 | `\|` | Left |
 | 7 | `^` | Left |
 | 8 | `&` | Left |
 | 9 | `<<`, `>>` | Left |
 | 10 | `+`, `-`, `++`, `??` | Left |
-| 11 | `*`, `/`, `%` | Left |
+| 11 | `*`, `/`, `%`, `@` | Left |
 | 12 | Unary prefix (`not`, `-`, `~`, `&`, `&mut`) | — |
 | 13 | Postfix (`.await`, `?`, `.field`, `[i]`, `()`) | Left |
 
@@ -4006,10 +4178,10 @@ language constructs by implementing a known trait. The set of syntax
 traits is **fixed and closed** — users cannot define new syntax hooks.
 Arithmetic and comparison operators are the main exception: they use
 fixed method names on the concrete type (`add`, `sub`, `mul`, `div`,
-`eq`, `lt`, and so on). The prelude traits `Add`, `Sub`, `Mul`,
-`Div`, `Neg`, `Eq`, and `Ord` remain available for explicit bounds
-and documentation, but an unbounded generic does not need to name
-them.
+`matmul`, `eq`, `lt`, and so on). The prelude traits `Add`, `Sub`,
+`Mul`, `Div`, `MatMul`, `Neg`, `Eq`, and `Ord` remain available for
+explicit bounds and documentation, but an unbounded generic does not
+need to name them.
 
 | Trait | Unlocks | Syntax |
 |-------|---------|--------|
@@ -4019,6 +4191,8 @@ them.
 | `ScopedMut[T]` | `with` blocks (guarded, mutable) | `with expr as mut name:` |
 | `Index[I, O]` | Subscript read | `expr[index]` |
 | `IndexMut[I, O]` | Subscript write | `expr[index] = val` |
+| `MultiIndex[O]` | Generalized subscript read | `expr[i, j]`, `expr[1:4, :, ...]` |
+| `MultiIndexMut[V]` | Generalized subscript write | `expr[i, j] = val`, `expr[:, 0] = val` |
 | `Try[T, E]` | `?` operator | `expr?` |
 | `Drop` | Destructor | automatic at scope exit |
 
@@ -4034,6 +4208,39 @@ impl Index[(usize, usize), f64] for Matrix:
 
 let m = Matrix.new(3, 3)
 let val = m[(1, 2)]    // calls Matrix::index
+```
+
+**Generalized indexing:**
+
+The `[]` syntax also supports comma-separated multi-dimensional
+indices, slice notation, ellipsis, and `newaxis`:
+
+```
+let pixel = image[10, 20, 0]
+let rows = image[2:5, :]
+let flipped = image[::-1]
+let channel0 = image[..., 0]
+let batched = image[newaxis, :]
+image[2:5, :] = 0.0
+```
+
+The compiler evaluates each component left-to-right and lowers the
+list into a standard sequence of `IndexSpec` values with four forms:
+scalar, slice, ellipsis, and new-axis insertion. `...` may appear at
+most once in a single index list. The meaning of those specs is owned
+by the receiving type's `MultiIndex` / `MultiIndexMut`
+implementation. Standard library tensor and array-view types interpret
+negative scalar indices and slice bounds relative to the end of the
+indexed dimension.
+
+The standard library exposes `IndexSpec` as the carrier for those
+components:
+
+```
+IndexSpec.Scalar(expr)
+IndexSpec.Slice(start?, stop?, step?)
+IndexSpec.Ellipsis
+IndexSpec.NewAxis
 ```
 
 ```
@@ -4080,6 +4287,7 @@ concrete type:
 | `-` | `sub` |
 | `*` | `mul` |
 | `/` | `div` |
+| `@` | `matmul` |
 | unary `-` | `neg` |
 | `==` | `eq` |
 | `!=` | `ne` |
@@ -4101,6 +4309,8 @@ trait Mul[Rhs, Output]:
     fn mul(self: Self, rhs: Rhs) -> Output
 trait Div[Rhs, Output]:
     fn div(self: Self, rhs: Rhs) -> Output
+trait MatMul[Rhs, Output]:
+    fn matmul(self: Self, rhs: Rhs) -> Output
 trait Neg[Output]:
     fn neg(self: Self) -> Output
 ```
@@ -4150,17 +4360,33 @@ if user.name in whitelist:
     grant_access()
 ```
 
-**Operator desugaring:** When the compiler encounters `a + b` and
-both operands are struct types, it looks up `Add.add` on the left
-operand's type. The expression desugars to a method call with
+**Operator desugaring:** For user-defined types, operator resolution
+searches the full `(lhs_type, rhs_type)` pair:
+
+1. Try an implementation whose `Self` is the left operand type and
+   whose right-hand-side parameter matches the right operand type.
+2. If none exists, try an implementation whose `Self` is the right
+   operand type and whose right-hand-side parameter matches the left
+   operand type.
+3. Exactly one implementation must match. If both sides provide
+   distinct applicable implementations, the expression is ambiguous
+   and rejected.
+
+The selected operation then desugars to a method call with
 auto-referencing:
 
 ```
-a + b      →  Add.add(&a, &b)    // both operands auto-ref'd
-a * b      →  Mul.mul(&a, &b)
+a + b      →  Add.add(&a, &b)       // left-side dispatch
+1.0 + arr  →  Add.add(&arr, &1.0)   // right-side dispatch
+a @ b      →  MatMul.matmul(&a, &b)
 -a         →  Neg.neg(&a)
 a == b     →  Eq.eq(&a, &b)
 ```
+
+When right-side dispatch is selected, the implementation still
+represents the original source expression order. An implementation of
+`Sub[f64, Array] for Array` therefore defines `f64 - Array`, not
+`Array - f64`.
 
 **Operator traits should take `&Self`, not `Self`.** If `add` takes
 `Self` by value, then `a + b` moves both operands and `a + b + c`
@@ -4670,6 +4896,19 @@ for (i, item) in collection.enumerate():
     print(f"{i}: {item}")
 ```
 
+The binding position is a full pattern, not just an identifier:
+
+```
+for (key, value) in map:
+    println(f"{key} = {value}")
+
+for { name, age, .. } in users:
+    print(f"{name}: {age}")
+
+for Some(item) in optional_items:
+    process(item)
+```
+
 **Implicit iteration:** When the expression after `in` implements
 `Iter[T]` directly (e.g., ranges, iterators), it is used as-is.
 When it does not implement `Iter[T]` but has an `.iter()` method
@@ -4686,10 +4925,17 @@ for item in my_vec.iter_mut():    // mutable references
 for item in my_vec.into_iter():   // consuming (moves elements)
 ```
 
-`for x in expr: body` desugars to calling `next()` in a loop.
+`for pattern in expr: body` desugars to calling `next()` in a loop.
 The implicit `.iter()` insertion means `for x in collection:`
 borrows the collection immutably — the collection remains valid
 after the loop.
+
+Pattern matching uses the same pattern language as `let` and `match`.
+Irrefutable patterns bind every element. Refutable patterns are
+allowed; elements that do not match are skipped and iteration
+continues. Reference-pattern ergonomics (§9.7) apply here too, so
+patterns over `.iter()` output usually bind references without
+explicit `&`.
 
 ### 13.6 Collection Comprehensions
 
@@ -4732,6 +4978,59 @@ operator (§9.9) may appear in the `if` filter clause:
 
 The parser resolves this structurally — `for PATTERN in EXPR` is
 always iteration, `EXPR in EXPR` in the filter is always membership.
+
+### 13.6a Option and Result For-Comprehensions
+
+`for` can also express short-circuiting chains over `Option` and
+`Result`. Clauses are separated by `;`. Each binding clause unwraps
+one successful value and binds it for the following clauses.
+
+```
+let name: Option[str] =
+    for user in get_user(id);
+        profile in get_profile(user):
+    yield profile.display_name
+
+let data: Result[Response, Error] =
+    for conn in connect(host);
+        auth in conn.authenticate(token);
+        resp in auth.fetch(path):
+    yield resp
+```
+
+The first clause determines the carrier family:
+
+- `Option[T]` comprehensions unwrap `Some(...)` and short-circuit on
+  `None`.
+- `Result[T, E]` comprehensions unwrap `Ok(...)` and short-circuit on
+  `Err(...)`.
+
+The expression form ends with `yield expr`, which re-wraps the final
+value in `Some(...)` or `Ok(...)`. The statement form omits `yield`
+and runs its body only when every clause succeeds:
+
+```
+for user in get_user(id); profile in get_profile(user):
+    update_profile(profile)
+```
+
+This is equivalent to nested `match` expressions over the relevant
+success and failure constructors.
+
+Option comprehensions also support boolean guard clauses:
+
+```
+let active_name =
+    for user in get_user(id);
+        if user.is_active();
+        profile in get_profile(user):
+    yield profile.name
+```
+
+If the guard is false, the comprehension produces `None`. `Result`
+comprehensions do not have an implicit guard-failure error value; use
+an explicit `if`/`match` inside the comprehension body when guard
+failure must choose an `Err`.
 
 ---
 
@@ -8817,6 +9116,13 @@ fn factorial(n: Int, acc: Int) -> Int:
 @[tailrec]
 fn bad(n: Int) -> Int:
     match n { 0 => 1; _ => n * bad(n - 1) }  // ERROR
+
+// FAIL: defer prevents tail-call guarantee
+@[tailrec]
+fn also_bad(n: Int) -> Int:
+    if n <= 0: 0
+    defer log(n)
+    also_bad(n - 1)                         // ERROR
 ```
 
 ### 25.13 Partial Application (Section 9.4)
@@ -8832,6 +9138,16 @@ fn test:
 fn test:
     let result = vec![1, 2, 3] |> map(add(10, _)) |> collect[Vec]()
     assert(result == vec![11, 12, 13])
+
+// PASS: multiple placeholders preserve left-to-right order
+fn make_pair(a: str, b: i32, c: bool) -> str: "{a}:{b}:{c}"
+fn test:
+    let f = make_pair(_, 10, _)
+    assert(f("x", true) == "x:10:true")
+
+// FAIL: no implicit currying
+fn test:
+    let add5 = add(5)     // ERROR: wrong argument count
 ```
 
 ### 25.14 Pattern Matching (Section 9.7)
@@ -9983,6 +10299,14 @@ fn test:
     let pairs = vec![(1, "a"), (2, "b")]
     for (n, s) in pairs:         // .iter() auto-inserted
         assert(n > 0)
+
+// PASS: refutable patterns skip non-matching elements
+fn test:
+    let values = vec![Some(1), None, Some(3)]
+    var sum = 0
+    for Some(x) in values:
+        sum += x
+    assert(sum == 4)
 
 // PASS: mutable iteration requires explicit .iter_mut()
 fn test:
@@ -11328,6 +11652,105 @@ fn test:
     assert(prime_squares.len() == 6)
 ```
 
+### 25.101 Named Arguments and Implicit Context (Section 9.1a, Section 7.3a)
+
+```
+fn label(host: str, port: i32, timeout: i32 = 30) -> str:
+    "{host}:{port}/{timeout}"
+
+type Ctx { tag: str }
+fn tag_value(value: str, ctx: implicit &Ctx, suffix: str = "!") -> str:
+    "{ctx.tag}:{value}{suffix}"
+
+fn test:
+    assert(label("db", port: 5432) == "db:5432/30")
+    assert(label(port: 5432, host: "db", timeout: 5) == "db:5432/5")
+
+    with context(Ctx { tag: "gpu" }):
+        assert(tag_value("sin") == "gpu:sin!")
+        assert(tag_value("sin", suffix: "?") == "gpu:sin?")
+```
+
+### 25.102 Chained Comparisons (Section 4.2.7)
+
+```
+// PASS: ordered comparisons chain
+fn test:
+    let x = 5
+    assert(0 < x < 10)
+    assert(not (0 < x < 4))
+    assert(5 <= x <= 5)
+
+// FAIL: equality does not chain
+fn test:
+    let x = 1
+    x == x == true     // ERROR
+```
+
+### 25.103 Option and Result For-Comprehensions (Section 13.6a)
+
+```
+// PASS: Option comprehension
+fn test:
+    let result = for a in Some(2); b in Some(3):
+        yield a + b
+    assert(result == Some(5))
+
+// PASS: Option guard
+fn test:
+    let result = for x in Some(4); if x > 0:
+        yield x * 2
+    assert(result == Some(8))
+
+// PASS: Result comprehension
+fn test:
+    let result: Result[i32, str] =
+        for a in Ok(2); b in Ok(3):
+        yield a + b
+    assert(result == Ok(5))
+```
+
+### 25.104 Multi-Index and `@` Dispatch (Section 11.7)
+
+```
+// PASS: generalized indexing syntax routes through MultiIndex
+type Tensor { ... }
+type TensorView { ... }
+impl MultiIndex[TensorView] for Tensor:
+    fn multi_index(self: &Self, specs: &[IndexSpec]) -> TensorView: ...
+impl MultiIndexMut[f32] for Tensor:
+    fn multi_index_set(self: &mut Self, specs: &[IndexSpec], value: f32): ...
+
+fn test:
+    let patch = tensor[2:5, :, newaxis]
+    tensor[..., 0] = 1.0
+
+// PASS: right-side operator dispatch and matmul
+type Array { ... }
+impl Add[f64, Array] for Array:
+    fn add(self: &Self, lhs: &f64) -> Array: ...
+impl MatMul[Array, Array] for Array:
+    fn matmul(self: &Self, rhs: &Array) -> Array: ...
+
+fn test:
+    let shifted = 1.0 + arr
+    let prod = a @ b
+```
+
+### 25.105 Range Values (Section 4.7)
+
+```
+fn count(r: Range[i32]) -> i32:
+    var total = 0
+    for _ in r:
+        total += 1
+    total
+
+fn test:
+    let window = 0..4
+    assert(count(window) == 4)
+```
+
 ---
 
 # Part IV — Implementation Roadmap
@@ -11568,6 +11991,7 @@ The following keywords are reserved and cannot be used as identifiers:
 | `match` | Pattern matching |
 | `for` | Loop over iterables |
 | `while` | Conditional loop |
+| `yield` | Generator / comprehension yield |
 | `return` | Early return |
 | `break` | Break from loop |
 | `continue` | Continue to next iteration |
@@ -11582,6 +12006,8 @@ The following keywords are reserved and cannot be used as identifiers:
 | `trait`, `impl` | Trait definition/implementation |
 | `pub` | Visibility modifier |
 | `const` | Compile-time constant |
+| `implicit` | Implicit parameter modifier |
+| `newaxis` | Multi-index dimension insertion |
 | `it` | Implicit closure parameter |
 | `where` | Trait bound clauses |
 | `move` | Move closure (reserved for future use) |
