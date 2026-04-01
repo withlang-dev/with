@@ -1070,6 +1070,175 @@ fn Codegen.mir_str_concat(self: Codegen, lhs: i64, rhs: i64) -> i64:
     args.push(rhs_v)
     wl_build_call(self.builder, fn_type, func, vec_data_i64(&args), 2)
 
+fn Codegen.mir_display_resolved_type(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    if resolved > 0:
+        return resolved
+    self.sema.resolve_alias(sema_ty as TypeId) as i32
+
+fn Codegen.mir_display_type_kind(self: Codegen, resolved: i32) -> i32:
+    if resolved <= 0:
+        return 0
+    let tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk != 0:
+        return tk
+    self.sema.get_type_kind(resolved)
+
+fn Codegen.mir_struct_field_sema_type(self: Codegen, struct_sema_ty: i32, field_idx: i32) -> i32:
+    if struct_sema_ty <= 0 or field_idx < 0:
+        return 0
+    let resolved = self.mir_display_resolved_type(struct_sema_ty)
+    let tk = self.mir_display_type_kind(resolved)
+    if tk == TypeKind.TY_STRUCT:
+        let field_start = self.mir_input.mir_get_type_d1(resolved)
+        let field_count = self.mir_input.mir_get_type_d2(resolved)
+        if field_idx < field_count:
+            return self.mir_input.mir_get_type_extra(field_start + field_idx * 3 + 1)
+        return 0
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.mir_input.mir_get_type_d0(resolved)
+        if base_sym > 0 and self.sema.named_types.contains(base_sym):
+            let base_tid = self.sema.named_types.get(base_sym).unwrap()
+            if self.sema.get_type_kind(base_tid) == TypeKind.TY_STRUCT:
+                let field_start = self.sema.get_type_d1(base_tid)
+                let field_count = self.sema.get_type_d2(base_tid)
+                if field_idx < field_count:
+                    return self.sema.type_extra.get((field_start + field_idx * 3 + 1) as i64)
+    0
+
+fn Codegen.mir_enum_variant_count(self: Codegen, enum_sema_ty: i32) -> i32:
+    if enum_sema_ty <= 0:
+        return 0
+    let resolved = self.mir_display_resolved_type(enum_sema_ty)
+    let tk = self.mir_display_type_kind(resolved)
+    if tk == TypeKind.TY_ENUM:
+        return self.mir_input.mir_get_type_d2(resolved)
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.mir_input.mir_get_type_d0(resolved)
+        if base_sym > 0 and self.sema.named_types.contains(base_sym):
+            let base_tid = self.sema.named_types.get(base_sym).unwrap()
+            if self.sema.get_type_kind(base_tid) == TypeKind.TY_ENUM:
+                return self.sema.get_type_d2(base_tid)
+    0
+
+fn Codegen.mir_enum_variant_name(self: Codegen, enum_sema_ty: i32, variant_idx: i32) -> str:
+    if enum_sema_ty <= 0 or variant_idx < 0:
+        return "<invalid>"
+    let resolved = self.mir_display_resolved_type(enum_sema_ty)
+    let tk = self.mir_display_type_kind(resolved)
+    if tk == TypeKind.TY_ENUM:
+        let te_start = self.mir_input.mir_get_type_d1(resolved)
+        let variant_count = self.mir_input.mir_get_type_d2(resolved)
+        var pos = te_start
+        for vi in 0..variant_count:
+            let variant_name = self.mir_input.mir_get_type_extra(pos)
+            let payload_count = self.mir_input.mir_get_type_extra(pos + 1)
+            if vi == variant_idx:
+                return self.sema_symbol_text(variant_name)
+            pos = pos + 2 + payload_count
+        return "<invalid>"
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.mir_input.mir_get_type_d0(resolved)
+        if base_sym > 0 and self.sema.named_types.contains(base_sym):
+            let base_tid = self.sema.named_types.get(base_sym).unwrap()
+            if self.sema.get_type_kind(base_tid) == TypeKind.TY_ENUM:
+                let te_start = self.sema.get_type_d1(base_tid)
+                let variant_count = self.sema.get_type_d2(base_tid)
+                var pos = te_start
+                for vi in 0..variant_count:
+                    let variant_name = self.sema.type_extra.get(pos as i64)
+                    let payload_count = self.sema.type_extra.get((pos + 1) as i64)
+                    if vi == variant_idx:
+                        return self.sema_symbol_text(variant_name)
+                    pos = pos + 2 + payload_count
+    "<invalid>"
+
+fn Codegen.mir_enum_variant_payload_count(self: Codegen, enum_sema_ty: i32, variant_idx: i32) -> i32:
+    if enum_sema_ty <= 0 or variant_idx < 0:
+        return 0
+    let resolved = self.mir_display_resolved_type(enum_sema_ty)
+    let tk = self.mir_display_type_kind(resolved)
+    if tk == TypeKind.TY_ENUM:
+        let te_start = self.mir_input.mir_get_type_d1(resolved)
+        let variant_count = self.mir_input.mir_get_type_d2(resolved)
+        var pos = te_start
+        for vi in 0..variant_count:
+            let payload_count = self.mir_input.mir_get_type_extra(pos + 1)
+            if vi == variant_idx:
+                return payload_count
+            pos = pos + 2 + payload_count
+        return 0
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.mir_input.mir_get_type_d0(resolved)
+        if base_sym > 0 and self.sema.named_types.contains(base_sym):
+            let base_tid = self.sema.named_types.get(base_sym).unwrap()
+            if self.sema.get_type_kind(base_tid) == TypeKind.TY_ENUM:
+                let te_start = self.sema.get_type_d1(base_tid)
+                let variant_count = self.sema.get_type_d2(base_tid)
+                var pos = te_start
+                for vi in 0..variant_count:
+                    let payload_count = self.sema.type_extra.get((pos + 1) as i64)
+                    if vi == variant_idx:
+                        return payload_count
+                    pos = pos + 2 + payload_count
+    0
+
+fn Codegen.mir_enum_variant_discriminant(self: Codegen, enum_sema_ty: i32, variant_idx: i32) -> i64:
+    if enum_sema_ty <= 0 or variant_idx < 0:
+        return 0
+    let resolved = self.mir_display_resolved_type(enum_sema_ty)
+    let tk = self.mir_display_type_kind(resolved)
+    var enum_sym = 0
+    if tk == TypeKind.TY_ENUM:
+        enum_sym = self.mir_input.mir_get_type_d0(resolved)
+    else if tk == TypeKind.TY_GENERIC_INST:
+        enum_sym = self.mir_input.mir_get_type_d0(resolved)
+    let cg_sym = self.sema_sym_to_codegen_sym(enum_sym)
+    if cg_sym > 0:
+        let de_opt = self.disc_enum_type_map.get(cg_sym)
+        if de_opt.is_some():
+            let de_idx = de_opt.unwrap()
+            let v_start = self.disc_enum_variant_starts.get(de_idx as i64)
+            let v_count = self.disc_enum_variant_counts.get(de_idx as i64)
+            if variant_idx < v_count:
+                return self.disc_enum_variant_values.get((v_start + variant_idx) as i64) as i64
+    variant_idx as i64
+
+fn Codegen.mir_enum_tag_value(self: Codegen, val: i64) -> i64:
+    let val_ty = wl_type_of(val)
+    let vk = wl_get_type_kind(val_ty)
+    if vk == wl_integer_type_kind():
+        return val
+    if vk == wl_struct_type_kind() and wl_count_struct_elem_types(val_ty) > 0:
+        return wl_build_extract_value(self.builder, val, 0)
+    wl_const_int(wl_i32_type(self.context), 0, 0)
+
+fn Codegen.gen_enum_payload_field_value(self: Codegen, enum_val: i64, enum_sema_ty: i32, variant_idx: i32, field_idx: i32) -> i64:
+    if field_idx < 0:
+        return 0
+    let payload_ty = self.mir_enum_variant_payload_llvm_type(enum_sema_ty, variant_idx)
+    if payload_ty == 0:
+        return 0
+    let enum_ty = wl_type_of(enum_val)
+    if wl_get_type_kind(enum_ty) != wl_struct_type_kind() or wl_count_struct_elem_types(enum_ty) < 2:
+        return 0
+    let enum_ptr = self.create_entry_alloca(enum_ty)
+    wl_build_store(self.builder, enum_val, enum_ptr)
+    let data_ptr = wl_build_struct_gep(self.builder, enum_ty, enum_ptr, 1)
+    let payload_ptr = wl_build_bitcast(self.builder, data_ptr, wl_ptr_type(self.context))
+    if wl_get_type_kind(payload_ty) == wl_struct_type_kind():
+        let field_count = wl_count_struct_elem_types(payload_ty)
+        if field_idx >= field_count:
+            return 0
+        let field_ty = wl_struct_get_type_at(payload_ty, field_idx)
+        let field_ptr = wl_build_struct_gep(self.builder, payload_ty, payload_ptr, field_idx)
+        return wl_build_load(self.builder, field_ty, field_ptr)
+    if field_idx == 0:
+        return wl_build_load(self.builder, payload_ty, payload_ptr)
+    0
+
 fn Codegen.coerce_val_to_str(self: Codegen, val: i64, str_ty: i64) -> i64:
     let val_ty = wl_type_of(val)
     let vk = wl_get_type_kind(val_ty)
@@ -1095,7 +1264,11 @@ fn Codegen.coerce_val_to_str(self: Codegen, val: i64, str_ty: i64) -> i64:
             arg_ty = wl_f64_type(self.context)
             coerced = if vk == wl_float_type_kind(): wl_build_fp_cast(self.builder, val, arg_ty) else: val
         else:
-            return val
+            if val_ty == str_ty:
+                return val
+            if vk == wl_pointer_type_kind():
+                return self.coerce_ptr_to_str(val)
+            return self.gen_string_literal_raw("<unsupported>")
     let sym = self.intern.intern(fn_name)
     let fv = self.fn_values.get(sym)
     let ft = self.fn_fn_types.get(sym)
@@ -1131,10 +1304,35 @@ fn Codegen.call_runtime_str_fn(self: Codegen, fn_name: str, arg: i64, str_ty: i6
     a.push(arg)
     wl_build_call(self.builder, fnt, func, vec_data_i64(&a), 1)
 
+fn Codegen.coerce_typed_val_to_str(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) -> i64:
+    var effective_sema_ty = sema_ty
+    var resolved = self.mir_display_resolved_type(effective_sema_ty)
+    var tk = self.mir_display_type_kind(resolved)
+    let val_ty = wl_type_of(val)
+    if wl_get_type_kind(val_ty) == wl_struct_type_kind():
+        let enum_sym = self.enum_by_llvm.get(val_ty)
+        if enum_sym.is_some() and (tk == 0 or (tk != TypeKind.TY_ENUM and tk != TypeKind.TY_GENERIC_INST and tk != TypeKind.TY_STRUCT)):
+            let recovered = self.mir_find_named_type_text(self.intern.resolve(enum_sym.unwrap()))
+            if recovered > 0:
+                effective_sema_ty = recovered
+                resolved = recovered
+                tk = self.mir_display_type_kind(resolved)
+    if tk == TypeKind.TY_STR:
+        if val_ty == str_ty:
+            return val
+        return self.call_runtime_str_fn("with_fmt_str", val, str_ty)
+    if tk == TypeKind.TY_STRUCT:
+        return self.gen_debug_struct(val, resolved, str_ty)
+    if tk == TypeKind.TY_ENUM:
+        return self.gen_display_enum(val, effective_sema_ty, str_ty)
+    if tk == TypeKind.TY_GENERIC_INST and self.mir_enum_variant_count(effective_sema_ty) > 0:
+        return self.gen_display_enum(val, effective_sema_ty, str_ty)
+    self.coerce_val_to_str(val, str_ty)
+
 fn Codegen.gen_debug_format(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) -> i64:
     // Generate debug formatting based on sema type.
-    let resolved = if sema_ty > 0: self.mir_input.mir_resolve_alias(sema_ty) else: 0
-    let tk = if resolved > 0: self.mir_input.mir_get_type_kind(resolved) else: 0
+    let resolved = self.mir_display_resolved_type(sema_ty)
+    let tk = self.mir_display_type_kind(resolved)
 
     // str → quoted
     if resolved == self.sema.ty_str or tk == TypeKind.TY_STR:
@@ -1144,12 +1342,12 @@ fn Codegen.gen_debug_format(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) 
     if tk == TypeKind.TY_STRUCT:
         return self.gen_debug_struct(val, resolved, str_ty)
 
-    // Enum → ".VariantName"
-    if tk == TypeKind.TY_ENUM:
-        return self.gen_debug_enum(val, resolved, str_ty)
+    // Enums use their compiler-generated variant formatter for now.
+    if tk == TypeKind.TY_ENUM or (tk == TypeKind.TY_GENERIC_INST and self.mir_enum_variant_count(sema_ty) > 0):
+        return self.gen_debug_enum(val, sema_ty, str_ty)
 
     // Primitives (int, float, bool) → same as default display
-    self.coerce_val_to_str(val, str_ty)
+    self.coerce_typed_val_to_str(val, sema_ty, str_ty)
 
 fn Codegen.gen_debug_struct(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) -> i64:
     // Generate "TypeName { field1: val1, field2: val2 }"
@@ -1186,7 +1384,8 @@ fn Codegen.gen_debug_struct(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) 
 
         // Extract field value and format it
         let field_val = wl_build_extract_value(self.builder, val, fi)
-        let field_str = self.coerce_val_to_str(field_val, str_ty)
+        let field_sema_ty = self.mir_struct_field_sema_type(sema_ty, fi)
+        let field_str = self.coerce_typed_val_to_str(field_val, field_sema_ty, str_ty)
         result = self.mir_str_concat(result, field_str)
         fi = fi + 1
 
@@ -1195,9 +1394,53 @@ fn Codegen.gen_debug_struct(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) 
     result
 
 fn Codegen.gen_debug_enum(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) -> i64:
-    // Simple enum debug: just format the value as default
-    // Full enum variant names deferred to later task
-    self.coerce_val_to_str(val, str_ty)
+    self.gen_display_enum(val, sema_ty, str_ty)
+
+fn Codegen.gen_display_enum_variant(self: Codegen, val: i64, enum_sema_ty: i32, variant_idx: i32, str_ty: i64) -> i64:
+    let variant_name = self.mir_enum_variant_name(enum_sema_ty, variant_idx)
+    var result = self.gen_string_literal_raw(variant_name)
+    let payload_count = self.mir_enum_variant_payload_count(enum_sema_ty, variant_idx)
+    if payload_count <= 0:
+        return result
+    result = self.mir_str_concat(result, self.gen_string_literal_raw("("))
+    for pi in 0..payload_count:
+        if pi > 0:
+            result = self.mir_str_concat(result, self.gen_string_literal_raw(", "))
+        let payload_val = self.gen_enum_payload_field_value(val, enum_sema_ty, variant_idx, pi)
+        let payload_sema_ty = self.mir_enum_payload_sema_type(enum_sema_ty, variant_idx, pi)
+        let payload_str = self.coerce_typed_val_to_str(payload_val, payload_sema_ty, str_ty)
+        result = self.mir_str_concat(result, payload_str)
+    result = self.mir_str_concat(result, self.gen_string_literal_raw(")"))
+    result
+
+fn Codegen.gen_display_enum(self: Codegen, val: i64, enum_sema_ty: i32, str_ty: i64) -> i64:
+    let variant_count = self.mir_enum_variant_count(enum_sema_ty)
+    if variant_count <= 0:
+        return self.coerce_val_to_str(val, str_ty)
+    let tag_val = self.mir_enum_tag_value(val)
+    let tag_ty = wl_type_of(tag_val)
+    let result_ptr = self.create_entry_alloca(str_ty)
+    let merge_bb = wl_append_bb(self.context, self.current_function, "fmt.enum.merge")
+    let default_bb = wl_append_bb(self.context, self.current_function, "fmt.enum.default")
+    var vi = 0
+    while vi < variant_count:
+        let case_bb = wl_append_bb(self.context, self.current_function, "fmt.enum.case")
+        let else_bb = if vi + 1 < variant_count: wl_append_bb(self.context, self.current_function, "fmt.enum.next") else: default_bb
+        let disc = self.mir_enum_variant_discriminant(enum_sema_ty, vi)
+        let cond = wl_build_icmp(self.builder, wl_int_eq(), tag_val, wl_const_int(tag_ty, disc, 0))
+        wl_build_cond_br(self.builder, cond, case_bb, else_bb)
+        wl_position_at_end(self.builder, case_bb)
+        let case_str = self.gen_display_enum_variant(val, enum_sema_ty, vi, str_ty)
+        wl_build_store(self.builder, case_str, result_ptr)
+        wl_build_br(self.builder, merge_bb)
+        if vi + 1 < variant_count:
+            wl_position_at_end(self.builder, else_bb)
+        vi = vi + 1
+    wl_position_at_end(self.builder, default_bb)
+    wl_build_store(self.builder, self.gen_string_literal_raw("<invalid enum>"), result_ptr)
+    wl_build_br(self.builder, merge_bb)
+    wl_position_at_end(self.builder, merge_bb)
+    wl_build_load(self.builder, str_ty, result_ptr)
 
 fn Codegen.gen_fmt_with_spec(self: Codegen, val: i64, flags: i32, width: i32, precision: i32, mode: i32, str_ty: i64) -> i64:
     // Dispatch to runtime with_fmt_*_spec based on LLVM value type.
@@ -2180,6 +2423,18 @@ fn Codegen.mir_find_named_type(self: Codegen, type_sym: i32) -> i32:
         if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_ENUM:
             continue
         if self.mir_input.sema_type_d0.get(ti as i64) == type_sym:
+            return ti
+    0
+
+fn Codegen.mir_find_named_type_text(self: Codegen, type_name: str) -> i32:
+    if type_name.len() == 0:
+        return 0
+    for ti in 0..self.mir_input.sema_type_kinds.len() as i32:
+        let tk = self.mir_input.sema_type_kinds.get(ti as i64)
+        if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_ENUM:
+            continue
+        let sym = self.mir_input.sema_type_d0.get(ti as i64)
+        if self.sema_symbol_text(sym) == type_name:
             return ti
     0
 
@@ -3718,8 +3973,11 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_TO_STR:
         let fmt_val = self.mir_intrinsic_arg(body, args_id, 0)
+        let fmt_arg_start = body.call_arg_starts.get(args_id as i64)
+        let fmt_op = body.call_arg_operands.get(fmt_arg_start as i64)
+        let fmt_sema_ty = self.mir_operand_sema_type(body, fmt_op)
         let fmt_str_ty = self.resolve_named_type(self.intern.intern("str"))
-        result = self.coerce_val_to_str(fmt_val, fmt_str_ty)
+        result = self.coerce_typed_val_to_str(fmt_val, fmt_sema_ty, fmt_str_ty)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_DEBUG_STR:
         let dbg_val = self.mir_intrinsic_arg(body, args_id, 0)
