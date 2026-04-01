@@ -2009,10 +2009,28 @@ fn Codegen.mir_eval_call_operand(self: Codegen, body: MirBody, operand_id: i32, 
         self.debug_call_coerce_failure(call_context, 0, arg_index, 0, val, expected_ty)
     coerced
 
+fn Codegen.mir_unwrap_ref_like_sema_type(self: Codegen, sema_ty: i32) -> i32:
+    var current = sema_ty
+    for _ in 0..4:
+        if current <= 0:
+            return 0
+        let resolved = self.mir_input.mir_resolve_alias(current)
+        let tk = self.mir_input.mir_get_type_kind(resolved)
+        if tk != TypeKind.TY_REF and tk != TypeKind.TY_PTR:
+            return resolved
+        current = self.mir_input.mir_get_type_d0(resolved)
+    current
+
 fn Codegen.mir_intrinsic_recv_ptr(self: Codegen, body: MirBody, args_id: i32) -> i64:
     // Get a pointer to the receiver (arg 0) for instance method intrinsics.
     let arg_start = body.call_arg_starts.get(args_id as i64)
     let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    let recv_resolved = self.mir_unwrap_ref_like_sema_type(recv_sema)
+    if recv_sema > 0 and recv_resolved != recv_sema:
+        let recv_val = self.mir_eval_operand(body, recv_op, 0)
+        if wl_get_type_kind(wl_type_of(recv_val)) == wl_pointer_type_kind():
+            return recv_val
     let ok = body.operand_kinds.get(recv_op as i64)
     let od = body.operand_d0.get(recv_op as i64)
     // If operand is a place (Copy/Move), try to get its pointer directly.
@@ -2036,6 +2054,22 @@ fn Codegen.mir_intrinsic_recv_ptr(self: Codegen, body: MirBody, args_id: i32) ->
     wl_build_store(self.builder, val, alloca)
     alloca
 
+fn Codegen.mir_intrinsic_recv_vec_value(self: Codegen, body: MirBody, args_id: i32) -> i64:
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv = self.mir_intrinsic_arg(body, args_id, 0)
+    if wl_get_type_kind(wl_type_of(recv)) == wl_struct_type_kind():
+        return recv
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    let recv_unwrapped = self.mir_unwrap_ref_like_sema_type(recv_sema)
+    if recv_unwrapped > 0:
+        let recv_llvm_ty = self.mir_sema_type_to_llvm(recv_unwrapped)
+        if recv_llvm_ty != 0 and wl_get_type_kind(recv_llvm_ty) == wl_struct_type_kind():
+            let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+            if recv_ptr != 0 and wl_get_type_kind(wl_type_of(recv_ptr)) == wl_pointer_type_kind():
+                return wl_build_load(self.builder, recv_llvm_ty, recv_ptr)
+    recv
+
 fn Codegen.mir_intrinsic_arg(self: Codegen, body: MirBody, args_id: i32, idx: i32) -> i64:
     let arg_start = body.call_arg_starts.get(args_id as i64)
     let op_id = body.call_arg_operands.get((arg_start + idx) as i64)
@@ -2045,10 +2079,36 @@ fn Codegen.mir_extract_map_ptr(self: Codegen, recv: i64) -> i64:
     // HashMap value is either { ptr } struct or raw ptr (from field access).
     let recv_ty = wl_type_of(recv)
     if wl_get_type_kind(recv_ty) == wl_pointer_type_kind():
+        let pointee_ty = wl_get_element_type(recv_ty)
+        if pointee_ty != 0 and wl_get_type_kind(pointee_ty) == wl_struct_type_kind():
+            let loaded = wl_build_load(self.builder, pointee_ty, recv)
+            return wl_build_extract_value(self.builder, loaded, 0)
         return recv
     if wl_get_type_kind(recv_ty) == wl_struct_type_kind():
         return wl_build_extract_value(self.builder, recv, 0)
     recv
+
+fn Codegen.mir_intrinsic_map_handle(self: Codegen, body: MirBody, args_id: i32) -> i64:
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv = self.mir_intrinsic_arg(body, args_id, 0)
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    if recv_sema > 0:
+        let recv_resolved = self.mir_input.mir_resolve_alias(recv_sema)
+        let recv_tk = self.mir_input.mir_get_type_kind(recv_resolved)
+        if recv_tk == TypeKind.TY_REF or recv_tk == TypeKind.TY_PTR:
+            let pointee_sema = self.mir_input.mir_get_type_d0(recv_resolved)
+            if pointee_sema > 0:
+                let pointee_resolved = self.mir_input.mir_resolve_alias(pointee_sema)
+                if self.mir_input.mir_get_type_kind(pointee_resolved) == TypeKind.TY_GENERIC_INST:
+                    let base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(pointee_resolved))
+                    if base_sym == self.sym_hashmap or base_sym == self.sym_hashset:
+                        let pointee_ty = self.mir_sema_type_to_llvm(pointee_resolved)
+                        if pointee_ty != 0 and wl_get_type_kind(wl_type_of(recv)) == wl_pointer_type_kind():
+                            let loaded = wl_build_load(self.builder, pointee_ty, recv)
+                            if wl_get_type_kind(wl_type_of(loaded)) == wl_struct_type_kind():
+                                return wl_build_extract_value(self.builder, loaded, 0)
+    self.mir_extract_map_ptr(recv)
 
 fn Codegen.mir_intrinsic_dest_sema_type(self: Codegen, body: MirBody, dest_place: i32) -> i32:
     if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
@@ -2375,7 +2435,7 @@ fn Codegen.mir_vec_elem_type(self: Codegen, body: MirBody, recv_op_id: i32) -> i
     // Infer Vec element LLVM type from the receiver's sema type (using snapshot).
     let sema_ty = self.mir_operand_sema_type(body, recv_op_id)
     if sema_ty > 0:
-        let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+        let resolved = self.mir_unwrap_ref_like_sema_type(sema_ty)
         let tk = self.mir_input.mir_get_type_kind(resolved)
         if tk == TypeKind.TY_GENERIC_INST:
             let arg_count = self.mir_input.mir_get_type_d2(resolved)
@@ -2389,7 +2449,7 @@ fn Codegen.mir_vec_elem_type(self: Codegen, body: MirBody, recv_op_id: i32) -> i
 fn Codegen.mir_hashmap_key_type(self: Codegen, body: MirBody, recv_op_id: i32) -> i64:
     let sema_ty = self.mir_operand_sema_type(body, recv_op_id)
     if sema_ty > 0:
-        let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+        let resolved = self.mir_unwrap_ref_like_sema_type(sema_ty)
         let tk = self.mir_input.mir_get_type_kind(resolved)
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
@@ -2404,7 +2464,7 @@ fn Codegen.mir_hashmap_key_type(self: Codegen, body: MirBody, recv_op_id: i32) -
 fn Codegen.mir_hashmap_value_type(self: Codegen, body: MirBody, recv_op_id: i32) -> i64:
     let sema_ty = self.mir_operand_sema_type(body, recv_op_id)
     if sema_ty > 0:
-        let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+        let resolved = self.mir_unwrap_ref_like_sema_type(sema_ty)
         let tk = self.mir_input.mir_get_type_kind(resolved)
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
@@ -2632,7 +2692,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_load(self.builder, elem_ty, raw_ptr)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_LEN:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
         result = wl_build_extract_value(self.builder, recv, 1)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_SET:
@@ -2678,7 +2738,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_POP:
         // Pop: get last element, remove it. Simplified: just return default.
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
         let len = wl_build_extract_value(self.builder, recv, 1)
         let last_idx = wl_build_sub(self.builder, len, wl_const_int(i64_ty, 1, 0))
         let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
@@ -2734,9 +2794,8 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_insert_value(self.builder, empty, handle, 0)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_INSERT:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
-        let map_ptr = self.mir_extract_map_ptr(recv)
         let recv_op = body.call_arg_operands.get(arg_start as i64)
+        let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
         let val_raw = self.mir_intrinsic_arg(body, args_id, 2)
         let key_ty = self.mir_hashmap_key_type(body, recv_op)
@@ -2763,9 +2822,8 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_GET:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
-        let map_ptr = self.mir_extract_map_ptr(recv)
         let recv_op = body.call_arg_operands.get(arg_start as i64)
+        let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
         let key_ty = self.mir_hashmap_key_type(body, recv_op)
         let key = if key_ty != 0 and wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
@@ -2804,9 +2862,8 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             result = val
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_CONTAINS:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
-        let map_ptr = self.mir_extract_map_ptr(recv)
         let recv_op = body.call_arg_operands.get(arg_start as i64)
+        let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
         let key_ty = self.mir_hashmap_key_type(body, recv_op)
         let key = if key_ty != 0 and wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
@@ -2827,8 +2884,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i64_ty, 0, 0))
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_LEN:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
-        let map_ptr = self.mir_extract_map_ptr(recv)
+        let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let fn_val = self.ensure_hm_fn("with_hashmap_len", i64_ty)
         let fn_ty = wl_function_type(i64_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
         let args: Vec[i64] = Vec.new()
@@ -2836,8 +2892,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
-        let map_ptr = self.mir_extract_map_ptr(recv)
+        let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let key = self.mir_intrinsic_arg(body, args_id, 1)
         let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
         wl_build_store(self.builder, key, key_alloca)
@@ -2855,8 +2910,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 3)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
-        let map_ptr = self.mir_extract_map_ptr(recv)
+        let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let fn_val = self.ensure_hm_fn("with_hashmap_clear", void_ty)
         let fn_ty = wl_function_type(void_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
         let args: Vec[i64] = Vec.new()
@@ -2864,9 +2918,8 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_KEYS:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
-        let map_ptr = self.mir_extract_map_ptr(recv)
         let recv_op = body.call_arg_operands.get(arg_start as i64)
+        let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         var key_ty = self.mir_hashmap_key_type(body, recv_op)
         if key_ty == 0:
             key_ty = i64_ty
@@ -3079,7 +3132,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_ITER:
         // Vec.iter() — create VecIter[T] from Vec
         // VecIter = { data_ptr: i64, len: i64, idx: i64 }
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
         let iter_fields: Vec[i64] = Vec.new()
         iter_fields.push(i64_ty)
         iter_fields.push(i64_ty)
@@ -3593,7 +3646,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         result = self.mir_emit_vec_contains(body, args_id)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_JOIN:
-        let vj_recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let vj_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
         let vj_sep = self.mir_intrinsic_arg(body, args_id, 1)
         let vj_str_sym = self.intern.intern("str")
         let vj_str_ty = self.struct_llvm_types.get(self.struct_type_map.get(vj_str_sym).unwrap() as i64)
@@ -3818,7 +3871,7 @@ fn Codegen.mir_emit_vec_map(self: Codegen, body: MirBody, args_id: i32) -> i64:
     let i32_ty = wl_i32_type(self.context)
     let ptr_ty = wl_ptr_type(self.context)
     let void_ty = wl_void_type(self.context)
-    let recv = self.mir_intrinsic_arg(body, args_id, 0)
+    let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
     let fn_val = self.mir_intrinsic_arg(body, args_id, 1)
     let cty = wl_type_of(fn_val)
     var fn_ptr = fn_val
@@ -3897,7 +3950,7 @@ fn Codegen.mir_emit_vec_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
     let i32_ty = wl_i32_type(self.context)
     let ptr_ty = wl_ptr_type(self.context)
     let void_ty = wl_void_type(self.context)
-    let recv = self.mir_intrinsic_arg(body, args_id, 0)
+    let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
     let fn_val = self.mir_intrinsic_arg(body, args_id, 1)
     let cty = wl_type_of(fn_val)
     var fn_ptr = fn_val
@@ -3973,7 +4026,7 @@ fn Codegen.mir_emit_vec_contains(self: Codegen, body: MirBody, args_id: i32) -> 
     let i64_ty = wl_i64_type(self.context)
     let i1_ty = wl_i1_type(self.context)
     let ptr_ty = wl_ptr_type(self.context)
-    let recv = self.mir_intrinsic_arg(body, args_id, 0)
+    let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
     let needle_raw = self.mir_intrinsic_arg(body, args_id, 1)
     let arg_start = body.call_arg_starts.get(args_id as i64)
     let recv_op = body.call_arg_operands.get(arg_start as i64)
@@ -4022,7 +4075,7 @@ fn Codegen.mir_emit_vec_fold(self: Codegen, body: MirBody, args_id: i32) -> i64:
     let i64_ty = wl_i64_type(self.context)
     let i32_ty = wl_i32_type(self.context)
     let ptr_ty = wl_ptr_type(self.context)
-    let recv = self.mir_intrinsic_arg(body, args_id, 0)
+    let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
     let init = self.mir_intrinsic_arg(body, args_id, 1)
     let fn_val = self.mir_intrinsic_arg(body, args_id, 2)
     let cty = wl_type_of(fn_val)
