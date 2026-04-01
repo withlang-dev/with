@@ -526,6 +526,15 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 indices.push(idx_val)
                 cur_ptr = wl_build_gep(self.builder, elem_llvm, cur_ptr, vec_data_i64(&indices), 1)
                 cur_ty = elem_llvm
+            else if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
+                // Raw pointer indexing: load the pointer, then GEP.
+                if elem_llvm == 0:
+                    return 0
+                let raw_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
+                let indices: Vec[i64] = Vec.new()
+                indices.push(idx_val)
+                cur_ptr = wl_build_gep(self.builder, elem_llvm, raw_ptr, vec_data_i64(&indices), 1)
+                cur_ty = elem_llvm
             else:
                 // Vec, str, and slices all store their data pointer in field 0.
                 if elem_llvm == 0:
@@ -1290,6 +1299,218 @@ fn Codegen.gen_fmt_with_spec(self: Codegen, val: i64, flags: i32, width: i32, pr
     // Fallback: default format
     self.coerce_val_to_str(val, str_ty)
 
+// ── LLVM math intrinsic recognition ──────────────────────────────
+//
+// When codegen sees a call to sqrt, sin, cos, etc., emit the LLVM
+// intrinsic (e.g., @llvm.sqrt.f64) instead of a library call. This
+// compiles to hardware instructions where available (fsqrt on ARM64)
+// and eliminates the libm dependency for these functions.
+
+fn Codegen.try_emit_llvm_math_intrinsic(self: Codegen, fn_sym: i32, args: Vec[i64], dest_place: i32, body: MirBody, next_bb: i32) -> bool:
+    if fn_sym == 0 or args.len() == 0:
+        return false
+    let name = self.intern.resolve(fn_sym)
+    if name.len() == 0:
+        return false
+
+    // Determine LLVM intrinsic name. Only f64 variants for now.
+    var intrinsic_name = ""
+    var arg_count: i32 = 1
+    if name == "sqrt":   intrinsic_name = "llvm.sqrt.f64"
+    if name == "sin":    intrinsic_name = "llvm.sin.f64"
+    if name == "cos":    intrinsic_name = "llvm.cos.f64"
+    if name == "exp":    intrinsic_name = "llvm.exp.f64"
+    if name == "exp2":   intrinsic_name = "llvm.exp2.f64"
+    if name == "log":    intrinsic_name = "llvm.log.f64"
+    if name == "log2":   intrinsic_name = "llvm.log2.f64"
+    if name == "log10":  intrinsic_name = "llvm.log10.f64"
+    if name == "fabs":   intrinsic_name = "llvm.fabs.f64"
+    if name == "floor":  intrinsic_name = "llvm.floor.f64"
+    if name == "ceil":   intrinsic_name = "llvm.ceil.f64"
+    if name == "round":  intrinsic_name = "llvm.round.f64"
+    if name == "pow":
+        intrinsic_name = "llvm.pow.f64"
+        arg_count = 2
+    if name == "fma":
+        intrinsic_name = "llvm.fma.f64"
+        arg_count = 3
+
+    if intrinsic_name.len() == 0:
+        return false
+
+    // Verify the first argument is f64
+    let first_arg = args.get(0)
+    let arg_ty = wl_type_of(first_arg)
+    if wl_get_type_kind(arg_ty) != wl_double_type_kind():
+        return false
+
+    let f64_ty = wl_f64_type(self.context)
+
+    // Get or create the LLVM intrinsic declaration
+    let isym = self.intern.intern(intrinsic_name)
+    var func = 0 as i64
+    let cached = self.fn_values.get(isym)
+    if cached.is_some():
+        func = cached.unwrap() as i64
+    else:
+        let pts: Vec[i64] = Vec.new()
+        for i in 0..arg_count:
+            pts.push(f64_ty)
+        let ft = wl_function_type(f64_ty, vec_data_i64(&pts), arg_count, 0)
+        func = wl_add_function(self.llmod, intrinsic_name, ft)
+        self.fn_values.insert(isym, func)
+        self.fn_fn_types.insert(isym, ft)
+
+    let ft = self.fn_fn_types.get(isym).unwrap() as i64
+
+    // Build call args (cast to f64 if needed)
+    let call_args: Vec[i64] = Vec.new()
+    for i in 0..arg_count:
+        let a = args.get(i as i64)
+        let ak = wl_get_type_kind(wl_type_of(a))
+        if ak == wl_float_type_kind():
+            call_args.push(wl_build_fp_cast(self.builder, a, f64_ty))
+        else:
+            call_args.push(a)
+
+    let result = wl_build_call(self.builder, ft, func, vec_data_i64(&call_args), arg_count)
+
+    // Store result to dest
+    if dest_place >= 0 and result != 0:
+        let dst_local = body.place_locals.get(dest_place as i64)
+        let dst_ty = wl_type_of(result)
+        let dst_ptr = self.mir_place_ptr(body, dest_place, true, dst_ty)
+        if dst_ptr != 0:
+            wl_build_store(self.builder, result, dst_ptr)
+        self.mir_local_types.insert(dst_local, dst_ty)
+
+    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+        let next_val = self.mir_bb_values.get(next_bb as i64)
+        wl_build_br(self.builder, next_val)
+    true
+
+// ── FmtBuffer codegen helpers ────────────────────────────────────
+
+fn Codegen.ensure_fmt_buf_fn(self: Codegen, name: str, param_types: Vec[i64], param_count: i32, ret_ty: i64) -> i64:
+    let sym = self.intern.intern(name)
+    let fv = self.fn_values.get(sym)
+    if fv.is_some():
+        return fv.unwrap() as i64
+    let ft = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, 0)
+    let func = wl_add_function(self.llmod, name, ft)
+    self.fn_values.insert(sym, func)
+    self.fn_fn_types.insert(sym, ft)
+    func
+
+fn Codegen.gen_fmt_buf_new(self: Codegen) -> i64:
+    let ptr_ty = wl_ptr_type(self.context)
+    let pts: Vec[i64] = Vec.new()
+    let func = self.ensure_fmt_buf_fn("with_fmt_buf_new", pts, 0, ptr_ty)
+    let ft_sym = self.intern.intern("with_fmt_buf_new")
+    let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
+    wl_build_call(self.builder, ft, func, 0, 0)
+
+fn Codegen.gen_fmt_buf_write_str(self: Codegen, buf: i64, s: i64):
+    let ptr_ty = wl_ptr_type(self.context)
+    let str_ty = self.resolve_named_type(self.intern.intern("str"))
+    let pts: Vec[i64] = Vec.new()
+    pts.push(ptr_ty)
+    pts.push(str_ty)
+    let func = self.ensure_fmt_buf_fn("with_fmt_buf_write_str", pts, 2, wl_void_type(self.context))
+    let ft_sym = self.intern.intern("with_fmt_buf_write_str")
+    let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
+    let args: Vec[i64] = Vec.new()
+    args.push(buf)
+    args.push(s)
+    wl_build_call(self.builder, ft, func, vec_data_i64(&args), 2)
+
+fn Codegen.gen_fmt_buf_write_fmt(self: Codegen, buf: i64, val: i64, flags: i32, width: i32, precision: i32, mode: i32):
+    // Dispatch by LLVM type: integer → i64_spec, float → f64_spec, string → str_spec
+    let val_ty = wl_type_of(val)
+    let vk = wl_get_type_kind(val_ty)
+    let ptr_ty = wl_ptr_type(self.context)
+    let i32_ty = wl_i32_type(self.context)
+    let i64_ty = wl_i64_type(self.context)
+
+    if vk == wl_integer_type_kind():
+        // Integer: with_fmt_buf_write_i64_spec(buf, val, is_unsigned, flags, width, precision, mode)
+        let coerced = self.coerce_int_ext(val, i64_ty, false)
+        let pts: Vec[i64] = Vec.new()
+        pts.push(ptr_ty)
+        pts.push(i64_ty)
+        pts.push(i32_ty)
+        pts.push(i64_ty)
+        pts.push(i32_ty)
+        pts.push(i32_ty)
+        pts.push(i32_ty)
+        let func = self.ensure_fmt_buf_fn("with_fmt_buf_write_i64_spec", pts, 7, wl_void_type(self.context))
+        let ft_sym = self.intern.intern("with_fmt_buf_write_i64_spec")
+        let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
+        let args: Vec[i64] = Vec.new()
+        args.push(buf)
+        args.push(coerced)
+        args.push(wl_const_int(i32_ty, 0, 0))  // is_unsigned
+        args.push(wl_const_int(i64_ty, flags as i64, 0))
+        args.push(wl_const_int(i32_ty, width as i64, 0))
+        args.push(wl_const_int(i32_ty, precision as i64, 0))
+        args.push(wl_const_int(i32_ty, mode as i64, 0))
+        wl_build_call(self.builder, ft, func, vec_data_i64(&args), 7)
+
+    else if vk == wl_float_type_kind() or vk == wl_double_type_kind():
+        // Float: with_fmt_buf_write_f64_spec(buf, val, flags, width, precision, mode)
+        let f64_ty = wl_f64_type(self.context)
+        let coerced = if vk == wl_float_type_kind(): wl_build_fp_cast(self.builder, val, f64_ty) else: val
+        let pts: Vec[i64] = Vec.new()
+        pts.push(ptr_ty)
+        pts.push(f64_ty)
+        pts.push(i64_ty)
+        pts.push(i32_ty)
+        pts.push(i32_ty)
+        pts.push(i32_ty)
+        let func = self.ensure_fmt_buf_fn("with_fmt_buf_write_f64_spec", pts, 6, wl_void_type(self.context))
+        let ft_sym = self.intern.intern("with_fmt_buf_write_f64_spec")
+        let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
+        let args: Vec[i64] = Vec.new()
+        args.push(buf)
+        args.push(coerced)
+        args.push(wl_const_int(i64_ty, flags as i64, 0))
+        args.push(wl_const_int(i32_ty, width as i64, 0))
+        args.push(wl_const_int(i32_ty, precision as i64, 0))
+        args.push(wl_const_int(i32_ty, mode as i64, 0))
+        wl_build_call(self.builder, ft, func, vec_data_i64(&args), 6)
+
+    else:
+        // String or other: with_fmt_buf_write_str_spec(buf, val, flags, width, precision)
+        let str_ty = self.resolve_named_type(self.intern.intern("str"))
+        let pts: Vec[i64] = Vec.new()
+        pts.push(ptr_ty)
+        pts.push(str_ty)
+        pts.push(i64_ty)
+        pts.push(i32_ty)
+        pts.push(i32_ty)
+        let func = self.ensure_fmt_buf_fn("with_fmt_buf_write_str_spec", pts, 5, wl_void_type(self.context))
+        let ft_sym = self.intern.intern("with_fmt_buf_write_str_spec")
+        let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
+        let args: Vec[i64] = Vec.new()
+        args.push(buf)
+        args.push(val)
+        args.push(wl_const_int(i64_ty, flags as i64, 0))
+        args.push(wl_const_int(i32_ty, width as i64, 0))
+        args.push(wl_const_int(i32_ty, precision as i64, 0))
+        wl_build_call(self.builder, ft, func, vec_data_i64(&args), 5)
+
+fn Codegen.gen_fmt_buf_finish(self: Codegen, buf: i64) -> i64:
+    let ptr_ty = wl_ptr_type(self.context)
+    let str_ty = self.resolve_named_type(self.intern.intern("str"))
+    let pts: Vec[i64] = Vec.new()
+    pts.push(ptr_ty)
+    let func = self.ensure_fmt_buf_fn("with_fmt_buf_finish", pts, 1, str_ty)
+    let ft_sym = self.intern.intern("with_fmt_buf_finish")
+    let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
+    let args: Vec[i64] = Vec.new()
+    args.push(buf)
+    wl_build_call(self.builder, ft, func, vec_data_i64(&args), 1)
+
 fn Codegen.mir_pointer_elem_llvm_type(self: Codegen, sema_ty: i32) -> i64:
     if sema_ty <= 0:
         return 0
@@ -1852,6 +2073,9 @@ fn Codegen.mir_index_elem_sema_type(self: Codegen, sema_ty: i32) -> i32:
         return self.mir_input.mir_get_type_d0(resolved)
     if tk == TypeKind.TY_STR:
         return self.sema.ty_i32 as i32
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        // d0 = pointee type id
+        return self.mir_input.mir_get_type_d0(resolved)
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
         let arg_count = self.mir_input.mir_get_type_d2(resolved)
@@ -3441,6 +3665,35 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let sp_mode = sp_flags & 255
         result = self.gen_fmt_with_spec(sp_val, sp_flags, sp_width, sp_prec, sp_mode, sp_str_ty)
 
+    // ── FmtBuffer intrinsics (f-string formatting via buffer) ────
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_BUF_NEW:
+        result = self.gen_fmt_buf_new()
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_BUF_WRITE_STR:
+        let fb_buf = self.mir_intrinsic_arg(body, args_id, 0)
+        let fb_str = self.mir_intrinsic_arg(body, args_id, 1)
+        self.gen_fmt_buf_write_str(fb_buf, fb_str)
+        result = wl_const_int(wl_i32_type(self.context), 0, 0)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_BUF_WRITE_FMT:
+        // args: [buf, value, flags, width, precision, sema_type_id]
+        let fb_buf = self.mir_intrinsic_arg(body, args_id, 0)
+        let fb_val = self.mir_intrinsic_arg(body, args_id, 1)
+        let fb_flags_v = self.mir_intrinsic_arg(body, args_id, 2)
+        let fb_width_v = self.mir_intrinsic_arg(body, args_id, 3)
+        let fb_prec_v = self.mir_intrinsic_arg(body, args_id, 4)
+        let fb_type_v = self.mir_intrinsic_arg(body, args_id, 5)
+        let fb_flags = wl_const_int_sext_val(fb_flags_v) as i32
+        let fb_width = wl_const_int_sext_val(fb_width_v) as i32
+        let fb_prec = wl_const_int_sext_val(fb_prec_v) as i32
+        let fb_mode = fb_flags & 255
+        self.gen_fmt_buf_write_fmt(fb_buf, fb_val, fb_flags, fb_width, fb_prec, fb_mode)
+        result = wl_const_int(wl_i32_type(self.context), 0, 0)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_BUF_FINISH:
+        let fb_buf = self.mir_intrinsic_arg(body, args_id, 0)
+        result = self.gen_fmt_buf_finish(fb_buf)
+
     else:
         return false
 
@@ -4450,6 +4703,10 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         for di in 0..args.len() as i32:
             let a = args.get(di as i64)
             with_eprint(f"[mir-call]   arg[{di}] ty_kind={wl_get_type_kind(wl_type_of(a))}")
+    // LLVM intrinsic recognition: emit hardware instructions for known math functions.
+    let llvm_intrinsic_result = self.try_emit_llvm_math_intrinsic(callee_fn_sym, args, dest_place, body, next_bb)
+    if llvm_intrinsic_result:
+        return true
     let call_val = wl_build_call(self.builder, call_ft, actual_callee, vec_data_i64(&args), actual_arg_count)
     let ret_ty = wl_get_return_type(call_ft)
     if ret_ty != wl_void_type(self.context):

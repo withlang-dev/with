@@ -719,7 +719,13 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
         final_body = self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, self.pool.get_start(body), self.pool.get_end(body), body, 0, 0)
     let fn_node = self.pool.add_node(NodeKind.NK_FN_DECL, start, self.pool.get_end(body), name, final_body, flags)
     let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT
-    self.pool.add_fn_meta(fn_node, meta_flags, ret_type, params_start, param_count, tp_start, tp_count)
+    // @[c_export("name")] on non-extern fn: store callconv in tp_start slot
+    var final_tp_start = tp_start
+    var final_tp_count = tp_count
+    if self.pending_callconv != 0 and tp_count == 0:
+        final_tp_start = self.pending_callconv
+        self.pending_callconv = 0
+    self.pool.add_fn_meta(fn_node, meta_flags, ret_type, params_start, param_count, final_tp_start, final_tp_count)
     self.pool.add_fn_param_pattern_meta(fn_node, self.last_param_pattern_start, self.last_param_pattern_count)
     if self.last_where_count > 0:
         self.pool.add_where_meta(fn_node, self.last_where_start, self.last_where_count)

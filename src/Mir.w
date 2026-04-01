@@ -154,6 +154,10 @@ enum MirIntrinsic: i32:
     MIR_INTRINSIC_ATOMIC_CAS = 74
     MIR_INTRINSIC_ATOMIC_CAS_WEAK = 75
     MIR_INTRINSIC_ATOMIC_FENCE = 76
+    MIR_INTRINSIC_FMT_BUF_NEW = 77
+    MIR_INTRINSIC_FMT_BUF_WRITE_STR = 78
+    MIR_INTRINSIC_FMT_BUF_WRITE_FMT = 79
+    MIR_INTRINSIC_FMT_BUF_FINISH = 80
 
 // ── Projection kinds ─────────────────────────────────────────────
 

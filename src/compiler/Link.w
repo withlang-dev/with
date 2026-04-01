@@ -160,6 +160,32 @@ fn link_stage_find_runtime_object_path(name: str) -> str:
         return tmp_path
     ""
 
+fn link_stage_should_use_rt_core(obj_path: str) -> bool:
+    // Use the libc-free runtime for user programs that don't need LLVM bridge
+    // or c_import. The compiler itself (which needs wl_* symbols) always uses
+    // the libc-backed helpers.o runtime.
+    let undef = link_stage_undefined_symbols_for_object(obj_path)
+    if undef == "<probe-failed>":
+        return false
+    // If it needs LLVM bridge, it's the compiler — use libc runtime
+    if link_stage_str_contains(undef, "_wl_"):
+        return false
+    // If it uses c_import symbols or libc functions directly, use libc runtime
+    if link_stage_str_contains(undef, "_fopen"):
+        return false
+    if link_stage_str_contains(undef, "_fwrite"):
+        return false
+    if link_stage_str_contains(undef, "_printf"):
+        return false
+    if link_stage_str_contains(undef, "_malloc"):
+        return false
+    if link_stage_str_contains(undef, "_fclose"):
+        return false
+    // Check if it needs with_* symbols (which we provide in rt_core)
+    if link_stage_str_contains(undef, "_with_"):
+        return true
+    false
+
 fn link_stage_object_needs_llvm_bridge(obj_path: str) -> bool:
     let probe = "nm -u " ++ obj_path ++ " 2>/dev/null | grep -q '_wl_'"
     (probe |> with_system) == 0
@@ -236,16 +262,31 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
 
     let needs_helpers_runtime = link_stage_object_needs_helpers_runtime(obj_path)
     if needs_helpers_runtime != 0:
-        let support_runtime_path = link_stage_find_runtime_object_path("support_runtime.o")
-        if support_runtime_path.len() == 0:
-            with_eprint("error: missing runtime/support_runtime.o")
-            return false
-        extras.push(support_runtime_path)
-        let helpers_path = link_stage_find_runtime_object_path("helpers.o")
-        if helpers_path.len() == 0:
-            with_eprint("error: missing runtime/helpers.o")
-            return false
-        extras.push(helpers_path)
+        let use_rt_core = link_stage_should_use_rt_core(obj_path)
+        if use_rt_core:
+            // Use libc-free runtime for user programs
+            let rt_core_path = link_stage_find_runtime_object_path("rt_core.o")
+            if rt_core_path.len() == 0:
+                with_eprint("error: missing rt_core.o")
+                return false
+            extras.push(rt_core_path)
+            let rt_platform_path = link_stage_find_runtime_object_path("rt_darwin_aarch64.o")
+            if rt_platform_path.len() == 0:
+                with_eprint("error: missing rt_darwin_aarch64.o")
+                return false
+            extras.push(rt_platform_path)
+        else:
+            // Use libc-backed runtime for compiler and c_import programs
+            let support_runtime_path = link_stage_find_runtime_object_path("support_runtime.o")
+            if support_runtime_path.len() == 0:
+                with_eprint("error: missing runtime/support_runtime.o")
+                return false
+            extras.push(support_runtime_path)
+            let helpers_path = link_stage_find_runtime_object_path("helpers.o")
+            if helpers_path.len() == 0:
+                with_eprint("error: missing runtime/helpers.o")
+                return false
+            extras.push(helpers_path)
 
     // Link libcurl when HTTP functions are used (package management)
     let undef_syms = link_stage_undefined_symbols_for_object(obj_path)

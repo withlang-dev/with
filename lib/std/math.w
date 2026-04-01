@@ -1,8 +1,30 @@
 // std.math — Math utility functions
 //
-// Provides common math operations wrapping C libm functions.
+// No c_import. Transcendental functions declared as extern fn pointing
+// to libSystem symbols (same functions LLVM would call for its intrinsics).
+// On macOS these are in libSystem. On Linux, link with -lm.
 
-use c_import("math.h")
+// ── libm function declarations (non-variadic, extern fn is correct) ──
+
+extern fn sqrt(x: f64) -> f64
+extern fn pow(base: f64, exp: f64) -> f64
+extern fn floor(x: f64) -> f64
+extern fn ceil(x: f64) -> f64
+extern fn round(x: f64) -> f64
+extern fn sin(x: f64) -> f64
+extern fn cos(x: f64) -> f64
+extern fn tan(x: f64) -> f64
+extern fn log(x: f64) -> f64
+extern fn log10(x: f64) -> f64
+extern fn exp(x: f64) -> f64
+extern fn fabs(x: f64) -> f64
+extern fn fmod(x: f64, y: f64) -> f64
+extern fn asin(x: f64) -> f64
+extern fn acos(x: f64) -> f64
+extern fn atan(x: f64) -> f64
+extern fn atan2(y: f64, x: f64) -> f64
+
+// ── Pure With functions (no dependencies) ────────────────────────
 
 /// Absolute value. Returns `0 - x` if `x < 0`, otherwise `x`.
 pub fn abs[T](x: T) -> T:
@@ -33,6 +55,8 @@ pub fn clamp[T](x: T, lo: T, hi: T) -> T:
     if x < lo then lo
     else if x > hi then hi
     else x
+
+// ── Wrappers (stable public API) ────────────────────────────────
 
 /// Square root.
 pub fn sqrt_f64(x: f64) -> f64:

@@ -85,6 +85,11 @@ endif
 
 LIBCLANG_FILE := $(firstword $(wildcard $(LLVM_PREFIX)/lib/libclang.dylib) $(wildcard $(LLVM_PREFIX)/lib/libclang.so))
 
+# libc-free runtime objects for user programs
+RT_CORE_OBJ := $(OUT_LIB_DIR)/rt_core.o
+RT_DARWIN_AARCH64_OBJ := $(OUT_LIB_DIR)/rt_darwin_aarch64.o
+
+# Core runtime artifacts (needed by the compiler itself — all C/asm)
 RUNTIME_ARTIFACTS := \
 	$(HELPERS_OBJ) \
 	$(SUPPORT_RUNTIME_OBJ) \
@@ -95,6 +100,9 @@ RUNTIME_ARTIFACTS := \
 	$(LLVM_BRIDGE_OBJ) \
 	$(CLANG_BRIDGE_OBJ) \
 	$(LLVM_LINK_STAMP)
+
+# With-language runtime objects (compiled by the With compiler, built after stage2)
+RT_WITH_ARTIFACTS := $(RT_CORE_OBJ) $(RT_DARWIN_AARCH64_OBJ)
 
 # Version resolution:
 #   Source of truth: src/version (e.g., "v0.12.0")
@@ -229,6 +237,13 @@ $(FIBER_ASM_OBJ): $(FIBER_ASM_SRC) | $(OUT_LIB_DIR)
 	@if [ -z "$(FIBER_ASM_SRC)" ]; then echo "error: unsupported host architecture $(UNAME_M) for fiber_asm.o" >&2; exit 1; fi
 	$(call HOST_COMPILE,)
 
+$(RT_CORE_OBJ): rt/rt_core.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
+	$(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
+
+# Compile With runtime backend to .o using the With compiler (after stage2 exists)
+$(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
+	$(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
+
 $(EMBEDDED_OBJECTS_INC): scripts/embed_runtime_objects.sh $(HELPERS_OBJ) $(SUPPORT_RUNTIME_OBJ) $(WITH_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) | $(OUT_LIB_DIR)
 	@bash "$(ROOT_DIR)/scripts/embed_runtime_objects.sh" "$(OUT_LIB_DIR)" "$@"
 
@@ -351,7 +366,7 @@ $(STAGE3_BIN): $(STAGE2_BIN) $(GEN_STAMP) $(RUNTIME_LINK)
 	@rm -rf "$(HOME)/.cache/with/c_import"
 	$(call build_stage,$(STAGE2_BIN),stage3,$(STAGE_BUILD_TMP),-O0)
 
-$(CANONICAL_BIN): $(STAGE2_BIN) | $(OUT_BIN_DIR)
+$(CANONICAL_BIN): $(STAGE2_BIN) $(RT_WITH_ARTIFACTS) | $(OUT_BIN_DIR)
 	@rm -f "$@" && rm -rf "$@.dSYM"
 	@cp "$(STAGE2_BIN)" "$@"
 	@[ ! -d "$(STAGE2_BIN).dSYM" ] || cp -R "$(STAGE2_BIN).dSYM" "$@.dSYM"

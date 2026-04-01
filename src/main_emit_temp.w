@@ -55,6 +55,7 @@ fn main -> void:
     var dump_async_mir_flag = false
     var deterministic_mode = false
     var emit_c_mode = false
+    var emit_obj_mode = false
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
@@ -90,6 +91,8 @@ fn main -> void:
             deterministic_mode = true
         if arg == "--emit-c":
             emit_c_mode = true
+        if arg == "--emit-obj":
+            emit_obj_mode = true
         i = i + 1
 
     // Find the first non-flag positional argument after the command.
@@ -97,7 +100,7 @@ fn main -> void:
     let output_path = find_output_arg(argc)
 
     if command == "build":
-        exit(run_build_command(source_file, opt_level, no_std, alloc_mode, emit_c_mode, output_path))
+        exit(run_build_command(source_file, opt_level, no_std, alloc_mode, emit_c_mode, emit_obj_mode, output_path))
         return
     if command == "run":
         if emit_c_mode:
@@ -242,7 +245,7 @@ fn find_output_arg(argc: i32) -> str:
         i = i + 1
     ""
 
-fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, output_path: str) -> i32:
+fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, emit_obj_mode: bool, output_path: str) -> i32:
     if source_file == "":
         with_eprint("error: 'build' requires a source file argument")
         return 1
@@ -256,6 +259,16 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
         with_eprint("emitted C: " ++ c_path)
         with_eprint("compile with zig cc (example):")
         with_eprint("  zig cc -target <triple> -I runtime " ++ c_path ++ " runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_<arch>.s -o <output>")
+        comp.print_warnings()
+        return 0
+    if emit_obj_mode:
+        var obj_path = output_path
+        if obj_path == "":
+            obj_path = link_stage_output_path_for_source(source_file) ++ ".o"
+        let result = comp.emit_object_to_path(source_file, obj_path)
+        if result == "":
+            with_eprint("error: build failed")
+            return 1
         comp.print_warnings()
         return 0
     let bin_path = comp.build_binary(source_file)

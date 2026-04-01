@@ -1048,28 +1048,36 @@ fn MirBuilder.lower_fmt_with_spec(self: MirBuilder, operand: i32, flags: i32, wi
     self.body.new_operand(OperandKind.OK_COPY, result_place)
 
 fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
-    // Desugar NodeKind.NK_FSTRING to BinaryOp.OP_CONCAT chain with explicit formatting.
-    // Each expression segment is converted to str via MirIntrinsic.MIR_INTRINSIC_FMT_TO_STR
-    // before concatenation, so BinaryOp.OP_CONCAT only operates on str operands.
+    // Lower f-string to FmtBuffer approach:
+    //   buf = fmt_buf_new()
+    //   for each segment: fmt_buf_write_*(buf, value, ...)
+    //   result = fmt_buf_finish(buf)
     let seg_count = self.ast.get_data0(node)
     let extra_start = self.ast.get_data1(node)
-    var result = 0
+
+    if seg_count == 0:
+        return self.lower_str_lit(self.pool.intern(""))
+
+    // Step 1: Create FmtBuffer via MIR_INTRINSIC_FMT_BUF_NEW
+    let buf_op = self.lower_fstring_buf_new(node)
+
+    // Step 2: For each segment, emit a write call
     var pos = extra_start
     var i = 0
     while i < seg_count:
         let seg_kind = self.ast.get_extra(pos)
-        var seg_operand = 0
         if seg_kind == FStringSegmentKind.LITERAL:
             let sym = self.ast.get_extra(pos + 1)
-            seg_operand = self.lower_str_lit(sym)
+            let str_op = self.lower_str_lit(sym)
+            self.lower_fstring_buf_write_str(buf_op, str_op, node)
             pos = pos + 2
         else if seg_kind == FStringSegmentKind.EXPR:
             let expr_node = self.ast.get_extra(pos + 1)
             let spec_node = self.ast.get_extra(pos + 2)
-            seg_operand = self.lower_expr(expr_node)
+            let expr_op = self.lower_expr(expr_node)
             let expr_ty = self.expr_type(expr_node)
             let resolved_ty = if expr_ty > 0: self.sema.resolve_alias(expr_ty) else: 0
-            // Handle format spec
+
             var handled = false
             if spec_node != 0:
                 let spec_flags = self.ast.get_data0(spec_node)
@@ -1077,34 +1085,91 @@ fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
                 let spec_width = self.ast.get_data1(spec_node)
                 let spec_precision = self.ast.get_data2(spec_node)
                 if spec_mode == 63:
-                    // Debug mode
-                    seg_operand = self.lower_fmt_debug(seg_operand, resolved_ty, node)
+                    // Debug mode: format to str then write
+                    let debug_str = self.lower_fmt_debug(expr_op, resolved_ty, node)
+                    self.lower_fstring_buf_write_str(buf_op, debug_str, node)
                     handled = true
                 else if spec_mode != 0 or spec_width > 0 or spec_precision >= 0 or (spec_flags & 0x1C0000) != 0:
-                    // Has format spec (mode, width, precision, or sign/alt/zero flags)
-                    seg_operand = self.lower_fmt_with_spec(seg_operand, spec_flags, spec_width, spec_precision, resolved_ty, node)
+                    // Spec formatting: emit FMT_BUF_WRITE_FMT intrinsic
+                    self.lower_fstring_buf_write_fmt(buf_op, expr_op, spec_flags, spec_width, spec_precision, resolved_ty, node)
                     handled = true
-            if not handled and resolved_ty != self.sema.ty_str:
-                // Convert non-str expressions to str via formatting intrinsic
-                seg_operand = self.lower_fmt_to_str(seg_operand, node)
+            if not handled:
+                if resolved_ty == self.sema.ty_str:
+                    // String: write directly
+                    self.lower_fstring_buf_write_str(buf_op, expr_op, node)
+                else:
+                    // Non-str: format to str then write
+                    let formatted = self.lower_fmt_to_str(expr_op, node)
+                    self.lower_fstring_buf_write_str(buf_op, formatted, node)
             pos = pos + 3
         else:
             pos = pos + 1
             i = i + 1
             continue
-        if result == 0:
-            result = seg_operand
-        else:
-            // Emit BinaryOp.OP_CONCAT binary: result ++ seg_operand (both are str)
-            let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_CONCAT, result, seg_operand)
-            let temp = self.new_temp(self.sema.ty_str)
-            let place = self.place_for_local(temp)
-            self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
-            result = self.body.new_operand(OperandKind.OK_COPY, place)
         i = i + 1
-    if result == 0:
-        return self.lower_str_lit(self.pool.intern(""))
-    result
+
+    // Step 3: Finalize buffer to str
+    self.lower_fstring_buf_finish(buf_op, node)
+
+fn MirBuilder.lower_fstring_buf_new(self: MirBuilder, node: i32) -> i32:
+    let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_new"), self.sema.ty_i32)
+    let call_args: Vec[i32] = Vec.new()
+    let args_id = self.body.new_call_args(call_args)
+    // Result is a pointer (use i32 as placeholder sema type, codegen knows it's ptr)
+    let result_local = self.new_temp(self.sema.ty_i32)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.body.set_call_intrinsic(args_id, MirIntrinsic.MIR_INTRINSIC_FMT_BUF_NEW)
+    self.body.new_operand(OperandKind.OK_COPY, result_place)
+
+fn MirBuilder.lower_fstring_buf_write_str(self: MirBuilder, buf_op: i32, str_op: i32, node: i32):
+    let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_write_str"), self.sema.ty_void)
+    let call_args: Vec[i32] = Vec.new()
+    call_args.push(buf_op)
+    call_args.push(str_op)
+    let args_id = self.body.new_call_args(call_args)
+    let result_local = self.new_temp(self.sema.ty_void)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.body.set_call_intrinsic(args_id, MirIntrinsic.MIR_INTRINSIC_FMT_BUF_WRITE_STR)
+
+fn MirBuilder.lower_fstring_buf_write_fmt(self: MirBuilder, buf_op: i32, val_op: i32, flags: i32, width: i32, precision: i32, sema_ty: i32, node: i32):
+    let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_write_fmt"), self.sema.ty_void)
+    let flags_const = self.const_operand(ConstKind.CK_INT, flags, self.sema.ty_i32)
+    let width_const = self.const_operand(ConstKind.CK_INT, width, self.sema.ty_i32)
+    let prec_const = self.const_operand(ConstKind.CK_INT, precision, self.sema.ty_i32)
+    let type_const = self.const_operand(ConstKind.CK_INT, sema_ty, self.sema.ty_i32)
+    let call_args: Vec[i32] = Vec.new()
+    call_args.push(buf_op)
+    call_args.push(val_op)
+    call_args.push(flags_const)
+    call_args.push(width_const)
+    call_args.push(prec_const)
+    call_args.push(type_const)
+    let args_id = self.body.new_call_args(call_args)
+    let result_local = self.new_temp(self.sema.ty_void)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.body.set_call_intrinsic(args_id, MirIntrinsic.MIR_INTRINSIC_FMT_BUF_WRITE_FMT)
+
+fn MirBuilder.lower_fstring_buf_finish(self: MirBuilder, buf_op: i32, node: i32) -> i32:
+    let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_finish"), self.sema.ty_str)
+    let call_args: Vec[i32] = Vec.new()
+    call_args.push(buf_op)
+    let args_id = self.body.new_call_args(call_args)
+    let result_local = self.new_temp(self.sema.ty_str)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.body.set_call_intrinsic(args_id, MirIntrinsic.MIR_INTRINSIC_FMT_BUF_FINISH)
+    self.body.new_operand(OperandKind.OK_COPY, result_place)
 
 fn MirBuilder.lower_float_lit(self: MirBuilder, sym: i32, type_id: i32) -> i32:
     let ty = if type_id == 0 or self.sema.get_type_kind(type_id) == TypeKind.TY_VOID: self.sema.ty_f64 else: type_id
