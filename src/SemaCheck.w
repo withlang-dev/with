@@ -2877,7 +2877,21 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                     self.emit_error(f"parameter '{aname}' specified more than once", node)
                     continue
                 resolved_map.insert(matched, self.ast.get_extra(extra_start + ai))
-            // Third pass: fill defaults for remaining unresolved params
+            // Third pass: fill implicit params from with-implicit scope
+            for pi in 0..param_count:
+                if resolved_map.contains(pi): continue
+                let pflags = self.ast.fn_param_flags(ps, pi)
+                if fn_param_is_implicit(pflags) == 0: continue
+                let expected_ty = self.sig_param_type(sig_idx, pi)
+                var si = self.implicit_binding_types.len() as i32 - 1
+                while si >= 0:
+                    let bind_ty = self.implicit_binding_types.get(si as i64)
+                    if self.types_compatible(expected_ty, bind_ty) != 0:
+                        let bind_sym = self.implicit_binding_syms.get(si as i64)
+                        resolved_map.insert(pi, 0 - bind_sym)
+                        break
+                    si = si - 1
+            // Fourth pass: fill defaults for remaining unresolved params
             for pi in 0..param_count:
                 if not resolved_map.contains(pi):
                     let default_node = self.ast.get_fn_param_default(ps, pi)
@@ -2892,6 +2906,58 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                     final_args.push(0)
             self.store_resolved_call_args(node, final_args)
             resolved_arg_count = param_count - param_offset
+
+    // Implicit parameter resolution for plain calls (no named args).
+    // When the caller provides fewer args than params and the missing
+    // params are implicit, fill them from the with-implicit scope.
+    if self.has_resolved_call_args(node) == 0 and sig_idx >= 0 and self.fn_decl_nodes.contains(fn_sym):
+        if self.implicit_binding_types.len() > 0:
+            let fn_node_impl = self.fn_decl_nodes.get(fn_sym).unwrap()
+            let meta_impl = self.ast.find_fn_meta(fn_node_impl)
+            if meta_impl >= 0:
+                let param_count = self.sig_get_param_count(sig_idx)
+                let actual = arg_count + param_offset
+                if actual < param_count:
+                    let ps = self.ast.fn_meta_param_start(meta_impl)
+                    var has_implicit = 0
+                    for pi in actual..param_count:
+                        let pflags = self.ast.fn_param_flags(ps, pi)
+                        if fn_param_is_implicit(pflags) != 0:
+                            has_implicit = 1
+                            break
+                    if has_implicit != 0:
+                        let resolved_map: HashMap[i32, i32] = HashMap.new()
+                        // Positional args
+                        for ai in 0..arg_count:
+                            resolved_map.insert(ai + param_offset, self.ast.get_extra(extra_start + ai))
+                        // Fill implicit params
+                        for pi in 0..param_count:
+                            if resolved_map.contains(pi): continue
+                            let pflags = self.ast.fn_param_flags(ps, pi)
+                            if fn_param_is_implicit(pflags) == 0: continue
+                            let expected_ty = self.sig_param_type(sig_idx, pi)
+                            var si = self.implicit_binding_types.len() as i32 - 1
+                            while si >= 0:
+                                let bind_ty = self.implicit_binding_types.get(si as i64)
+                                if self.types_compatible(expected_ty, bind_ty) != 0:
+                                    let bind_sym = self.implicit_binding_syms.get(si as i64)
+                                    resolved_map.insert(pi, 0 - bind_sym)
+                                    break
+                                si = si - 1
+                        // Fill defaults
+                        for pi in 0..param_count:
+                            if not resolved_map.contains(pi):
+                                let default_node = self.ast.get_fn_param_default(ps, pi)
+                                if default_node != 0:
+                                    resolved_map.insert(pi, default_node)
+                        let final_args: Vec[i32] = Vec.new()
+                        for pi in param_offset..param_count:
+                            if resolved_map.contains(pi):
+                                final_args.push(resolved_map.get(pi).unwrap())
+                            else:
+                                final_args.push(0)
+                        self.store_resolved_call_args(node, final_args)
+                        resolved_arg_count = param_count - param_offset
 
     // Check all arguments (with contextual expected-type propagation when
     // calling a known function signature).

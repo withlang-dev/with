@@ -15,4 +15,6 @@ fn main:
     assert(sum_to(100, 0) == 5050)
     assert(factorial_acc(5, 1) == 120)
     assert(factorial_acc(10, 1) == 3628800)
+    // Deep recursion — would stack overflow without TCO
+    assert(sum_to(1000000, 0) == 1784293664)
     print("ok")

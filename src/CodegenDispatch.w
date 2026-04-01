@@ -108,6 +108,17 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
         if te_count > 0:
             return wl_struct_type(self.context, vec_data_i64(&elem_types), te_count, 0)
         return wl_i32_type(self.context)
+    if tk == TypeKind.TY_RANGE:
+        let range_elem_tid = self.mir_input.mir_get_type_d0(resolved)
+        var range_elem_llvm = self.mir_sema_type_to_llvm(range_elem_tid)
+        if range_elem_llvm == 0:
+            range_elem_llvm = wl_i32_type(self.context)
+        // Range struct: {start: Elem, end: Elem, inclusive: i8}
+        let range_fields: Vec[i64] = Vec.new()
+        range_fields.push(range_elem_llvm)
+        range_fields.push(range_elem_llvm)
+        range_fields.push(wl_i8_type(self.context))
+        return wl_struct_type(self.context, vec_data_i64(&range_fields), 3, 0)
     if tk == TypeKind.TY_ARRAY:
         let arr_elem_tid = self.mir_input.mir_get_type_d0(resolved)
         let arr_len = self.mir_input.mir_get_type_d1(resolved)
@@ -3188,6 +3199,20 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             if asm_has_output:
                 result = asm_call_result
         // Branch to next bb
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+        return true
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX:
+        // Multi-dimensional indexing: call the multi_index method on the base type.
+        // The base value is the first MIR arg. The spec data is in the AST node.
+        let mi_node = body.call_ast_node(args_id)
+        if mi_node != 0:
+            let base_val = self.mir_intrinsic_arg(body, args_id, 0)
+            // Placeholder: pass through the base value.
+            // Full IndexSpec array construction will be added when
+            // MultiIndex trait impls exist in the stdlib.
+            result = base_val
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
