@@ -16,7 +16,9 @@ set -euo pipefail
 #   //! check-only               — only run check mode (no build/run)
 #
 # Environment:
-#   WITH_TEST_JOBS=N  — number of parallel jobs (default: CPU count)
+#   WITH_TEST_JOBS=N     — number of parallel jobs (default: CPU count)
+#   WITH_TEST_TIMING=1   — show per-test timing and slowest-tests summary
+#   WITH_TEST_TIMEOUT=N  — per-test timeout in seconds (default: 30)
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -25,6 +27,13 @@ source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 COMPILER="${WITH:-./out/bin/with-stage2}"
 RUN_TIMEOUT_SECS="${WITH_TEST_TIMEOUT:-30}"
 JOBS="${WITH_TEST_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)}"
+SHOW_TIMING="${WITH_TEST_TIMING:-0}"
+
+# Portable millisecond clock. Uses perl for sub-second precision
+# (bash SECONDS is integer-only, and date %N is not available on macOS).
+_epoch_ms() {
+  perl -MTime::HiRes=time -e 'printf "%d\n", time()*1000'
+}
 
 if [[ ! -x "$COMPILER" ]]; then
   echo "error: missing compiler: $COMPILER" >&2
@@ -74,6 +83,19 @@ run_single_test() {
   local name
   name="$(basename "$file" .w)"
 
+  local t_start
+  t_start="$(_epoch_ms)"
+
+  # Write result with elapsed time appended as a tab-separated field.
+  # Format: "PASS name\t<ms>" or "FAIL name (reason)\t<ms>"
+  _emit_result() {
+    local msg="$1"
+    local t_end
+    t_end="$(_epoch_ms)"
+    local elapsed_ms=$(( t_end - t_start ))
+    printf '%s\t%d\n' "$msg" "$elapsed_ms" > "$result_file"
+  }
+
   local my_tmp
   my_tmp="$(mktemp -d)"
 
@@ -81,7 +103,7 @@ run_single_test() {
   while IFS= read -r line; do
     case "$line" in
       "//! skip"*)
-        echo "PASS $name (skipped)" > "$result_file"
+        _emit_result "PASS $name (skipped)"
         rm -rf "$my_tmp"
         return
         ;;
@@ -119,14 +141,14 @@ run_single_test() {
     local rc=0
     timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
-      echo "FAIL $name (expected check failure)" > "$result_file"
+      _emit_result "FAIL $name (expected check failure)"
       rm -rf "$my_tmp"
       return
     fi
     if grep -Fq "$expect_check_fail" "$my_tmp/err"; then
-      echo "PASS $name" > "$result_file"
+      _emit_result "PASS $name"
     else
-      echo "FAIL $name (missing error: $expect_check_fail)" > "$result_file"
+      _emit_result "FAIL $name (missing error: $expect_check_fail)"
     fi
     rm -rf "$my_tmp"
     return
@@ -137,11 +159,11 @@ run_single_test() {
     local rc=0
     timeout "$RUN_TIMEOUT_SECS" "$COMPILER" build $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
-      echo "FAIL $name (expected build failure)" > "$result_file"
+      _emit_result "FAIL $name (expected build failure)"
     elif grep -Fq "$expect_build_fail" "$my_tmp/err"; then
-      echo "PASS $name" > "$result_file"
+      _emit_result "PASS $name"
     else
-      echo "FAIL $name (missing error: $expect_build_fail)" > "$result_file"
+      _emit_result "FAIL $name (missing error: $expect_build_fail)"
     fi
     local stem="${file%.w}"
     rm -f "$stem" "${stem}.o" 2>/dev/null || true
@@ -154,13 +176,13 @@ run_single_test() {
     local rc=0
     timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
     if [[ "$rc" -ne 0 ]]; then
-      echo "FAIL $name (check failed with rc=$rc)" > "$result_file"
+      _emit_result "FAIL $name (check failed with rc=$rc)"
     elif grep -Fq "$expect_check_stdout" "$my_tmp/out"; then
-      echo "PASS $name" > "$result_file"
+      _emit_result "PASS $name"
     else
       local got
       got="$(head -5 "$my_tmp/out")"
-      echo "FAIL $name (missing output: $expect_check_stdout, got: $got)" > "$result_file"
+      _emit_result "FAIL $name (missing output: $expect_check_stdout, got: $got)"
     fi
     rm -rf "$my_tmp"
     return
@@ -171,9 +193,9 @@ run_single_test() {
     local rc=0
     timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
-      echo "PASS $name" > "$result_file"
+      _emit_result "PASS $name"
     else
-      echo "FAIL $name (check failed)" > "$result_file"
+      _emit_result "FAIL $name (check failed)"
     fi
     rm -rf "$my_tmp"
     return
@@ -188,7 +210,7 @@ run_single_test() {
   rm -f "$stem" "${stem}.o" 2>/dev/null || true
 
   if [[ "$rc" -eq 124 ]]; then
-    echo "FAIL $name (timeout after ${RUN_TIMEOUT_SECS}s)" > "$result_file"
+    _emit_result "FAIL $name (timeout after ${RUN_TIMEOUT_SECS}s)"
     rm -rf "$my_tmp"
     return
   fi
@@ -196,29 +218,29 @@ run_single_test() {
   if [[ "$rc" -ne 0 ]]; then
     local errtail
     errtail="$(tail -3 "$my_tmp/err" 2>/dev/null || true)"
-    echo "FAIL $name (exit code $rc) $errtail" > "$result_file"
+    _emit_result "FAIL $name (exit code $rc) $errtail"
     rm -rf "$my_tmp"
     return
   fi
 
   # If no expect-stdout directive, pass on exit 0
   if [[ -z "$expect_stdout" ]]; then
-    echo "PASS $name" > "$result_file"
+    _emit_result "PASS $name"
     rm -rf "$my_tmp"
     return
   fi
 
   if grep -Fq "$expect_stdout" "$my_tmp/out"; then
-    echo "PASS $name" > "$result_file"
+    _emit_result "PASS $name"
   else
     local got
     got="$(head -1 "$my_tmp/out" 2>/dev/null || echo "(empty)")"
-    echo "FAIL $name (stdout mismatch, expected: $expect_stdout, got: $got)" > "$result_file"
+    _emit_result "FAIL $name (stdout mismatch, expected: $expect_stdout, got: $got)"
   fi
   rm -rf "$my_tmp"
 }
 
-export -f run_single_test
+export -f run_single_test _epoch_ms
 export results_dir
 
 # Run tests in parallel
@@ -240,18 +262,34 @@ wait
 passed=0
 failed=0
 failures_list=""
+timing_data=""
 
 for result_file in "$results_dir"/result_*; do
   [[ -e "$result_file" ]] || continue
-  line="$(cat "$result_file")"
-  echo "$line"
-  case "$line" in
+  raw="$(cat "$result_file")"
+  # Split on tab: message \t elapsed_ms
+  msg="${raw%%	*}"
+  ms="${raw##*	}"
+  # If no tab (shouldn't happen), treat whole line as message, ms=0
+  if [[ "$msg" == "$raw" ]]; then
+    ms=0
+  fi
+
+  if [[ "$SHOW_TIMING" == "1" ]]; then
+    printf "%s  (%d ms)\n" "$msg" "$ms"
+  else
+    echo "$msg"
+  fi
+
+  timing_data="${timing_data}${ms}	${msg}\n"
+
+  case "$msg" in
     PASS*)
       passed=$((passed + 1))
       ;;
     FAIL*)
       failed=$((failed + 1))
-      failures_list="${failures_list}  ${line}\n"
+      failures_list="${failures_list}  ${msg}\n"
       ;;
   esac
 done
@@ -264,6 +302,19 @@ if [[ -n "$failures_list" ]]; then
   echo ""
   echo "failures:"
   printf "$failures_list"
+fi
+
+if [[ "$SHOW_TIMING" == "1" ]]; then
+  echo ""
+  echo "--- slowest tests ---"
+  printf "$timing_data" | sort -t'	' -k1 -rn | head -20 | while IFS='	' read -r tms tname; do
+    [[ -z "$tms" ]] && continue
+    if [[ "$tms" -ge 1000 ]]; then
+      printf "  %6d ms  %s\n" "$tms" "$tname"
+    else
+      printf "  %6d ms  %s\n" "$tms" "$tname"
+    fi
+  done
 fi
 
 if [[ "$failed" -gt 0 ]]; then

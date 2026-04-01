@@ -1,5 +1,4 @@
 //! expect-stdout: ok
-extern fn print(s: str) -> void
 
 enum SegKind: i32:
     Literal = 0

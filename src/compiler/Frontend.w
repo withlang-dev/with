@@ -892,8 +892,11 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         pre_sema.decl_is_c_import = self.decl_is_c_import
         self.seed_sema_module_graph_frontend(&mut pre_sema)
         pre_sema.prepare_for_comptime_transform()
-        pool = comptime_transform_module(pool, &mut pre_sema, &mut self.pool)
+        // The comptime transform must run against the same intern pool that
+        // pre-sema prepared, otherwise cloned AST symbol ids may be resolved
+        // against a stale symbol table in the transform pass.
         self.pool = pre_sema.pool
+        pool = comptime_transform_module(pool, &mut pre_sema, &mut self.pool)
         self.diagnostics = pre_sema.diags
         self.decl_source_paths = pre_sema.decl_source_paths
         self.decl_source_file_ids = pre_sema.decl_source_file_ids
@@ -1135,6 +1138,14 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let id = prelude_ordered.get(oi as i64)
         let ik = merged_pool.kind(id)
         if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(prelude_ordered, merged_pool, oi, higher_fn_names):
+            // Error when a prelude fn (with a body) is shadowed by an extern fn
+            // (no body). The extern silently replaces the real function with an
+            // unresolved C symbol, causing a cryptic linker error later.
+            if ik == NodeKind.NK_FN_DECL:
+                let shadowed_name = merged_pool.get_data0(id)
+                if frontend_name_shadowed_by_extern(root_ordered, merged_pool, shadowed_name):
+                    let sname = self.pool.resolve(shadowed_name)
+                    self.diagnostics.emit(Diagnostic.err(f"extern fn '{sname}' shadows prelude function '{sname}'", Span { file: 0, start: merged_pool.get_start(id), end: merged_pool.get_end(id) }))
             continue
         merged_pool.add_decl(id)
         rebuilt_paths.push(prelude_paths.get(oi as i64))
@@ -1154,6 +1165,13 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     self.decl_source_paths = rebuilt_paths
     self.decl_source_file_ids = rebuilt_file_ids
     merged_pool
+
+fn frontend_name_shadowed_by_extern(tier: Vec[i32], pool: AstPool, name: i32) -> bool:
+    for i in 0..tier.len() as i32:
+        let d = tier.get(i as i64)
+        if pool.kind(d) == NodeKind.NK_EXTERN_FN and pool.get_data0(d) == name:
+            return true
+    false
 
 fn frontend_fn_shadowed_in_tier(tier: Vec[i32], pool: AstPool, idx: i32, higher_names: Vec[i32]) -> bool:
     // Check if this fn is shadowed by a higher-priority tier.

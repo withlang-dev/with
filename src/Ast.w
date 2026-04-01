@@ -82,8 +82,14 @@ enum NodeKind: i32:
     NK_COMPTIME_ERROR = 71
     NK_FSTRING = 72       // d0=segment_count, d1=0, extra=[seg_kind, seg_data...]
     NK_FSTRING_SPEC = 73  // d0=packed_flags, d1=width, d2=precision
+    // NK_WITH_IMPLICIT: d0=source_expr, d1=body, d2=binding_name_sym
+    NK_WITH_IMPLICIT = 76
     NK_COMPUTED_FIELD_ACCESS = 74  // d0=expr(node), d1=field_expr(node), d2=0
     NK_ASM_EXPR = 75  // d0=template(string_sym), d1=constraints(string_sym), d2=flags (bit0=volatile, bit1=has_output)
+    // NK_MULTI_INDEX: d0=base_expr, d1=specs_extra_start, d2=specs_count
+    NK_MULTI_INDEX = 77
+    // NK_INDEX_SPEC: d0=start_or_expr, d1=stop, d2=step_and_kind (kind * INDEX_KIND_SHIFT + step_node)
+    NK_INDEX_SPEC = 78
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -189,9 +195,20 @@ enum FnFlags: i32:
 const FN_META_REQUIRED_UNIT: i32 = 65536
 const FN_PARAM_STRIDE: i32 = 3
 const FN_PARAM_FLAG_NOALIAS: i32 = 1
+const FN_PARAM_FLAG_IMPLICIT: i32 = 2
+
+// Multi-index spec kind constants (stored in NK_INDEX_SPEC.d2 high bits)
+const INDEX_SCALAR: i32 = 0
+const INDEX_SLICE: i32 = 1
+const INDEX_ELLIPSIS: i32 = 2
+const INDEX_NEWAXIS: i32 = 3
+const INDEX_KIND_SHIFT: i32 = 268435456  // 1 << 28
 
 fn fn_param_is_noalias(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_NOALIAS) % 2
+
+fn fn_param_is_implicit(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_IMPLICIT) % 2
 
 // Visibility flags
 enum Visibility: i32:
@@ -228,6 +245,7 @@ enum BinaryOp: i32:
     OP_ADD_SAT = 25
     OP_SUB_SAT = 26
     OP_MUL_SAT = 27
+    OP_MATMUL = 28
 
 // Unary operators
 enum UnaryOp: i32:
@@ -364,6 +382,8 @@ type AstPool {
     comptime_decl_set: HashMap[i32, i32],
     move_closure_set: HashMap[i32, i32],
     non_escaping_closure_set: HashMap[i32, i32],
+    // Named argument names for call nodes: key = call_node, value = extra_start of name sym array
+    call_named_args: HashMap[i32, i32],
 
     // Frozen flag: set to 1 after construction completes.
     // When frozen, mutation methods (add_node, add_extra, etc.) will error.
@@ -414,6 +434,7 @@ fn AstPool.new -> AstPool:
         comptime_decl_set: HashMap.new(),
         move_closure_set: HashMap.new(),
         non_escaping_closure_set: HashMap.new(),
+        call_named_args: HashMap.new(),
         frozen: 0,
     }
     // Reserve node 0 as null sentinel
@@ -636,6 +657,18 @@ fn AstPool.get_fn_param_default(self: &AstPool, param_start: i32, param_idx: i32
     if self.fn_param_defaults.contains(key):
         return self.fn_param_defaults.get(key).unwrap()
     0
+
+fn AstPool.set_call_named_args(self: &mut AstPool, call_node: NodeId, names_extra_start: i32):
+    self.call_named_args.insert(call_node as i32, names_extra_start)
+
+fn AstPool.get_call_named_arg(self: &AstPool, call_node: NodeId, arg_idx: i32) -> i32:
+    if self.call_named_args.contains(call_node as i32):
+        let start = self.call_named_args.get(call_node as i32).unwrap()
+        return self.get_extra(start + arg_idx)
+    0
+
+fn AstPool.has_call_named_args(self: &AstPool, call_node: NodeId) -> i32:
+    if self.call_named_args.contains(call_node as i32): 1 else: 0
 
 fn AstPool.add_type_meta(self: &mut AstPool, node: NodeId, derive_start: i32, derive_count: i32):
     let idx = self.type_meta.len() as i32

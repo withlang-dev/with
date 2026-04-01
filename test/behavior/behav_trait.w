@@ -1,5 +1,4 @@
 //! expect-stdout: ok
-extern fn print(s: str) -> void
 
 // Behavior test: traits — declaration, impl, method dispatch
 

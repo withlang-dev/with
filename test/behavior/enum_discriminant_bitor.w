@@ -1,5 +1,3 @@
-extern fn print(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
 @[flags]
 enum Perms: i32 { Read | Write | Execute }

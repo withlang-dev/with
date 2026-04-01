@@ -1,6 +1,4 @@
 //! expect-stdout: ok
-extern fn print(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
 // Test: else belongs to the outer if, not the inner if (dangling-else).
 fn main:

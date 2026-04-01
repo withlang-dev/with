@@ -1,5 +1,4 @@
 //! expect-stdout: ok
-extern fn print(s: str) -> void
 
 fn main:
     // bool → i32: true=1, false=0 (zero-extend, not sign-extend)

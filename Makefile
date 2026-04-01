@@ -366,10 +366,15 @@ $(STAGE3_BIN): $(STAGE2_BIN) $(GEN_STAMP) $(RUNTIME_LINK)
 	@rm -rf "$(HOME)/.cache/with/c_import"
 	$(call build_stage,$(STAGE2_BIN),stage3,$(STAGE_BUILD_TMP),-O0)
 
+# Build the canonical binary with embedded runtime objects.
+# Phase 1 (during EMBEDDED_OBJECTS_INC): embeds C-compiled objects (helpers, etc.)
+# Phase 2 (here): re-embeds with With-compiled rt_core + rt_darwin_aarch64,
+# recompiles embedded_objects.c, and has the compiler re-link itself.
 $(CANONICAL_BIN): $(STAGE2_BIN) $(RT_WITH_ARTIFACTS) | $(OUT_BIN_DIR)
 	@rm -f "$@" && rm -rf "$@.dSYM"
-	@cp "$(STAGE2_BIN)" "$@"
-	@[ ! -d "$(STAGE2_BIN).dSYM" ] || cp -R "$(STAGE2_BIN).dSYM" "$@.dSYM"
+	@bash "$(ROOT_DIR)/scripts/embed_runtime_objects.sh" "$(OUT_LIB_DIR)" "$(EMBEDDED_OBJECTS_INC)"
+	@$(HOST_CC) -c -O2 -o "$(EMBEDDED_OBJECTS_OBJ)" runtime/embedded_objects.c -I.
+	@WITH_OUT_DIR="$(ROOT_DIR)/out" $(STAGE2_BIN) build $(GEN_MAIN_ENTRY) -O0 -o "$@"
 	@echo "build complete: $@"
 
 test: $(STAGE2_BIN)
@@ -385,11 +390,9 @@ install: $(STAGE2_BIN)
 	install -m 0755 "$(STAGE2_BIN)" "$(INSTALL_BINDIR)/with"
 	cp -R "$(OUT_LIB_DIR)/." "$(INSTALL_LIBDIR)/"
 
-install-user: $(STAGE2_BIN)
+install-user: $(CANONICAL_BIN)
 	install -d "$(USER_BINDIR)"
-	install -d "$(USER_LIBDIR)"
-	install -m 0755 "$(STAGE2_BIN)" "$(USER_BINDIR)/with"
-	cp -R "$(OUT_LIB_DIR)/." "$(USER_LIBDIR)/"
+	install -m 0755 "$(CANONICAL_BIN)" "$(USER_BINDIR)/with"
 
 update-seed: fixpoint
 	@cp "$(STAGE2_BIN)" "$(SEED_PATH)"

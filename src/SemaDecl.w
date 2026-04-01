@@ -973,6 +973,36 @@ fn Sema.collect_extern_fn(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
     if is_local != 0:
         self.set_pretty_symbol(name, self.extract_decl_name_after(node, "fn"))
+
+    // Error if this extern fn shadows a regular function from the same file or
+    // the prelude. An extern fn silently replaces the existing signature with an
+    // unresolved C symbol, producing a cryptic linker error instead of a clear
+    // sema diagnostic.
+    //
+    // Only fire for same-file or prelude functions. Functions from other imported
+    // modules are intentional C interop (e.g. a library wrapping C's abs()).
+    // Extern-to-extern re-declarations are harmless (same C symbol) and allowed.
+    if self.fn_decl_nodes.contains(name):
+        let existing_node = self.fn_decl_nodes.get(name).unwrap()
+        if existing_node != node:
+            // Find the decl index of the existing function to check its origin
+            for edi in 0..self.ast.decl_count():
+                if self.ast.get_decl(edi) == existing_node:
+                    if self.is_local_or_prelude_decl(edi) != 0:
+                        let fn_name_str = self.pool_resolve(name)
+                        self.emit_error(f"'{fn_name_str}' is already defined as a function; extern fn would shadow it", node)
+                        return
+                    break
+
+    // Cross-module check: imported functions (prelude or use'd modules) may
+    // have a different symbol ID for the same name string (imports are parsed
+    // with separate InternPools). Scan non-local fn_decls by string name.
+    // Only error if the extern is a local (user-file) declaration shadowing
+    // an imported function — the user likely didn't intend to override it.
+    // Cross-module shadow detection (prelude fn shadowed by user extern fn)
+    // is handled in the import merger (Frontend.w) where it can see both
+    // declarations before the prelude version is dropped from the decl list.
+
     let flags = self.ast.get_data2(node)
     let is_variadic = flags % 2
 

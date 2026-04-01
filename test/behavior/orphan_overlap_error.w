@@ -1,6 +1,4 @@
 //! expect-check-fail: overlapping implementations
-extern fn print(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
 trait Renderable:
     fn render(self: Self) -> str

@@ -1,6 +1,4 @@
 //! expect-stdout: ok
-extern fn print(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
 enum Color: i32 { Red = 1 | Green = 2 | Blue = 4 }
 

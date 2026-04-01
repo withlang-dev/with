@@ -1,5 +1,4 @@
 //! expect-stdout: ok
-extern fn print(s: str) -> void
 
 // User-defined enum with the same variant names as Option (None, Some).
 // This must not interfere with the prelude's VecIter_i32.next which

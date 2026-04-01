@@ -1,7 +1,5 @@
 //! expect-stdout: 10 20 30
 //! expect-stdout: ok
-extern fn print(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
 fn main:
     let arr = [10, 20, 30]

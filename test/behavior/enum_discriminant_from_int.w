@@ -1,5 +1,4 @@
 //! expect-stdout: ok
-extern fn print(s: str) -> void
 
 enum Direction: i32 { North = 0 | East = 1 | South = 2 | West = 3 }
 

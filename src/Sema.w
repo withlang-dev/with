@@ -280,6 +280,14 @@ type Sema {
     capture_field_syms: Vec[i32],
     capture_field_kinds: Vec[i32],
 
+    // Resolved call args for named-arg calls: call_node → (start << 16 | count) in call_resolved_args_data
+    call_resolved_args_map: HashMap[i32, i32],
+    call_resolved_args_data: Vec[i32],
+
+    // Implicit parameter bindings stack: pairs of (type_id, binding_sym)
+    implicit_binding_types: Vec[i32],
+    implicit_binding_syms: Vec[i32],
+
     // Typed dump sidecar maps (keyed by span start byte offset)
     typed_expr_types: HashMap[i32, i32],
     typed_binding_types: HashMap[i32, i32],
@@ -691,6 +699,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         borrow_path_data: Vec.new(),
         capture_field_syms: Vec.new(),
         capture_field_kinds: Vec.new(),
+        call_resolved_args_map: sema_new_map_i32_i32(),
+        call_resolved_args_data: Vec.new(),
+        implicit_binding_types: Vec.new(),
+        implicit_binding_syms: Vec.new(),
         typed_expr_types,
         typed_binding_types,
         typed_binding_names,

@@ -669,6 +669,15 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         out = out ++ render_expr(pool, intern, (body) as NodeId, indent + 2)
         return out
 
+    if kind == NodeKind.NK_WITH_IMPLICIT:
+        let wi_source = pool.get_data0(node)
+        let wi_body = pool.get_data1(node)
+        let wi_name = intern.resolve(pool.get_data2(node))
+        var wi_out = prefix ++ "with " ++ render_expr(pool, intern, (wi_source) as NodeId, 0)
+        wi_out = wi_out ++ " as " ++ wi_name ++ ":\n"
+        wi_out = wi_out ++ render_expr(pool, intern, (wi_body) as NodeId, indent + 2)
+        return wi_out
+
     if kind == NodeKind.NK_RECORD_UPDATE:
         let source = pool.get_data0(node)
         let extra_start = pool.get_data1(node)

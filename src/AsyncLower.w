@@ -311,6 +311,11 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
         self.walk_expr(async_ast_get_data1(self.ast, node))
         return
 
+    if kind == NodeKind.NK_WITH_IMPLICIT:
+        self.walk_expr(async_ast_get_data0(self.ast, node))
+        self.walk_expr(async_ast_get_data1(self.ast, node))
+        return
+
     if kind == NodeKind.NK_ASYNC_SCOPE:
         self.walk_expr(async_ast_get_data1(self.ast, node))
         return

@@ -319,6 +319,10 @@ fn Sema.check_fn_body(self: Sema, node: i32):
                 if not ok_wrapped:
                     self.emit_error("return type mismatch", body)
 
+    // @[tailrec] enforcement: verify all recursive calls are in tail position
+    if (flags / FnFlags.TAILREC) % 2 == 1:
+        self.verify_tail_position(body, fn_name, 1)
+
     // Restore state
     self.current_return_type = saved_ret
     self.current_gen_yield_type = saved_gen_yield_type
@@ -691,6 +695,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_INDEX:
         return self.check_index(node) as TypeId
 
+    if kind == NodeKind.NK_MULTI_INDEX:
+        return self.check_multi_index(node) as TypeId
+
     if kind == NodeKind.NK_SLICE:
         return self.check_slice(node) as TypeId
 
@@ -773,6 +780,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_WITH_EXPR:
         return self.check_with_expr(node) as TypeId
+
+    if kind == NodeKind.NK_WITH_IMPLICIT:
+        return self.check_with_implicit(node) as TypeId
 
     if kind == NodeKind.NK_RECORD_UPDATE:
         return self.check_record_update(node) as TypeId
@@ -1117,6 +1127,25 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         self.ast.set_data0(node, wrap_op)
         return self.arithmetic_result_type(lhs, rhs) as i32
 
+    // @ matmul operator — always dispatches to method
+    if op == BinaryOp.OP_MATMUL:
+        let lhs_resolved = self.resolve_alias(lhs)
+        let lhs_name = self.get_type_name(lhs_resolved as i32)
+        let matmul_sym = self.pool_intern("matmul")
+        if lhs_name != 0:
+            let sig = self.lookup_method_sig(lhs_name, matmul_sym)
+            if sig >= 0:
+                return self.sig_return_type(sig)
+        // Reversed-operand lookup
+        let rhs_resolved = self.resolve_alias(rhs)
+        let rhs_name = self.get_type_name(rhs_resolved as i32)
+        if rhs_name != 0:
+            let sig = self.lookup_method_sig(rhs_name, matmul_sym)
+            if sig >= 0:
+                return self.sig_return_type(sig)
+        self.emit_error("@ operator requires a type implementing 'matmul'", node)
+        return 0
+
     if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL or op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD:
         if op == BinaryOp.OP_ADD and lhs == self.ty_str and rhs == self.ty_str:
             return self.ty_str as i32
@@ -1133,16 +1162,23 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
             return result as i32
         let lhs_resolved = self.resolve_alias(lhs)
         let lhs_name = self.get_type_name(lhs_resolved as i32)
+        let method_name = if op == BinaryOp.OP_ADD: "add" else:
+            if op == BinaryOp.OP_SUB: "sub" else:
+            if op == BinaryOp.OP_MUL: "mul" else:
+            if op == BinaryOp.OP_DIV: "div" else:
+            "mod"
+        let method_sym = self.pool_intern(method_name)
         if lhs_name != 0:
-            let method_name = if op == BinaryOp.OP_ADD: "add" else:
-                if op == BinaryOp.OP_SUB: "sub" else:
-                if op == BinaryOp.OP_MUL: "mul" else:
-                if op == BinaryOp.OP_DIV: "div" else:
-                "mod"
-            let method_sym = self.pool_intern(method_name)
             let method_sig = self.lookup_method_sig(lhs_name, method_sym)
             if method_sig >= 0:
                 return self.sig_return_type(method_sig)
+        // Reversed-operand lookup: try RHS type
+        let rhs_resolved = self.resolve_alias(rhs)
+        let rhs_name = self.get_type_name(rhs_resolved as i32)
+        if rhs_name != 0:
+            let rhs_method_sig = self.lookup_method_sig(rhs_name, method_sym)
+            if rhs_method_sig >= 0:
+                return self.sig_return_type(rhs_method_sig)
         self.emit_error("arithmetic operator requires numeric operands", node)
         return 0
 
@@ -1483,7 +1519,12 @@ fn Sema.check_for(self: Sema, node: i32) -> i32:
     let elem_type = self.infer_for_element_type(iter_type as i32)
 
     self.push_scope()
-    self.scope_put(binding, elem_type, 0)
+    // Check if binding is a pattern node (e.g., tuple destructuring)
+    let bk = self.ast.kind(binding)
+    if bk >= NodeKind.NK_PAT_WILDCARD and bk <= NodeKind.NK_PAT_SLICE:
+        self.check_pattern(binding, elem_type)
+    else:
+        self.scope_put(binding, elem_type, 0)
     let for_meta = self.ast.find_for_meta(node)
     if for_meta >= 0:
         let index_binding = self.ast.for_meta_index_binding(for_meta)
@@ -1716,6 +1757,33 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
                     let ci_tid = self.ensure_generic_inst_type(ci_base_sym, ci_args, ci_arg_count)
                     self.typed_expr_types.insert(node, ci_tid as i32)
                     return ci_tid as i32
+    0
+
+fn Sema.check_multi_index(self: Sema, node: i32) -> i32:
+    let base = self.ast.get_data0(node)
+    let specs_start = self.ast.get_data1(node)
+    let specs_count = self.ast.get_data2(node)
+    let base_ty = self.check_expr(base)
+    // Check each index spec
+    for si in 0..specs_count:
+        let spec = self.ast.get_extra(specs_start + si)
+        let d0 = self.ast.get_data0(spec)
+        let d1 = self.ast.get_data1(spec)
+        let d2 = self.ast.get_data2(spec)
+        let kind = d2 / INDEX_KIND_SHIFT
+        if d0 != 0: self.check_expr(d0)
+        if d1 != 0: self.check_expr(d1)
+        let step = d2 - kind * INDEX_KIND_SHIFT
+        if step != 0: self.check_expr(step)
+    // Look up multi_index method on base type
+    let base_resolved = self.resolve_alias(base_ty)
+    let base_name = self.get_type_name(base_resolved as i32)
+    if base_name != 0:
+        let mi_sym = self.pool_intern("multi_index")
+        let mi_sig = self.lookup_method_sig(base_name, mi_sym)
+        if mi_sig >= 0:
+            return self.sig_return_type(mi_sig)
+    self.emit_error("type does not support multi-dimensional indexing", node)
     0
 
 fn Sema.check_slice(self: Sema, node: i32) -> i32:
@@ -2409,10 +2477,29 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
 
     self.push_scope()
     let te_start = self.type_extra.len() as i32
+    // Partial application: if body is NK_CALL, resolve callee param types for placeholders
+    var partial_sig = 0 - 1
+    if self.ast.kind(body) == NodeKind.NK_CALL:
+        let call_callee = self.ast.get_data0(body)
+        if self.ast.kind(call_callee) == NodeKind.NK_IDENT:
+            let callee_sym = self.ast.get_data0(call_callee)
+            partial_sig = self.get_sig(callee_sym)
     for pi in 0..param_count:
         let p_sym = self.ast.get_extra(extra_start + pi * 2)
-        self.scope_put(p_sym, self.ty_i32 as i32, 0)
-        self.type_extra.push(self.ty_i32 as i32)
+        var p_ty = self.ty_i32 as i32
+        // For partial app, find which call arg position this placeholder occupies
+        if partial_sig >= 0 and self.ast.kind(body) == NodeKind.NK_CALL:
+            let call_extra = self.ast.get_data1(body)
+            let call_argc = self.ast.get_data2(body)
+            for ai in 0..call_argc:
+                let arg = self.ast.get_extra(call_extra + ai)
+                if self.ast.kind(arg) == NodeKind.NK_IDENT:
+                    if self.ast.get_data0(arg) == p_sym:
+                        if ai < self.sig_get_param_count(partial_sig):
+                            p_ty = self.sig_param_type(partial_sig, ai)
+                        break
+        self.scope_put(p_sym, p_ty, 0)
+        self.type_extra.push(p_ty)
     self.check_expr(body)
 
     // Phase 1 ephemerality rule: closures cannot capture ephemeral refs/values.
@@ -2484,7 +2571,11 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
                     self.scope_set_state(cap_sym, VarState.MOVED)
             ci = ci + 1
 
-    self.add_type(TypeKind.TY_FN, te_start, param_count, self.ty_i32 as i32) as i32
+    // Use callee return type for partial application closures
+    var closure_ret_ty = self.ty_i32 as i32
+    if partial_sig >= 0:
+        closure_ret_ty = self.sig_return_type(partial_sig)
+    self.add_type(TypeKind.TY_FN, te_start, param_count, closure_ret_ty) as i32
 
 fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
     let lhs = self.ast.get_data0(node)
@@ -2554,6 +2645,23 @@ fn Sema.check_with_expr(self: Sema, node: i32) -> i32:
     // ends in Unit; otherwise returns the final expression value.
     if is_mut != 0 and body_ty == self.ty_void:
         return source_ty as i32
+    body_ty as i32
+
+fn Sema.check_with_implicit(self: Sema, node: i32) -> i32:
+    let source = self.ast.get_data0(node)
+    let body = self.ast.get_data1(node)
+    let binding_name = self.ast.get_data2(node)
+    let source_ty = self.check_expr(source)
+    // Push implicit binding onto stack
+    self.implicit_binding_types.push(source_ty as i32)
+    self.implicit_binding_syms.push(binding_name)
+    self.push_scope()
+    self.scope_put(binding_name, source_ty as i32, 0)
+    let body_ty = self.check_expr(body)
+    self.pop_scope()
+    // Pop implicit binding
+    self.implicit_binding_types.pop()
+    self.implicit_binding_syms.pop()
     body_ty as i32
 
 fn Sema.check_record_update(self: Sema, node: i32) -> i32:
@@ -2728,11 +2836,69 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     let variant_expected_ty = if self.variant_lookup.contains(fn_sym) and self.is_ci_visible(fn_sym) != 0: self.expected_variant_constructor_type(fn_sym) else: 0
     let variant_payload_tys = if variant_expected_ty != 0: self.enum_variant_payload_types(variant_expected_ty, fn_sym) else: Vec.new()
 
+    // Resolve named arguments: reorder args to match parameter order, fill defaults
+    var resolved_extra_start = extra_start
+    var resolved_arg_count = arg_count
+    if self.ast.has_call_named_args(node) != 0 and sig_idx >= 0 and self.fn_decl_nodes.contains(fn_sym):
+        let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
+        let meta = self.ast.find_fn_meta(fn_node)
+        if meta >= 0:
+            let param_count = self.sig_get_param_count(sig_idx)
+            let ps = self.ast.fn_meta_param_start(meta)
+            // Build resolved_args map: param_idx → arg_node
+            let resolved_map: HashMap[i32, i32] = HashMap.new()
+            // First pass: assign positional args left-to-right
+            var first_named_idx = arg_count
+            for ai in 0..arg_count:
+                let name_sym = self.ast.get_call_named_arg(node, ai)
+                if name_sym != 0:
+                    first_named_idx = ai
+                    break
+                let pi = ai + param_offset
+                if pi < param_count:
+                    resolved_map.insert(pi, self.ast.get_extra(extra_start + ai))
+            // Second pass: assign named args by matching parameter names
+            for ai in first_named_idx..arg_count:
+                let name_sym = self.ast.get_call_named_arg(node, ai)
+                if name_sym == 0:
+                    continue
+                var matched = 0 - 1
+                for pi in 0..param_count:
+                    let pname = self.ast.fn_param_name(ps, pi)
+                    if pname == name_sym:
+                        matched = pi
+                        break
+                if matched < 0:
+                    let aname = self.pool_resolve(name_sym)
+                    self.emit_error(f"no parameter named '{aname}'", node)
+                    continue
+                if resolved_map.contains(matched):
+                    let aname = self.pool_resolve(name_sym)
+                    self.emit_error(f"parameter '{aname}' specified more than once", node)
+                    continue
+                resolved_map.insert(matched, self.ast.get_extra(extra_start + ai))
+            // Third pass: fill defaults for remaining unresolved params
+            for pi in 0..param_count:
+                if not resolved_map.contains(pi):
+                    let default_node = self.ast.get_fn_param_default(ps, pi)
+                    if default_node != 0:
+                        resolved_map.insert(pi, default_node)
+            // Store resolved arg order in sema (AST is frozen)
+            let final_args: Vec[i32] = Vec.new()
+            for pi in param_offset..param_count:
+                if resolved_map.contains(pi):
+                    final_args.push(resolved_map.get(pi).unwrap())
+                else:
+                    final_args.push(0)
+            self.store_resolved_call_args(node, final_args)
+            resolved_arg_count = param_count - param_offset
+
     // Check all arguments (with contextual expected-type propagation when
     // calling a known function signature).
+    let has_resolved = self.has_resolved_call_args(node)
     let arg_types: Vec[i32] = Vec.new()
-    for ai in 0..arg_count:
-        let arg_node = self.ast.get_extra(extra_start + ai)
+    for ai in 0..resolved_arg_count:
+        let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
         var expected_ty = 0
         if sig_idx >= 0:
             let param_i = ai + param_offset
@@ -2740,6 +2906,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 expected_ty = self.sig_param_type(sig_idx, param_i)
         else if ai < variant_payload_tys.len() as i32:
             expected_ty = variant_payload_tys.get(ai as i64)
+        if arg_node == 0:
+            arg_types.push(0)
+            continue
         let is_closure_arg = self.ast.kind(arg_node) == NodeKind.NK_CLOSURE
         if is_closure_arg:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
@@ -2749,8 +2918,10 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         arg_types.push(arg_ty as i32)
 
     // Mark non-Copy args as moved
-    for ai in 0..arg_count:
-        self.mark_moved_if_consumed(self.ast.get_extra(extra_start + ai))
+    for ai in 0..resolved_arg_count:
+        let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+        if arg_node != 0:
+            self.mark_moved_if_consumed(arg_node)
 
     if self.check_comptime_call_restriction(fn_sym, node) != 0:
         return 0
@@ -2762,16 +2933,18 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         // metadata packed into fn_meta flags by the parser).
         let expected = self.sig_get_param_count(sig_idx)
         let min_expected = self.fn_min_expected_arg_count(fn_sym, expected)
-        let actual = arg_count + param_offset
-        if self.sig_is_variadic(sig_idx) == 0:
-            if actual < min_expected or actual > expected:
-                let fn_name = self.pool_resolve(fn_sym)
-                if min_expected == expected:
-                    self.emit_error(f"function '{fn_name}' expects {expected} argument(s), found {actual}", node)
-                else:
-                    self.emit_error(f"function '{fn_name}' expects {min_expected}-{expected} argument(s), found {actual}", node)
+        let actual = resolved_arg_count + param_offset
+        // Skip arg count check when named args were resolved (already filled defaults)
+        if self.ast.has_call_named_args(node) == 0:
+            if self.sig_is_variadic(sig_idx) == 0:
+                if actual < min_expected or actual > expected:
+                    let fn_name = self.pool_resolve(fn_sym)
+                    if min_expected == expected:
+                        self.emit_error(f"function '{fn_name}' expects {expected} argument(s), found {actual}", node)
+                    else:
+                        self.emit_error(f"function '{fn_name}' expects {min_expected}-{expected} argument(s), found {actual}", node)
 
-        for ai in 0..arg_count:
+        for ai in 0..resolved_arg_count:
             let param_i = ai + param_offset
             if param_i >= expected:
                 break
@@ -2782,13 +2955,14 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 if self.type_is_dyn_object(exp_resolved) == 0:
                     if self.types_compatible(expected_ty, arg_ty) == 0:
                         if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
+                            let err_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                             if not (self.ci_syms.contains(fn_sym) and self.try_ci_coercion(arg_ty, expected_ty) != 0):
-                                self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, param_i, expected_ty, arg_ty, self.ast.get_extra(extra_start + ai))
-            let arg_node = self.ast.get_extra(extra_start + ai)
-            if self.expr_is_ephemeral_task(arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
-                self.emit_warning("ephemeral Task passed by value may escape", arg_node)
+                                self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, param_i, expected_ty, arg_ty, err_arg_node)
+            let eph_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+            if self.expr_is_ephemeral_task(eph_arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
+                self.emit_warning("ephemeral Task passed by value may escape", eph_arg_node)
 
-        self.check_dyn_trait_call_compat(fn_sym, extra_start, arg_types, arg_count, param_offset)
+        self.check_dyn_trait_call_compat(fn_sym, resolved_extra_start, arg_types, resolved_arg_count, param_offset)
         self.typed_expr_types.insert(node, ret)
         return ret
 
@@ -2852,6 +3026,109 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     if callee_ty != 0:
         self.emit_error("value is not callable", callee)
     0
+
+fn Sema.store_resolved_call_args(self: Sema, call_node: i32, args: Vec[i32]):
+    let start = self.call_resolved_args_data.len() as i32
+    let count = args.len() as i32
+    for i in 0..count:
+        self.call_resolved_args_data.push(args.get(i as i64))
+    self.call_resolved_args_map.insert(call_node, start * 65536 + count)
+
+fn Sema.get_resolved_call_arg(self: Sema, call_node: i32, idx: i32) -> i32:
+    if self.call_resolved_args_map.contains(call_node):
+        let packed = self.call_resolved_args_map.get(call_node).unwrap()
+        let start = packed / 65536
+        return self.call_resolved_args_data.get((start + idx) as i64)
+    0
+
+fn Sema.has_resolved_call_args(self: Sema, call_node: i32) -> i32:
+    if self.call_resolved_args_map.contains(call_node): 1 else: 0
+
+fn Sema.get_resolved_call_arg_count(self: Sema, call_node: i32) -> i32:
+    if self.call_resolved_args_map.contains(call_node):
+        let packed = self.call_resolved_args_map.get(call_node).unwrap()
+        return packed % 65536
+    0
+
+// Walk AST verifying recursive calls are in tail position for @[tailrec] functions.
+// in_tail=1 means this node is in tail position, in_tail=0 means it's not.
+fn Sema.verify_tail_position(self: Sema, node: i32, fn_sym: i32, in_tail: i32):
+    if node == 0:
+        return
+    let kind = self.ast.kind(node)
+
+    // Recursive call: check it's in tail position
+    if kind == NodeKind.NK_CALL:
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            let callee_sym = self.ast.get_data0(callee)
+            if callee_sym == fn_sym and in_tail == 0:
+                self.emit_error("recursive call is not in tail position (function is @[tailrec])", node)
+        // Check args are NOT in tail position
+        let extra_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        for ai in 0..arg_count:
+            self.verify_tail_position(self.ast.get_extra(extra_start + ai), fn_sym, 0)
+        return
+
+    // Block: last expression (tail) inherits tail position, statements don't
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        let tail = self.ast.get_data2(node)
+        for si in 0..stmt_count:
+            self.verify_tail_position(self.ast.get_extra(extra_start + si), fn_sym, 0)
+        self.verify_tail_position(tail, fn_sym, in_tail)
+        return
+
+    // If-else: both branches inherit tail position
+    if kind == NodeKind.NK_IF_EXPR:
+        self.verify_tail_position(self.ast.get_data0(node), fn_sym, 0)  // condition
+        self.verify_tail_position(self.ast.get_data1(node), fn_sym, in_tail)  // then
+        self.verify_tail_position(self.ast.get_data2(node), fn_sym, in_tail)  // else
+        return
+
+    // Match: all arm bodies inherit tail position
+    if kind == NodeKind.NK_MATCH:
+        let subject = self.ast.get_data0(node)
+        let arm_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        self.verify_tail_position(subject, fn_sym, 0)
+        for ai in 0..arm_count:
+            let arm = self.ast.get_extra(arm_start + ai)
+            let arm_body = self.ast.get_data1(arm)
+            self.verify_tail_position(arm_body, fn_sym, in_tail)
+        return
+
+    // Return: value inherits tail position
+    if kind == NodeKind.NK_RETURN:
+        self.verify_tail_position(self.ast.get_data0(node), fn_sym, 1)
+        return
+
+    // Loops, defer: NOT tail position for body
+    if kind == NodeKind.NK_FOR or kind == NodeKind.NK_WHILE or kind == NodeKind.NK_LOOP:
+        self.verify_tail_position(self.ast.get_data2(node), fn_sym, 0)
+        return
+    if kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER:
+        self.verify_tail_position(self.ast.get_data0(node), fn_sym, 0)
+        return
+
+    // Let binding: value is not in tail position
+    if kind == NodeKind.NK_LET_BINDING:
+        self.verify_tail_position(self.ast.get_data1(node), fn_sym, 0)
+        return
+
+    // Binary/unary/assign: operands are not in tail position
+    if kind == NodeKind.NK_BINARY:
+        self.verify_tail_position(self.ast.get_data1(node), fn_sym, 0)
+        self.verify_tail_position(self.ast.get_data2(node), fn_sym, 0)
+        return
+    if kind == NodeKind.NK_UNARY:
+        self.verify_tail_position(self.ast.get_data1(node), fn_sym, 0)
+        return
+    if kind == NodeKind.NK_ASSIGN:
+        self.verify_tail_position(self.ast.get_data1(node), fn_sym, 0)
+        return
 
 fn Sema.fn_min_expected_arg_count(self: Sema, fn_sym: i32, fallback_expected: i32) -> i32:
     if fallback_expected <= 0:

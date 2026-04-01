@@ -952,6 +952,17 @@ pub fn fmt_f64_spec(val: f64, flags: i64, width: i32, precision: i32, mode: i32)
     else:
         len = rt_f64_to_buf(val, &buf as *mut u8, 64)
 
+    // sign_plus flag: insert '+' for non-negative values
+    let sign_plus = ((flags >> 18) & 1) as i32
+    if sign_plus != 0 and len > 0 and buf[0] != 45:  // not already '-'
+        // Shift buffer right by 1 and prepend '+'
+        var si = len
+        while si > 0:
+            buf[si as i64] = buf[(si - 1) as i64]
+            si = si - 1
+        buf[0] = 43  // '+'
+        len = len + 1
+
     if width > 0 and len < width as i64:
         let fill_char = ((flags >> 8) & 255) as i32
         let align_mode = ((flags >> 16) & 3) as i32
@@ -1463,6 +1474,10 @@ pub fn vec_push_bool(v: *mut u8, val: i32):
 pub fn vec_get_bool(v: *mut u8, idx: i64) -> i32:
     vec_get_i32(v, idx)
 
+@[c_export("with_ptr_get_i32")]
+pub fn ptr_get_i32(ptr: *const u8, index: i64) -> i32:
+    *((ptr as i64 + index * 4) as *const i32)
+
 @[c_export("with_vec_set_i32")]
 pub fn vec_set_i32(v: *mut u8, idx: i64, val: i32):
     let vlen = vec_get_len(v)
@@ -1742,16 +1757,19 @@ pub fn hashmap_clear(map: *mut u8):
     hm_set_len(m, 0)
 
 @[c_export("with_hashmap_keys_out")]
-pub fn hashmap_keys_out(map: *mut u8, keys_out: *mut u8):
+pub fn hashmap_keys_out(out: *mut u8, map: *mut u8, key_size: i64):
     let m = map as i64
+    if m == 0:
+        vec_new_out(out, key_size)
+        return
     let cap = hm_cap(m)
     let ksz = hm_key_size(m)
-    var j: i64 = 0
+    let effective_ksz = if ksz > 0: ksz else: key_size
+    vec_new_out(out, effective_ksz)
     var i: i64 = 0
     while i < cap:
         if hm_occ(m)[i] != 0:
-            rt_memcpy((keys_out as i64 + j * ksz) as *mut u8, (hm_keys(m) as i64 + i * ksz) as *const u8, ksz)
-            j = j + 1
+            vec_push(out, (hm_keys(m) as i64 + i * ksz) as *const u8)
         i = i + 1
 
 @[c_export("with_hashmap_free")]

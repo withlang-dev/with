@@ -1,8 +1,6 @@
 //! expect-stdout: matched empty
 //! expect-stdout: has elements
 //! expect-stdout: ok
-extern fn print(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
 fn check_empty(arr: [0]i32) -> str:
     match arr

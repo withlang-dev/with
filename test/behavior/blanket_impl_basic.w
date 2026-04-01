@@ -1,6 +1,4 @@
 //! expect-stdout: ok
-extern fn print(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
 trait Showable:
     fn show(self: Self) -> str

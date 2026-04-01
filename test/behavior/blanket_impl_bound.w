@@ -1,5 +1,4 @@
 //! expect-check-fail: does not implement trait
-extern fn print(s: str) -> void
 
 trait Readable:
     fn read(self: Self) -> str

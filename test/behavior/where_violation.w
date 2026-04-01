@@ -1,5 +1,4 @@
 //! expect-error: does not implement trait
-extern fn print(s: str) -> void
 
 trait Printable =
     fn show(self: Self) -> str

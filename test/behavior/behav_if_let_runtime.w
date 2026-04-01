@@ -10,11 +10,10 @@ fn get_none() -> ?i32:
 
 fn describe(opt: ?i32) -> str:
     if let .Some(x) = opt:
-        "has:" ++ i32_to_str(x)
+        "has:" ++ int_to_string(x)
     else:
         "nothing"
 
-extern fn i32_to_str(n: i32) -> str
 
 fn main:
     let a = get_some()
