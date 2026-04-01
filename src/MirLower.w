@@ -1588,9 +1588,23 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
         return self.lower_index(self.ast.get_data0(node), self.ast.get_data1(node))
 
     if kind == NodeKind.NK_MULTI_INDEX:
-        // Multi-dimensional indexing: fall back to AST codegen for now
-        self.mark_unsupported()
-        return self.place_for_local(0)
+        // Multi-dimensional indexing via MIR_INTRINSIC_MULTI_INDEX.
+        // The intrinsic carries the AST node through to codegen which
+        // has LLVM IR power to alloca IndexSpec array, populate it,
+        // and call the multi_index trait method.
+        let base_op = self.lower_expr(self.ast.get_data0(node))
+        let mi_args: Vec[i32] = Vec.new()
+        mi_args.push(base_op)
+        let mi_args_id = self.body.new_call_args(mi_args)
+        self.body.set_call_intrinsic(mi_args_id, MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX)
+        self.body.set_call_ast_node(mi_args_id, node)
+        let mi_ret_ty = self.expr_type(node)
+        let mi_result = self.new_temp(mi_ret_ty)
+        let mi_result_place = self.place_for_local(mi_result)
+        let mi_next_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), mi_args_id, mi_result_place, mi_next_bb)
+        self.switch_to(mi_next_bb)
+        return mi_result_place
 
     if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_DEREF:
         return self.lower_deref(self.ast.get_data1(node))
@@ -1863,8 +1877,14 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
     if self.ast.kind(iter_expr) == NodeKind.NK_RANGE:
         return self.lower_for_range(pat_or_sym, iter_expr, body_expr)
 
-    // Check for slice/vec-based for
+    // Range variable: iter_expr is an ident/expr whose type is TY_RANGE
     let iter_ty = self.expr_type(iter_expr)
+    if iter_ty != 0:
+        let range_resolved = self.sema.resolve_alias(iter_ty)
+        if self.sema.get_type_kind(range_resolved) == TypeKind.TY_RANGE:
+            return self.lower_for_range_var(pat_or_sym, iter_expr, body_expr, range_resolved)
+
+    // Check for slice/vec-based for
     if iter_ty != 0:
         let resolved = self.sema.resolve_alias(iter_ty)
         let tk = self.sema.get_type_kind(resolved)
@@ -1960,6 +1980,85 @@ fn MirBuilder.bind_for_element(self: MirBuilder, pat_or_sym: i32, item_place: i3
         let bind_place = self.place_for_local(bind_local)
         let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
         self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(body_expr))
+
+fn MirBuilder.lower_for_range_var(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_expr: i32, range_ty: i32) -> i32:
+    // for i in range_var → extract start/end/inclusive from the range struct,
+    // then generate the same counter-based loop as lower_for_range.
+    // Range layout: {start: Elem, end: Elem, inclusive: i8}
+    let elem_ty = self.sema.get_type_d0(range_ty)
+    let range_op = self.lower_expr(iter_expr)
+    let range_place = self.materialize_operand(range_op, range_ty, self.ast.get_start(iter_expr))
+
+    // Extract fields via projection
+    let start_place = self.body.new_field_place(range_place, 0, elem_ty)
+    let end_place_field = self.body.new_field_place(range_place, 1, elem_ty)
+    let incl_place = self.body.new_field_place(range_place, 2, self.sema.ty_bool)
+
+    // Read start, end, inclusive into locals
+    let start_op = self.body.new_operand(OperandKind.OK_COPY, start_place)
+    let end_op = self.body.new_operand(OperandKind.OK_COPY, end_place_field)
+    let incl_op = self.body.new_operand(OperandKind.OK_COPY, incl_place)
+
+    // Counter = start
+    let counter_local = self.new_temp(elem_ty)
+    let counter_place = self.place_for_local(counter_local)
+    self.assign_operand_to_place(counter_place, start_op, self.ast.get_start(iter_expr))
+
+    // End value
+    let end_local = self.new_temp(elem_ty)
+    let end_place = self.place_for_local(end_local)
+    self.assign_operand_to_place(end_place, end_op, self.ast.get_start(iter_expr))
+
+    // Inclusive flag
+    let incl_local = self.new_temp(self.sema.ty_bool)
+    let incl_local_place = self.place_for_local(incl_local)
+    self.assign_operand_to_place(incl_local_place, incl_op, self.ast.get_start(iter_expr))
+
+    let header_bb = self.new_block()
+    let body_bb = self.new_block()
+    let inc_bb = self.new_block()
+    let exit_bb = self.new_block()
+
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+    self.push_loop(inc_bb, exit_bb)
+
+    // Header: compare counter < end (use LTE since we can't branch on inclusive at MIR level;
+    // for simplicity, use LTE and rely on the sema-level inclusive flag from the range type)
+    self.switch_to(header_bb)
+    let counter_read = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let end_read = self.body.new_operand(OperandKind.OK_COPY, end_place)
+    // Use the static inclusive flag from the range type
+    let inclusive = self.sema.get_type_d1(range_ty)
+    let cmp_op = if inclusive != 0: BinaryOp.OP_LTE else: BinaryOp.OP_LT
+    let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, cmp_op, counter_read, end_read)
+    let cmp_local = self.new_temp(self.sema.ty_bool)
+    let cmp_place = self.place_for_local(cmp_local)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
+    let cmp_result = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(body_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
+
+    // Body
+    self.switch_to(body_bb)
+    self.bind_for_element(pat_or_sym, counter_place, elem_ty, body_expr)
+    let _ = self.lower_expr(body_expr)
+    self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
+
+    // Increment
+    self.switch_to(inc_bb)
+    let cur_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let one_op = self.int_const_operand(1, elem_ty)
+    let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op, one_op)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+
+    self.pop_loop()
+    self.switch_to(exit_bb)
+    self.unit_operand()
 
 fn MirBuilder.lower_for_range(self: MirBuilder, pat_or_sym: i32, range_node: i32, body_expr: i32) -> i32:
     // for i in start..end  →  counter = start; while counter < end: body; counter += 1
@@ -2708,12 +2807,16 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
     let sig_idx = self.call_sig_for_expr(fn_expr)
 
     let args: Vec[i32] = Vec.new()
-    // Use sema-resolved arg order for named-arg calls
+    // Use sema-resolved arg order for named-arg and implicit-arg calls
     if self.sema.has_resolved_call_args(node) != 0:
         let resolved_count = self.sema.get_resolved_call_arg_count(node)
         for i in 0..resolved_count:
             let arg_node = self.sema.get_resolved_call_arg(node, i)
-            if arg_node != 0:
+            if arg_node < 0:
+                // Negative value = implicit parameter marker: 0 - bind_sym
+                let impl_sym = 0 - arg_node
+                args.push(self.lower_var(impl_sym, 0))
+            else if arg_node != 0:
                 args.push(self.lower_call_arg(arg_node, sig_idx, i))
             else:
                 args.push(self.unit_operand())
@@ -3863,6 +3966,34 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_RECORD_UPDATE:
         return self.lower_record_update(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node)
 
+    if kind == NodeKind.NK_RANGE:
+        let range_start_node = self.ast.get_data0(node)
+        let range_end_node = self.ast.get_data1(node)
+        let range_inclusive = self.ast.get_data2(node)
+        var range_elem = self.sema.ty_i32 as i32
+        if range_start_node != 0:
+            range_elem = self.expr_type(range_start_node)
+        else if range_end_node != 0:
+            range_elem = self.expr_type(range_end_node)
+        let start_op = if range_start_node != 0: self.lower_expr(range_start_node) else: self.int_const_operand(0, range_elem)
+        let end_op = self.lower_expr(range_end_node)
+        let incl_op = self.int_const_operand(range_inclusive, self.sema.ty_bool)
+        let range_fields: Vec[i32] = Vec.new()
+        let range_names: Vec[i32] = Vec.new()
+        range_fields.push(start_op)
+        range_fields.push(end_op)
+        range_fields.push(incl_op)
+        range_names.push(0)
+        range_names.push(0)
+        range_names.push(0)
+        let range_fid = self.body.new_agg_fields(range_fields, range_names)
+        let range_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, range_fid, 0)
+        let range_ty = self.expr_type(node)
+        let range_tmp = self.new_temp(range_ty)
+        let range_place = self.place_for_local(range_tmp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, range_place, range_rv, self.ast.get_start(node))
+        return self.body.new_operand(OperandKind.OK_COPY, range_place)
+
     if kind == NodeKind.NK_TUPLE:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
@@ -4072,6 +4203,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
             builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, local_id, 0, builder.ast.get_start(fn_node))
             if builder.sema.is_copy(p_ty) == 0:
                 builder.schedule_drop(local_id, DropKind.DK_VALUE)
+        builder.body.n_params = param_count
 
     // Set expected_type to the function's return type so that intrinsic calls
     // (Vec.new, HashMap.new) in tail position can resolve their generic inst type.
@@ -4111,7 +4243,91 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
     builder.pop_scope_inline()
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
 
+    // Self-tail-call optimization for @[tailrec] functions.
+    let fn_flags = builder.ast.get_data2(fn_node)
+    if (fn_flags / FnFlags.TAILREC) % 2 == 1:
+        optimize_self_tail_calls(&mut builder.body)
+
     builder.body
+
+fn optimize_self_tail_calls(body: &mut MirBody):
+    let fn_sym = body.fn_sym
+    if fn_sym == 0 or body.n_params == 0:
+        return
+    let bb_count = body.block_count()
+    var bb = 0
+    while bb < bb_count:
+        if body.term_kind(bb) != TermKind.TK_CALL:
+            bb = bb + 1
+            continue
+        let callee_op_id = body.term_data0(bb)
+        let args_id = body.term_data1(bb)
+        let result_place = body.term_data2(bb)
+        let next_bb = body.term_data3(bb)
+        // Check: callee is this function
+        if callee_op_id < 0 or callee_op_id >= body.operand_kinds.len() as i32:
+            bb = bb + 1
+            continue
+        let op_kind = body.operand_kinds.get(callee_op_id as i64)
+        if op_kind != OperandKind.OK_CONSTANT:
+            bb = bb + 1
+            continue
+        let const_id = body.operand_d0.get(callee_op_id as i64)
+        if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+            bb = bb + 1
+            continue
+        if body.const_kinds.get(const_id as i64) != ConstKind.CK_FN:
+            bb = bb + 1
+            continue
+        if body.const_d0.get(const_id as i64) != fn_sym:
+            bb = bb + 1
+            continue
+        // Check: result goes to local 0 (return place)
+        if result_place >= 0 and result_place < body.place_locals.len() as i32:
+            if body.place_locals.get(result_place as i64) != 0:
+                bb = bb + 1
+                continue
+        // Check: next block is pure TK_RETURN (no statements)
+        if next_bb < 0 or next_bb >= bb_count:
+            bb = bb + 1
+            continue
+        if body.term_kind(next_bb) != TermKind.TK_RETURN:
+            bb = bb + 1
+            continue
+        if body.bb_stmt_counts.get(next_bb as i64) != 0:
+            bb = bb + 1
+            continue
+        // This is a self-tail-call. Transform it.
+        // Step 1: Read call args into temp locals (aliasing safety)
+        let arg_start = body.call_arg_starts.get(args_id as i64)
+        let arg_count = body.call_arg_counts.get(args_id as i64)
+        let n_params = body.n_params
+        let span = body.bb_term_spans.get(bb as i64)
+        // Copy args to temps
+        for ai in 0..arg_count:
+            if ai >= n_params: break
+            let arg_op = body.call_arg_operands.get((arg_start + ai) as i64)
+            let param_local = ai + 1  // params are locals 1..n_params
+            let param_ty = body.local_type_ids.get(param_local as i64)
+            let tmp = body.new_temp(param_ty)
+            let tmp_place = body.new_place(tmp)
+            let rv = body.new_rvalue(RvalueKind.RK_USE, arg_op, 0, 0)
+            body.push_stmt(bb, StmtKind.Assign, tmp_place, rv, span)
+        // Copy temps back to params
+        // We pushed n temps starting at (local_count - n_params) before temps were added
+        let first_tmp = body.local_type_ids.len() as i32 - arg_count
+        for ai in 0..arg_count:
+            if ai >= n_params: break
+            let tmp_local = first_tmp + ai
+            let param_local = ai + 1
+            let param_place = body.new_place(param_local)
+            let tmp_place_read = body.new_place(tmp_local)
+            let tmp_op = body.new_operand(OperandKind.OK_COPY, tmp_place_read)
+            let rv = body.new_rvalue(RvalueKind.RK_USE, tmp_op, 0, 0)
+            body.push_stmt(bb, StmtKind.Assign, param_place, rv, span)
+        // Replace terminator with GOTO to entry block (bb0)
+        body.set_terminator(bb, TermKind.TK_GOTO, 0, 0, 0, 0, span)
+        bb = bb + 1
 
 fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
     var mir_mod = MirModule.init()
