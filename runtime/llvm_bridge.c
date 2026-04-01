@@ -427,6 +427,14 @@ int64_t wl_build_call(int64_t b, int64_t fn_ty, int64_t fn, int64_t args_ptr, in
         (unsigned)cnt, ""));
 }
 
+void wl_set_tail_call(int64_t call_inst) {
+    LLVMSetTailCall(V(call_inst), 1);
+}
+
+void wl_set_musttail_call(int64_t call_inst) {
+    LLVMSetTailCallKind(V(call_inst), LLVMTailCallKindMustTail);
+}
+
 // ── Misc builder / value ops ───────────────────────────────
 void wl_instruction_erase(int64_t v)    { LLVMInstructionEraseFromParent(V(v)); }
 int32_t wl_get_value_kind(int64_t v)    { return (int32_t)LLVMGetValueKind(V(v)); }
