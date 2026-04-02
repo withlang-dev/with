@@ -4154,12 +4154,16 @@ fn Parser.parse_for_comprehension(self: Parser, start: i32, first_binding: i32, 
     while bi >= 0:
         let bkind = bind_kinds.get(bi as i64)
         if bkind == 1:
-            // Guard: if guard_expr: inner else: None
+            // Guard: if guard_expr: inner else: None (or void for imperative)
             let guard_expr = bind_exprs.get(bi as i64)
-            let none_node = self.pool.add_node(NodeKind.NK_VARIANT_SHORTHAND, start, start, none_sym, 0, 0)
-            inner = self.pool.add_node(NodeKind.NK_IF_EXPR, start, self.prev_end(), guard_expr, inner, none_node)
+            var guard_else: NodeId = 0 as NodeId
+            if has_yield != 0:
+                guard_else = self.pool.add_node(NodeKind.NK_VARIANT_SHORTHAND, start, start, none_sym, 0, 0)
+            else:
+                guard_else = self.pool.add_node(NodeKind.NK_BLOCK, start, start, 0, 0, 0)
+            inner = self.pool.add_node(NodeKind.NK_IF_EXPR, start, self.prev_end(), guard_expr, inner, guard_else)
         else:
-            // Binding: match source: Some(sym) => inner, None => None
+            // Binding: match source: Some(sym) => inner, None => None/void
             let source = bind_exprs.get(bi as i64)
             let bsym = bind_syms.get(bi as i64)
             // Build Some(bsym) pattern — use NK_PAT_IDENT for correct binding
@@ -4171,8 +4175,12 @@ fn Parser.parse_for_comprehension(self: Parser, start: i32, first_binding: i32, 
             let some_arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, start, self.prev_end(), some_pat, inner, 0)
             // Build None pattern
             let none_pat = self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, start, start, none_sym, 0, 0)
-            // Build None arm: None => None
-            let none_body = self.pool.add_node(NodeKind.NK_VARIANT_SHORTHAND, start, start, none_sym, 0, 0)
+            // Build None arm: value comprehension → None, imperative → void
+            var none_body: NodeId = 0 as NodeId
+            if has_yield != 0:
+                none_body = self.pool.add_node(NodeKind.NK_VARIANT_SHORTHAND, start, start, none_sym, 0, 0)
+            else:
+                none_body = self.pool.add_node(NodeKind.NK_BLOCK, start, start, 0, 0, 0)
             let none_arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, start, self.prev_end(), none_pat, none_body, 0)
             // Build match
             let arms_extra = self.pool.extra_len()
