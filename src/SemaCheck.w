@@ -2886,6 +2886,55 @@ fn Sema.is_sizeof_or_alignof(self: Sema, callee: i32) -> i32:
         return 1
     0
 
+fn Sema.is_chan_call(self: Sema, callee: i32) -> i32:
+    let kind = self.ast.kind(callee)
+    if kind != NodeKind.NK_TYPE_GENERIC and kind != NodeKind.NK_INDEX:
+        return 0
+    let gi_base = self.ast.get_data0(callee)
+    if self.ast.kind(gi_base) != NodeKind.NK_IDENT:
+        return 0
+    let gi_name = self.pool_resolve(self.ast.get_data0(gi_base))
+    if gi_name == "chan":
+        return 1
+    0
+
+fn Sema.chan_return_type(self: Sema, callee: i32) -> i32:
+    // chan[T](cap) → (Sender[T], Receiver[T])
+    // Extract T from the generic call's type argument
+    let type_arg_node = self.ast.get_data1(callee)
+    var elem_type = self.ty_i32 as i32
+    if type_arg_node > 0:
+        // Look up the type from sema's type cache
+        if self.typed_expr_types.contains(type_arg_node):
+            elem_type = self.typed_expr_types.get(type_arg_node).unwrap()
+        else:
+            // Try to resolve as a named type
+            let ta_kind = self.ast.kind(type_arg_node)
+            if ta_kind == NodeKind.NK_IDENT or ta_kind == NodeKind.NK_TYPE_NAMED:
+                let ta_sym = self.ast.get_data0(type_arg_node)
+                let prim = self.primitive_type_by_sym(ta_sym)
+                if prim != 0:
+                    elem_type = prim as i32
+                else if self.named_types.contains(ta_sym):
+                    elem_type = self.named_types.get(ta_sym).unwrap()
+    // Build Sender[T] and Receiver[T] types
+    let sender_sym = self.pool_intern("Sender")
+    let receiver_sym = self.pool_intern("Receiver")
+    let sender_args: Vec[i32] = Vec.new()
+    sender_args.push(elem_type)
+    let sender_ty = self.ensure_generic_inst_type(sender_sym, sender_args, 1)
+    let receiver_args: Vec[i32] = Vec.new()
+    receiver_args.push(elem_type)
+    let receiver_ty = self.ensure_generic_inst_type(receiver_sym, receiver_args, 1)
+    // Build tuple (Sender[T], Receiver[T])
+    let tuple_elems: Vec[i32] = Vec.new()
+    tuple_elems.push(sender_ty as i32)
+    tuple_elems.push(receiver_ty as i32)
+    let te_start = self.type_extra.len() as i32
+    self.type_extra.push(sender_ty as i32)
+    self.type_extra.push(receiver_ty as i32)
+    self.add_type(TypeKind.TY_TUPLE, te_start, 2, 0) as i32
+
 fn Sema.is_nameof_call(self: Sema, callee: i32) -> i32:
     let kind = self.ast.kind(callee)
     if kind != NodeKind.NK_TYPE_GENERIC and kind != NodeKind.NK_INDEX:
@@ -2933,6 +2982,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         return self.ty_str as i32
     if self.is_transmute_call(callee) != 0:
         return self.transmute_target_type(callee)
+    if self.is_chan_call(callee) != 0:
+        return self.chan_return_type(callee)
 
     // Method call: callee is field_access
     if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:

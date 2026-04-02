@@ -4982,6 +4982,88 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         wl_build_br(self.builder, gc_next_val)
                     return true
 
+                // chan[T](capacity) → (Sender[T], Receiver[T])
+                if gc_callee_sym == self.sym_chan:
+                    self.ensure_async_runtime_declared()
+                    // Extract element type from generic call's type argument
+                    var chan_elem_size: i64 = 4  // default for i32
+                    let chan_gc_node = gc_node
+                    let chan_type_args_node = self.pool.get_data0(chan_gc_node)
+                    if chan_type_args_node > 0:
+                        let chan_ta_kind = self.pool.kind(chan_type_args_node)
+                        if chan_ta_kind == NodeKind.NK_INDEX:
+                            let chan_type_node = self.pool.get_data1(chan_type_args_node)
+                            if chan_type_node > 0:
+                                let chan_type_llvm = self.resolve_type(chan_type_node)
+                                if chan_type_llvm != 0:
+                                    chan_elem_size = self.abi_size_of(chan_type_llvm)
+                    // Also try sema typed_expr_types for the call node
+                    let chan_dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+                    if chan_dest_sema > 0:
+                        let chan_resolved = self.mir_input.mir_resolve_alias(chan_dest_sema)
+                        if self.mir_input.mir_get_type_kind(chan_resolved) == TypeKind.TY_TUPLE:
+                            let chan_tc = self.mir_input.mir_get_type_d2(chan_resolved)
+                            if chan_tc > 0:
+                                let chan_ts = self.mir_input.mir_get_type_d1(chan_resolved)
+                                let chan_elem_tid = self.mir_input.mir_get_type_extra(chan_ts)
+                                if chan_elem_tid > 0:
+                                    // This is Sender[T] — extract T
+                                    let chan_sender_resolved = self.mir_input.mir_resolve_alias(chan_elem_tid)
+                                    if self.mir_input.mir_get_type_kind(chan_sender_resolved) == TypeKind.TY_GENERIC_INST:
+                                        let chan_gi_argc = self.mir_input.mir_get_type_d2(chan_sender_resolved)
+                                        if chan_gi_argc > 0:
+                                            let chan_gi_start = self.mir_input.mir_get_type_d1(chan_sender_resolved)
+                                            let chan_t_tid = self.mir_input.mir_get_type_extra(chan_gi_start)
+                                            if chan_t_tid > 0:
+                                                let chan_t_llvm = self.mir_sema_type_to_llvm(chan_t_tid)
+                                                if chan_t_llvm != 0:
+                                                    chan_elem_size = self.abi_size_of(chan_t_llvm)
+                    // Get capacity argument
+                    let chan_cap_val = self.mir_intrinsic_arg(body, args_id, 0)
+                    // Call with_channel_create(capacity, elem_size)
+                    var chan_create_fn = wl_get_named_function(self.llmod, "with_channel_create")
+                    if chan_create_fn == 0:
+                        let ccp: Vec[i64] = Vec.new()
+                        ccp.push(wl_i32_type(self.context))
+                        ccp.push(wl_i32_type(self.context))
+                        let ccft = wl_function_type(wl_i64_type(self.context), vec_data_i64(&ccp), 2, 0)
+                        chan_create_fn = wl_add_function(self.llmod, "with_channel_create", ccft)
+                    let ccft2 = wl_global_get_value_type(chan_create_fn)
+                    let cca: Vec[i64] = Vec.new()
+                    cca.push(chan_cap_val)
+                    cca.push(wl_const_int(wl_i32_type(self.context), chan_elem_size, 0))
+                    let chan_handle = wl_build_call(self.builder, ccft2, chan_create_fn, vec_data_i64(&cca), 2)
+                    // Construct tuple (Sender{handle}, Receiver{handle})
+                    // Sender = { i64 }, Receiver = { i64 }
+                    // Tuple = { {i64}, {i64} }
+                    let chan_inner_fields: Vec[i64] = Vec.new()
+                    chan_inner_fields.push(wl_i64_type(self.context))
+                    let chan_sender_ty = wl_struct_type(self.context, vec_data_i64(&chan_inner_fields), 1, 0)
+                    let chan_receiver_ty = chan_sender_ty  // same layout
+                    let chan_tuple_fields: Vec[i64] = Vec.new()
+                    chan_tuple_fields.push(chan_sender_ty)
+                    chan_tuple_fields.push(chan_receiver_ty)
+                    let chan_tuple_ty = wl_struct_type(self.context, vec_data_i64(&chan_tuple_fields), 2, 0)
+                    // Build sender = { handle }
+                    var chan_sender_val = wl_get_undef(chan_sender_ty)
+                    chan_sender_val = wl_build_insert_value(self.builder, chan_sender_val, chan_handle, 0)
+                    // Build receiver = { handle }
+                    var chan_receiver_val = wl_get_undef(chan_receiver_ty)
+                    chan_receiver_val = wl_build_insert_value(self.builder, chan_receiver_val, chan_handle, 0)
+                    // Build tuple = { sender, receiver }
+                    var chan_tuple_val = wl_get_undef(chan_tuple_ty)
+                    chan_tuple_val = wl_build_insert_value(self.builder, chan_tuple_val, chan_sender_val, 0)
+                    chan_tuple_val = wl_build_insert_value(self.builder, chan_tuple_val, chan_receiver_val, 1)
+                    if dest_place >= 0:
+                        let chan_local = body.place_locals.get(dest_place as i64)
+                        let chan_alloca = self.create_entry_alloca(chan_tuple_ty)
+                        wl_build_store(self.builder, chan_tuple_val, chan_alloca)
+                        self.mir_local_ptrs.insert(chan_local, chan_alloca)
+                        self.mir_local_types.insert(chan_local, chan_tuple_ty)
+                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                    return true
+
                 // Channel builtins: Channel(cap), send(ch, val), recv(ch), close(ch)
                 if gc_callee_sym == self.sym_channel:
                     self.ensure_async_runtime_declared()
