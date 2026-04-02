@@ -1,12 +1,16 @@
-// std.async — collection-level async combinators.
+// std.task — Task type and collection-level async combinators.
 //
-// Implementation note:
-// These combinators are implemented in plain With and consume `tasks` exactly
-// once up front into an internal Vec for stable ordering and cancellation
-// bookkeeping.
+// Task[T] is an opaque handle to a running fiber. It contains the fiber_id
+// and a pointer to the heap-allocated result buffer where the fiber writes
+// its return value. The T parameter is for type safety in sema.
 
 use std.collections
 use std.result
+
+/// Opaque handle to a running fiber. Returned by async fn calls.
+/// The result_buf points to a heap-allocated buffer where the fiber
+/// writes its return value. Await loads from it and frees it.
+pub type Task[T] { fiber_id: i32, result_buf: *mut u8 }
 
 /// Await all tasks. Returns Vec[T] in input order.
 /// Fails fast on first Err.
