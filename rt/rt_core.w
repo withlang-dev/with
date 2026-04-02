@@ -560,7 +560,7 @@ pub fn eprint(s: str):
 
 // ── Panic / assert ─────────────────────────────────────────────────
 
-@[c_export("with_panic")]
+@[c_export("with_panic_core")]
 pub fn panic_impl(msg: str, file: str, line: i32):
     write_all(2, "panic: " as *const u8, 7)
     let mp = str_data(msg)

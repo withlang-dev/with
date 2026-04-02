@@ -20,6 +20,16 @@ __attribute__((weak)) int32_t with_fiber_in_fiber(void) {
     return 0;
 }
 
+__attribute__((weak)) int32_t with_fiber_is_cancelled(void) {
+    return 0;
+}
+
+__attribute__((weak)) void with_fiber_panic_capture(const char *msg, int32_t msg_len) {
+    (void)msg; (void)msg_len;
+    // Fallback: if fiber.o not linked, just abort
+    abort();
+}
+
 with_str with_str_from_cstr(const char *s) {
     with_str out;
     if (!s) {
@@ -90,7 +100,31 @@ void with_assert(bool cond, const char *msg, const char *file, int line) {
     }
 }
 
+// Fiber panic hook: set by fiber.c's with_runtime_init to enable panic capture.
+// When NULL, panics abort normally. When set, called to capture panic in fiber.
+void (*with_fiber_panic_hook)(const char *msg, int32_t msg_len) = NULL;
+int32_t (*with_fiber_in_fiber_hook)(void) = NULL;
+
 void with_panic(with_str msg, with_str file, int32_t line) {
+    // If inside a fiber, capture the panic instead of aborting.
+    if (with_fiber_in_fiber_hook && with_fiber_in_fiber_hook()) {
+        if (with_fiber_panic_hook) {
+            char buf[512];
+            int len = 0;
+            if (file.len > 0) {
+                len = snprintf(buf, sizeof(buf), "panic at %.*s:%d: %.*s",
+                              (int)file.len, file.ptr, (int)line,
+                              (int)msg.len, msg.ptr);
+            } else {
+                len = snprintf(buf, sizeof(buf), "panic: %.*s",
+                              (int)msg.len, msg.ptr);
+            }
+            if (len < 0) len = 0;
+            if (len >= (int)sizeof(buf)) len = (int)sizeof(buf) - 1;
+            with_fiber_panic_hook(buf, (int32_t)len);
+            __builtin_unreachable();
+        }
+    }
     if (file.len > 0) {
         fprintf(stderr, "panic at %.*s:%d: ", (int)file.len, file.ptr, (int)line);
     } else {

@@ -197,10 +197,11 @@ int32_t with_fiber_spawn(void (*entry_fn)(void *, void *), void *arg,
                           void *result_buf, int32_t result_size,
                           int32_t stack_size);
 void with_fiber_yield(void);
-int64_t with_fiber_await(int32_t fiber_id);
+void with_fiber_await(int32_t fiber_id);
 int32_t with_fiber_cancel(int32_t fiber_id);
 void with_fiber_set_result(int64_t value);
 int32_t with_fiber_in_fiber(void);
+int32_t with_fiber_is_cancelled(void);
 void with_fiber_select(int32_t *fiber_ids, int32_t count, int32_t *result_index);
 
 // ── Channels (sized element slots) ─────────────────────────────────
