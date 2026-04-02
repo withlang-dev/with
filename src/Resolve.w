@@ -656,27 +656,6 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         self.walk_expr(pool, module_id, parent_def, comp_scope, pool.get_data0(node))
         return
 
-    if kind == NodeKind.NK_FOR_COMPREHENSION:
-        let extra_start = pool.get_data1(node)
-        let packed_d2 = pool.get_data2(node)
-        let binding_count = packed_d2 & 65535
-        var scope = current_scope
-        for i in 0..binding_count:
-            let base = extra_start + i * 3
-            let sym = pool.get_extra(base)
-            let expr = pool.get_extra(base + 1)
-            let bkind = pool.get_extra(base + 2)
-            if bkind == 0:
-                self.walk_expr(pool, module_id, parent_def, scope, expr)
-                let comp_scope = self.add_scope(module_id, scope, parent_def, ScopeKind.SK_COMPREHENSION)
-                let bdef = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, sym, pool.get_start(node), pool.get_end(node))
-                self.add_binding(comp_scope, sym, bdef)
-                scope = comp_scope
-            else:
-                self.walk_expr(pool, module_id, parent_def, scope, expr)
-        self.walk_expr(pool, module_id, parent_def, scope, pool.get_data0(node))
-        return
-
     if kind == NodeKind.NK_STRUCT_LIT:
         let field_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)

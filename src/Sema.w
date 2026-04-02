@@ -283,9 +283,6 @@ type Sema {
     // Resolved call args for named-arg calls: call_node → (start << 16 | count) in call_resolved_args_data
     call_resolved_args_map: HashMap[i32, i32],
     call_resolved_args_data: Vec[i32],
-    // For-comprehension type dispatch: node → 1 if Result (Ok/Err), 0 or absent if Option (Some/None)
-    comprehension_is_result: HashMap[i32, i32],
-
     // Implicit parameter bindings stack: pairs of (type_id, binding_sym)
     implicit_binding_types: Vec[i32],
     implicit_binding_syms: Vec[i32],
@@ -703,7 +700,6 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         capture_field_kinds: Vec.new(),
         call_resolved_args_map: sema_new_map_i32_i32(),
         call_resolved_args_data: Vec.new(),
-        comprehension_is_result: sema_new_map_i32_i32(),
         implicit_binding_types: Vec.new(),
         implicit_binding_syms: Vec.new(),
         typed_expr_types,

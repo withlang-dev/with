@@ -753,20 +753,6 @@ fn ct_clone_tree_with_subst(pool: &mut AstPool, node: i32, subst_sym: i32, subst
         let iterable = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), expr, pool.get_data1(node), iterable, pool.literal_suffix(node))
 
-    if kind == NodeKind.NK_FOR_COMPREHENSION:
-        let body = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let old_extra = pool.get_data1(node)
-        let packed_d2 = pool.get_data2(node)
-        let binding_count = packed_d2 & 65535
-        let new_extra = pool.extra_len()
-        for i in 0..binding_count:
-            let base = old_extra + i * 3
-            pool.add_extra(pool.get_extra(base))
-            let expr = ct_clone_tree_with_subst(pool, pool.get_extra(base + 1), subst_sym, subst_node, index_sym, index_node)
-            pool.add_extra(expr)
-            pool.add_extra(pool.get_extra(base + 2))
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), body, new_extra, packed_d2, pool.literal_suffix(node))
-
     if kind == NodeKind.NK_ASYNC_SCOPE:
         let body = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), body, 0, pool.literal_suffix(node))
@@ -1097,16 +1083,6 @@ fn ct_transform_expr(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, i
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data0(node)))
         pool.set_data2(node, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data2(node)))
-        return node
-
-    if kind == NodeKind.NK_FOR_COMPREHENSION:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data0(node)))
-        let extra_start = pool.get_data1(node)
-        let packed_d2 = pool.get_data2(node)
-        let binding_count = packed_d2 & 65535
-        for i in 0..binding_count:
-            let idx = extra_start + i * 3 + 1
-            pool.extra.set_i32(idx as i64, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_extra(idx)))
         return node
 
     if kind == NodeKind.NK_ASYNC_SCOPE:

@@ -4122,13 +4122,6 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         return self.lower_optional_chain(node)
 
-    if kind == NodeKind.NK_FOR_COMPREHENSION:
-        // NK_FOR_COMPREHENSION is reserved for future use when the parser
-        // switches from match desugaring to this dedicated node.
-        // Currently the parser still emits NK_MATCH for comprehensions.
-        self.mark_unsupported()
-        return self.unit_operand()
-
     if kind == NodeKind.NK_COMPTIME:
         // Comptime branches are already pruned by ComptimeTransform.
         // Just unwrap and lower the inner expression.
