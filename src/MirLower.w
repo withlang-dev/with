@@ -1558,6 +1558,20 @@ fn MirBuilder.lower_ref(self: MirBuilder, expr: i32, borrow_kind: i32, node: i32
     self.body.new_operand(OperandKind.OK_COPY, temp_place)
 
 fn MirBuilder.lower_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32):
+    // Multi-index assignment: a[i, j] = value → call multi_index_set
+    if self.ast.kind(place_expr) == NodeKind.NK_MULTI_INDEX:
+        let mi_base_op = self.lower_expr(self.ast.get_data0(place_expr))
+        let mi_rhs_op = self.lower_expr(rhs_expr)
+        let mi_args: Vec[i32] = Vec.new()
+        mi_args.push(mi_base_op)
+        mi_args.push(mi_rhs_op)
+        let mi_args_id = self.body.new_call_args(mi_args)
+        self.body.set_call_intrinsic(mi_args_id, MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX_SET)
+        self.body.set_call_ast_node(mi_args_id, place_expr)
+        let mi_next_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), mi_args_id, self.place_for_local(0), mi_next_bb)
+        self.switch_to(mi_next_bb)
+        return
     let place = self.lower_expr_place(place_expr)
     let saved_expected = self.expected_type
     let dest_ty = self.expr_type(place_expr)
@@ -4107,6 +4121,13 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         return self.lower_optional_chain(node)
+
+    if kind == NodeKind.NK_FOR_COMPREHENSION:
+        // NK_FOR_COMPREHENSION is reserved for future use when the parser
+        // switches from match desugaring to this dedicated node.
+        // Currently the parser still emits NK_MATCH for comprehensions.
+        self.mark_unsupported()
+        return self.unit_operand()
 
     if kind == NodeKind.NK_COMPTIME:
         // Comptime branches are already pruned by ComptimeTransform.

@@ -262,6 +262,16 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 
+    if kind == NodeKind.NK_FOR_COMPREHENSION:
+        let extra_start = async_ast_get_data1(self.ast, node)
+        let packed_d2 = async_ast_get_data2(self.ast, node)
+        let binding_count = packed_d2 & 65535
+        for i in 0..binding_count:
+            let expr = async_extra_or_zero(self.ast, extra_start + i * 3 + 1)
+            self.walk_expr(expr)
+        self.walk_expr(async_ast_get_data0(self.ast, node))
+        return
+
     if kind == NodeKind.NK_STRUCT_LIT:
         // d0 is a symbol, not a node — don't walk it
         let field_start = async_ast_get_data1(self.ast, node)

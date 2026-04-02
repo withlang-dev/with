@@ -90,6 +90,9 @@ enum NodeKind: i32:
     NK_MULTI_INDEX = 77
     // NK_INDEX_SPEC: d0=start_or_expr, d1=stop, d2=step_and_kind (kind * INDEX_KIND_SHIFT + step_node)
     NK_INDEX_SPEC = 78
+    // NK_FOR_COMPREHENSION: d0=body_expr, d1=extra_start, d2=binding_count|(has_yield<<16)
+    // extra: [sym0, expr0, kind0, sym1, expr1, kind1, ...] (kind: 0=binding, 1=guard)
+    NK_FOR_COMPREHENSION = 79
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81

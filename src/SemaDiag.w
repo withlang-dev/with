@@ -154,6 +154,7 @@ fn typed_expr_kind_name(kind: i32) -> str:
     if kind == NodeKind.NK_CONTINUE: return "continue_expr"
     if kind == NodeKind.NK_ARRAY_LIT: return "array_literal"
     if kind == NodeKind.NK_ARRAY_COMPREHENSION: return "array_comprehension"
+    if kind == NodeKind.NK_FOR_COMPREHENSION: return "for_comprehension"
     if kind == NodeKind.NK_STRUCT_LIT: return "struct_literal"
     if kind == NodeKind.NK_MATCH: return "match_expr"
     if kind == NodeKind.NK_ENUM_VARIANT: return "enum_variant"
@@ -715,6 +716,16 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return out
 
+    if kind == NodeKind.NK_FOR_COMPREHENSION:
+        let extra_start = self.ast.get_data1(node)
+        let packed_d2 = self.ast.get_data2(node)
+        let binding_count = packed_d2 & 65535
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        for i in 0..binding_count:
+            let expr = self.ast.get_extra(extra_start + i * 3 + 1)
+            out = out ++ self.dump_typed_expr_tree(expr, indent + 1)
+        return out
+
     if kind == NodeKind.NK_STRUCT_LIT:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
@@ -969,6 +980,16 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return
+
+    if kind == NodeKind.NK_FOR_COMPREHENSION:
+        let extra_start = self.ast.get_data1(node)
+        let packed_d2 = self.ast.get_data2(node)
+        let binding_count = packed_d2 & 65535
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        for i in 0..binding_count:
+            let expr = self.ast.get_extra(extra_start + i * 3 + 1)
+            self.emit_typed_expr_tree(expr, indent + 1)
         return
 
     if kind == NodeKind.NK_STRUCT_LIT:
