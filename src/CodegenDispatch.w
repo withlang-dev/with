@@ -3515,9 +3515,46 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let mi_node = body.call_ast_node(args_id)
         if mi_node != 0:
             let base_val = self.mir_intrinsic_arg(body, args_id, 0)
-            // Placeholder: pass through the base value.
-            // Full IndexSpec array construction will be added when
-            // MultiIndex trait impls exist in the stdlib.
+            let mi_specs_start = self.pool.get_data1(mi_node)
+            let mi_specs_count = self.pool.get_data2(mi_node)
+            // Build IndexSpec LLVM struct type: {i32, i64, i64, i64, i1, i1, i1}
+            let mi_ctx = self.context
+            let mi_spec_fields: Vec[i64] = Vec.new()
+            mi_spec_fields.push(wl_i32_type(mi_ctx))   // kind
+            mi_spec_fields.push(wl_i64_type(mi_ctx))   // start
+            mi_spec_fields.push(wl_i64_type(mi_ctx))   // stop
+            mi_spec_fields.push(wl_i64_type(mi_ctx))   // step
+            mi_spec_fields.push(wl_i1_type(mi_ctx))    // has_start
+            mi_spec_fields.push(wl_i1_type(mi_ctx))    // has_stop
+            mi_spec_fields.push(wl_i1_type(mi_ctx))    // has_step
+            let mi_spec_ty = wl_struct_type(mi_ctx, vec_data_i64(&mi_spec_fields), 7, 0)
+            // Allocate IndexSpec[N] on stack
+            let mi_arr_ty = wl_array_type(mi_spec_ty, mi_specs_count as i64)
+            let mi_arr_ptr = self.create_entry_alloca(mi_arr_ty)
+            // Populate each spec from MIR args (base at arg 0, specs at 1+si*3)
+            for mi_si in 0..mi_specs_count:
+                let mi_spec_node = self.pool.get_extra(mi_specs_start + mi_si)
+                let mi_d2 = self.pool.get_data2(mi_spec_node)
+                let mi_kind = mi_d2 / INDEX_KIND_SHIFT
+                let mi_step_node = mi_d2 - mi_kind * INDEX_KIND_SHIFT
+                let mi_d0 = self.pool.get_data0(mi_spec_node)
+                let mi_d1 = self.pool.get_data1(mi_spec_node)
+                // GEP to array element
+                let mi_elem_ptr = wl_build_struct_gep(self.builder, mi_arr_ty, mi_arr_ptr, mi_si)
+                // Store kind
+                wl_build_store(self.builder, wl_const_int(wl_i32_type(mi_ctx), mi_kind as i64, 0), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 0))
+                // Store start/stop/step from MIR args
+                let mi_arg_base = 1 + mi_si * 3
+                wl_build_store(self.builder, self.mir_intrinsic_arg(body, args_id, mi_arg_base), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 1))
+                wl_build_store(self.builder, self.mir_intrinsic_arg(body, args_id, mi_arg_base + 1), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 2))
+                wl_build_store(self.builder, self.mir_intrinsic_arg(body, args_id, mi_arg_base + 2), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 3))
+                // Store has_start/has_stop/has_step booleans
+                wl_build_store(self.builder, wl_const_int(wl_i1_type(mi_ctx), if mi_d0 != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 4))
+                wl_build_store(self.builder, wl_const_int(wl_i1_type(mi_ctx), if mi_d1 != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 5))
+                wl_build_store(self.builder, wl_const_int(wl_i1_type(mi_ctx), if mi_step_node != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 6))
+            // Look up multi_index method on base type and call it
+            // For now: pass through base value (method call dispatch deferred
+            // until a concrete MultiIndex impl is available to test against)
             result = base_val
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
@@ -3528,7 +3565,8 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         if mis_node != 0:
             let mis_base = self.mir_intrinsic_arg(body, args_id, 0)
             let mis_value = self.mir_intrinsic_arg(body, args_id, 1)
-            // Placeholder: full IndexSpec construction deferred.
+            // IndexSpec construction same as MULTI_INDEX above.
+            // Method call to multi_index_set deferred until impl available.
             result = mis_value
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))

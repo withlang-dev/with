@@ -1632,12 +1632,25 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
 
     if kind == NodeKind.NK_MULTI_INDEX:
         // Multi-dimensional indexing via MIR_INTRINSIC_MULTI_INDEX.
-        // The intrinsic carries the AST node through to codegen which
-        // has LLVM IR power to alloca IndexSpec array, populate it,
-        // and call the multi_index trait method.
+        // Lower base + all spec expressions as MIR args.
+        // Arg layout: [base, spec0_start, spec0_stop, spec0_step, spec1_start, ...]
+        // Each spec contributes 3 args (0 if absent). The AST node carries
+        // kind/has_* metadata that codegen reads directly.
         let base_op = self.lower_expr(self.ast.get_data0(node))
         let mi_args: Vec[i32] = Vec.new()
         mi_args.push(base_op)
+        let specs_start = self.ast.get_data1(node)
+        let specs_count = self.ast.get_data2(node)
+        for si in 0..specs_count:
+            let spec = self.ast.get_extra(specs_start + si)
+            let d0 = self.ast.get_data0(spec)
+            let d1 = self.ast.get_data1(spec)
+            let d2 = self.ast.get_data2(spec)
+            let step_node = d2 - (d2 / INDEX_KIND_SHIFT) * INDEX_KIND_SHIFT
+            // Lower each expression or emit 0
+            mi_args.push(if d0 != 0: self.lower_expr(d0) else: self.int_const_operand(0, self.sema.ty_i64))
+            mi_args.push(if d1 != 0: self.lower_expr(d1) else: self.int_const_operand(0, self.sema.ty_i64))
+            mi_args.push(if step_node != 0: self.lower_expr(step_node) else: self.int_const_operand(0, self.sema.ty_i64))
         let mi_args_id = self.body.new_call_args(mi_args)
         self.body.set_call_intrinsic(mi_args_id, MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX)
         self.body.set_call_ast_node(mi_args_id, node)
