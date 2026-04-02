@@ -386,6 +386,7 @@ type Codegen {
     sym_size_of: i32,
     sym_alignof: i32,
     sym_align_of: i32,
+    sym_chan: i32,
     sym_todo: i32,
     sym_unreachable: i32,
     sym_src: i32,
@@ -706,6 +707,7 @@ fn Codegen.init_with_opt_and_intern(module_name: str, opt_level: i32, intern: In
     cg.sym_size_of = cg.intern.intern("size_of")
     cg.sym_alignof = cg.intern.intern("alignof")
     cg.sym_align_of = cg.intern.intern("align_of")
+    cg.sym_chan = cg.intern.intern("chan")
     cg.sym_todo = cg.intern.intern("todo")
     cg.sym_unreachable = cg.intern.intern("unreachable")
     cg.sym_src = cg.intern.intern("src")
@@ -753,7 +755,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         sym_Self: 0, sym_self: 0, sym_unit: 0,
         sym_bool: 0, sym_usize: 0, sym_isize: 0, sym_void: 0,
         sym_never: 0, sym_str: 0,
-        sym_sizeof: 0, sym_size_of: 0, sym_alignof: 0, sym_align_of: 0,
+        sym_sizeof: 0, sym_size_of: 0, sym_alignof: 0, sym_align_of: 0, sym_chan: 0,
         sym_todo: 0, sym_unreachable: 0, sym_src: 0, sym_transmute: 0,
         sym_nameof: 0, sym_type_name: 0, sym_embed_file: 0,
         sym_channel: 0, sym_send: 0, sym_recv: 0, sym_close: 0,

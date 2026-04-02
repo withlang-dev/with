@@ -2,12 +2,6 @@
 
 use std.channel
 
-fn make_sender(ch: Channel[i32]) -> Sender[i32]:
-    Sender { handle: ch.handle }
-
-fn make_receiver(ch: Channel[i32]) -> Receiver[i32]:
-    Receiver { handle: ch.handle }
-
 async fn producer(tx: Sender[i32]) -> i32:
     tx.send(1)
     tx.send(2)
@@ -21,9 +15,9 @@ async fn consumer(rx: Receiver[i32]) -> i32:
     a + b + c
 
 async fn main:
-    let ch = Channel[i32].new(2)
-    let tx = make_sender(ch)
-    let rx = make_receiver(ch)
+    let pair = chan[i32](2)
+    let tx = pair.0
+    let rx = pair.1
     let p = producer(tx)
     let c = consumer(rx)
     let sum = c.await
