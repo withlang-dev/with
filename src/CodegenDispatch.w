@@ -703,6 +703,25 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         let closure_result = self.gen_closure(closure_node)
         return closure_result
 
+    if ck == ConstKind.CK_ASYNC_BLOCK:
+        // Same preamble as CK_CLOSURE: populate local_allocas/local_types from MIR locals
+        let ab_node = cd
+        if ab_node <= 0 or ab_node >= self.pool.node_count():
+            return wl_get_undef(fallback_ty)
+        for ab_li in 0..body.local_count():
+            let ab_name_sym = body.local_names.get(ab_li as i64)
+            if ab_name_sym != 0:
+                let ab_ptr_opt = self.mir_local_ptrs.get(ab_li)
+                if ab_ptr_opt.is_some():
+                    self.local_allocas.insert(ab_name_sym, ab_ptr_opt.unwrap())
+                    let ab_ty_opt = self.mir_local_types.get(ab_li)
+                    if ab_ty_opt.is_some():
+                        self.local_types.insert(ab_name_sym, ab_ty_opt.unwrap())
+                let ab_sema_ty = body.local_type_ids.get(ab_li as i64)
+                if ab_sema_ty != 0:
+                    self.local_sema_types.insert(ab_name_sym, ab_sema_ty)
+        return self.gen_async_block(ab_node)
+
     if ck == ConstKind.CK_FN:
         let fn_sym = cd
         // ConstKind.CK_FN sym from MirLower is in sema pool — must translate to codegen pool.
@@ -5549,6 +5568,19 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
         return true
 
     if tk == TermKind.TK_RETURN:
+        // Async block trampoline: store result into rbuf, ret void
+        if self.async_block_rbuf != 0:
+            let ab_ret_ptr_opt = self.mir_local_ptrs.get(0)
+            if ab_ret_ptr_opt.is_some():
+                var ab_ret_ty = self.current_ret_type
+                let ab_ret_ty_opt = self.mir_local_types.get(0)
+                if ab_ret_ty_opt.is_some():
+                    ab_ret_ty = ab_ret_ty_opt.unwrap() as i64
+                if ab_ret_ty != 0 and ab_ret_ty != wl_void_type(self.context):
+                    let ab_ret_val = wl_build_load(self.builder, ab_ret_ty, ab_ret_ptr_opt.unwrap() as i64)
+                    wl_build_store(self.builder, ab_ret_val, self.async_block_rbuf)
+            let _ = wl_build_ret_void(self.builder)
+            return true
         if self.current_ret_type == wl_void_type(self.context):
             let _ = wl_build_ret_void(self.builder)
             return true
@@ -7767,5 +7799,255 @@ fn Codegen.generate_async_trampoline(self: Codegen, fn_sym: i32, callee: i64, ca
         wl_position_at_end(self.builder, saved_bb)
 
     tramp_fn
+
+// ── Async block codegen ──────────────────────────────────────────
+
+fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
+    let body_node = self.pool.get_data0(node)
+    let ctx = self.context
+    let ptr_ty = wl_ptr_type(ctx)
+    let i32_ty = wl_i32_type(ctx)
+    let i64_ty = wl_i64_type(ctx)
+    let void_ty = wl_void_type(ctx)
+
+    // 1. Collect captures (local_allocas populated by CK_ASYNC_BLOCK preamble)
+    let fresh_captures: Vec[i32] = Vec.new()
+    self.async_block_captures = fresh_captures
+    self.collect_captures(body_node)
+    let captures = self.async_block_captures
+    let capture_count = captures.len() as i32
+
+    // 2. Build capture struct type
+    let cap_types: Vec[i64] = Vec.new()
+    for ci in 0..capture_count:
+        let sym = captures.get(ci as i64)
+        let ty_opt = self.local_types.get(sym)
+        if ty_opt.is_some():
+            cap_types.push(ty_opt.unwrap() as i64)
+        else:
+            cap_types.push(i32_ty)
+    var cap_struct_type: i64 = 0
+    if capture_count > 0:
+        cap_struct_type = wl_struct_type(ctx, vec_data_i64(&cap_types), capture_count, 0)
+
+    // Determine result type from sema (unwrap Task[T] → T for result buffer)
+    var ret_sema_ty_id = self.sema.ty_i32 as i32
+    let node_sema_ty = self.sema_type_of_node(node)
+    if node_sema_ty != 0:
+        let unwrapped = self.sema.unwrap_task_type(node_sema_ty) as i32
+        if unwrapped > 0:
+            ret_sema_ty_id = unwrapped
+    var ret_ty = self.sema_type_to_llvm(ret_sema_ty_id)
+    if ret_ty == 0:
+        ret_ty = i32_ty
+
+    // 3. Create anonymous trampoline: void(ptr env, ptr result_buf)
+    self.async_block_counter = self.async_block_counter + 1
+    let tramp_name = "__async_block_" ++ int_to_string(self.async_block_counter)
+    let tramp_params: Vec[i64] = Vec.new()
+    tramp_params.push(ptr_ty)  // env
+    tramp_params.push(ptr_ty)  // result_buf
+    let tramp_ft = wl_function_type(void_ty, vec_data_i64(&tramp_params), 2, 0)
+    let tramp_fn = wl_add_function(self.llmod, tramp_name, tramp_ft)
+
+    // 4. Save codegen state
+    let saved_fn = self.current_function
+    let saved_ret = self.current_ret_type
+    let saved_bb = wl_get_insert_block(self.builder)
+    let saved_allocas = self.local_allocas
+    let saved_types = self.local_types
+    let saved_muts = self.local_muts
+    let saved_loops = self.capture_loop_state()
+    let saved_mir_locals = self.mir_local_ptrs
+    let saved_mir_types = self.mir_local_types
+    let saved_mir_bbs = self.mir_bb_values
+
+    // 5. Fresh context for trampoline body
+    self.current_function = tramp_fn
+    self.current_ret_type = ret_ty
+    self.local_allocas = HashMap.new()
+    self.local_types = HashMap.new()
+    self.local_muts = HashMap.new()
+
+    let entry_bb = wl_append_bb(ctx, tramp_fn, "entry")
+    wl_position_at_end(self.builder, entry_bb)
+
+    let env_arg = wl_get_param(tramp_fn, 0)
+    let rbuf_arg = wl_get_param(tramp_fn, 1)
+
+    // Load captures from env struct
+    if capture_count > 0 and cap_struct_type != 0:
+        for ci in 0..capture_count:
+            let sym = captures.get(ci as i64)
+            let cap_ty = cap_types.get(ci as i64)
+            let field_ptr = wl_build_struct_gep(self.builder, cap_struct_type, env_arg, ci)
+            let val = wl_build_load(self.builder, cap_ty, field_ptr)
+            let alloca = wl_build_alloca(self.builder, cap_ty)
+            wl_build_store(self.builder, val, alloca)
+            self.local_allocas.insert(sym, alloca)
+            self.local_types.insert(sym, cap_ty)
+
+    // Free env struct
+    var free_fn = wl_get_named_function(self.llmod, "with_free")
+    if free_fn == 0:
+        let fp: Vec[i64] = Vec.new()
+        fp.push(ptr_ty)
+        let fft = wl_function_type(void_ty, vec_data_i64(&fp), 1, 0)
+        free_fn = wl_add_function(self.llmod, "with_free", fft)
+    if capture_count > 0:
+        let free_ft = wl_global_get_value_type(free_fn)
+        let free_args: Vec[i64] = Vec.new()
+        free_args.push(env_arg)
+        wl_build_call(self.builder, free_ft, free_fn, vec_data_i64(&free_args), 1)
+
+    // 6. Lower body via MirBuilder (same pattern as gen_closure)
+    var ab_builder = MirBuilder.init(self.sema, self.pool, self.intern, 0)
+    if ret_sema_ty_id != 0 and ret_sema_ty_id != self.sema.ty_void as i32:
+        ab_builder.body.local_type_ids.set_i32(0, ret_sema_ty_id)
+    else:
+        ab_builder.body.local_type_ids.set_i32(0, self.sema.ty_i32 as i32)
+    ab_builder.push_scope()
+    // Register captures as MIR locals
+    for ci in 0..capture_count:
+        let sym = captures.get(ci as i64)
+        var cap_sema_ty = self.sema.ty_i32 as i32
+        let cap_sema_opt = self.local_sema_types.get(sym)
+        if cap_sema_opt.is_some():
+            cap_sema_ty = cap_sema_opt.unwrap()
+        let cap_local = ab_builder.body.new_local(cap_sema_ty, 0, sym, 1)
+        ab_builder.bind_local(sym, cap_local)
+    // Lower body expression
+    let ab_result = ab_builder.lower_expr(body_node)
+    let ab_ret_place = ab_builder.place_for_local(0)
+    ab_builder.assign_operand_to_place(ab_ret_place, ab_result, self.pool.get_end(body_node))
+    ab_builder.pop_scope_inline()
+    ab_builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+    let ab_body = ab_builder.body
+
+    // Set rbuf flag so TK_RETURN stores result into result_buf
+    self.async_block_rbuf = rbuf_arg
+
+    // Create return alloca for MIR local 0
+    let ret_alloca = wl_build_alloca(self.builder, ret_ty)
+    self.mir_local_ptrs = HashMap.new()
+    self.mir_local_types = HashMap.new()
+    // Map capture MIR locals
+    for ci in 0..capture_count:
+        let sym = captures.get(ci as i64)
+        let cap_alloca_opt = self.local_allocas.get(sym)
+        if cap_alloca_opt.is_some():
+            // MIR locals: 0 = return, 1..N = captures
+            self.mir_local_ptrs.insert(ci + 1, cap_alloca_opt.unwrap())
+            self.mir_local_types.insert(ci + 1, cap_types.get(ci as i64))
+    self.mir_local_ptrs.insert(0, ret_alloca)
+    self.mir_local_types.insert(0, ret_ty)
+
+    // Create LLVM BBs for MIR blocks
+    self.mir_bb_values = Vec.new()
+    let bb_count = ab_body.block_count()
+    for bi in 0..bb_count:
+        let bb = wl_append_bb(ctx, tramp_fn, "bb")
+        self.mir_bb_values.push(bb)
+    if bb_count > 0:
+        wl_build_br(self.builder, self.mir_bb_values.get(0))
+
+    // Emit MIR statements and terminators
+    for bi in 0..bb_count:
+        let bb = self.mir_bb_values.get(bi as i64)
+        wl_position_at_end(self.builder, bb)
+        let stmt_start = ab_body.bb_stmt_starts.get(bi as i64)
+        let stmt_count = ab_body.bb_stmt_counts.get(bi as i64)
+        for si in 0..stmt_count:
+            self.mir_emit_stmt(ab_body, stmt_start + si)
+        let term = ab_body.term_kind(bi)
+        if term == TermKind.TK_RETURN:
+            // TK_RETURN intercept handles store to rbuf + ret void
+            if not self.mir_emit_term(ab_body, bi):
+                let _ = wl_build_unreachable(self.builder)
+        else:
+            if not self.mir_emit_term(ab_body, bi):
+                let _ = wl_build_unreachable(self.builder)
+
+    // 7. Restore codegen state
+    self.async_block_rbuf = 0
+    self.mir_local_ptrs = saved_mir_locals
+    self.mir_local_types = saved_mir_types
+    self.mir_bb_values = saved_mir_bbs
+    self.current_function = saved_fn
+    self.current_ret_type = saved_ret
+    self.local_allocas = saved_allocas
+    self.local_types = saved_types
+    self.local_muts = saved_muts
+    self.restore_loop_state(saved_loops)
+    if saved_bb != 0:
+        wl_position_at_end(self.builder, saved_bb)
+
+    // 8. Back in outer function: heap-allocate capture struct and fill it
+    self.ensure_async_runtime_declared()
+    var env_ptr = wl_const_null(ptr_ty)
+    if capture_count > 0 and cap_struct_type != 0:
+        let cap_size = wl_abi_size_of(self.data_layout, cap_struct_type)
+        var alloc_fn = wl_get_named_function(self.llmod, "with_alloc")
+        if alloc_fn == 0:
+            let ap: Vec[i64] = Vec.new()
+            ap.push(i64_ty)
+            let aft = wl_function_type(ptr_ty, vec_data_i64(&ap), 1, 0)
+            alloc_fn = wl_add_function(self.llmod, "with_alloc", aft)
+        let alloc_ft = wl_global_get_value_type(alloc_fn)
+        let alloc_args: Vec[i64] = Vec.new()
+        alloc_args.push(wl_const_int(i64_ty, cap_size, 0))
+        env_ptr = wl_build_call(self.builder, alloc_ft, alloc_fn, vec_data_i64(&alloc_args), 1)
+        // Store captures into heap struct
+        for ci in 0..capture_count:
+            let sym = captures.get(ci as i64)
+            let src_opt = saved_allocas.get(sym)
+            if src_opt.is_some():
+                let cap_ty = cap_types.get(ci as i64)
+                let val = wl_build_load(self.builder, cap_ty, src_opt.unwrap() as i64)
+                let fld = wl_build_struct_gep(self.builder, cap_struct_type, env_ptr, ci)
+                wl_build_store(self.builder, val, fld)
+
+    // 9. Heap-allocate result buffer
+    let result_size = wl_abi_size_of(self.data_layout, ret_ty)
+    var alloc_fn2 = wl_get_named_function(self.llmod, "with_alloc")
+    if alloc_fn2 == 0:
+        let ap2: Vec[i64] = Vec.new()
+        ap2.push(i64_ty)
+        let aft2 = wl_function_type(ptr_ty, vec_data_i64(&ap2), 1, 0)
+        alloc_fn2 = wl_add_function(self.llmod, "with_alloc", aft2)
+    let alloc_ft2 = wl_global_get_value_type(alloc_fn2)
+    let rbuf_args: Vec[i64] = Vec.new()
+    rbuf_args.push(wl_const_int(i64_ty, if result_size > 0: result_size else: 1, 0))
+    let result_buf = wl_build_call(self.builder, alloc_ft2, alloc_fn2, vec_data_i64(&rbuf_args), 1)
+
+    // 10. Call with_fiber_spawn(trampoline, env, result_buf, result_size, 0)
+    var spawn_fn = wl_get_named_function(self.llmod, "with_fiber_spawn")
+    if spawn_fn == 0:
+        let sp: Vec[i64] = Vec.new()
+        sp.push(ptr_ty)
+        sp.push(ptr_ty)
+        sp.push(ptr_ty)
+        sp.push(i32_ty)
+        sp.push(i32_ty)
+        let sft = wl_function_type(i32_ty, vec_data_i64(&sp), 5, 0)
+        spawn_fn = wl_add_function(self.llmod, "with_fiber_spawn", sft)
+    let spawn_ft = wl_global_get_value_type(spawn_fn)
+    let spawn_args: Vec[i64] = Vec.new()
+    spawn_args.push(tramp_fn)
+    spawn_args.push(env_ptr)
+    spawn_args.push(result_buf)
+    spawn_args.push(wl_const_int(i32_ty, result_size, 0))
+    spawn_args.push(wl_const_int(i32_ty, 0, 0))
+    let fiber_id = wl_build_call(self.builder, spawn_ft, spawn_fn, vec_data_i64(&spawn_args), 5)
+
+    // 11. Construct Task { fiber_id, result_buf }
+    let task_fields: Vec[i64] = Vec.new()
+    task_fields.push(i32_ty)
+    task_fields.push(ptr_ty)
+    let task_ty = wl_struct_type(ctx, vec_data_i64(&task_fields), 2, 0)
+    var task_val = wl_get_undef(task_ty)
+    task_val = wl_build_insert_value(self.builder, task_val, fiber_id, 0)
+    task_val = wl_build_insert_value(self.builder, task_val, result_buf, 1)
+    task_val
 
 // ── Option method dispatch ────────────────────────────────────────

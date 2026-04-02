@@ -70,6 +70,7 @@ enum ConstKind: i32:
     CK_ZERO_SIZED = 5
     CK_FN = 6
     CK_CLOSURE = 7
+    CK_ASYNC_BLOCK = 8
 
 // ── Call intrinsic kinds ─────────────────────────────────────────
 // Attached to TermKind.TK_CALL terminators to mark known container/builtin
@@ -1006,6 +1007,9 @@ fn mir_const_text(body: MirBody, const_id: i32, pool: InternPool, sema: Sema) ->
     if k == ConstKind.CK_CLOSURE:
         return f"const closure(node{d0})"
 
+    if k == ConstKind.CK_ASYNC_BLOCK:
+        return f"const async_block(node{d0})"
+
     f"const<{k}>({d0})"
 
 fn mir_agg_fields_text(body: MirBody, fields_id: i32, pool: InternPool, sema: Sema) -> str:
@@ -1362,7 +1366,7 @@ fn validate_mir_body(body: MirBody) -> str:
 
     for ci in 0..const_count:
         let ck = body.const_kinds.get(ci as i64)
-        if ck == ConstKind.CK_INT or ck == ConstKind.CK_BOOL or ck == ConstKind.CK_STR or ck == ConstKind.CK_UNIT or ck == ConstKind.CK_FLOAT or ck == ConstKind.CK_ZERO_SIZED or ck == ConstKind.CK_FN or ck == ConstKind.CK_CLOSURE:
+        if ck == ConstKind.CK_INT or ck == ConstKind.CK_BOOL or ck == ConstKind.CK_STR or ck == ConstKind.CK_UNIT or ck == ConstKind.CK_FLOAT or ck == ConstKind.CK_ZERO_SIZED or ck == ConstKind.CK_FN or ck == ConstKind.CK_CLOSURE or ck == ConstKind.CK_ASYNC_BLOCK:
             continue
         return f"const{ci}: unknown const kind {ck}"
 

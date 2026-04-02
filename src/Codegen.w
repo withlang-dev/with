@@ -592,6 +592,7 @@ type Codegen {
     uses_async: bool,
     async_block_counter: i32,
     async_block_captures: Vec[i32],
+    async_block_rbuf: i64,
 
     // Scope locals for drop
     scope_local_syms: Vec[i32],
@@ -878,6 +879,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         uses_async: false,
         async_block_counter: 0,
         async_block_captures: Vec.new(),
+        async_block_rbuf: 0,
         scope_local_syms: Vec.new(),
         scope_local_allocas: Vec.new(),
         scope_local_types: Vec.new(),
