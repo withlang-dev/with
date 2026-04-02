@@ -8,6 +8,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <signal.h>
+#include <setjmp.h>
 
 // ── Fiber context (must match assembly layout) ─────────────────────
 
@@ -40,6 +41,11 @@ typedef struct Fiber {
     void        *arg;          // Argument to entry function
     struct Fiber *next;        // For scheduler queue
     int32_t      id;
+    // Panic capture: setjmp/longjmp for catching panics inside fibers
+    jmp_buf      panic_jmp;
+    int32_t      has_panic;
+    const char  *panic_msg;
+    int32_t      panic_msg_len;
 } Fiber;
 
 // ── Scheduler ───────────────────────────────────────────────────────
@@ -67,6 +73,10 @@ static int completed_count = 0;
 
 int32_t with_fiber_in_fiber(void) {
     return current_fiber != NULL;
+}
+
+int32_t with_fiber_is_cancelled(void) {
+    return (current_fiber && current_fiber->cancel_requested) ? 1 : 0;
 }
 
 // Assembly-implemented context switch
@@ -176,6 +186,9 @@ static void recycle_fiber(Fiber *f) {
     f->entry = NULL;
     f->arg = NULL;
     f->id = 0;
+    if (f->panic_msg) { free((void *)f->panic_msg); f->panic_msg = NULL; }
+    f->has_panic = 0;
+    f->panic_msg_len = 0;
     f->next = free_pool_head;
     free_pool_head = f;
 }
@@ -200,9 +213,11 @@ static void free_fiber_pool(void) {
 // Trampoline: entered when fiber starts executing.
 static void fiber_trampoline(void) {
     // current_fiber is set before switching to us.
-    // Call trampoline(args, result_buf)
+    // Call trampoline(args, result_buf).
+    // If a panic occurs, with_fiber_panic_capture() switches back
+    // to the scheduler directly — we never reach the code below.
     current_fiber->entry(current_fiber->arg, current_fiber->result_buf);
-    // Fiber function returned — mark as done.
+    // Fiber function returned normally — mark as done.
     current_fiber->state = FIBER_DONE;
     // Store in completed list for await.
     if (completed_count < MAX_FIBERS) {
@@ -214,9 +229,73 @@ static void fiber_trampoline(void) {
     __builtin_unreachable();
 }
 
+// ── Stack overflow signal handler ──────────────────────────────────
+
+// Alternate signal stack so the handler can run when the fiber stack overflows.
+static uint8_t fiber_alt_stack_buf[SIGSTKSZ];
+
+static void fiber_write_i32(int fd, int32_t n) {
+    char buf[16];
+    int i = 0;
+    if (n < 0) { write(fd, "-", 1); n = -n; }
+    if (n == 0) { write(fd, "0", 1); return; }
+    while (n > 0 && i < 15) { buf[i++] = '0' + (n % 10); n /= 10; }
+    for (int j = i - 1; j >= 0; j--) write(fd, &buf[j], 1);
+}
+
+static void fiber_stack_overflow_handler(int sig, siginfo_t *info, void *ucontext) {
+    (void)ucontext;
+    void *fault_addr = info->si_addr;
+    size_t page_sz = guard_page_size();
+
+    // Check if fault is in current fiber's guard page
+    if (current_fiber && current_fiber->stack) {
+        void *guard_start = (char *)current_fiber->stack - page_sz;
+        void *guard_end = current_fiber->stack;
+        if (fault_addr >= guard_start && fault_addr < guard_end) {
+            write(2, "fatal: fiber stack overflow (fiber #", 36);
+            fiber_write_i32(2, current_fiber->id);
+            write(2, ")\n", 2);
+            _exit(134);
+        }
+    }
+
+    // Not a fiber guard page hit — restore default and re-raise
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = SIG_DFL;
+    sigaction(sig, &sa, NULL);
+    raise(sig);
+}
+
+static void fiber_install_signal_handlers(void) {
+    // Set up alternate signal stack (needed because fiber stack is what overflowed)
+    stack_t ss;
+    ss.ss_sp = fiber_alt_stack_buf;
+    ss.ss_size = sizeof(fiber_alt_stack_buf);
+    ss.ss_flags = 0;
+    sigaltstack(&ss, NULL);
+
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = fiber_stack_overflow_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sigaction(SIGSEGV, &sa, NULL);
+#ifdef SIGBUS
+    sigaction(SIGBUS, &sa, NULL);
+#endif
+}
+
 // ── Public API (called from generated code) ─────────────────────────
 
 // Initialize the runtime (called once before main if async is used).
+// Panic hooks — defined in support_runtime.c, set here during init
+extern void (*with_fiber_panic_hook)(const char *msg, int32_t msg_len);
+extern int32_t (*with_fiber_in_fiber_hook)(void);
+// Forward declaration
+void with_fiber_panic_capture(const char *msg, int32_t msg_len);
+
 void with_runtime_init(void) {
     ready_head = NULL;
     ready_tail = NULL;
@@ -230,6 +309,10 @@ void with_runtime_init(void) {
     live_fiber_count = 0;
     fiber_steal_events = 0;
     scheduler_round = 0;
+    fiber_install_signal_handlers();
+    // Register panic hooks so with_panic captures inside fibers
+    with_fiber_panic_hook = with_fiber_panic_capture;
+    with_fiber_in_fiber_hook = with_fiber_in_fiber;
 }
 
 // Create a new fiber. Returns fiber ID.
@@ -311,6 +394,21 @@ void with_runtime_run(void) {
         }
         // FIBER_DONE fibers are in the completed list.
     }
+
+    // Report unhandled panics from fire-and-forget fibers
+    int had_unhandled_panic = 0;
+    for (int i = 0; i < completed_count; i++) {
+        if (completed[i] && completed[i]->has_panic) {
+            fprintf(stderr, "unhandled panic in fiber #%d: %.*s\n",
+                    completed[i]->id,
+                    (int)completed[i]->panic_msg_len,
+                    completed[i]->panic_msg ? completed[i]->panic_msg : "(null)");
+            had_unhandled_panic = 1;
+        }
+    }
+    if (had_unhandled_panic) {
+        _exit(1);
+    }
 }
 
 // Yield the current fiber (cooperative scheduling point).
@@ -343,20 +441,37 @@ static void run_one_fiber(void) {
     }
 }
 
-// Await a fiber by ID. Returns the fiber's result.
+// Await a fiber by ID.
 // If called from a fiber, yields until target completes.
 // If called from main thread, runs scheduler inline until target completes.
-int64_t with_fiber_await(int32_t fiber_id) {
+// Result is read from the fiber's heap-allocated result_buf by codegen, not returned here.
+void with_fiber_await(int32_t fiber_id) {
     while (1) {
         // Check if fiber is completed.
         for (int i = 0; i < completed_count; i++) {
             if (completed[i] && completed[i]->id == fiber_id) {
-                int64_t result = completed[i]->result;
+                // Check if the fiber panicked — re-raise in awaiter's context
+                if (completed[i]->has_panic) {
+                    // Take ownership of panic message before recycling
+                    const char *msg = completed[i]->panic_msg;
+                    int32_t msg_len = completed[i]->panic_msg_len;
+                    completed[i]->panic_msg = NULL; // prevent double-free in recycle
+                    completed[i]->has_panic = 0;
+                    recycle_fiber(completed[i]);
+                    completed[i] = completed[completed_count - 1];
+                    completed_count--;
+                    // Re-raise: print message and abort
+                    if (msg && msg_len > 0) {
+                        fprintf(stderr, "%.*s\n", (int)msg_len, msg);
+                        free((void *)msg);
+                    }
+                    abort();
+                }
                 // Recycle for stack/Fiber reuse.
                 recycle_fiber(completed[i]);
                 completed[i] = completed[completed_count - 1];
                 completed_count--;
-                return result;
+                return;
             }
         }
         // Not done yet.
@@ -369,7 +484,7 @@ int64_t with_fiber_await(int32_t fiber_id) {
                 run_one_fiber();
             } else {
                 // No more fibers to run and target not done — shouldn't happen.
-                return -1;
+                return;
             }
         }
     }
@@ -422,6 +537,30 @@ void with_fiber_set_result(int64_t value) {
     if (current_fiber) {
         current_fiber->result = value;
     }
+}
+
+// Capture a panic inside a fiber. Called from with_panic when in fiber context.
+// For v1: mark the fiber as panicked and yield back to the scheduler.
+// The fiber will not resume; the panic is reported at await or during drain.
+void with_fiber_panic_capture(const char *msg, int32_t msg_len) {
+    if (!current_fiber) return;
+    current_fiber->has_panic = 1;
+    // Copy the message since the original may be stack-allocated
+    char *buf = (char *)malloc((size_t)msg_len + 1);
+    if (buf) {
+        memcpy(buf, msg, (size_t)msg_len);
+        buf[msg_len] = '\0';
+    }
+    current_fiber->panic_msg = buf;
+    current_fiber->panic_msg_len = msg_len;
+    // Mark fiber as done and switch back to scheduler
+    current_fiber->state = FIBER_DONE;
+    if (completed_count < MAX_FIBERS) {
+        completed[completed_count++] = current_fiber;
+    }
+    with_fiber_switch(&current_fiber->ctx, &scheduler_ctx);
+    // Should never reach here — scheduler won't re-run this fiber
+    __builtin_unreachable();
 }
 
 // Shutdown the runtime (cleanup).

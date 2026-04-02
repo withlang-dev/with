@@ -2828,6 +2828,9 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "is_some": return MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME
         if method_name == "is_none": return MirIntrinsic.MIR_INTRINSIC_OPT_IS_NONE
         return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "Channel":
+        if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_CHAN_CREATE
+        return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "Sender":
         if method_name == "send": return MirIntrinsic.MIR_INTRINSIC_CHAN_SEND
         if method_name == "close": return MirIntrinsic.MIR_INTRINSIC_CHAN_CLOSE
@@ -3604,15 +3607,57 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         await_args.push(fid)
         let await_ft = wl_global_get_value_type(await_fn)
         wl_build_call(self.builder, await_ft, await_fn, vec_data_i64(&await_args), 1)
-        // TODO: cancellation check (with_fiber_is_cancelled)
-        // Load result from heap buffer
+
+        // Cancellation check: if current fiber was cancelled, free rbuf and skip result load
+        var is_cancelled_fn = wl_get_named_function(self.llmod, "with_fiber_is_cancelled")
+        if is_cancelled_fn == 0:
+            let ic_ft = wl_function_type(wl_i32_type(self.context), 0, 0, 0)
+            is_cancelled_fn = wl_add_function(self.llmod, "with_fiber_is_cancelled", ic_ft)
+        let ic_ft2 = wl_global_get_value_type(is_cancelled_fn)
+        let cancelled_val = wl_build_call(self.builder, ic_ft2, is_cancelled_fn, 0, 0)
+        let is_cancelled = wl_build_icmp(self.builder, wl_int_ne(), cancelled_val, wl_const_int(wl_i32_type(self.context), 0, 0))
+        let continue_bb = wl_append_bb(self.context, self.current_function, "await.continue")
+        let cancelled_bb = wl_append_bb(self.context, self.current_function, "await.cancelled")
+        wl_build_cond_br(self.builder, is_cancelled, cancelled_bb, continue_bb)
+
+        // Cancelled path: free result buffer, store zero value
+        wl_position_at_end(self.builder, cancelled_bb)
+        let free_fn_name_c = "with_free"
+        var free_fn_c = wl_get_named_function(self.llmod, free_fn_name_c)
+        if free_fn_c == 0:
+            let fp_c: Vec[i64] = Vec.new()
+            fp_c.push(wl_ptr_type(self.context))
+            let fft_c = wl_function_type(wl_void_type(self.context), vec_data_i64(&fp_c), 1, 0)
+            free_fn_c = wl_add_function(self.llmod, free_fn_name_c, fft_c)
+        let fft_c2 = wl_global_get_value_type(free_fn_c)
+        let fa_c: Vec[i64] = Vec.new()
+        fa_c.push(rbuf)
+        wl_build_call(self.builder, fft_c2, free_fn_c, vec_data_i64(&fa_c), 1)
+        // Store zero-initialized value for cancelled case
+        if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+            let cdst_local = body.place_locals.get(dest_place as i64)
+            let cdst_sema_ty = body.local_type_ids.get(cdst_local as i64)
+            var cdst_llvm_ty = self.mir_sema_type_to_llvm(cdst_sema_ty)
+            if cdst_llvm_ty == 0:
+                cdst_llvm_ty = wl_i32_type(self.context)
+            let cdst_alloca = self.create_entry_alloca(cdst_llvm_ty)
+            wl_build_store(self.builder, self.build_default_value(cdst_llvm_ty), cdst_alloca)
+            self.mir_local_ptrs.insert(cdst_local, cdst_alloca)
+            self.mir_local_types.insert(cdst_local, cdst_llvm_ty)
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+        else:
+            wl_build_unreachable(self.builder)
+
+        // Continue path: load result from heap buffer, free it
+        wl_position_at_end(self.builder, continue_bb)
         if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
             let dst_local = body.place_locals.get(dest_place as i64)
             let dst_sema_ty = body.local_type_ids.get(dst_local as i64)
             var dst_llvm_ty = self.mir_sema_type_to_llvm(dst_sema_ty)
             if dst_llvm_ty == 0:
                 dst_llvm_ty = wl_i32_type(self.context)
-            let typed_buf = rbuf  // already i8*
+            let typed_buf = rbuf
             let result_val = wl_build_load(self.builder, dst_llvm_ty, typed_buf)
             let dst_alloca = self.create_entry_alloca(dst_llvm_ty)
             wl_build_store(self.builder, result_val, dst_alloca)
@@ -4269,6 +4314,44 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         csa.push(send_slot)
         wl_build_call(self.builder, csft2, cs_fn, vec_data_i64(&csa), 2)
         result = wl_const_int(wl_i32_type(self.context), 0, 0)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_CHAN_CREATE:
+        // Channel[T].new(capacity): extract elem_size from generic T arg, call with_channel_create
+        let create_cap = self.mir_intrinsic_arg(body, args_id, 0)
+        // Determine element size from destination type (Channel[T])
+        var chan_elem_size: i64 = 8  // default for i64
+        let dest_sema_ch = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        if dest_sema_ch > 0:
+            let resolved_ch = self.mir_input.mir_resolve_alias(dest_sema_ch)
+            if self.mir_input.mir_get_type_kind(resolved_ch) == TypeKind.TY_GENERIC_INST:
+                let gi_argc = self.mir_input.mir_get_type_d2(resolved_ch)
+                if gi_argc > 0:
+                    let args_start_ch = self.mir_input.mir_get_type_d1(resolved_ch)
+                    let elem_tid = self.mir_input.mir_get_type_extra(args_start_ch)
+                    if elem_tid > 0:
+                        let elem_llvm = self.mir_sema_type_to_llvm(elem_tid)
+                        if elem_llvm != 0:
+                            chan_elem_size = self.abi_size_of(elem_llvm)
+        // Call with_channel_create(capacity, elem_size) -> i64
+        let ccr_fn_name = "with_channel_create"
+        var ccr_fn = wl_get_named_function(self.llmod, ccr_fn_name)
+        if ccr_fn == 0:
+            let ccrp: Vec[i64] = Vec.new()
+            ccrp.push(wl_i32_type(self.context))   // capacity
+            ccrp.push(wl_i32_type(self.context))   // elem_size
+            let ccrft = wl_function_type(wl_i64_type(self.context), vec_data_i64(&ccrp), 2, 0)
+            ccr_fn = wl_add_function(self.llmod, ccr_fn_name, ccrft)
+        let ccrft2 = wl_global_get_value_type(ccr_fn)
+        let ccra: Vec[i64] = Vec.new()
+        ccra.push(create_cap)
+        ccra.push(wl_const_int(wl_i32_type(self.context), chan_elem_size, 0))
+        let chan_handle = wl_build_call(self.builder, ccrft2, ccr_fn, vec_data_i64(&ccra), 2)
+        // Wrap in Channel { handle } struct
+        let chan_struct_fields: Vec[i64] = Vec.new()
+        chan_struct_fields.push(wl_i64_type(self.context))
+        let chan_struct_ty = wl_struct_type(self.context, vec_data_i64(&chan_struct_fields), 1, 0)
+        let empty_chan = self.build_default_value(chan_struct_ty)
+        result = wl_build_insert_value(self.builder, empty_chan, chan_handle, 0)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_CHAN_RECV:
         // Receiver.recv(): extract handle, alloca for result, call with_channel_recv, load result

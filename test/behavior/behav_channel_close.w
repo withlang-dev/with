@@ -8,14 +8,15 @@ fn make_sender(ch: Channel[i32]) -> Sender[i32]:
 fn make_receiver(ch: Channel[i32]) -> Receiver[i32]:
     Receiver { handle: ch.handle }
 
-async fn producer(ch: Sender[i32]) -> i32:
-    ch.send(42)
-    ch.send(100)
+async fn producer(tx: Sender[i32]) -> i32:
+    tx.send(1)
+    tx.send(2)
+    tx.close()
     0
 
-async fn consumer(ch: Receiver[i32]) -> i32:
-    let a = ch.recv()
-    let b = ch.recv()
+async fn consumer(rx: Receiver[i32]) -> i32:
+    let a = rx.recv()
+    let b = rx.recv()
     a + b
 
 async fn main:
@@ -24,7 +25,7 @@ async fn main:
     let rx = make_receiver(ch)
     let p = producer(tx)
     let c = consumer(rx)
-    let result = c.await
+    let sum = c.await
     let _ = p.await
-    assert(result == 142)
+    assert(sum == 3)
     print("ok")

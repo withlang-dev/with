@@ -23,6 +23,10 @@ __attribute__((weak)) int32_t with_fiber_in_fiber(void) {
     return 0;
 }
 
+__attribute__((weak)) int32_t with_fiber_is_cancelled(void) {
+    return 0;
+}
+
 // ── String operations ──────────────────────────────────────────────
 
 with_str with_str_concat(with_str a, with_str b) {

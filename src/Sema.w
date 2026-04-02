@@ -60,6 +60,7 @@ enum DeriveReq: i32:
     EQ = 2
 
 type SemaBuiltinSymbols {
+    task: i32,
     channel: i32,
     send: i32,
     recv: i32,
@@ -487,6 +488,7 @@ fn sema_pair_key(a: i32, b: i32) -> i64:
 
 fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
     SemaBuiltinSymbols {
+        task: 0,
         channel: 0,
         send: 0,
         recv: 0,
@@ -970,6 +972,7 @@ fn Sema.init_builtin_reflection_types(self: &mut Sema):
     self.ty_variant_info = self.register_builtin_struct_type("VariantInfo", variant_info_names, variant_info_types, 4) as TypeId
 
 fn Sema.init_intrinsic_symbols(self: &mut Sema):
+    self.syms.task = self.pool_intern("Task")
     self.syms.channel = self.pool_intern("Channel")
     self.syms.send = self.pool_intern("send")
     self.syms.recv = self.pool_intern("recv")

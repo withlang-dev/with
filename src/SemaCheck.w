@@ -506,6 +506,24 @@ fn Sema.expr_is_task_value(self: Sema, node: i32) -> i32:
         return self.expr_is_tuple_of_tasks(node)
     0
 
+fn Sema.unwrap_task_type(self: Sema, ty: TypeId) -> TypeId:
+    let resolved = self.resolve_alias(ty)
+    if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved as i32)
+        if base_sym == self.syms.task:
+            let arg_count = self.get_generic_inst_arg_count(resolved as i32)
+            if arg_count > 0:
+                return self.get_generic_inst_arg(resolved as i32, 0) as TypeId
+    ty
+
+fn Sema.type_is_task(self: Sema, ty: i32) -> i32:
+    let resolved = self.resolve_alias(ty as TypeId)
+    if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved as i32)
+        if base_sym == self.syms.task:
+            return 1
+    0
+
 fn Sema.expr_is_scoped_task_value(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
@@ -874,10 +892,12 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             if self.expr_is_tuple_of_tasks(inner) == 0:
                 self.emit_error("await tuple requires Task values", node)
                 return inner_ty
+            // TODO: unwrap tuple of Task[T] → tuple of T
             return inner_ty
         if self.expr_is_task_value(inner) == 0:
             self.emit_error("await requires a Task value", node)
-        return inner_ty
+        // Unwrap Task[T] → T for the .await expression type
+        return self.unwrap_task_type(inner_ty)
 
 
     if kind == NodeKind.NK_ASYNC_BLOCK:
@@ -1411,7 +1431,10 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     self.typed_binding_types.insert(node, bind_type as i32)
     self.typed_binding_names.insert(node, name)
     self.typed_binding_muts.insert(node, is_mut)
-    self.scope_set_is_task(name, self.expr_is_task_value(value))
+    var is_task_val = self.expr_is_task_value(value)
+    if is_task_val == 0:
+        is_task_val = self.type_is_task(bind_type as i32)
+    self.scope_set_is_task(name, is_task_val)
     self.scope_set_is_scoped_task(name, self.expr_is_scoped_task_value(value))
     self.scope_set_is_ephemeral_task(name, self.expr_is_ephemeral_task(value))
 
