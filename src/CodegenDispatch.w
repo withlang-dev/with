@@ -3512,8 +3512,6 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         return true
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX:
-        // Multi-dimensional indexing: call the multi_index method on the base type.
-        // The base value is the first MIR arg. The spec data is in the AST node.
         let mi_node = body.call_ast_node(args_id)
         if mi_node != 0:
             let base_val = self.mir_intrinsic_arg(body, args_id, 0)
@@ -3521,6 +3519,17 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             // Full IndexSpec array construction will be added when
             // MultiIndex trait impls exist in the stdlib.
             result = base_val
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+        return true
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX_SET:
+        let mis_node = body.call_ast_node(args_id)
+        if mis_node != 0:
+            let mis_base = self.mir_intrinsic_arg(body, args_id, 0)
+            let mis_value = self.mir_intrinsic_arg(body, args_id, 1)
+            // Placeholder: full IndexSpec construction deferred.
+            result = mis_value
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true

@@ -576,6 +576,23 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         out = out ++ " for " ++ intern.resolve(binding) ++ " in " ++ render_expr(pool, intern, (iterable) as NodeId, 0)
         return out ++ "]"
 
+    if kind == NodeKind.NK_FOR_COMPREHENSION:
+        let extra_start = pool.get_data1(node)
+        let packed_d2 = pool.get_data2(node)
+        let binding_count = packed_d2 & 65535
+        var out = prefix ++ "for_comprehension("
+        for i in 0..binding_count:
+            let base = extra_start + i * 3
+            let bkind = pool.get_extra(base + 2)
+            if i > 0:
+                out = out ++ "; "
+            if bkind == 1:
+                out = out ++ "if " ++ render_expr(pool, intern, (pool.get_extra(base + 1)) as NodeId, 0)
+            else:
+                out = out ++ intern.resolve(pool.get_extra(base)) ++ " in " ++ render_expr(pool, intern, (pool.get_extra(base + 1)) as NodeId, 0)
+        out = out ++ ": " ++ render_expr(pool, intern, (pool.get_data0(node)) as NodeId, 0)
+        return out ++ ")"
+
     if kind == NodeKind.NK_STRUCT_LIT:
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)

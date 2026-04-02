@@ -930,6 +930,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         self.pop_scope()
         return self.add_type(TypeKind.TY_ARRAY, result_elem as i32, 0, 0)
 
+    if kind == NodeKind.NK_FOR_COMPREHENSION:
+        return self.check_for_comprehension(node) as TypeId
+
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         let base = self.check_expr(self.ast.get_data0(node))
         return base
@@ -1503,6 +1506,17 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
     let target_type = self.check_expr(target)
     let value_type = if target_type != 0: self.check_expr_with_expected(value, target_type) else: self.check_expr(value)
 
+    // Multi-index assignment: a[i, j] = value → requires multi_index_set
+    if self.ast.kind(target) == NodeKind.NK_MULTI_INDEX:
+        let mi_base = self.ast.get_data0(target)
+        let mi_base_resolved = self.resolve_alias(target_type)
+        let mi_name = self.get_type_name(mi_base_resolved as i32)
+        if mi_name != 0:
+            let mis_sym = self.pool_intern("multi_index_set")
+            let mis_sig = self.lookup_method_sig(mi_name, mis_sym)
+            if mis_sig < 0:
+                self.emit_error("type does not support indexed assignment (no multi_index_set method)", target)
+
     // Check mutability
     if self.ast.kind(target) == NodeKind.NK_IDENT:
         let target_sym = self.ast.get_data0(target)
@@ -1549,6 +1563,55 @@ fn Sema.preferred_compatible_type(self: Sema, lhs: TypeId, rhs: TypeId) -> TypeI
         if self.get_type_d0(lhs_resolved) == self.get_type_d0(rhs_resolved):
             return rhs
     lhs
+
+fn Sema.check_for_comprehension(self: Sema, node: i32) -> i32:
+    let body_expr = self.ast.get_data0(node)
+    let extra_start = self.ast.get_data1(node)
+    let packed_d2 = self.ast.get_data2(node)
+    let binding_count = packed_d2 % 65536
+    let has_yield = packed_d2 / 65536
+
+    // Type-check bindings in nested scopes
+    self.push_scope()
+    var is_result = 0
+    var first_src_ty: i32 = 0
+    for bi in 0..binding_count:
+        let sym = self.ast.get_extra(extra_start + bi * 3)
+        let expr = self.ast.get_extra(extra_start + bi * 3 + 1)
+        let kind = self.ast.get_extra(extra_start + bi * 3 + 2)
+        if kind == 1:
+            // Guard: type-check as bool
+            self.check_expr(expr)
+            continue
+        // Binding: type-check source expression
+        let src_ty = self.check_expr(expr)
+        if first_src_ty == 0:
+            first_src_ty = src_ty as i32
+        // Determine Option vs Result from first binding
+        if first_src_ty == src_ty as i32 and src_ty != 0:
+            let ok_payloads = self.enum_variant_payload_types(src_ty as i32, self.syms.ok)
+            if ok_payloads.len() > 0:
+                is_result = 1
+        // Infer element type (unwrap Option or Result)
+        let elem_ty = self.try_unwrapped_type(src_ty as i32)
+        if sym != 0:
+            self.scope_put(sym, elem_ty, 0)
+
+    // Store is_result flag for MIR lowering
+    if is_result != 0:
+        self.comprehension_is_result.insert(node, 1)
+
+    // Type-check body
+    let body_ty = self.check_expr(body_expr)
+    self.pop_scope()
+
+    if has_yield == 0:
+        return self.ty_void as i32
+
+    // Return type: same wrapper as the first binding's source (Option or Result)
+    if first_src_ty != 0:
+        return first_src_ty
+    body_ty as i32
 
 fn Sema.check_for(self: Sema, node: i32) -> i32:
     let binding = self.ast.get_data0(node)
