@@ -3605,6 +3605,8 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_AWAIT:
         // Await: extract fiber_id and result_buf from Task struct,
         // call with_fiber_await(fiber_id), load result from buffer, free buffer.
+        // Cancellation checks are at MIR level (IS_CANCELLED / WAS_CANCELLED_RETURN
+        // intrinsics emitted by MirLower, with defers in the unwind BB).
         let task_op = self.mir_intrinsic_arg(body, args_id, 0)
         let task_ty = wl_type_of(task_op)
         // Find the MIR local for the Task to look up its result type
@@ -3623,143 +3625,49 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let rbuf_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 1)
         let rbuf = wl_build_load(self.builder, wl_ptr_type(self.context), rbuf_ptr)
         // Call with_fiber_await(fiber_id)
-        let await_fn_name = "with_fiber_await"
-        var await_fn = wl_get_named_function(self.llmod, await_fn_name)
+        var await_fn = wl_get_named_function(self.llmod, "with_fiber_await")
         if await_fn == 0:
-            let await_params: Vec[i64] = Vec.new()
-            await_params.push(wl_i32_type(self.context))
-            let await_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&await_params), 1, 0)
-            await_fn = wl_add_function(self.llmod, await_fn_name, await_ft)
-        let await_args: Vec[i64] = Vec.new()
-        await_args.push(fid)
+            let ap: Vec[i64] = Vec.new()
+            ap.push(wl_i32_type(self.context))
+            let aft = wl_function_type(wl_void_type(self.context), vec_data_i64(&ap), 1, 0)
+            await_fn = wl_add_function(self.llmod, "with_fiber_await", aft)
         let await_ft = wl_global_get_value_type(await_fn)
-        wl_build_call(self.builder, await_ft, await_fn, vec_data_i64(&await_args), 1)
-
-        // Two-check cancellation structure per spec:
-        // Check 1: Am I cancelled? (parent cancelled me)
-        var is_cancelled_fn = wl_get_named_function(self.llmod, "with_fiber_is_cancelled")
-        if is_cancelled_fn == 0:
-            let ic_ft = wl_function_type(wl_i32_type(self.context), 0, 0, 0)
-            is_cancelled_fn = wl_add_function(self.llmod, "with_fiber_is_cancelled", ic_ft)
-        let ic_ft2 = wl_global_get_value_type(is_cancelled_fn)
-        let cancelled_val = wl_build_call(self.builder, ic_ft2, is_cancelled_fn, 0, 0)
-        let is_cancelled = wl_build_icmp(self.builder, wl_int_ne(), cancelled_val, wl_const_int(wl_i32_type(self.context), 0, 0))
-        let check_child_bb = wl_append_bb(self.context, self.current_function, "await.check_child")
-        let unwind_bb = wl_append_bb(self.context, self.current_function, "await.unwind")
-        wl_build_cond_br(self.builder, is_cancelled, unwind_bb, check_child_bb)
-
-        // Check 2: Did my child return due to cancellation?
-        wl_position_at_end(self.builder, check_child_bb)
-
-        // Pre-load result from buffer BEFORE the child-cancel check/free.
-        // This ensures LLVM can't hoist a free above the load.
-        var preloaded_result: i64 = 0
-        var preloaded_alloca: i64 = 0
+        let aa: Vec[i64] = Vec.new()
+        aa.push(fid)
+        wl_build_call(self.builder, await_ft, await_fn, vec_data_i64(&aa), 1)
+        // Load result from buffer, free buffer, store to dest
         if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
-            // Resolve result LLVM type. Primary source: async_task_result_types
-            // (keyed by the Task MIR local, set at spawn time). Fallbacks: MIR
-            // sema type, last_async_spawn_ret_ty, i32.
-            var pl_llvm_ty: i64 = 0
+            var dst_llvm_ty: i64 = 0
             if task_mir_local >= 0:
                 let trt_opt = self.async_task_result_types.get(task_mir_local)
                 if trt_opt.is_some():
-                    pl_llvm_ty = trt_opt.unwrap() as i64
-            if pl_llvm_ty == 0 or pl_llvm_ty == wl_void_type(self.context):
-                let pl_local = body.place_locals.get(dest_place as i64)
-                let pl_sema_ty = body.local_type_ids.get(pl_local as i64)
-                pl_llvm_ty = self.mir_sema_type_to_llvm(pl_sema_ty)
-            if pl_llvm_ty == 0 or pl_llvm_ty == wl_void_type(self.context):
+                    dst_llvm_ty = trt_opt.unwrap() as i64
+            if dst_llvm_ty == 0 or dst_llvm_ty == wl_void_type(self.context):
+                let dst_local = body.place_locals.get(dest_place as i64)
+                let dst_sema_ty = body.local_type_ids.get(dst_local as i64)
+                dst_llvm_ty = self.mir_sema_type_to_llvm(dst_sema_ty)
+            if dst_llvm_ty == 0 or dst_llvm_ty == wl_void_type(self.context):
                 if self.last_async_spawn_ret_ty != 0:
-                    pl_llvm_ty = self.last_async_spawn_ret_ty
-            if pl_llvm_ty == 0 or pl_llvm_ty == wl_void_type(self.context):
-                pl_llvm_ty = wl_i32_type(self.context)
-            preloaded_result = wl_build_load(self.builder, pl_llvm_ty, rbuf)
-            preloaded_alloca = self.create_entry_alloca(pl_llvm_ty)
-            wl_build_store(self.builder, preloaded_result, preloaded_alloca)
-        var wcr_fn = wl_get_named_function(self.llmod, "with_fiber_was_cancelled_return")
-        if wcr_fn == 0:
-            let wcr_p: Vec[i64] = Vec.new()
-            wcr_p.push(wl_i32_type(self.context))
-            let wcr_ft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&wcr_p), 1, 0)
-            wcr_fn = wl_add_function(self.llmod, "with_fiber_was_cancelled_return", wcr_ft)
-        let wcr_ft2 = wl_global_get_value_type(wcr_fn)
-        let wcr_args: Vec[i64] = Vec.new()
-        wcr_args.push(fid)
-        let child_cancelled = wl_build_call(self.builder, wcr_ft2, wcr_fn, vec_data_i64(&wcr_args), 1)
-        let child_is_cancelled = wl_build_icmp(self.builder, wl_int_ne(), child_cancelled, wl_const_int(wl_i32_type(self.context), 0, 0))
-        let propagate_bb = wl_append_bb(self.context, self.current_function, "await.propagate")
-        let normal_bb = wl_append_bb(self.context, self.current_function, "await.normal")
-        wl_build_cond_br(self.builder, child_is_cancelled, propagate_bb, normal_bb)
-
-        // Propagation path: child was cancelled → free rbuf, request self-cancel, unwind
-        wl_position_at_end(self.builder, propagate_bb)
-        var free_fn_p = wl_get_named_function(self.llmod, "with_free")
-        if free_fn_p == 0:
-            let fp_p: Vec[i64] = Vec.new()
-            fp_p.push(wl_ptr_type(self.context))
-            let fft_p = wl_function_type(wl_void_type(self.context), vec_data_i64(&fp_p), 1, 0)
-            free_fn_p = wl_add_function(self.llmod, "with_free", fft_p)
-        let fft_p2 = wl_global_get_value_type(free_fn_p)
-        let fa_p: Vec[i64] = Vec.new()
-        fa_p.push(rbuf)
-        wl_build_call(self.builder, fft_p2, free_fn_p, vec_data_i64(&fa_p), 1)
-        var rcs_fn = wl_get_named_function(self.llmod, "with_fiber_request_cancel_self")
-        if rcs_fn == 0:
-            let rcs_ft = wl_function_type(wl_void_type(self.context), 0, 0, 0)
-            rcs_fn = wl_add_function(self.llmod, "with_fiber_request_cancel_self", rcs_ft)
-        let rcs_ft2 = wl_global_get_value_type(rcs_fn)
-        wl_build_call(self.builder, rcs_ft2, rcs_fn, 0, 0)
-        wl_build_br(self.builder, unwind_bb)
-
-        // Unwind path: set cancelled_return, free rbuf (if from self-cancel path), store zero, continue
-        wl_position_at_end(self.builder, unwind_bb)
-        var scr_fn = wl_get_named_function(self.llmod, "with_fiber_set_cancelled_return")
-        if scr_fn == 0:
-            let scr_ft = wl_function_type(wl_void_type(self.context), 0, 0, 0)
-            scr_fn = wl_add_function(self.llmod, "with_fiber_set_cancelled_return", scr_ft)
-        let scr_ft2 = wl_global_get_value_type(scr_fn)
-        wl_build_call(self.builder, scr_ft2, scr_fn, 0, 0)
-        // Free rbuf (for the self-cancel case; propagate already freed)
-        // Use a flag or just free unconditionally — double-free is prevented
-        // because propagate_bb frees then branches here, but self-cancel doesn't.
-        // For self-cancel (check 1 true): rbuf hasn't been freed yet.
-        // For propagate (check 2 true): rbuf was freed in propagate_bb.
-        // Solution: use a phi node or just skip free here and let next_bb handle it.
-        // Simplest: the MIR unwind BB (B5) will handle cleanup. For now just branch out.
-        if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
-            let cdst_local = body.place_locals.get(dest_place as i64)
-            let cdst_sema_ty = body.local_type_ids.get(cdst_local as i64)
-            var cdst_llvm_ty = self.mir_sema_type_to_llvm(cdst_sema_ty)
-            if cdst_llvm_ty == 0:
-                cdst_llvm_ty = wl_i32_type(self.context)
-            let cdst_alloca = self.create_entry_alloca(cdst_llvm_ty)
-            wl_build_store(self.builder, self.build_default_value(cdst_llvm_ty), cdst_alloca)
-            self.mir_local_ptrs.insert(cdst_local, cdst_alloca)
-            self.mir_local_types.insert(cdst_local, cdst_llvm_ty)
-        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
-            wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
-        else:
-            wl_build_unreachable(self.builder)
-
-        // Normal path: use pre-loaded result (loaded before the branch), free buffer
-        wl_position_at_end(self.builder, normal_bb)
-        if dest_place >= 0 and dest_place < body.place_locals.len() as i32 and preloaded_alloca != 0:
+                    dst_llvm_ty = self.last_async_spawn_ret_ty
+            if dst_llvm_ty == 0 or dst_llvm_ty == wl_void_type(self.context):
+                dst_llvm_ty = wl_i32_type(self.context)
+            let result_val = wl_build_load(self.builder, dst_llvm_ty, rbuf)
+            let dst_alloca = self.create_entry_alloca(dst_llvm_ty)
+            wl_build_store(self.builder, result_val, dst_alloca)
             let dst_local = body.place_locals.get(dest_place as i64)
-            self.mir_local_ptrs.insert(dst_local, preloaded_alloca)
-            self.mir_local_types.insert(dst_local, wl_type_of(preloaded_result))
+            self.mir_local_ptrs.insert(dst_local, dst_alloca)
+            self.mir_local_types.insert(dst_local, dst_llvm_ty)
         // Free result buffer
-        let free_fn_name = "with_free"
-        var free_fn = wl_get_named_function(self.llmod, free_fn_name)
+        var free_fn = wl_get_named_function(self.llmod, "with_free")
         if free_fn == 0:
-            let free_params: Vec[i64] = Vec.new()
-            free_params.push(wl_ptr_type(self.context))
-            let free_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&free_params), 1, 0)
-            free_fn = wl_add_function(self.llmod, free_fn_name, free_ft)
-        let free_args: Vec[i64] = Vec.new()
-        free_args.push(rbuf)
+            let fp: Vec[i64] = Vec.new()
+            fp.push(wl_ptr_type(self.context))
+            let fft = wl_function_type(wl_void_type(self.context), vec_data_i64(&fp), 1, 0)
+            free_fn = wl_add_function(self.llmod, "with_free", fft)
         let free_ft = wl_global_get_value_type(free_fn)
-        wl_build_call(self.builder, free_ft, free_fn, vec_data_i64(&free_args), 1)
-        // Branch to next bb
+        let fa: Vec[i64] = Vec.new()
+        fa.push(rbuf)
+        wl_build_call(self.builder, free_ft, free_fn, vec_data_i64(&fa), 1)
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
@@ -4523,6 +4431,36 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let sda: Vec[i64] = Vec.new()
         sda.push(sd_handle)
         wl_build_call(self.builder, sdft2, sd_fn, vec_data_i64(&sda), 1)
+        result = wl_const_int(wl_i32_type(self.context), 0, 0)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_IS_CANCELLED:
+        var ic_fn = wl_get_named_function(self.llmod, "with_fiber_is_cancelled")
+        if ic_fn == 0:
+            let icft = wl_function_type(wl_i32_type(self.context), 0, 0, 0)
+            ic_fn = wl_add_function(self.llmod, "with_fiber_is_cancelled", icft)
+        let icft2 = wl_global_get_value_type(ic_fn)
+        result = wl_build_call(self.builder, icft2, ic_fn, 0, 0)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_WAS_CANCELLED_RETURN:
+        let wcr_fid = self.mir_intrinsic_arg(body, args_id, 0)
+        var wcr_fn = wl_get_named_function(self.llmod, "with_fiber_was_cancelled_return")
+        if wcr_fn == 0:
+            let wcrp: Vec[i64] = Vec.new()
+            wcrp.push(wl_i32_type(self.context))
+            let wcrft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&wcrp), 1, 0)
+            wcr_fn = wl_add_function(self.llmod, "with_fiber_was_cancelled_return", wcrft)
+        let wcrft2 = wl_global_get_value_type(wcr_fn)
+        let wcra: Vec[i64] = Vec.new()
+        wcra.push(wcr_fid)
+        result = wl_build_call(self.builder, wcrft2, wcr_fn, vec_data_i64(&wcra), 1)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_SET_CANCELLED_RETURN:
+        var scr_fn = wl_get_named_function(self.llmod, "with_fiber_set_cancelled_return")
+        if scr_fn == 0:
+            let scrft = wl_function_type(wl_void_type(self.context), 0, 0, 0)
+            scr_fn = wl_add_function(self.llmod, "with_fiber_set_cancelled_return", scrft)
+        let scrft2 = wl_global_get_value_type(scr_fn)
+        wl_build_call(self.builder, scrft2, scr_fn, 0, 0)
         result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
     else:
