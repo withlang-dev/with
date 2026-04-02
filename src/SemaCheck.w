@@ -2873,6 +2873,14 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             self.check_expr(self.ast.get_extra(extra_start + ai))
         return 0
 
+    // Reject named args on closures and function pointers (spec §F4 rule 7)
+    if self.ast.has_call_named_args(node) != 0:
+        let local_tid = self.scope_lookup(fn_sym)
+        if local_tid >= 0:
+            let resolved_callee = self.resolve_alias(local_tid)
+            if self.get_type_kind(resolved_callee) == TypeKind.TY_FN:
+                self.emit_error("named arguments are not supported for closures or function pointers", node)
+
     let param_offset = if self.in_pipeline_rhs != 0: 1 else: 0
     let sig_idx_raw = self.get_sig(fn_sym)
     let sig_idx = if sig_idx_raw >= 0 and self.is_ci_visible(fn_sym) == 0: 0 - 1 else: sig_idx_raw
@@ -3044,14 +3052,28 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         let min_expected = self.fn_min_expected_arg_count(fn_sym, expected)
         let actual = resolved_arg_count + param_offset
         // Skip arg count check when named args were resolved (already filled defaults)
-        if self.ast.has_call_named_args(node) == 0:
+        if self.ast.has_call_named_args(node) == 0 and self.has_resolved_call_args(node) == 0:
             if self.sig_is_variadic(sig_idx) == 0:
                 if actual < min_expected or actual > expected:
-                    let fn_name = self.pool_resolve(fn_sym)
-                    if min_expected == expected:
-                        self.emit_error(f"function '{fn_name}' expects {expected} argument(s), found {actual}", node)
+                    // Check if missing params include implicit ones
+                    var has_unfilled_implicit = 0
+                    if self.fn_decl_nodes.contains(fn_sym) and actual < expected:
+                        let fn_node_check = self.fn_decl_nodes.get(fn_sym).unwrap()
+                        let meta_check = self.ast.find_fn_meta(fn_node_check)
+                        if meta_check >= 0:
+                            let ps_check = self.ast.fn_meta_param_start(meta_check)
+                            for pi in actual..expected:
+                                let pflags = self.ast.fn_param_flags(ps_check, pi)
+                                if fn_param_is_implicit(pflags) != 0:
+                                    has_unfilled_implicit = 1
+                    if has_unfilled_implicit != 0:
+                        self.emit_error("implicit parameter not provided; add a 'with' binding of the matching type", node)
                     else:
-                        self.emit_error(f"function '{fn_name}' expects {min_expected}-{expected} argument(s), found {actual}", node)
+                        let fn_name = self.pool_resolve(fn_sym)
+                        if min_expected == expected:
+                            self.emit_error(f"function '{fn_name}' expects {expected} argument(s), found {actual}", node)
+                        else:
+                            self.emit_error(f"function '{fn_name}' expects {min_expected}-{expected} argument(s), found {actual}", node)
 
         for ai in 0..resolved_arg_count:
             let param_i = ai + param_offset

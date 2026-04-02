@@ -125,3 +125,8 @@ impl Hash for str =
             h = (h *% 1099511628211) ^ self[i]
             i = i + 1
         h
+
+/// Multi-dimensional indexing. Implement to enable `a[i, j]` and slice syntax.
+pub trait MultiIndex =
+    fn multi_index(self: &Self, specs: &[IndexSpec], count: i32) -> Self
+    fn multi_index_set(self: &mut Self, specs: &[IndexSpec], count: i32, value: Self)

@@ -50,3 +50,15 @@ type Atomic[T]  {
 /// Iterator over Vec[T]. Obtain via `vec.iter()`.
 /// Call `.next()` to get `Option[T]` — `Some(val)` or `None`.
 type VecIter[T]  { data_ptr: i64, len: i64, idx: i64 }
+
+/// Index specification for multi-dimensional indexing.
+/// Used by the MultiIndex trait. kind: 0=scalar, 1=slice, 2=ellipsis, 3=newaxis.
+pub type IndexSpec {
+    kind: i32,
+    start: i64,
+    stop: i64,
+    step: i64,
+    has_start: bool,
+    has_stop: bool,
+    has_step: bool,
+}

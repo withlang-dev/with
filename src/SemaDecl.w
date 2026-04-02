@@ -922,6 +922,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
 
     // Resolve param types
     let sig_param_start = self.sig_params.len() as i32
+    let implicit_type_ids: Vec[i32] = Vec.new()
     for pi in 0..param_count:
         let p_name_sym = self.ast.fn_param_name(param_start, pi)
         if is_local != 0:
@@ -930,6 +931,13 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
         let p_tid = self.resolve_type_expr(p_type_node)
         if self.is_opaque_value_type(p_tid) != 0:
             self.emit_error("opaque types cannot be passed by value; use a pointer or reference", p_type_node)
+        // Check for duplicate implicit parameter types (spec §F6)
+        let p_flags = self.ast.fn_param_flags(param_start, pi)
+        if fn_param_is_implicit(p_flags) != 0:
+            for prev in 0..implicit_type_ids.len() as i32:
+                if implicit_type_ids.get(prev as i64) == p_tid as i32:
+                    self.emit_error("function has multiple implicit parameters of the same type", p_type_node)
+            implicit_type_ids.push(p_tid as i32)
         self.sig_params.push(p_tid as i32)
 
     let ret_type = self.resolve_type_expr(ret_node)
