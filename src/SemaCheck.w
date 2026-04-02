@@ -903,7 +903,14 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_ASYNC_BLOCK:
         if self.in_comptime_fn != 0:
             self.emit_error("async is not allowed in comptime", node)
-        return self.check_expr(self.ast.get_data0(node))
+        let ab_body_ty = self.check_expr(self.ast.get_data0(node))
+        // Wrap in Task[T] — async blocks spawn a fiber and return a Task
+        let ab_task_args: Vec[i32] = Vec.new()
+        ab_task_args.push(ab_body_ty as i32)
+        let ab_task_ty = self.ensure_generic_inst_type(self.syms.task, ab_task_args, 1)
+        if ab_task_ty != 0:
+            return ab_task_ty
+        return ab_body_ty
 
     if kind == NodeKind.NK_SPAWN:
         if self.in_comptime_fn != 0:

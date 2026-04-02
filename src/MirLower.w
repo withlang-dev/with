@@ -4235,13 +4235,19 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return body_result
 
     if kind == NodeKind.NK_ASYNC_BLOCK:
-        // async: body — execute body synchronously for v1.
-        // True fiber spawning requires parser-level desugaring into an
-        // anonymous async function call (future work).
-        let async_body = self.ast.get_data0(node)
-        if async_body != 0:
-            return self.lower_expr(async_body)
-        return self.unit_operand()
+        // Emit CK_ASYNC_BLOCK constant — codegen handles the fiber spawn.
+        // Same pattern as CK_CLOSURE: MIR just creates a marker, codegen
+        // creates the anonymous function, collects captures, and spawns.
+        let ab_ty = self.expr_type(node)
+        if ab_ty == 0:
+            return self.unit_operand()
+        let ab_tmp = self.new_temp(ab_ty)
+        let ab_place = self.place_for_local(ab_tmp)
+        let ab_const = self.body.new_const(ConstKind.CK_ASYNC_BLOCK, node, 0, 0, ab_ty)
+        let ab_op = self.body.new_operand(OperandKind.OK_CONSTANT, ab_const)
+        let ab_rv = self.body.new_rvalue(RvalueKind.RK_USE, ab_op, 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, ab_place, ab_rv, self.ast.get_start(node))
+        return self.body.new_operand(OperandKind.OK_COPY, ab_place)
 
     if kind == NodeKind.NK_SELECT_AWAIT:
         let extra_start = self.ast.get_data0(node)
