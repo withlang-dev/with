@@ -564,7 +564,8 @@ fn MirBuilder.struct_field_type(self: MirBuilder, struct_tid: i32, field_sym: i3
 
 fn MirBuilder.tuple_elem_type(self: MirBuilder, tuple_tid: i32, field_idx: i32) -> i32:
     let resolved = self.sema.resolve_alias(tuple_tid)
-    if self.sema.get_type_kind(resolved) != TypeKind.TY_TUPLE:
+    let tk = self.sema.get_type_kind(resolved)
+    if tk != TypeKind.TY_TUPLE:
         return 0
     let elem_start = self.sema.get_type_d0(resolved)
     let elem_count = self.sema.get_type_d1(resolved)

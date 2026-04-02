@@ -892,12 +892,27 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             if self.expr_is_tuple_of_tasks(inner) == 0:
                 self.emit_error("await tuple requires Task values", node)
                 return inner_ty
-            // TODO: unwrap tuple of Task[T] → tuple of T
-            return inner_ty
+            // Unwrap tuple of Task[T] → tuple of T
+            let extra_s = self.ast.get_data0(inner)
+            let unwrapped_elems: Vec[i32] = Vec.new()
+            for ei in 0..elem_count:
+                let elem_node = self.ast.get_extra(extra_s + ei)
+                var elem_ty = 0
+                if self.typed_expr_types.contains(elem_node):
+                    elem_ty = self.typed_expr_types.get(elem_node).unwrap()
+                unwrapped_elems.push(self.unwrap_task_type(elem_ty) as i32)
+            let te_start = self.type_extra.len() as i32
+            for ei in 0..elem_count:
+                self.type_extra.push(unwrapped_elems.get(ei as i64))
+            let unwrapped_tuple = self.add_type(TypeKind.TY_TUPLE, te_start, elem_count, 0)
+            self.typed_expr_types.insert(node, unwrapped_tuple as i32)
+            return unwrapped_tuple as TypeId
         if self.expr_is_task_value(inner) == 0:
             self.emit_error("await requires a Task value", node)
         // Unwrap Task[T] → T for the .await expression type
-        return self.unwrap_task_type(inner_ty)
+        let await_result_ty = self.unwrap_task_type(inner_ty)
+        self.typed_expr_types.insert(node, await_result_ty as i32)
+        return await_result_ty
 
 
     if kind == NodeKind.NK_ASYNC_BLOCK:
@@ -2809,6 +2824,9 @@ fn Sema.check_tuple_destructure(self: Sema, node: i32) -> i32:
     let name_count = self.ast.get_data1(node)
     let value = self.ast.get_data2(node)
     let val_type = self.check_expr(value)
+    // Ensure the value expression's type is cached for MIR lowering
+    if val_type != 0 and val_type != self.ty_void:
+        self.typed_expr_types.insert(value, val_type as i32)
     let resolved = self.resolve_alias(val_type)
     let is_tuple = self.get_type_kind(resolved) == TypeKind.TY_TUPLE
     if is_tuple == 0:
