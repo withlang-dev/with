@@ -852,6 +852,13 @@ fn MirBuilder.variant_index(self: MirBuilder, variant_sym: i32) -> i32:
         return self.sema.variant_lookup.get(variant_sym).unwrap()
     0
 
+// Resolve variant sym from an AST node, checking sema's comprehension sidecar first.
+fn MirBuilder.resolve_variant_sym(self: MirBuilder, node: i32) -> i32:
+    let sym = self.ast.get_data0(node)
+    if self.sema.comp_resolved.contains(node):
+        return self.sema.comp_resolved.get(node).unwrap()
+    sym
+
 fn MirBuilder.success_variant_index(self: MirBuilder) -> i32:
     let some_sym = self.pool.intern("Some")
     if self.sema.variant_lookup.contains(some_sym):
@@ -2425,7 +2432,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         return
 
     if pk == NodeKind.NK_PAT_VARIANT or pk == NodeKind.NK_PAT_ENUM_SHORTHAND:
-        let variant_sym = self.ast.get_data0(pat_node)
+        let variant_sym = self.resolve_variant_sym(pat_node)
         let payload_start = self.ast.get_data1(pat_node)
         let payload_count = self.ast.get_data2(pat_node)
         let variant_idx = self.variant_index(variant_sym)
@@ -3840,7 +3847,10 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             return self.body.new_operand(OperandKind.OK_COPY, gc_place)
         // Check for enum variant constructor call: Some(v), Ok(v), Err(e), etc.
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
-            let vc_sym = self.ast.get_data0(callee)
+            var vc_sym = self.ast.get_data0(callee)
+            // Resolve for-comprehension _Payload marker
+            if self.sema.comp_resolved.contains(node):
+                vc_sym = self.sema.comp_resolved.get(node).unwrap()
             if self.sema.variant_lookup.contains(vc_sym):
                 let vc_variant_idx = self.sema.variant_lookup.get(vc_sym).unwrap()
                 var vc_result_ty = self.expr_type(node)
@@ -4077,7 +4087,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.body.new_operand(OperandKind.OK_COPY, arr_place)
 
     if kind == NodeKind.NK_VARIANT_SHORTHAND:
-        let vs_name_sym = self.ast.get_data0(node)
+        let vs_name_sym = self.resolve_variant_sym(node)
         let vs_args_start = self.ast.get_data1(node)
         let vs_arg_count = self.ast.get_data2(node)
         let vs_variant_idx = self.variant_index(vs_name_sym)

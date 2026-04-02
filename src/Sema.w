@@ -287,6 +287,10 @@ type Sema {
     implicit_binding_types: Vec[i32],
     implicit_binding_syms: Vec[i32],
 
+    // For-comprehension resolved variants: node → resolved variant sym.
+    // Maps _Payload/_Empty marker nodes to Some/None or Ok/Err.
+    comp_resolved: HashMap[i32, i32],
+
     // Typed dump sidecar maps (keyed by span start byte offset)
     typed_expr_types: HashMap[i32, i32],
     typed_binding_types: HashMap[i32, i32],
@@ -702,6 +706,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         call_resolved_args_data: Vec.new(),
         implicit_binding_types: Vec.new(),
         implicit_binding_syms: Vec.new(),
+        comp_resolved: sema_new_map_i32_i32(),
         typed_expr_types,
         typed_binding_types,
         typed_binding_names,

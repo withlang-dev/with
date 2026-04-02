@@ -798,7 +798,16 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.check_range(node) as TypeId
 
     if kind == NodeKind.NK_VARIANT_SHORTHAND:
-        let name = self.ast.get_data0(node)
+        var name = self.ast.get_data0(node)
+        // Resolve for-comprehension _Empty marker
+        let vs_name_str = self.pool_resolve(name)
+        if vs_name_str == "_Empty" and self.has_expected_type != 0:
+            let exp_resolved = self.resolve_alias(self.expected_expr_type)
+            if self.enum_has_variant(exp_resolved as i32, self.syms.none) != 0:
+                name = self.syms.none
+            else if self.enum_has_variant(exp_resolved as i32, self.syms.err) != 0:
+                name = self.syms.err
+            self.comp_resolved.insert(node, name)
         let expected_variant_ty = self.expected_variant_constructor_type(name)
         if expected_variant_ty != 0:
             self.typed_expr_types.insert(node, expected_variant_ty)
@@ -2354,7 +2363,20 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         return
 
     if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
-        let v_name = self.ast.get_data0(node)
+        var v_name = self.ast.get_data0(node)
+        // Resolve for-comprehension markers: _Payload → Some/Ok, _Empty → None/Err
+        let v_name_str = self.pool_resolve(v_name)
+        if v_name_str == "_Payload" or v_name_str == "_Empty":
+            let resolved_st = self.resolve_alias(subject_type)
+            let is_payload = v_name_str == "_Payload"
+            let try_sym = if is_payload: self.syms.some else: self.syms.none
+            if self.enum_has_variant(resolved_st as i32, try_sym) != 0:
+                v_name = try_sym
+            else:
+                let try_sym2 = if is_payload: self.syms.ok else: self.syms.err
+                if self.enum_has_variant(resolved_st as i32, try_sym2) != 0:
+                    v_name = try_sym2
+            self.comp_resolved.insert(node, v_name)
         let pattern_enum_ty = self.resolve_variant_pattern_enum_type(node, subject_type, v_name)
         if pattern_enum_ty == 0:
             return
@@ -2876,6 +2898,19 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     var fn_sym = 0
     if self.ast.kind(callee) == NodeKind.NK_IDENT:
         fn_sym = self.ast.get_data0(callee)
+        // Resolve for-comprehension _Payload marker to Some or Ok
+        let call_name = self.pool_resolve(fn_sym)
+        if call_name == "_Payload":
+            // Try expected type first, then fall back to Some (most common)
+            if self.has_expected_type != 0:
+                let exp_resolved = self.resolve_alias(self.expected_expr_type)
+                if self.enum_has_variant(exp_resolved as i32, self.syms.ok) != 0:
+                    fn_sym = self.syms.ok
+                else:
+                    fn_sym = self.syms.some
+            else:
+                fn_sym = self.syms.some
+            self.comp_resolved.insert(node, fn_sym)
     else:
         self.check_expr(callee)
         for ai in 0..arg_count:
