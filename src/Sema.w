@@ -240,6 +240,7 @@ type Sema {
     must_use_fns: HashMap[i32, i32],
     result_option_fns: HashMap[i32, i32],
     task_fns: HashMap[i32, i32],
+    fn_stack_sizes: HashMap[i32, i32],
     mutable_global_syms: HashMap[i32, i32],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
@@ -586,6 +587,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let must_use_fns = sema_new_map_i32_i32()
     let result_option_fns = sema_new_map_i32_i32()
     let task_fns = sema_new_map_i32_i32()
+    let fn_stack_sizes = sema_new_map_i32_i32()
     let mutable_global_syms = sema_new_map_i32_i32()
     let method_impl_nodes = sema_new_map_i32_i32()
     let method_decl_origins = sema_new_map_i32_i32()
@@ -675,6 +677,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         must_use_fns,
         result_option_fns,
         task_fns,
+        fn_stack_sizes,
         mutable_global_syms,
         syms: sema_builtin_symbols_zero(),
         method_impl_nodes,

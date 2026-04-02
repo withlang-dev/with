@@ -4198,16 +4198,107 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             return self.lower_expr(scope_body)
         return self.unit_operand()
 
-    if kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SELECT_AWAIT:
-        // Async lowering is deferred to later waves.
-        self.mark_unsupported()
-        if self.ast.get_data0(node) != 0:
-            let _ = self.lower_expr(self.ast.get_data0(node))
-        if self.ast.get_data1(node) != 0:
-            let _ = self.lower_expr(self.ast.get_data1(node))
-        if self.ast.get_data2(node) != 0:
-            let _ = self.lower_expr(self.ast.get_data2(node))
+    if kind == NodeKind.NK_ASYNC_BLOCK:
+        // async: body — for v1, execute body synchronously.
+        // True fiber spawning for inline blocks is Phase 7 future work.
+        let async_body = self.ast.get_data0(node)
+        if async_body != 0:
+            return self.lower_expr(async_body)
         return self.unit_operand()
+
+    if kind == NodeKind.NK_SELECT_AWAIT:
+        let extra_start = self.ast.get_data0(node)
+        let arm_count = self.ast.get_data1(node)
+        if arm_count <= 0:
+            return self.unit_operand()
+        let span = self.ast.get_start(node)
+
+        // 1. Lower each arm's task expression → task operands
+        var task_ops: Vec[i32] = Vec.new()
+        for ai in 0..arm_count:
+            let task_node = self.ast.get_extra(extra_start + ai * 3 + 1)
+            let task_op = self.lower_expr(task_node)
+            task_ops.push(task_op)
+
+        // 2. Emit select intrinsic call: passes all task operands, returns winner index
+        let select_args: Vec[i32] = Vec.new()
+        for ai in 0..arm_count:
+            select_args.push(task_ops.get(ai as i64))
+        let select_call_id = self.body.new_call_args(select_args)
+        self.body.set_call_intrinsic(select_call_id, MirIntrinsic.MIR_INTRINSIC_FIBER_SELECT)
+        self.body.set_call_ast_node(select_call_id, node)
+        let select_result_local = self.new_temp(self.sema.ty_i32)
+        let select_result_place = self.place_for_local(select_result_local)
+        let switch_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), select_call_id, select_result_place, switch_bb)
+        self.switch_to(switch_bb)
+
+        // 3. Create basic blocks for each arm + join
+        var arm_bbs: Vec[i32] = Vec.new()
+        var switch_vals: Vec[i32] = Vec.new()
+        for ai in 0..arm_count:
+            let arm_bb = self.new_block()
+            arm_bbs.push(arm_bb)
+            switch_vals.push(ai)
+        let join_bb = self.new_block()
+        let select_expr_type = self.expr_type(node)
+        let result_local = self.new_temp(select_expr_type)
+        let result_place = self.place_for_local(result_local)
+
+        // 4. Switch on winner index
+        let switch_op = self.body.new_operand(OperandKind.OK_COPY, select_result_place)
+        let switch_table = self.body.new_switch_table(switch_vals, arm_bbs)
+        self.terminate(TermKind.TK_SWITCH_INT, switch_op, switch_table, join_bb, 0)
+
+        // 5. Each arm: await winner, cancel losers, execute body
+        for ai in 0..arm_count:
+            self.switch_to(arm_bbs.get(ai as i64) as i32)
+            let arm_name = self.ast.get_extra(extra_start + ai * 3)
+            let arm_body = self.ast.get_extra(extra_start + ai * 3 + 2)
+
+            // Await the winning task to get its result
+            let await_args: Vec[i32] = Vec.new()
+            await_args.push(task_ops.get(ai as i64))
+            let await_call_id = self.body.new_call_args(await_args)
+            self.body.set_call_intrinsic(await_call_id, MirIntrinsic.MIR_INTRINSIC_FIBER_AWAIT)
+            self.body.set_call_ast_node(await_call_id, node)
+            let await_result_ty = self.expr_type(node)
+            let await_result_local = self.new_temp(await_result_ty)
+            let await_result_place = self.place_for_local(await_result_local)
+            let after_await_bb = self.new_block()
+            self.terminate(TermKind.TK_CALL, self.unit_operand(), await_call_id, await_result_place, after_await_bb)
+            self.switch_to(after_await_bb)
+
+            // Bind result to arm variable
+            let bind_local = self.body.new_local(await_result_ty, 0, arm_name, 1)
+            self.bind_local(arm_name, bind_local)
+            let bind_place = self.place_for_local(bind_local)
+            let await_result_op = self.body.new_operand(OperandKind.OK_COPY, await_result_place)
+            self.assign_operand_to_place(bind_place, await_result_op, span)
+
+            // Cancel losing tasks
+            for li in 0..arm_count:
+                if li != ai:
+                    let cancel_args: Vec[i32] = Vec.new()
+                    cancel_args.push(task_ops.get(li as i64))
+                    let cancel_call_id = self.body.new_call_args(cancel_args)
+                    self.body.set_call_intrinsic(cancel_call_id, MirIntrinsic.MIR_INTRINSIC_FIBER_CANCEL)
+                    self.body.set_call_ast_node(cancel_call_id, node)
+                    let cancel_result_local = self.new_temp(self.sema.ty_i32)
+                    let cancel_result_place = self.place_for_local(cancel_result_local)
+                    let after_cancel_bb = self.new_block()
+                    self.terminate(TermKind.TK_CALL, self.unit_operand(), cancel_call_id, cancel_result_place, after_cancel_bb)
+                    self.switch_to(after_cancel_bb)
+
+            // Execute arm body
+            let body_op = self.lower_expr(arm_body)
+
+            // Store body result and branch to join
+            self.assign_operand_to_place(result_place, body_op, span)
+            self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+        self.switch_to(join_bb)
+        return self.body.new_operand(OperandKind.OK_COPY, result_place)
 
     self.mark_unsupported()
     self.unit_operand()

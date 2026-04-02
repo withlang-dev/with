@@ -384,6 +384,8 @@ type AstPool {
     non_escaping_closure_set: HashMap[i32, i32],
     // Named argument names for call nodes: key = call_node, value = extra_start of name sym array
     call_named_args: HashMap[i32, i32],
+    // @[stack_size(N)] annotation: fn_node → stack size in bytes
+    fn_stack_sizes: HashMap[i32, i32],
 
     // Frozen flag: set to 1 after construction completes.
     // When frozen, mutation methods (add_node, add_extra, etc.) will error.
@@ -435,6 +437,7 @@ fn AstPool.new -> AstPool:
         move_closure_set: HashMap.new(),
         non_escaping_closure_set: HashMap.new(),
         call_named_args: HashMap.new(),
+        fn_stack_sizes: HashMap.new(),
         frozen: 0,
     }
     // Reserve node 0 as null sentinel

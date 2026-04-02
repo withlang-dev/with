@@ -201,16 +201,16 @@ int64_t with_fiber_await(int32_t fiber_id);
 int32_t with_fiber_cancel(int32_t fiber_id);
 void with_fiber_set_result(int64_t value);
 int32_t with_fiber_in_fiber(void);
-int32_t with_fiber_select(int32_t *fiber_ids, int32_t count, int64_t *result_out);
+void with_fiber_select(int32_t *fiber_ids, int32_t count, int32_t *result_index);
 
-// ── Channels ───────────────────────────────────────────────────────
+// ── Channels (sized element slots) ─────────────────────────────────
 
-void *with_channel_create(int32_t capacity);
-void with_channel_send(void *ch_ptr, int64_t value);
-int64_t with_channel_recv(void *ch_ptr);
-int32_t with_channel_try_recv(void *ch_ptr, int64_t *out);
-void with_channel_close(void *ch_ptr);
-void with_channel_destroy(void *ch_ptr);
+int64_t with_channel_create(int32_t capacity, int32_t elem_size);
+void with_channel_send(int64_t ch_handle, void *value_ptr);
+int32_t with_channel_recv(int64_t ch_handle, void *out_ptr);
+int32_t with_channel_try_recv(int64_t ch_handle, void *out_ptr);
+void with_channel_close(int64_t ch_handle);
+void with_channel_destroy(int64_t ch_handle);
 
 // ── C Builtins ─────────────────────────────────────────────────────
 

@@ -5,6 +5,9 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <signal.h>
 
 // ── Fiber context (must match assembly layout) ─────────────────────
 
@@ -117,6 +120,11 @@ static Fiber *dequeue_any(void) {
     return f;
 }
 
+static size_t guard_page_size(void) {
+    long ps = sysconf(_SC_PAGESIZE);
+    return ps > 0 ? (size_t)ps : 4096;
+}
+
 static Fiber *acquire_fiber(void) {
     if (free_pool_head) {
         Fiber *f = free_pool_head;
@@ -137,11 +145,21 @@ static Fiber *acquire_fiber(void) {
     if (!f) return NULL;
     memset(f, 0, sizeof(Fiber));
     f->stack_size = FIBER_STACK_SIZE;
-    f->stack = malloc(f->stack_size);
-    if (!f->stack) {
+
+    // Allocate stack with guard page via mmap.
+    // Layout: [guard page (PROT_NONE)] [usable stack (PROT_READ|PROT_WRITE)]
+    size_t page_sz = guard_page_size();
+    size_t total = page_sz + f->stack_size;
+    void *region = mmap(NULL, total, PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (region == MAP_FAILED) {
         free(f);
         return NULL;
     }
+    // Guard page at low address — stack overflow hits PROT_NONE → SIGSEGV/SIGBUS.
+    mprotect(region, page_sz, PROT_NONE);
+    f->stack = (char *)region + page_sz; // usable stack starts above guard
+    f->stack_size = FIBER_STACK_SIZE;
     fiber_pool_alloc_count++;
     return f;
 }
@@ -162,11 +180,19 @@ static void recycle_fiber(Fiber *f) {
     free_pool_head = f;
 }
 
+static void free_fiber_stack(Fiber *f) {
+    if (!f->stack) return;
+    size_t page_sz = guard_page_size();
+    void *region = (char *)f->stack - page_sz;
+    munmap(region, page_sz + f->stack_size);
+    f->stack = NULL;
+}
+
 static void free_fiber_pool(void) {
     while (free_pool_head) {
         Fiber *f = free_pool_head;
         free_pool_head = f->next;
-        free(f->stack);
+        free_fiber_stack(f);
         free(f);
     }
 }
@@ -215,10 +241,23 @@ void with_runtime_init(void) {
 int32_t with_fiber_spawn(void (*entry_fn)(void*, void*), void *arg,
                           void *result_buf, int32_t result_size,
                           int32_t stack_size) {
-    (void)stack_size; // TODO: custom stack sizes
     if (live_fiber_count >= MAX_FIBERS) return -1;
     Fiber *f = acquire_fiber();
     if (!f) return -1;
+
+    // Honor custom stack size if requested and this is a fresh allocation.
+    // Pooled fibers keep their original stack — reallocating would be wasteful.
+    if (stack_size > 0 && f->stack_size != (size_t)stack_size) {
+        free_fiber_stack(f);
+        f->stack_size = (size_t)stack_size;
+        size_t page_sz = guard_page_size();
+        size_t total = page_sz + f->stack_size;
+        void *region = mmap(NULL, total, PROT_READ | PROT_WRITE,
+                            MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (region == MAP_FAILED) { free(f); return -1; }
+        mprotect(region, page_sz, PROT_NONE);
+        f->stack = (char *)region + page_sz;
+    }
 
     f->entry = entry_fn;
     f->arg = arg;
@@ -440,16 +479,17 @@ int64_t with_fiber_steal_events(void) {
     return fiber_steal_events;
 }
 
-// ── Channels ────────────────────────────────────────────────────────
+// ── Channels (sized element slots) ──────────────────────────────────
 
 #define CHAN_INITIAL_CAPACITY 16
 
 typedef struct {
-    int64_t *buffer;
+    uint8_t *buffer;           // ring buffer of elem_size-byte slots
+    int32_t  elem_size;        // bytes per element
     int32_t  head;
     int32_t  tail;
     int32_t  count;
-    int32_t  capacity;         // allocated ring size
+    int32_t  capacity;         // allocated ring size (in elements)
     int32_t  bounded_capacity; // >0 for bounded channels, 0 for unbounded
     int32_t  closed;
 } Channel;
@@ -461,11 +501,15 @@ static int channel_grow(Channel *ch) {
     int32_t new_cap = old_cap > 0 ? old_cap * 2 : CHAN_INITIAL_CAPACITY;
     if (new_cap < CHAN_INITIAL_CAPACITY) new_cap = CHAN_INITIAL_CAPACITY;
 
-    int64_t *new_buf = (int64_t *)malloc(sizeof(int64_t) * (size_t)new_cap);
+    uint8_t *new_buf = (uint8_t *)malloc((size_t)ch->elem_size * (size_t)new_cap);
     if (!new_buf) return 0;
 
+    // Linearize the ring buffer into new_buf.
     for (int32_t i = 0; i < ch->count; i++) {
-        new_buf[i] = ch->buffer[(ch->head + i) % old_cap];
+        int32_t src_idx = (ch->head + i) % old_cap;
+        memcpy(new_buf + (size_t)i * ch->elem_size,
+               ch->buffer + (size_t)src_idx * ch->elem_size,
+               (size_t)ch->elem_size);
     }
 
     free(ch->buffer);
@@ -476,11 +520,13 @@ static int channel_grow(Channel *ch) {
     return 1;
 }
 
-// Create a new channel with given capacity (0 = unbounded).
-void *with_channel_create(int32_t capacity) {
+// Create a new channel with given capacity and element size.
+// capacity=0 means unbounded. elem_size is sizeof(element type).
+int64_t with_channel_create(int32_t capacity, int32_t elem_size) {
     Channel *ch = (Channel *)malloc(sizeof(Channel));
-    if (!ch) return NULL;
+    if (!ch) return 0;
     memset(ch, 0, sizeof(Channel));
+    ch->elem_size = elem_size > 0 ? elem_size : 1;
 
     if (capacity > 0) {
         ch->bounded_capacity = capacity;
@@ -490,18 +536,19 @@ void *with_channel_create(int32_t capacity) {
         ch->capacity = CHAN_INITIAL_CAPACITY;
     }
 
-    ch->buffer = (int64_t *)malloc(sizeof(int64_t) * (size_t)ch->capacity);
+    ch->buffer = (uint8_t *)malloc((size_t)ch->elem_size * (size_t)ch->capacity);
     if (!ch->buffer) {
         free(ch);
-        return NULL;
+        return 0;
     }
 
-    return ch;
+    return (int64_t)(uintptr_t)ch;
 }
 
-// Send a value to a channel. Blocks (yields) if channel is full.
-void with_channel_send(void *ch_ptr, int64_t value) {
-    Channel *ch = (Channel *)ch_ptr;
+// Send a value to a channel. Copies elem_size bytes from value_ptr.
+// Blocks (yields) if channel is full.
+void with_channel_send(int64_t ch_handle, void *value_ptr) {
+    Channel *ch = (Channel *)(uintptr_t)ch_handle;
     if (!ch || !ch->buffer) return;
 
     while (ch->count >= ch->capacity) {
@@ -510,7 +557,6 @@ void with_channel_send(void *ch_ptr, int64_t value) {
         // Unbounded channel: grow instead of blocking.
         if (ch->bounded_capacity == 0) {
             if (channel_grow(ch)) break;
-            // Allocation failure: fall back to cooperative waiting.
         }
 
         if (current_fiber) {
@@ -521,15 +567,16 @@ void with_channel_send(void *ch_ptr, int64_t value) {
         }
     }
     if (ch->closed) return;
-    ch->buffer[ch->tail] = value;
+    memcpy(ch->buffer + (size_t)ch->tail * ch->elem_size,
+           value_ptr, (size_t)ch->elem_size);
     ch->tail = (ch->tail + 1) % ch->capacity;
     ch->count++;
 }
 
-// Receive a value from a channel. Returns the value.
-// Blocks (yields) if channel is empty. Returns -1 if channel closed and empty.
-int64_t with_channel_recv(void *ch_ptr) {
-    Channel *ch = (Channel *)ch_ptr;
+// Receive a value from a channel. Copies elem_size bytes to out_ptr.
+// Blocks (yields) if channel is empty. Returns 0 on success, -1 if closed+empty.
+int32_t with_channel_recv(int64_t ch_handle, void *out_ptr) {
+    Channel *ch = (Channel *)(uintptr_t)ch_handle;
     if (!ch || !ch->buffer) return -1;
     while (ch->count == 0) {
         if (ch->closed) return -1;
@@ -540,18 +587,20 @@ int64_t with_channel_recv(void *ch_ptr) {
             else return -1; // deadlock prevention
         }
     }
-    int64_t value = ch->buffer[ch->head];
+    memcpy(out_ptr, ch->buffer + (size_t)ch->head * ch->elem_size,
+           (size_t)ch->elem_size);
     ch->head = (ch->head + 1) % ch->capacity;
     ch->count--;
-    return value;
+    return 0;
 }
 
-// Try to receive without blocking. Returns 1 if got value (stored in *out), 0 if empty.
-int32_t with_channel_try_recv(void *ch_ptr, int64_t *out) {
-    Channel *ch = (Channel *)ch_ptr;
+// Try to receive without blocking. Returns 1 if got value, 0 if empty.
+int32_t with_channel_try_recv(int64_t ch_handle, void *out_ptr) {
+    Channel *ch = (Channel *)(uintptr_t)ch_handle;
     if (!ch || !ch->buffer) return 0;
     if (ch->count == 0) return 0;
-    *out = ch->buffer[ch->head];
+    memcpy(out_ptr, ch->buffer + (size_t)ch->head * ch->elem_size,
+           (size_t)ch->elem_size);
     ch->head = (ch->head + 1) % ch->capacity;
     ch->count--;
     return 1;
@@ -560,22 +609,18 @@ int32_t with_channel_try_recv(void *ch_ptr, int64_t *out) {
 // ── Select Await ────────────────────────────────────────────────────
 
 // Select await: wait for the first of N fibers to complete.
-// Takes an array of fiber IDs and count.
-// Returns the index (0-based) of the first completed fiber.
-// The result of the completed fiber is stored in *result_out.
-int32_t with_fiber_select(int32_t *fiber_ids, int32_t count, int64_t *result_out) {
+// Takes an array of fiber IDs, count, and pointer to store winner index.
+// Writes the 0-based index of the first completed fiber to *result_index.
+// The caller is responsible for loading the result from the winning task's
+// result buffer and cancelling/freeing the losers.
+void with_fiber_select(int32_t *fiber_ids, int32_t count, int32_t *result_index) {
     while (1) {
         // Check if any of the target fibers are completed.
         for (int i = 0; i < count; i++) {
             for (int j = 0; j < completed_count; j++) {
                 if (completed[j] && completed[j]->id == fiber_ids[i]) {
-                    *result_out = completed[j]->result;
-                    // Clean up the completed fiber.
-                    free(completed[j]->stack);
-                    free(completed[j]);
-                    completed[j] = completed[completed_count - 1];
-                    completed_count--;
-                    return i;
+                    *result_index = i;
+                    return;
                 }
             }
         }
@@ -586,21 +631,22 @@ int32_t with_fiber_select(int32_t *fiber_ids, int32_t count, int64_t *result_out
             if (with_runtime_has_fibers()) {
                 run_one_fiber();
             } else {
-                return -1; // deadlock
+                *result_index = -1; // deadlock
+                return;
             }
         }
     }
 }
 
 // Close the channel.
-void with_channel_close(void *ch_ptr) {
-    Channel *ch = (Channel *)ch_ptr;
-    ch->closed = 1;
+void with_channel_close(int64_t ch_handle) {
+    Channel *ch = (Channel *)(uintptr_t)ch_handle;
+    if (ch) ch->closed = 1;
 }
 
 // Free channel memory.
-void with_channel_destroy(void *ch_ptr) {
-    Channel *ch = (Channel *)ch_ptr;
+void with_channel_destroy(int64_t ch_handle) {
+    Channel *ch = (Channel *)(uintptr_t)ch_handle;
     if (!ch) return;
     free(ch->buffer);
     free(ch);
