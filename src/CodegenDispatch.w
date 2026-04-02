@@ -8134,7 +8134,7 @@ fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
     self.ensure_async_runtime_declared()
     var env_ptr = wl_const_null(ptr_ty)
     if capture_count > 0 and cap_struct_type != 0:
-        let cap_size = wl_abi_size_of(self.data_layout, cap_struct_type)
+        let cap_size = self.abi_size_of(cap_struct_type)
         var alloc_fn = wl_get_named_function(self.llmod, "with_alloc")
         if alloc_fn == 0:
             let ap: Vec[i64] = Vec.new()
@@ -8156,7 +8156,7 @@ fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
                 wl_build_store(self.builder, val, fld)
 
     // 9. Heap-allocate result buffer
-    let result_size = wl_abi_size_of(self.data_layout, ret_ty)
+    let result_size = self.abi_size_of(ret_ty)
     var alloc_fn2 = wl_get_named_function(self.llmod, "with_alloc")
     if alloc_fn2 == 0:
         let ap2: Vec[i64] = Vec.new()
