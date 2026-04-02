@@ -588,6 +588,8 @@ type Codegen {
     // Async
     async_fn_symbols: HashMap[i32, i32],
     async_fn_ret_types: HashMap[i32, i64],
+    async_task_result_types: HashMap[i32, i64],
+    last_async_spawn_ret_ty: i64,
     async_fn_args_struct_types: HashMap[i32, i64],
     task_locals: HashMap[i32, i32],
     uses_async: bool,
@@ -876,6 +878,8 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         current_fn_saw_explicit_return: false,
         async_fn_symbols: HashMap.new(),
         async_fn_ret_types: HashMap.new(),
+        async_task_result_types: HashMap.new(),
+        last_async_spawn_ret_ty: 0,
         async_fn_args_struct_types: HashMap.new(),
         task_locals: HashMap.new(),
         uses_async: false,
