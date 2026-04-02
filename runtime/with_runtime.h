@@ -204,6 +204,13 @@ int32_t with_fiber_in_fiber(void);
 int32_t with_fiber_is_cancelled(void);
 void with_fiber_select(int32_t *fiber_ids, int32_t count, int32_t *result_index);
 
+// ── Async Scopes ───────────────────────────────────────────────────
+
+int64_t with_scope_create(void);
+void with_scope_track(int64_t handle, int32_t fiber_id);
+void with_scope_await_all(int64_t handle);
+void with_scope_destroy(int64_t handle);
+
 // ── Channels (sized element slots) ─────────────────────────────────
 
 int64_t with_channel_create(int32_t capacity, int32_t elem_size);

@@ -4402,6 +4402,45 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         wl_build_call(self.builder, ccft2, cc_fn, vec_data_i64(&cca), 1)
         result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SCOPE_CREATE:
+        // with_scope_create() -> i64
+        var sc_fn = wl_get_named_function(self.llmod, "with_scope_create")
+        if sc_fn == 0:
+            let scft = wl_function_type(wl_i64_type(self.context), 0, 0, 0)
+            sc_fn = wl_add_function(self.llmod, "with_scope_create", scft)
+        let scft2 = wl_global_get_value_type(sc_fn)
+        result = wl_build_call(self.builder, scft2, sc_fn, 0, 0)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SCOPE_AWAIT_ALL:
+        // with_scope_await_all(handle: i64)
+        let sa_handle = self.mir_intrinsic_arg(body, args_id, 0)
+        var sa_fn = wl_get_named_function(self.llmod, "with_scope_await_all")
+        if sa_fn == 0:
+            let sap: Vec[i64] = Vec.new()
+            sap.push(wl_i64_type(self.context))
+            let saft = wl_function_type(wl_void_type(self.context), vec_data_i64(&sap), 1, 0)
+            sa_fn = wl_add_function(self.llmod, "with_scope_await_all", saft)
+        let saft2 = wl_global_get_value_type(sa_fn)
+        let saa: Vec[i64] = Vec.new()
+        saa.push(sa_handle)
+        wl_build_call(self.builder, saft2, sa_fn, vec_data_i64(&saa), 1)
+        result = wl_const_int(wl_i32_type(self.context), 0, 0)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SCOPE_DESTROY:
+        // with_scope_destroy(handle: i64)
+        let sd_handle = self.mir_intrinsic_arg(body, args_id, 0)
+        var sd_fn = wl_get_named_function(self.llmod, "with_scope_destroy")
+        if sd_fn == 0:
+            let sdp: Vec[i64] = Vec.new()
+            sdp.push(wl_i64_type(self.context))
+            let sdft = wl_function_type(wl_void_type(self.context), vec_data_i64(&sdp), 1, 0)
+            sd_fn = wl_add_function(self.llmod, "with_scope_destroy", sdft)
+        let sdft2 = wl_global_get_value_type(sd_fn)
+        let sda: Vec[i64] = Vec.new()
+        sda.push(sd_handle)
+        wl_build_call(self.builder, sdft2, sd_fn, vec_data_i64(&sda), 1)
+        result = wl_const_int(wl_i32_type(self.context), 0, 0)
+
     else:
         return false
 
@@ -5230,15 +5269,37 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                             wl_build_br(self.builder, gc_next_val)
                         return true
 
-            // async scope s.track(expr) — pass-through: evaluate the argument
+            // async scope s.track(task_expr) — register task with scope
             let gc_name = if gc_callee_sym > 0: self.intern.resolve(gc_callee_sym) else: "?"
             if gc_name == "track":
                 let gc_mir_start2 = body.call_arg_starts.get(args_id as i64)
                 let gc_mir_count2 = body.call_arg_counts.get(args_id as i64)
-                // Evaluate the last argument (the async call), skip receiver
                 if gc_mir_count2 > 1:
+                    // Evaluate receiver (scope handle) and argument (Task value)
+                    let gc_recv_op = body.call_arg_operands.get(gc_mir_start2 as i64)
+                    let gc_recv_val = self.mir_eval_operand(body, gc_recv_op, 0)
                     let gc_arg_op = body.call_arg_operands.get((gc_mir_start2 + gc_mir_count2 - 1) as i64)
                     let gc_arg_val = self.mir_eval_operand(body, gc_arg_op, 0)
+                    // Extract fiber_id from Task { i32, ptr }
+                    let gc_task_ty = wl_type_of(gc_arg_val)
+                    let gc_task_alloca = self.create_entry_alloca(gc_task_ty)
+                    wl_build_store(self.builder, gc_arg_val, gc_task_alloca)
+                    let gc_fid_ptr = wl_build_struct_gep(self.builder, gc_task_ty, gc_task_alloca, 0)
+                    let gc_fid = wl_build_load(self.builder, wl_i32_type(self.context), gc_fid_ptr)
+                    // Call with_scope_track(scope_handle, fiber_id)
+                    var gc_track_fn = wl_get_named_function(self.llmod, "with_scope_track")
+                    if gc_track_fn == 0:
+                        let gtp: Vec[i64] = Vec.new()
+                        gtp.push(wl_i64_type(self.context))
+                        gtp.push(wl_i32_type(self.context))
+                        let gtft = wl_function_type(wl_void_type(self.context), vec_data_i64(&gtp), 2, 0)
+                        gc_track_fn = wl_add_function(self.llmod, "with_scope_track", gtft)
+                    let gtft2 = wl_global_get_value_type(gc_track_fn)
+                    let gta: Vec[i64] = Vec.new()
+                    gta.push(gc_recv_val)
+                    gta.push(gc_fid)
+                    wl_build_call(self.builder, gtft2, gc_track_fn, vec_data_i64(&gta), 2)
+                    // Store Task value to dest (so caller can still use it)
                     if dest_place >= 0 and gc_arg_val != 0:
                         let gc_dst_ptr = self.mir_place_ptr(body, dest_place, false, 0)
                         if gc_dst_ptr != 0:

@@ -2389,3 +2389,78 @@ pub fn sysinfo_hostname() -> str:
 @[c_export("with_sysinfo")]
 pub fn sysinfo_impl(out: *mut u8) -> i32:
     rt_sysinfo(out)
+
+// ── Async Scopes (structured concurrency) ──────────────────────────
+// Scope holds a heap-allocated array of fiber IDs.
+// Layout: [count: i32, capacity: i32, ids: *mut i32]
+// Packed into a single heap allocation: 8 bytes header + ids array.
+
+extern fn with_fiber_await(fiber_id: i32) -> void
+
+@[c_export("with_scope_create")]
+pub fn scope_create() -> i64:
+    // Allocate: 8 bytes header (count + capacity) + 16 * 4 bytes for IDs
+    let cap = 16
+    let size = 8 + cap * 4
+    let ptr = rt_alloc(size as i64)
+    if ptr as i64 == 0:
+        return 0
+    // count = 0
+    let count_ptr = ptr as *mut i32
+    unsafe:
+        *count_ptr = 0
+    // capacity = 16
+    let cap_ptr = (ptr as i64 + 4) as *mut i32
+    unsafe:
+        *cap_ptr = cap
+    ptr as i64
+
+@[c_export("with_scope_track")]
+pub fn scope_track(handle: i64, fiber_id: i32):
+    if handle == 0:
+        return
+    let count_ptr = handle as *mut i32
+    let cap_ptr = (handle + 4) as *mut i32
+    let count = unsafe: *count_ptr
+    let cap = unsafe: *cap_ptr
+    if count >= cap:
+        // Grow: allocate new buffer, copy, free old
+        let new_cap = cap * 2
+        let new_size = 8 + new_cap * 4
+        let new_ptr = rt_alloc(new_size as i64)
+        if new_ptr as i64 == 0:
+            return
+        // Copy header + existing IDs
+        let old_size = 8 + count * 4
+        rt_memcpy(new_ptr, handle as *const u8, old_size as i64)
+        rt_free(handle as *mut u8)
+        // Update capacity in new buffer
+        let new_cap_ptr = (new_ptr as i64 + 4) as *mut i32
+        unsafe:
+            *new_cap_ptr = new_cap
+        // Recurse with new handle (now has room)
+        scope_track(new_ptr as i64, fiber_id)
+        return
+    // Store fiber_id at offset 8 + count * 4
+    let slot = (handle + 8 + count as i64 * 4) as *mut i32
+    unsafe:
+        *slot = fiber_id
+    unsafe:
+        *count_ptr = count + 1
+
+@[c_export("with_scope_await_all")]
+pub fn scope_await_all(handle: i64):
+    if handle == 0:
+        return
+    let count_ptr = handle as *mut i32
+    let count = unsafe: *count_ptr
+    for i in 0..count:
+        let slot = (handle + 8 + i as i64 * 4) as *const i32
+        let fid = unsafe: *slot
+        with_fiber_await(fid)
+
+@[c_export("with_scope_destroy")]
+pub fn scope_destroy(handle: i64):
+    if handle == 0:
+        return
+    rt_free(handle as *mut u8)

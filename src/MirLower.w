@@ -4186,21 +4186,58 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 
     if kind == NodeKind.NK_ASYNC_SCOPE:
         // async scope: d0=name(sym), d1=body(node)
-        // Bind the scope variable as a unit value so s.track(expr) resolves.
-        // Actual structured concurrency is future work; for now scope body
-        // executes synchronously (like spawn/await pass-through).
+        // 1. Create scope handle via with_scope_create()
         let scope_sym = self.ast.get_data0(node)
+        let span = self.ast.get_start(node)
+        let create_args: Vec[i32] = Vec.new()
+        let create_call_id = self.body.new_call_args(create_args)
+        self.body.set_call_intrinsic(create_call_id, MirIntrinsic.MIR_INTRINSIC_SCOPE_CREATE)
+        self.body.set_call_ast_node(create_call_id, node)
+        let scope_local = self.new_temp(self.sema.ty_i64)
+        let scope_place = self.place_for_local(scope_local)
+        let after_create_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), create_call_id, scope_place, after_create_bb)
+        self.switch_to(after_create_bb)
+        // Bind scope handle to scope variable name
         if scope_sym > 0:
-            let scope_local = self.body.new_local(self.sema.ty_void as i32, 0, scope_sym, 1)
-            self.bind_local(scope_sym, scope_local)
+            let bind_local = self.body.new_local(self.sema.ty_i64 as i32, 0, scope_sym, 1)
+            self.bind_local(scope_sym, bind_local)
+            let bind_place = self.place_for_local(bind_local)
+            let scope_op = self.body.new_operand(OperandKind.OK_COPY, scope_place)
+            self.assign_operand_to_place(bind_place, scope_op, span)
+        // 2. Execute scope body (s.track() calls resolve via existing codegen path)
         let scope_body = self.ast.get_data1(node)
+        var body_result = self.unit_operand()
         if scope_body != 0:
-            return self.lower_expr(scope_body)
-        return self.unit_operand()
+            body_result = self.lower_expr(scope_body)
+        // 3. Await all tracked tasks: with_scope_await_all(handle)
+        let await_all_args: Vec[i32] = Vec.new()
+        await_all_args.push(self.body.new_operand(OperandKind.OK_COPY, scope_place))
+        let await_all_call_id = self.body.new_call_args(await_all_args)
+        self.body.set_call_intrinsic(await_all_call_id, MirIntrinsic.MIR_INTRINSIC_SCOPE_AWAIT_ALL)
+        self.body.set_call_ast_node(await_all_call_id, node)
+        let await_all_result = self.new_temp(0)
+        let await_all_place = self.place_for_local(await_all_result)
+        let after_await_all_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), await_all_call_id, await_all_place, after_await_all_bb)
+        self.switch_to(after_await_all_bb)
+        // 4. Destroy scope: with_scope_destroy(handle)
+        let destroy_args: Vec[i32] = Vec.new()
+        destroy_args.push(self.body.new_operand(OperandKind.OK_COPY, scope_place))
+        let destroy_call_id = self.body.new_call_args(destroy_args)
+        self.body.set_call_intrinsic(destroy_call_id, MirIntrinsic.MIR_INTRINSIC_SCOPE_DESTROY)
+        self.body.set_call_ast_node(destroy_call_id, node)
+        let destroy_result = self.new_temp(0)
+        let destroy_place = self.place_for_local(destroy_result)
+        let after_destroy_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), destroy_call_id, destroy_place, after_destroy_bb)
+        self.switch_to(after_destroy_bb)
+        return body_result
 
     if kind == NodeKind.NK_ASYNC_BLOCK:
-        // async: body — for v1, execute body synchronously.
-        // True fiber spawning for inline blocks is Phase 7 future work.
+        // async: body — execute body synchronously for v1.
+        // True fiber spawning requires parser-level desugaring into an
+        // anonymous async function call (future work).
         let async_body = self.ast.get_data0(node)
         if async_body != 0:
             return self.lower_expr(async_body)
