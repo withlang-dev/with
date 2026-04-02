@@ -13,9 +13,7 @@ async fn consumer(ch: Receiver[i32]) -> i32:
     a + b
 
 async fn main:
-    let pair = chan[i32](8)
-    let tx = pair.0
-    let rx = pair.1
+    let (tx, rx) = chan[i32](8)
     let p = producer(tx)
     let c = consumer(rx)
     let result = c.await
