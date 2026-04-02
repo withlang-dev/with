@@ -1559,9 +1559,7 @@ fn Sema.check_for(self: Sema, node: i32) -> i32:
     let elem_type = self.infer_for_element_type(iter_type as i32)
 
     self.push_scope()
-    // Check if binding is a pattern node (e.g., tuple destructuring)
-    let bk = self.ast.kind(binding)
-    if bk >= NodeKind.NK_PAT_WILDCARD and bk <= NodeKind.NK_PAT_SLICE:
+    if self.ast.for_binding_is_pattern(node):
         self.check_pattern(binding, elem_type)
     else:
         self.scope_put(binding, elem_type, 0)

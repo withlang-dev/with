@@ -843,6 +843,40 @@ fn AstPool.for_meta_index_binding(self: &AstPool, meta: i32) -> i32:
 fn AstPool.for_meta_label(self: &AstPool, meta: i32) -> i32:
     self.for_meta.get((meta + 2) as i64)
 
+fn ast_is_pattern_kind(kind: i32) -> bool:
+    kind == NodeKind.NK_PAT_WILDCARD or
+    kind == NodeKind.NK_PAT_IDENT or
+    kind == NodeKind.NK_PAT_INT or
+    kind == NodeKind.NK_PAT_BOOL or
+    kind == NodeKind.NK_PAT_STRING or
+    kind == NodeKind.NK_PAT_VARIANT or
+    kind == NodeKind.NK_PAT_TUPLE or
+    kind == NodeKind.NK_PAT_STRUCT or
+    kind == NodeKind.NK_PAT_RANGE or
+    kind == NodeKind.NK_PAT_OR or
+    kind == NodeKind.NK_PAT_ENUM_SHORTHAND or
+    kind == NodeKind.NK_PAT_AT_BINDING or
+    kind == NodeKind.NK_PAT_SLICE or
+    kind == NodeKind.NK_PAT_TYPED_BIND
+
+fn AstPool.is_pattern_node(self: &AstPool, node: i32) -> bool:
+    if node <= 0 or node >= self.node_count():
+        return false
+    ast_is_pattern_kind(self.kind(node as NodeId))
+
+fn AstPool.for_binding_is_pattern(self: &AstPool, node: NodeId) -> bool:
+    if node <= 0 or node >= self.node_count():
+        return false
+    if self.kind(node) != NodeKind.NK_FOR:
+        return false
+    let binding = self.get_data0(node)
+    if not self.is_pattern_node(binding):
+        return false
+    let bind_node = binding as NodeId
+    let for_start = self.get_start(node)
+    let for_end = self.get_end(node)
+    self.get_start(bind_node) >= for_start and self.get_end(bind_node) <= for_end
+
 // ── Node Data Layout Reference ───────────────────────────────────
 //
 // NodeKind.NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
@@ -891,7 +925,7 @@ fn AstPool.for_meta_label(self: &AstPool, meta: i32) -> i32:
 // NodeKind.NK_ASSIGN:        d0=target(node), d1=value(node), d2=0
 // NodeKind.NK_WHILE:         d0=cond(node), d1=body(node), d2=label(sym,0=none)
 // NodeKind.NK_LOOP:          d0=body(node), d1=label(sym,0=none), d2=0
-// NodeKind.NK_FOR:           d0=binding(sym), d1=iterable(node), d2=body(node)
+// NodeKind.NK_FOR:           d0=binding(sym) or pattern(node), d1=iterable(node), d2=body(node)
 //                   extra: [index_binding(sym,0=none), label(sym,0=none)]
 // NodeKind.NK_BREAK:         d0=value(node,0=none), d1=label(sym,0=none), d2=0
 // NodeKind.NK_CONTINUE:      d0=label(sym,0=none), d1=0, d2=0
