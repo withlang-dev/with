@@ -1,4 +1,4 @@
-use std.async
+use std.task
 
 async fn fetch_user(id: i32) -> Result[i32, str]:
     if id > 0 then Ok(id * 10)

@@ -320,6 +320,9 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     let saved_comptime = self.in_comptime_fn
     if (flags / FnFlags.COMPTIME) % 2 == 1:
         self.in_comptime_fn = self.in_comptime_fn + 1
+    let saved_async = self.in_async_fn
+    if (flags / FnFlags.ASYNC) % 2 == 1:
+        self.in_async_fn = self.in_async_fn + 1
 
     // Check body — set expected type to return type for tail expression resolution
     let saved_expected_et = self.expected_expr_type
@@ -362,6 +365,7 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     self.current_gen_yield_type = saved_gen_yield_type
     self.has_gen_yield_type = saved_has_gen_yield_type
     self.in_comptime_fn = saved_comptime
+    self.in_async_fn = saved_async
     self.pop_scope()
 
 // ── Concrete type-checking for monomorphized generic functions ───
@@ -843,6 +847,8 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.check_tuple_destructure(node) as TypeId
 
     if kind == NodeKind.NK_AWAIT:
+        if self.in_async_fn == 0:
+            self.emit_error("await requires async context", node)
         if self.in_comptime_fn != 0:
             self.emit_error("await is not allowed in comptime", node)
         if self.has_live_await_guard() != 0:
