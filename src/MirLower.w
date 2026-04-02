@@ -420,6 +420,10 @@ fn MirBuilder.call_return_type(self: MirBuilder, callee: i32) -> i32:
                 return base_ty
             if method_name == "is_some" or method_name == "is_none":
                 return self.sema.ty_bool as i32
+        // Qualified enum variant constructor: EnumType.Variant(...)
+        let recv_ty = if base_ty != 0 and base_ty != self.sema.ty_void as i32: base_ty else: self.type_receiver_type(base)
+        if recv_ty != 0 and recv_ty != self.sema.ty_void as i32 and self.sema.enum_has_variant(recv_ty, method_sym) != 0:
+            return recv_ty
     self.sema.ty_void as i32
 
 fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_name: str) -> i32:
@@ -641,6 +645,11 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
             let ft = self.struct_field_type(base_ty, field_sym)
             if ft != 0:
                 return ft
+            if self.sema.enum_has_variant(base_ty, field_sym) != 0:
+                return base_ty
+        let recv_ty = self.type_receiver_type(base_node)
+        if recv_ty != 0 and recv_ty != self.sema.ty_void as i32 and self.sema.enum_has_variant(recv_ty, field_sym) != 0:
+            return recv_ty
         return self.sema.ty_void as i32
     if kind == NodeKind.NK_INT_LIT:
         let value = self.ast.int_lit_value(node)
@@ -687,14 +696,27 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
                         return self.sema.named_types.get(owner_sym).unwrap() as i32
                     break
     if kind == NodeKind.NK_MATCH:
-        // Infer match type from first arm body
+        // Merge arm body types so payloadless first arms do not collapse the
+        // whole expression to void when sema metadata is missing.
         let m_arms_start = self.ast.get_data1(node)
         let m_arms_count = self.ast.get_data2(node)
+        var match_ty = 0
         if m_arms_count > 0:
-            let first_arm = self.ast.get_extra(m_arms_start)
-            let arm_body = self.ast.get_data1(first_arm)
-            if arm_body != 0:
-                return self.expr_type(arm_body)
+            for mi in 0..m_arms_count:
+                let arm_node = self.ast.get_extra(m_arms_start + mi)
+                let arm_body = self.ast.get_data1(arm_node)
+                if arm_body == 0:
+                    continue
+                let arm_ty = self.expr_type(arm_body)
+                if arm_ty == 0 or arm_ty == self.sema.ty_void as i32:
+                    continue
+                if match_ty == 0 or match_ty == self.sema.ty_void as i32:
+                    match_ty = arm_ty
+                    continue
+                if self.sema.types_compatible(match_ty, arm_ty) != 0:
+                    match_ty = self.sema.preferred_compatible_type(match_ty as TypeId, arm_ty as TypeId) as i32
+            if match_ty != 0 and match_ty != self.sema.ty_void as i32:
+                return match_ty
     if kind == NodeKind.NK_IF_EXPR:
         // Infer if-expression type from then branch
         let then_expr = self.ast.get_data1(node)

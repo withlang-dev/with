@@ -2629,8 +2629,47 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
             var expr_start_pos = i + 1
             var j = expr_start_pos
             var colon_pos = -1
+            var in_string = false
+            var in_char = false
             while j < clen and depth > 0:
                 let jch = content.byte_at(j as i64)
+                if in_string:
+                    if jch == 92:
+                        let bs_start = j
+                        while j < clen and content.byte_at(j as i64) == 92:
+                            j = j + 1
+                        if j < clen and content.byte_at(j as i64) == 34:
+                            let src_bs = interp_quote_source_backslash_count(j - bs_start)
+                            if src_bs % 2 == 0:
+                                in_string = false
+                            j = j + 1
+                            continue
+                        continue
+                    j = j + 1
+                    continue
+                if in_char:
+                    if jch == 92 and j + 1 < clen:
+                        j = j + 2
+                        continue
+                    if jch == 39:
+                        in_char = false
+                    j = j + 1
+                    continue
+                if jch == 92:
+                    let bs_start = j
+                    while j < clen and content.byte_at(j as i64) == 92:
+                        j = j + 1
+                    if j < clen and content.byte_at(j as i64) == 34:
+                        let src_bs = interp_quote_source_backslash_count(j - bs_start)
+                        if src_bs == 0:
+                            in_string = true
+                        j = j + 1
+                        continue
+                    continue
+                if jch == 39:
+                    in_char = true
+                    j = j + 1
+                    continue
                 if jch == 123: depth = depth + 1
                 if jch == 125: depth = depth - 1
                 if depth == 1 and jch == 58 and colon_pos == -1:
@@ -2688,6 +2727,30 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
 
 fn interp_brace_char(code: i32) -> str:
     str_from_byte(code)
+
+fn interp_quote_source_backslash_count(raw_backslashes: i32) -> i32:
+    raw_backslashes / 2
+
+fn Parser.interp_normalize_expr_text(self: Parser, text: str) -> str:
+    // Re-lexed f-string hole expressions still contain the outer string's
+    // escape layer. Strip that layer so holes like {id(\"x\")} reparse as
+    // the user expression id("x"), and inner string escapes like \\ become
+    // the original source-level backslashes again.
+    var out = ""
+    let len = text.len() as i32
+    var i = 0
+    while i < len:
+        if text.byte_at(i as i64) == 92:
+            if i + 1 < len:
+                out = out ++ text.slice((i + 1) as i64, (i + 2) as i64)
+                i = i + 2
+                continue
+            out = out ++ interp_brace_char(92)
+            i = i + 1
+            continue
+        out = out ++ text.slice(i as i64, (i + 1) as i64)
+        i = i + 1
+    out
 
 fn Parser.interp_clean_segment(self: Parser, content: str, from: i32, to: i32) -> str:
     // Replace {{ → { and }} → } in literal segments (Python-style brace escaping).
@@ -2785,9 +2848,10 @@ fn Parser.parse_format_spec_text(self: Parser, spec_text: str, start: i32, end: 
 
 fn Parser.parse_interpolated_expr(self: Parser, expr_text: str, base_start: i32) -> NodeId:
     // Re-lex and parse the expression text
-    var lexer = Lexer.init(expr_text, 0)
+    let source_text = self.interp_normalize_expr_text(expr_text)
+    var lexer = Lexer.init(source_text, 0)
     let tokens = lexer.tokenize()
-    var sub_parser = Parser.init_with_pool(tokens, expr_text, 0, self.intern, self.diags, self.pool)
+    var sub_parser = Parser.init_with_pool(tokens, source_text, 0, self.intern, self.diags, self.pool)
     let result = sub_parser.parse_expr()
     // Sync the intern pool back
     self.intern = sub_parser.intern

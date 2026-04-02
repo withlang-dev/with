@@ -555,6 +555,9 @@ fn suffix_accept(src: str, pos: i32, slen: i32, suffix: str, suf_len: i32) -> bo
         return false
     true
 
+fn lex_fstring_quote_source_backslash_count(raw_backslashes: i32) -> i32:
+    raw_backslashes / 2
+
 fn Lexer.lex_ident(self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
@@ -585,8 +588,48 @@ fn Lexer.lex_ident(self: Lexer) -> i32:
         self.pos = self.pos + 1  // skip opening "
         // Lex string body with brace-depth tracking (same as normal strings)
         var f_brace_depth = 0
+        var f_expr_in_string = false
+        var f_expr_in_char = false
         while self.pos < slen:
             let fch = src.byte_at((self.pos) as i64)
+            if f_brace_depth > 0:
+                if f_expr_in_string:
+                    if fch == CharCode.Backslash:
+                        let bs_start = self.pos
+                        while self.pos < slen and src.byte_at((self.pos) as i64) == CharCode.Backslash:
+                            self.pos = self.pos + 1
+                        if self.pos < slen and src.byte_at((self.pos) as i64) == CharCode.Dquote:
+                            let src_bs = lex_fstring_quote_source_backslash_count(self.pos - bs_start)
+                            if src_bs % 2 == 0:
+                                f_expr_in_string = false
+                            self.pos = self.pos + 1
+                            continue
+                        continue
+                    self.pos = self.pos + 1
+                    continue
+                if f_expr_in_char:
+                    if fch == CharCode.Backslash and self.pos + 1 < slen:
+                        self.pos = self.pos + 2
+                        continue
+                    if fch == CharCode.Squote:
+                        f_expr_in_char = false
+                    self.pos = self.pos + 1
+                    continue
+                if fch == CharCode.Backslash:
+                    let bs_start = self.pos
+                    while self.pos < slen and src.byte_at((self.pos) as i64) == CharCode.Backslash:
+                        self.pos = self.pos + 1
+                    if self.pos < slen and src.byte_at((self.pos) as i64) == CharCode.Dquote:
+                        let src_bs = lex_fstring_quote_source_backslash_count(self.pos - bs_start)
+                        if src_bs == 0:
+                            f_expr_in_string = true
+                        self.pos = self.pos + 1
+                        continue
+                    continue
+                if fch == CharCode.Squote:
+                    f_expr_in_char = true
+                    self.pos = self.pos + 1
+                    continue
             if fch == CharCode.Lbrace and f_brace_depth == 0:
                 var fbs = 0
                 while fbs < self.pos and src.byte_at((self.pos - 1 - fbs) as i64) == CharCode.Backslash:
