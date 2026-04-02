@@ -4161,21 +4161,89 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let _ = self.lower_expr(inner)
         return self.unit_operand()
 
-    // expr.await → suspend until fiber completes, return result
+    // expr.await → suspend until fiber completes, check cancellation,
+    // emit unwind path with defers if cancelled, return result
     if kind == NodeKind.NK_AWAIT:
         let inner = self.ast.get_data0(node)
         let task_op = self.lower_expr(inner)
+        let result_ty = self.expr_type(node)
+        let span = self.ast.get_start(node)
+
+        // 1. Emit FIBER_AWAIT intrinsic call
         let await_args: Vec[i32] = Vec.new()
         await_args.push(task_op)
         let await_args_id = self.body.new_call_args(await_args)
         self.body.set_call_intrinsic(await_args_id, MirIntrinsic.MIR_INTRINSIC_FIBER_AWAIT)
         self.body.set_call_ast_node(await_args_id, node)
-        let result_ty = self.expr_type(node)
         let result_local = self.new_temp(result_ty)
         let result_place = self.place_for_local(result_local)
-        let next_bb = self.new_block()
-        self.terminate(TermKind.TK_CALL, self.unit_operand(), await_args_id, result_place, next_bb)
-        self.switch_to(next_bb)
+        let after_await = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), await_args_id, result_place, after_await)
+        self.switch_to(after_await)
+
+        // 2. Check self-cancellation: IS_CANCELLED() → i32
+        let ic_args: Vec[i32] = Vec.new()
+        let ic_args_id = self.body.new_call_args(ic_args)
+        self.body.set_call_intrinsic(ic_args_id, MirIntrinsic.MIR_INTRINSIC_FIBER_IS_CANCELLED)
+        let ic_result = self.new_temp(self.sema.ty_i32 as i32)
+        let ic_place = self.place_for_local(ic_result)
+        let check_self_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), ic_args_id, ic_place, check_self_bb)
+        self.switch_to(check_self_bb)
+
+        // Branch: 0 → check child, else → unwind
+        let check_child_bb = self.new_block()
+        let unwind_bb = self.new_block()
+        let normal_bb = self.new_block()
+        let sw_vals1: Vec[i32] = Vec.new()
+        sw_vals1.push(0)
+        let sw_tgts1: Vec[i32] = Vec.new()
+        sw_tgts1.push(check_child_bb)
+        let sw1 = self.body.new_switch_table(sw_vals1, sw_tgts1)
+        let ic_op = self.body.new_operand(OperandKind.OK_COPY, ic_place)
+        self.terminate(TermKind.TK_SWITCH_INT, ic_op, sw1, unwind_bb, 0)
+
+        // 3. Check child-cancellation: extract fiber_id from task, call WAS_CANCELLED_RETURN
+        self.switch_to(check_child_bb)
+        let task_inner_ty = self.expr_type(inner)
+        let task_place = self.materialize_operand(task_op, task_inner_ty, span)
+        let fid_place = self.body.new_field_place(task_place, 0, self.sema.ty_i32 as i32)
+        let fid_op = self.body.new_operand(OperandKind.OK_COPY, fid_place)
+        let wcr_args: Vec[i32] = Vec.new()
+        wcr_args.push(fid_op)
+        let wcr_args_id = self.body.new_call_args(wcr_args)
+        self.body.set_call_intrinsic(wcr_args_id, MirIntrinsic.MIR_INTRINSIC_FIBER_WAS_CANCELLED_RETURN)
+        let wcr_result = self.new_temp(self.sema.ty_i32 as i32)
+        let wcr_place = self.place_for_local(wcr_result)
+        let check_child_cont = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), wcr_args_id, wcr_place, check_child_cont)
+        self.switch_to(check_child_cont)
+
+        // Branch: 0 → normal, else → unwind
+        let sw_vals2: Vec[i32] = Vec.new()
+        sw_vals2.push(0)
+        let sw_tgts2: Vec[i32] = Vec.new()
+        sw_tgts2.push(normal_bb)
+        let sw2 = self.body.new_switch_table(sw_vals2, sw_tgts2)
+        let wcr_op = self.body.new_operand(OperandKind.OK_COPY, wcr_place)
+        self.terminate(TermKind.TK_SWITCH_INT, wcr_op, sw2, unwind_bb, 0)
+
+        // 4. Unwind BB: set cancelled_return, emit defers+drops, return
+        self.switch_to(unwind_bb)
+        let scr_args: Vec[i32] = Vec.new()
+        let scr_args_id = self.body.new_call_args(scr_args)
+        self.body.set_call_intrinsic(scr_args_id, MirIntrinsic.MIR_INTRINSIC_FIBER_SET_CANCELLED_RETURN)
+        let scr_result = self.new_temp(self.sema.ty_i32 as i32)
+        let scr_place = self.place_for_local(scr_result)
+        let after_scr = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), scr_args_id, scr_place, after_scr)
+        self.switch_to(after_scr)
+        self.emit_defers_for_return()
+        self.emit_drops_for_return()
+        self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+
+        // 5. Normal BB: continue with result
+        self.switch_to(normal_bb)
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
 
     // yield expr → for now, just evaluate the expression (state machine transform is future work)
