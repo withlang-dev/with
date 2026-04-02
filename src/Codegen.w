@@ -359,6 +359,8 @@ type Codegen {
     // Current function state
     current_ret_type: i64,
     mir_emit_mutual_tail_call: i32,
+    // Async trampolines: fn_sym → LLVM trampoline function value
+    async_trampolines: HashMap[i32, i64],
     current_function: i64,
     current_function_name_sym: i32,
     current_method_owner_sym: i32,
@@ -741,6 +743,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         sema_symbol_texts: Vec.new(),
         current_ret_type: 0,
         mir_emit_mutual_tail_call: 0,
+        async_trampolines: HashMap.new(),
         current_function: 0,
         current_function_name_sym: 0,
         current_method_owner_sym: 0,
@@ -4220,6 +4223,14 @@ fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
         wl_build_store(self.builder, init_value, init_global)
 
     let main_call = wl_build_call(self.builder, main_ft, main_fn, 0, 0)
+
+    // Drain pending fibers after main returns
+    var runtime_run_fn = wl_get_named_function(self.llmod, "with_runtime_run")
+    if runtime_run_fn == 0:
+        let runtime_run_ft_new = wl_function_type(wl_void_type(self.context), 0, 0, 0)
+        runtime_run_fn = wl_add_function(self.llmod, "with_runtime_run", runtime_run_ft_new)
+    let runtime_run_ft = wl_global_get_value_type(runtime_run_fn)
+    wl_build_call(self.builder, runtime_run_ft, runtime_run_fn, 0, 0)
 
     var runtime_shutdown_fn = wl_get_named_function(self.llmod, "with_runtime_shutdown")
     if runtime_shutdown_fn == 0:

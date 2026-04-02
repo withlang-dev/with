@@ -193,7 +193,9 @@ int32_t with_runtime_has_fibers(void);
 
 // ── Fiber / Task runtime ───────────────────────────────────────────
 
-int32_t with_fiber_spawn(void (*entry_fn)(void *), void *arg);
+int32_t with_fiber_spawn(void (*entry_fn)(void *, void *), void *arg,
+                          void *result_buf, int32_t result_size,
+                          int32_t stack_size);
 void with_fiber_yield(void);
 int64_t with_fiber_await(int32_t fiber_id);
 int32_t with_fiber_cancel(int32_t fiber_id);

@@ -7,7 +7,17 @@
 __attribute__((weak)) void with_runtime_init(void) {
 }
 
+__attribute__((weak)) void with_runtime_run(void) {
+}
+
 __attribute__((weak)) void with_runtime_shutdown(void) {
+}
+
+__attribute__((weak)) void with_fiber_yield(void) {
+}
+
+__attribute__((weak)) int32_t with_fiber_in_fiber(void) {
+    return 0;
 }
 
 with_str with_str_from_cstr(const char *s) {

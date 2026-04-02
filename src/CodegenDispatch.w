@@ -3572,6 +3572,61 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
 
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_AWAIT:
+        // Await: extract fiber_id and result_buf from Task struct,
+        // call with_fiber_await(fiber_id), load result from buffer, free buffer.
+        let task_op = self.mir_intrinsic_arg(body, args_id, 0)
+        let task_ty = wl_type_of(task_op)
+        // Task = { i32 fiber_id, i8* result_buf }
+        let task_alloca = self.create_entry_alloca(task_ty)
+        wl_build_store(self.builder, task_op, task_alloca)
+        let fid_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 0)
+        let fid = wl_build_load(self.builder, wl_i32_type(self.context), fid_ptr)
+        let rbuf_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 1)
+        let rbuf = wl_build_load(self.builder, wl_ptr_type(self.context), rbuf_ptr)
+        // Call with_fiber_await(fiber_id)
+        let await_fn_name = "with_fiber_await"
+        var await_fn = wl_get_named_function(self.llmod, await_fn_name)
+        if await_fn == 0:
+            let await_params: Vec[i64] = Vec.new()
+            await_params.push(wl_i32_type(self.context))
+            let await_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&await_params), 1, 0)
+            await_fn = wl_add_function(self.llmod, await_fn_name, await_ft)
+        let await_args: Vec[i64] = Vec.new()
+        await_args.push(fid)
+        let await_ft = wl_global_get_value_type(await_fn)
+        wl_build_call(self.builder, await_ft, await_fn, vec_data_i64(&await_args), 1)
+        // TODO: cancellation check (with_fiber_is_cancelled)
+        // Load result from heap buffer
+        if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+            let dst_local = body.place_locals.get(dest_place as i64)
+            let dst_sema_ty = body.local_type_ids.get(dst_local as i64)
+            var dst_llvm_ty = self.mir_sema_type_to_llvm(dst_sema_ty)
+            if dst_llvm_ty == 0:
+                dst_llvm_ty = wl_i32_type(self.context)
+            let typed_buf = rbuf  // already i8*
+            let result_val = wl_build_load(self.builder, dst_llvm_ty, typed_buf)
+            let dst_alloca = self.create_entry_alloca(dst_llvm_ty)
+            wl_build_store(self.builder, result_val, dst_alloca)
+            self.mir_local_ptrs.insert(dst_local, dst_alloca)
+            self.mir_local_types.insert(dst_local, dst_llvm_ty)
+        // Free result buffer
+        let free_fn_name = "with_free"
+        var free_fn = wl_get_named_function(self.llmod, free_fn_name)
+        if free_fn == 0:
+            let free_params: Vec[i64] = Vec.new()
+            free_params.push(wl_ptr_type(self.context))
+            let free_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&free_params), 1, 0)
+            free_fn = wl_add_function(self.llmod, free_fn_name, free_ft)
+        let free_args: Vec[i64] = Vec.new()
+        free_args.push(rbuf)
+        let free_ft = wl_global_get_value_type(free_fn)
+        wl_build_call(self.builder, free_ft, free_fn, vec_data_i64(&free_args), 1)
+        // Branch to next bb
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+        return true
+
     else:
         return self.mir_emit_intrinsic_call_ext(body, intrinsic, args_id, dest_place, next_bb)
 
@@ -5101,6 +5156,14 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     let llvm_intrinsic_result = self.try_emit_llvm_math_intrinsic(callee_fn_sym, args, dest_place, body, next_bb)
     if llvm_intrinsic_result:
         return true
+
+    // Async function call → fiber spawn.
+    // When the callee is an async fn, package args into a heap struct,
+    // generate a trampoline, heap-allocate result buffer, and call
+    // with_fiber_spawn. Return Task { fiber_id, result_buf }.
+    if callee_fn_sym != 0 and self.sema.task_fns.contains(callee_fn_sym):
+        return self.emit_async_fn_spawn(callee_fn_sym, callee, call_ft, args, dest_place, body, next_bb)
+
     let call_val = wl_build_call(self.builder, call_ft, actual_callee, vec_data_i64(&args), actual_arg_count)
     // Mark mutual tail calls so LLVM can optimize them
     if self.mir_emit_mutual_tail_call != 0 and call_val != 0:
@@ -6691,19 +6754,22 @@ fn Codegen.ensure_async_runtime_declared(self: Codegen):
         let ft = wl_function_type(void_ty, vec_data_i64(&no_params), 0, 0)
         wl_add_function(self.llmod, "with_runtime_shutdown", ft)
 
-    // i32 with_fiber_spawn(fn_ptr: ptr, arg: ptr) -> i32
+    // i32 with_fiber_spawn(entry: ptr, arg: ptr, result_buf: ptr, result_size: i32, stack_size: i32)
     if wl_get_named_function(self.llmod, "with_fiber_spawn") == 0:
         let params: Vec[i64] = Vec.new()
         params.push(ptr_ty)
         params.push(ptr_ty)
-        let ft = wl_function_type(i32_ty, vec_data_i64(&params), 2, 0)
+        params.push(ptr_ty)
+        params.push(i32_ty)
+        params.push(i32_ty)
+        let ft = wl_function_type(i32_ty, vec_data_i64(&params), 5, 0)
         wl_add_function(self.llmod, "with_fiber_spawn", ft)
 
-    // i64 with_fiber_await(task_id: i32) -> i64
+    // void with_fiber_await(fiber_id: i32)
     if wl_get_named_function(self.llmod, "with_fiber_await") == 0:
         let params: Vec[i64] = Vec.new()
         params.push(i32_ty)
-        let ft = wl_function_type(i64_ty, vec_data_i64(&params), 1, 0)
+        let ft = wl_function_type(void_ty, vec_data_i64(&params), 1, 0)
         wl_add_function(self.llmod, "with_fiber_await", ft)
 
     // i32 with_fiber_cancel(task_id: i32) -> i32
@@ -7214,5 +7280,161 @@ fn Codegen.gen_nameof(self: Codegen, node: i32) -> i64:
     else:
         type_name = "unknown"
     self.gen_string_literal_raw(type_name)
+
+// ── Async function spawn codegen ──────────────────────────────────
+
+fn Codegen.emit_async_fn_spawn(self: Codegen, fn_sym: i32, callee: i64, call_ft: i64, args: Vec[i64], dest_place: i32, body: MirBody, next_bb: i32) -> bool:
+    let ctx = self.context
+    let ptr_ty = wl_ptr_type(ctx)
+    let i32_ty = wl_i32_type(ctx)
+    let i64_ty = wl_i64_type(ctx)
+    let void_ty = wl_void_type(ctx)
+    let arg_count = args.len() as i32
+    let ret_ty = wl_get_return_type(call_ft)
+
+    // 1. Build args struct type: { arg0_ty, arg1_ty, ... }
+    let arg_types: Vec[i64] = Vec.new()
+    for ai in 0..arg_count:
+        arg_types.push(wl_type_of(args.get(ai as i64)))
+    let args_struct_ty = if arg_count > 0:
+        wl_struct_type(ctx, vec_data_i64(&arg_types), arg_count, 0)
+    else:
+        wl_struct_type(ctx, 0, 0, 0)
+
+    // 2. Heap-allocate args struct
+    let args_size = if arg_count > 0: wl_abi_size_of(wl_get_module_data_layout(self.llmod),args_struct_ty) else: 8
+    let alloc_fn_name = "with_alloc"
+    var alloc_fn = wl_get_named_function(self.llmod, alloc_fn_name)
+    if alloc_fn == 0:
+        let alloc_params: Vec[i64] = Vec.new()
+        alloc_params.push(i64_ty)
+        let alloc_ft = wl_function_type(ptr_ty, vec_data_i64(&alloc_params), 1, 0)
+        alloc_fn = wl_add_function(self.llmod, alloc_fn_name, alloc_ft)
+    let alloc_ft = wl_global_get_value_type(alloc_fn)
+    let alloc_args: Vec[i64] = Vec.new()
+    alloc_args.push(wl_const_int(i64_ty, args_size, 0))
+    let env_ptr = wl_build_call(self.builder, alloc_ft, alloc_fn, vec_data_i64(&alloc_args), 1)
+
+    // 3. Store args into heap struct
+    for ai in 0..arg_count:
+        let field_ptr = wl_build_struct_gep(self.builder, args_struct_ty, env_ptr, ai)
+        wl_build_store(self.builder, args.get(ai as i64), field_ptr)
+
+    // 4. Heap-allocate result buffer
+    let result_size = if ret_ty != void_ty: wl_abi_size_of(wl_get_module_data_layout(self.llmod),ret_ty) else: 0
+    let rbuf_alloc_args: Vec[i64] = Vec.new()
+    rbuf_alloc_args.push(wl_const_int(i64_ty, if result_size > 0: result_size else: 1, 0))
+    let result_buf = wl_build_call(self.builder, alloc_ft, alloc_fn, vec_data_i64(&rbuf_alloc_args), 1)
+
+    // 5. Get or generate trampoline
+    var trampoline = 0 as i64
+    if self.async_trampolines.contains(fn_sym):
+        trampoline = self.async_trampolines.get(fn_sym).unwrap() as i64
+    else:
+        trampoline = self.generate_async_trampoline(fn_sym, callee, call_ft, args_struct_ty, arg_types)
+        self.async_trampolines.insert(fn_sym, trampoline)
+
+    // 6. Call with_fiber_spawn(trampoline, env, result_buf, result_size, stack_size)
+    let spawn_fn_name = "with_fiber_spawn"
+    var spawn_fn = wl_get_named_function(self.llmod, spawn_fn_name)
+    if spawn_fn == 0:
+        let spawn_params: Vec[i64] = Vec.new()
+        spawn_params.push(ptr_ty)   // entry fn
+        spawn_params.push(ptr_ty)   // arg
+        spawn_params.push(ptr_ty)   // result_buf
+        spawn_params.push(i32_ty)   // result_size
+        spawn_params.push(i32_ty)   // stack_size
+        let spawn_ft = wl_function_type(i32_ty, vec_data_i64(&spawn_params), 5, 0)
+        spawn_fn = wl_add_function(self.llmod, spawn_fn_name, spawn_ft)
+    let spawn_ft = wl_global_get_value_type(spawn_fn)
+    let spawn_args: Vec[i64] = Vec.new()
+    spawn_args.push(trampoline)
+    spawn_args.push(env_ptr)
+    spawn_args.push(result_buf)
+    spawn_args.push(wl_const_int(i32_ty, result_size, 0))
+    spawn_args.push(wl_const_int(i32_ty, 0, 0))  // default stack size
+    let fiber_id = wl_build_call(self.builder, spawn_ft, spawn_fn, vec_data_i64(&spawn_args), 5)
+
+    // 7. Construct Task { fiber_id, result_buf }
+    if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+        let dst_local = body.place_locals.get(dest_place as i64)
+        // Task = { i32, ptr }
+        let task_fields: Vec[i64] = Vec.new()
+        task_fields.push(i32_ty)
+        task_fields.push(ptr_ty)
+        let task_ty = wl_struct_type(ctx, vec_data_i64(&task_fields), 2, 0)
+        let task_alloca = self.create_entry_alloca(task_ty)
+        let fid_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 0)
+        wl_build_store(self.builder, fiber_id, fid_ptr)
+        let rbuf_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 1)
+        wl_build_store(self.builder, result_buf, rbuf_ptr)
+        self.mir_local_ptrs.insert(dst_local, task_alloca)
+        self.mir_local_types.insert(dst_local, task_ty)
+
+    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+    true
+
+fn Codegen.generate_async_trampoline(self: Codegen, fn_sym: i32, callee: i64, call_ft: i64, args_struct_ty: i64, arg_types: Vec[i64]) -> i64:
+    let ctx = self.context
+    let ptr_ty = wl_ptr_type(ctx)
+    let void_ty = wl_void_type(ctx)
+    let ret_ty = wl_get_return_type(call_ft)
+    let param_count = wl_count_param_types(call_ft)
+
+    // Trampoline signature: void(i8* env, i8* result_buf)
+    let tramp_params: Vec[i64] = Vec.new()
+    tramp_params.push(ptr_ty)
+    tramp_params.push(ptr_ty)
+    let tramp_ft = wl_function_type(void_ty, vec_data_i64(&tramp_params), 2, 0)
+    let fn_name = self.intern.resolve(fn_sym)
+    let tramp_name = "__async_tramp_" ++ fn_name
+    let tramp_fn = wl_add_function(self.llmod, tramp_name, tramp_ft)
+
+    // Save current builder position
+    let saved_bb = wl_get_insert_block(self.builder)
+
+    // Build trampoline body
+    let entry_bb = wl_append_bb(ctx, tramp_fn, "entry")
+    wl_position_at_end(self.builder, entry_bb)
+
+    let env_arg = wl_get_param(tramp_fn, 0)
+    let rbuf_arg = wl_get_param(tramp_fn, 1)
+
+    // Unpack args from env struct
+    let call_args: Vec[i64] = Vec.new()
+    for pi in 0..param_count:
+        let field_ptr = wl_build_struct_gep(self.builder, args_struct_ty, env_arg, pi)
+        let param_ty = arg_types.get(pi as i64)
+        let val = wl_build_load(self.builder, param_ty, field_ptr)
+        call_args.push(val)
+
+    // Free env struct
+    let free_fn_name = "with_free"
+    var free_fn = wl_get_named_function(self.llmod, free_fn_name)
+    if free_fn == 0:
+        let free_params: Vec[i64] = Vec.new()
+        free_params.push(ptr_ty)
+        let free_ft = wl_function_type(void_ty, vec_data_i64(&free_params), 1, 0)
+        free_fn = wl_add_function(self.llmod, free_fn_name, free_ft)
+    let free_ft = wl_global_get_value_type(free_fn)
+    let free_args: Vec[i64] = Vec.new()
+    free_args.push(env_arg)
+    wl_build_call(self.builder, free_ft, free_fn, vec_data_i64(&free_args), 1)
+
+    // Call the actual async function
+    let result = wl_build_call(self.builder, call_ft, callee, vec_data_i64(&call_args), param_count)
+
+    // Store result into result buffer
+    if ret_ty != void_ty:
+        wl_build_store(self.builder, result, rbuf_arg)
+
+    let _ = wl_build_ret_void(self.builder)
+
+    // Restore builder position
+    if saved_bb != 0:
+        wl_position_at_end(self.builder, saved_bb)
+
+    tramp_fn
 
 // ── Option method dispatch ────────────────────────────────────────

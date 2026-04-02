@@ -29,9 +29,11 @@ typedef struct Fiber {
     FiberState   state;
     void        *stack;        // Base of allocated stack memory
     size_t       stack_size;
-    int64_t      result;       // Return value (i64 to hold most types)
+    int64_t      result;       // Return value (legacy)
+    void        *result_buf;   // Heap-allocated result buffer (new)
+    int32_t      result_size;  // Size of result buffer
     int32_t      cancel_requested; // Cooperative cancel flag (observed at yield/await)
-    void       (*entry)(void*); // Entry function
+    void       (*entry)(void*, void*); // Entry: trampoline(args, result_buf)
     void        *arg;          // Argument to entry function
     struct Fiber *next;        // For scheduler queue
     int32_t      id;
@@ -172,7 +174,8 @@ static void free_fiber_pool(void) {
 // Trampoline: entered when fiber starts executing.
 static void fiber_trampoline(void) {
     // current_fiber is set before switching to us.
-    current_fiber->entry(current_fiber->arg);
+    // Call trampoline(args, result_buf)
+    current_fiber->entry(current_fiber->arg, current_fiber->result_buf);
     // Fiber function returned — mark as done.
     current_fiber->state = FIBER_DONE;
     // Store in completed list for await.
@@ -204,15 +207,23 @@ void with_runtime_init(void) {
 }
 
 // Create a new fiber. Returns fiber ID.
-// entry_fn: the async function to run (takes void* arg, returns void — result stored via with_fiber_set_result)
-// arg: argument pointer (can be NULL)
-int32_t with_fiber_spawn(void (*entry_fn)(void*), void *arg) {
+// entry_fn: trampoline(args, result_buf)
+// arg: heap-allocated args struct
+// result_buf: heap-allocated result buffer (caller owns)
+// result_size: sizeof(return type)
+// stack_size: 0 = default (FIBER_STACK_SIZE)
+int32_t with_fiber_spawn(void (*entry_fn)(void*, void*), void *arg,
+                          void *result_buf, int32_t result_size,
+                          int32_t stack_size) {
+    (void)stack_size; // TODO: custom stack sizes
     if (live_fiber_count >= MAX_FIBERS) return -1;
     Fiber *f = acquire_fiber();
     if (!f) return -1;
 
     f->entry = entry_fn;
     f->arg = arg;
+    f->result_buf = result_buf;
+    f->result_size = result_size;
     f->state = FIBER_READY;
     f->id = next_fiber_id++;
     f->result = 0;
