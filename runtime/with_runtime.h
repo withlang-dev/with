@@ -203,6 +203,9 @@ void with_fiber_set_result(int64_t value);
 int32_t with_fiber_in_fiber(void);
 int32_t with_fiber_is_cancelled(void);
 void with_fiber_select(int32_t *fiber_ids, int32_t count, int32_t *result_index);
+void with_fiber_set_cancelled_return(void);
+int32_t with_fiber_was_cancelled_return(int32_t fiber_id);
+void with_fiber_request_cancel_self(void);
 
 // ── Async Scopes ───────────────────────────────────────────────────
 

@@ -8,7 +8,6 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <signal.h>
-#include <setjmp.h>
 
 // ── Fiber context (must match assembly layout) ─────────────────────
 
@@ -37,12 +36,12 @@ typedef struct Fiber {
     void        *result_buf;   // Heap-allocated result buffer (new)
     int32_t      result_size;  // Size of result buffer
     int32_t      cancel_requested; // Cooperative cancel flag (observed at yield/await)
+    int32_t      cancelled_return; // Set by unwind path — parent sees child was cancelled
     void       (*entry)(void*, void*); // Entry: trampoline(args, result_buf)
     void        *arg;          // Argument to entry function
     struct Fiber *next;        // For scheduler queue
     int32_t      id;
-    // Panic capture: setjmp/longjmp for catching panics inside fibers
-    jmp_buf      panic_jmp;
+    // Panic capture
     int32_t      has_panic;
     const char  *panic_msg;
     int32_t      panic_msg_len;
@@ -143,6 +142,7 @@ static Fiber *acquire_fiber(void) {
         f->state = FIBER_READY;
         f->result = 0;
         f->cancel_requested = 0;
+        f->cancelled_return = 0;
         f->entry = NULL;
         f->arg = NULL;
         f->next = NULL;
@@ -183,6 +183,7 @@ static void recycle_fiber(Fiber *f) {
     f->state = FIBER_DONE;
     f->result = 0;
     f->cancel_requested = 0;
+    f->cancelled_return = 0;
     f->entry = NULL;
     f->arg = NULL;
     f->id = 0;
@@ -539,6 +540,28 @@ void with_fiber_set_result(int64_t value) {
     if (current_fiber) {
         current_fiber->result = value;
     }
+}
+
+// Cancellation propagation: set cancelled_return flag on current fiber.
+// Called by unwind path before returning from a cancelled fiber.
+void with_fiber_set_cancelled_return(void) {
+    if (!current_fiber) return;
+    __atomic_store_n(&current_fiber->cancelled_return, 1, __ATOMIC_RELEASE);
+}
+
+// Check if a completed fiber returned due to cancellation (not normal completion).
+int32_t with_fiber_was_cancelled_return(int32_t fiber_id) {
+    for (int i = 0; i < completed_count; i++) {
+        if (completed[i] && completed[i]->id == fiber_id)
+            return __atomic_load_n(&completed[i]->cancelled_return, __ATOMIC_ACQUIRE);
+    }
+    return 0;
+}
+
+// Request self-cancellation (used when propagating child cancellation upward).
+void with_fiber_request_cancel_self(void) {
+    if (!current_fiber) return;
+    __atomic_store_n(&current_fiber->cancel_requested, 1, __ATOMIC_RELEASE);
 }
 
 // Capture a panic inside a fiber. Called from with_panic when in fiber context.
