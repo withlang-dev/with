@@ -24,6 +24,17 @@ __attribute__((weak)) int32_t with_fiber_is_cancelled(void) {
     return 0;
 }
 
+__attribute__((weak)) void with_fiber_set_cancelled_return(void) {
+}
+
+__attribute__((weak)) int32_t with_fiber_was_cancelled_return(int32_t fiber_id) {
+    (void)fiber_id;
+    return 0;
+}
+
+__attribute__((weak)) void with_fiber_request_cancel_self(void) {
+}
+
 __attribute__((weak)) void with_fiber_panic_capture(const char *msg, int32_t msg_len) {
     (void)msg; (void)msg_len;
     // Fallback: if fiber.o not linked, just abort
