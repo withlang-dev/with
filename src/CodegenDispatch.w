@@ -3607,6 +3607,14 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         // call with_fiber_await(fiber_id), load result from buffer, free buffer.
         let task_op = self.mir_intrinsic_arg(body, args_id, 0)
         let task_ty = wl_type_of(task_op)
+        // Find the MIR local for the Task to look up its result type
+        var task_mir_local: i32 = -1
+        let await_arg_start = body.call_arg_starts.get(args_id as i64)
+        let await_op_id = body.call_arg_operands.get(await_arg_start as i64)
+        if await_op_id >= 0 and await_op_id < body.operand_d0.len() as i32:
+            let await_place_id = body.operand_d0.get(await_op_id as i64)
+            if await_place_id >= 0 and await_place_id < body.place_locals.len() as i32:
+                task_mir_local = body.place_locals.get(await_place_id as i64)
         // Task = { i32 fiber_id, i8* result_buf }
         let task_alloca = self.create_entry_alloca(task_ty)
         wl_build_store(self.builder, task_op, task_alloca)
@@ -3642,6 +3650,32 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
 
         // Check 2: Did my child return due to cancellation?
         wl_position_at_end(self.builder, check_child_bb)
+
+        // Pre-load result from buffer BEFORE the child-cancel check/free.
+        // This ensures LLVM can't hoist a free above the load.
+        var preloaded_result: i64 = 0
+        var preloaded_alloca: i64 = 0
+        if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+            // Resolve result LLVM type. Primary source: async_task_result_types
+            // (keyed by the Task MIR local, set at spawn time). Fallbacks: MIR
+            // sema type, last_async_spawn_ret_ty, i32.
+            var pl_llvm_ty: i64 = 0
+            if task_mir_local >= 0:
+                let trt_opt = self.async_task_result_types.get(task_mir_local)
+                if trt_opt.is_some():
+                    pl_llvm_ty = trt_opt.unwrap() as i64
+            if pl_llvm_ty == 0 or pl_llvm_ty == wl_void_type(self.context):
+                let pl_local = body.place_locals.get(dest_place as i64)
+                let pl_sema_ty = body.local_type_ids.get(pl_local as i64)
+                pl_llvm_ty = self.mir_sema_type_to_llvm(pl_sema_ty)
+            if pl_llvm_ty == 0 or pl_llvm_ty == wl_void_type(self.context):
+                if self.last_async_spawn_ret_ty != 0:
+                    pl_llvm_ty = self.last_async_spawn_ret_ty
+            if pl_llvm_ty == 0 or pl_llvm_ty == wl_void_type(self.context):
+                pl_llvm_ty = wl_i32_type(self.context)
+            preloaded_result = wl_build_load(self.builder, pl_llvm_ty, rbuf)
+            preloaded_alloca = self.create_entry_alloca(pl_llvm_ty)
+            wl_build_store(self.builder, preloaded_result, preloaded_alloca)
         var wcr_fn = wl_get_named_function(self.llmod, "with_fiber_was_cancelled_return")
         if wcr_fn == 0:
             let wcr_p: Vec[i64] = Vec.new()
@@ -3707,20 +3741,12 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         else:
             wl_build_unreachable(self.builder)
 
-        // Normal path: load result from heap buffer, free it
+        // Normal path: use pre-loaded result (loaded before the branch), free buffer
         wl_position_at_end(self.builder, normal_bb)
-        if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+        if dest_place >= 0 and dest_place < body.place_locals.len() as i32 and preloaded_alloca != 0:
             let dst_local = body.place_locals.get(dest_place as i64)
-            let dst_sema_ty = body.local_type_ids.get(dst_local as i64)
-            var dst_llvm_ty = self.mir_sema_type_to_llvm(dst_sema_ty)
-            if dst_llvm_ty == 0:
-                dst_llvm_ty = wl_i32_type(self.context)
-            let typed_buf = rbuf
-            let result_val = wl_build_load(self.builder, dst_llvm_ty, typed_buf)
-            let dst_alloca = self.create_entry_alloca(dst_llvm_ty)
-            wl_build_store(self.builder, result_val, dst_alloca)
-            self.mir_local_ptrs.insert(dst_local, dst_alloca)
-            self.mir_local_types.insert(dst_local, dst_llvm_ty)
+            self.mir_local_ptrs.insert(dst_local, preloaded_alloca)
+            self.mir_local_types.insert(dst_local, wl_type_of(preloaded_result))
         // Free result buffer
         let free_fn_name = "with_free"
         var free_fn = wl_get_named_function(self.llmod, free_fn_name)
@@ -7396,8 +7422,10 @@ fn Codegen.declare_async_function(self: Codegen, fn_node: i32):
     let tramp_name = name_str ++ "_fiber"
     wl_add_function(self.llmod, tramp_name, tramp_fn_type)
 
-    // 4. Declare the public spawn wrapper: name(params) -> i32 (Task ID)
-    let spawn_fn_type = wl_function_type(i32_ty, vec_data_i64(&param_types), param_count, 0)
+    // 4. Declare the function with its actual return type. The MIR body
+    // computes the real return value. The trampoline calls this function
+    // and stores the result into the result buffer.
+    let spawn_fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, 0)
     let effective_name = self.function_symbol_name(name_sym)
     let spawn_fn = wl_add_function(self.llmod, effective_name, spawn_fn_type)
     self.apply_noalias_param_attrs(spawn_fn, param_start, param_count)
@@ -7784,7 +7812,12 @@ fn Codegen.emit_async_fn_spawn(self: Codegen, fn_sym: i32, callee: i64, call_ft:
     let i64_ty = wl_i64_type(ctx)
     let void_ty = wl_void_type(ctx)
     let arg_count = args.len() as i32
-    let ret_ty = wl_get_return_type(call_ft)
+    // Use actual async fn return type for result buffer sizing.
+    // call_ft is the spawn wrapper type (returns i32), not the real return type.
+    var ret_ty = wl_get_return_type(call_ft)
+    let actual_ret_opt = self.async_fn_ret_types.get(fn_sym)
+    if actual_ret_opt.is_some():
+        ret_ty = actual_ret_opt.unwrap() as i64
 
     // 1. Build args struct type: { arg0_ty, arg1_ty, ... }
     let arg_types: Vec[i64] = Vec.new()
@@ -7868,6 +7901,9 @@ fn Codegen.emit_async_fn_spawn(self: Codegen, fn_sym: i32, callee: i64, call_ft:
         wl_build_store(self.builder, result_buf, rbuf_ptr)
         self.mir_local_ptrs.insert(dst_local, task_alloca)
         self.mir_local_types.insert(dst_local, task_ty)
+        // Store result type for FIBER_AWAIT to load correctly
+        self.async_task_result_types.insert(dst_local as i32, ret_ty)
+        self.last_async_spawn_ret_ty = ret_ty
 
     if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
         wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
@@ -7877,8 +7913,14 @@ fn Codegen.generate_async_trampoline(self: Codegen, fn_sym: i32, callee: i64, ca
     let ctx = self.context
     let ptr_ty = wl_ptr_type(ctx)
     let void_ty = wl_void_type(ctx)
-    let ret_ty = wl_get_return_type(call_ft)
-    let param_count = wl_count_param_types(call_ft)
+    // Use actual async fn return type, not the spawn wrapper's i32 return.
+    // call_ft is the spawn wrapper type (returns i32), but we need the real
+    // return type for the result buffer. Look it up from async_fn_ret_types.
+    var ret_ty = wl_get_return_type(call_ft)
+    let actual_ret_opt = self.async_fn_ret_types.get(fn_sym)
+    if actual_ret_opt.is_some():
+        ret_ty = actual_ret_opt.unwrap() as i64
+    let param_count = arg_types.len() as i32
 
     // Trampoline signature: void(i8* env, i8* result_buf)
     let tramp_params: Vec[i64] = Vec.new()
