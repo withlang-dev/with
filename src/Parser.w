@@ -4137,8 +4137,10 @@ fn Parser.parse_for_comprehension(self: Parser, start: i32, first_binding: i32, 
     let body_expr = self.parse_block_or_expr()
 
     // Build nested match from inside out
-    let some_sym = self.intern.intern("Some")
-    let none_sym = self.intern.intern("None")
+    // Use placeholder variant names — sema resolves to Some/None or Ok/Err
+    // based on the match subject's type (Option vs Result).
+    let some_sym = self.intern.intern("_Payload")
+    let none_sym = self.intern.intern("_Empty")
 
     // Innermost: wrap body in Some(body) if yield
     var inner: NodeId = body_expr
@@ -4173,12 +4175,15 @@ fn Parser.parse_for_comprehension(self: Parser, start: i32, first_binding: i32, 
             let some_pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, start, some_sym, pat_extra, 1)
             // Build Some arm: Some(bsym) => inner
             let some_arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, start, self.prev_end(), some_pat, inner, 0)
-            // Build None pattern
-            let none_pat = self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, start, start, none_sym, 0, 0)
-            // Build None arm: value comprehension → None, imperative → void
+            // Build failure arm: at-binding pattern (___fail @ _) captures the
+            // entire matched value. Body returns ___fail — propagating None or
+            // Err(e) unchanged regardless of which enum type it is.
+            let fail_sym = self.intern.intern(f"___fail_{bi}")
+            let wild = self.pool.add_node(NodeKind.NK_PAT_WILDCARD, start, start, 0, 0, 0)
+            let none_pat = self.pool.add_node(NodeKind.NK_PAT_AT_BINDING, start, start, fail_sym, wild, 0)
             var none_body: NodeId = 0 as NodeId
             if has_yield != 0:
-                none_body = self.pool.add_node(NodeKind.NK_VARIANT_SHORTHAND, start, start, none_sym, 0, 0)
+                none_body = self.pool.add_node(NodeKind.NK_IDENT, start, start, fail_sym, 0, 0)
             else:
                 none_body = self.pool.add_node(NodeKind.NK_BLOCK, start, start, 0, 0, 0)
             let none_arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, start, self.prev_end(), none_pat, none_body, 0)
