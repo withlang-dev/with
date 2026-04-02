@@ -982,6 +982,10 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     // Track async fns
     if (flags / FnFlags.ASYNC) % 2 == 1:
         self.task_fns.insert(fn_name, 1)
+    // Track @[stack_size(N)]
+    if self.ast.fn_stack_sizes.contains(node as i32):
+        let ss = self.ast.fn_stack_sizes.get(node as i32).unwrap()
+        self.fn_stack_sizes.insert(fn_name, ss)
 
     // Unbind Self
     if self_type_id != 0:

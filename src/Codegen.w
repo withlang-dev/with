@@ -4239,7 +4239,11 @@ fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
     let runtime_shutdown_ft = wl_global_get_value_type(runtime_shutdown_fn)
     wl_build_call(self.builder, runtime_shutdown_ft, runtime_shutdown_fn, 0, 0)
 
-    if ret_ty == wl_void_type(self.context):
+    // For void or async main, return 0.
+    // Async main's spawn wrapper returns fiber_id (i32), not a meaningful exit code.
+    let main_sym = self.intern.intern("main")
+    let main_is_async = self.sema.task_fns.contains(main_sym)
+    if ret_ty == wl_void_type(self.context) or wl_get_type_kind(ret_ty) == wl_struct_type_kind() or main_is_async:
         let _ = wl_build_ret(self.builder, wl_const_int(i32_ty, 0, 0))
         return
 

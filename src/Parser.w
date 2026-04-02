@@ -40,6 +40,7 @@ type Parser {
     pending_packed: i32,
     pending_bitpacked: i32,
     pending_callconv: i32,
+    pending_stack_size: i32,
     pending_unsafe_fn: i32,
     saw_implicit_it: i32,
     implicit_it_depth: i32,
@@ -81,6 +82,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_packed: 0,
         pending_bitpacked: 0,
         pending_callconv: 0,
+        pending_stack_size: 0,
         pending_unsafe_fn: 0,
         saw_implicit_it: 0,
         implicit_it_depth: 0,
@@ -290,6 +292,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_packed = 0
     self.pending_bitpacked = 0
     self.pending_callconv = 0
+    self.pending_stack_size = 0
     var derive_syms: Vec[i32] = Vec.new()
 
     while self.peek() == TokenKind.TK_AT:
@@ -389,6 +392,18 @@ fn Parser.skip_attributes(self: Parser):
                 self.advance()
                 if self.peek() == TokenKind.TK_STRING_LIT:
                     self.pending_callconv = self.intern_current()
+                    self.advance()
+                if self.peek() == TokenKind.TK_R_PAREN:
+                    self.advance()
+        else if self.is_ident_named("stack_size"):
+            self.advance()
+            if self.peek() == TokenKind.TK_L_PAREN:
+                self.advance()
+                if self.peek() == TokenKind.TK_INT_LIT:
+                    let val_s = self.current_start()
+                    let val_e = self.current_end()
+                    let val_text = self.source.slice(val_s as i64, val_e as i64)
+                    self.pending_stack_size = parse_int(val_text) as i32
                     self.advance()
                 if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
@@ -729,6 +744,9 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     self.pool.add_fn_param_pattern_meta(fn_node, self.last_param_pattern_start, self.last_param_pattern_count)
     if self.last_where_count > 0:
         self.pool.add_where_meta(fn_node, self.last_where_start, self.last_where_count)
+    if self.pending_stack_size > 0:
+        self.pool.fn_stack_sizes.insert(fn_node as i32, self.pending_stack_size)
+        self.pending_stack_size = 0
     fn_node
 
 // ── extern fn ────────────────────────────────────────────────────
@@ -3949,7 +3967,11 @@ fn Parser.parse_select_await(self: Parser) -> NodeId:
             break
         self.advance()
         self.skip_newlines()
-        let task_expr = self.parse_expr()
+        // Parse task expression with closure suppression:
+        // In select arms, `name = task_expr => body`, we must not
+        // parse `task_expr => body` as a closure. Use suppress_as
+        // flag repurposed: instead, parse ident_or_call directly.
+        let task_expr = self.parse_ident_or_call()
         self.expect(TokenKind.TK_FAT_ARROW)
         let body = self.parse_block_or_expr()
         arm_entries.push(name_sym)
