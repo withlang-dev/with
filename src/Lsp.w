@@ -1332,7 +1332,7 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
 
     if kind == NodeKind.NK_FOR:
         var result: Vec[str] = Vec.new()
-        if node_start < offset and offset <= node_end:
+        if node_start < offset and offset <= node_end and not pool.for_binding_is_pattern(nid):
             let sym = pool.get_data0(nid)
             if sym != 0:
                 let name = intern.resolve(sym)
@@ -1418,7 +1418,7 @@ fn lsp_collect_bindings(pool: AstPool, intern: InternPool, node: i32, offset: i3
         return
 
     if kind == NodeKind.NK_FOR:
-        if node_start < offset:
+        if node_start < offset and not pool.for_binding_is_pattern(nid):
             let sym = pool.get_data0(nid)
             if sym != 0:
                 let name = intern.resolve(sym)

@@ -616,9 +616,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         let loop_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_LOOP)
 
         let binding = pool.get_data0(node)
-        let for_start = pool.get_start(node)
-        let for_end = pool.get_end(node)
-        if binding > 0 and binding < pool.node_count() and pool.kind(binding) >= NodeKind.NK_PAT_WILDCARD and pool.kind(binding) <= NodeKind.NK_PAT_SLICE and pool.get_start(binding) >= for_start and pool.get_end(binding) <= for_end:
+        if pool.for_binding_is_pattern(node):
             self.bind_pattern(pool, module_id, parent_def, loop_scope, binding)
         else if binding > 0:
             let did = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, binding, pool.get_start(node), pool.get_end(node))

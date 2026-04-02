@@ -1894,31 +1894,34 @@ fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32) -> i
     self.switch_to(exit_bb)
     self.unit_operand()
 
-fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
+fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
+    let pat_or_sym = self.ast.get_data0(for_node)
+    let iter_expr = self.ast.get_data1(for_node)
+    let body_expr = self.ast.get_data2(for_node)
     // Check for range-based for: for i in start..end
     if self.ast.kind(iter_expr) == NodeKind.NK_RANGE:
-        return self.lower_for_range(pat_or_sym, iter_expr, body_expr)
+        return self.lower_for_range(for_node, pat_or_sym, iter_expr, body_expr)
 
     // Range variable: iter_expr is an ident/expr whose type is TY_RANGE
     let iter_ty = self.expr_type(iter_expr)
     if iter_ty != 0:
         let range_resolved = self.sema.resolve_alias(iter_ty)
         if self.sema.get_type_kind(range_resolved) == TypeKind.TY_RANGE:
-            return self.lower_for_range_var(pat_or_sym, iter_expr, body_expr, range_resolved)
+            return self.lower_for_range_var(for_node, pat_or_sym, iter_expr, body_expr, range_resolved)
 
     // Check for slice/vec-based for
     if iter_ty != 0:
         let resolved = self.sema.resolve_alias(iter_ty)
         let tk = self.sema.get_type_kind(resolved)
         if tk == TypeKind.TY_SLICE or tk == TypeKind.TY_ARRAY:
-            return self.lower_for_slice(pat_or_sym, iter_expr, body_expr)
+            return self.lower_for_slice(for_node, pat_or_sym, iter_expr, body_expr)
         // Vec[T] — use counter-based loop with VEC_LEN / VEC_GET intrinsics
         if tk == TypeKind.TY_GENERIC_INST:
             let type_name_sym = self.sema.get_type_name(resolved)
             if type_name_sym != 0:
                 let type_name = self.pool.resolve(type_name_sym)
                 if type_name == "Vec":
-                    return self.lower_for_vec(pat_or_sym, iter_expr, body_expr)
+                    return self.lower_for_vec(for_node, pat_or_sym, iter_expr, body_expr)
 
     // Handle for x in vec.iter() — redirect to lower_for_vec with the Vec receiver.
     if self.ast.kind(iter_expr) == NodeKind.NK_CALL:
@@ -1937,7 +1940,7 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
                         if recv_name_sym != 0:
                             let recv_name = self.pool.resolve(recv_name_sym)
                             if recv_name == "Vec":
-                                return self.lower_for_vec(pat_or_sym, recv, body_expr)
+                                return self.lower_for_vec(for_node, pat_or_sym, recv, body_expr)
 
     // Iterator protocol: not yet fully implemented in MIR.
     // Fall back to AST codegen for functions using iterator-based for loops.
@@ -1977,7 +1980,7 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
     let next_payload = self.body.new_operand(OperandKind.OK_COPY, next_place)
     self.assign_operand_to_place(item_place, next_payload, self.ast.get_start(iter_expr))
 
-    self.bind_for_element(pat_or_sym, item_place, elem_ty, body_expr)
+    self.bind_for_element(for_node, pat_or_sym, item_place, elem_ty, body_expr)
 
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
@@ -1986,13 +1989,11 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
     self.switch_to(exit_bb)
     self.unit_operand()
 
-fn MirBuilder.bind_for_element(self: MirBuilder, pat_or_sym: i32, item_place: i32, elem_ty: i32, body_expr: i32):
+fn MirBuilder.bind_for_element(self: MirBuilder, for_node: i32, pat_or_sym: i32, item_place: i32, elem_ty: i32, body_expr: i32):
     // Bind loop variable: supports both simple identifiers and pattern destructuring
-    if pat_or_sym > 0 and pat_or_sym < self.ast.node_count():
-        let pk = self.ast.kind(pat_or_sym)
-        if pk >= NodeKind.NK_PAT_WILDCARD and pk <= NodeKind.NK_PAT_SLICE:
-            let _ = self.lower_pattern(pat_or_sym, item_place)
-            return
+    if self.ast.for_binding_is_pattern(for_node):
+        let _ = self.lower_pattern(pat_or_sym, item_place)
+        return
     if pat_or_sym != 0:
         let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
         self.bind_local(pat_or_sym, bind_local)
@@ -2003,7 +2004,7 @@ fn MirBuilder.bind_for_element(self: MirBuilder, pat_or_sym: i32, item_place: i3
         let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
         self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(body_expr))
 
-fn MirBuilder.lower_for_range_var(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_expr: i32, range_ty: i32) -> i32:
+fn MirBuilder.lower_for_range_var(self: MirBuilder, for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32, range_ty: i32) -> i32:
     // for i in range_var → extract start/end/inclusive from the range struct,
     // then generate the same counter-based loop as lower_for_range.
     // Range layout: {start: Elem, end: Elem, inclusive: i8}
@@ -2066,7 +2067,7 @@ fn MirBuilder.lower_for_range_var(self: MirBuilder, pat_or_sym: i32, iter_expr: 
 
     // Body
     self.switch_to(body_bb)
-    self.bind_for_element(pat_or_sym, counter_place, elem_ty, body_expr)
+    self.bind_for_element(for_node, pat_or_sym, counter_place, elem_ty, body_expr)
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
@@ -2082,7 +2083,7 @@ fn MirBuilder.lower_for_range_var(self: MirBuilder, pat_or_sym: i32, iter_expr: 
     self.switch_to(exit_bb)
     self.unit_operand()
 
-fn MirBuilder.lower_for_range(self: MirBuilder, pat_or_sym: i32, range_node: i32, body_expr: i32) -> i32:
+fn MirBuilder.lower_for_range(self: MirBuilder, for_node: i32, pat_or_sym: i32, range_node: i32, body_expr: i32) -> i32:
     // for i in start..end  →  counter = start; while counter < end: body; counter += 1
     let start_node = self.ast.get_data0(range_node)
     let end_node = self.ast.get_data1(range_node)
@@ -2132,7 +2133,7 @@ fn MirBuilder.lower_for_range(self: MirBuilder, pat_or_sym: i32, range_node: i32
 
     // Body: bind loop variable = counter, execute body
     self.switch_to(body_bb)
-    self.bind_for_element(pat_or_sym, counter_place, elem_ty, body_expr)
+    self.bind_for_element(for_node, pat_or_sym, counter_place, elem_ty, body_expr)
 
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
@@ -2149,7 +2150,7 @@ fn MirBuilder.lower_for_range(self: MirBuilder, pat_or_sym: i32, range_node: i32
     self.switch_to(exit_bb)
     self.unit_operand()
 
-fn MirBuilder.lower_for_slice(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
+fn MirBuilder.lower_for_slice(self: MirBuilder, for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
     // for x in slice → index from 0 to len
     let iter_op = self.lower_expr(iter_expr)
     let iter_ty = self.expr_type(iter_expr)
@@ -2204,7 +2205,7 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, pat_or_sym: i32, iter_expr: i32,
     let elem_local = self.new_temp(elem_ty)
     let elem_place = self.place_for_local(elem_local)
     self.assign_operand_to_place(elem_place, elem_op, self.ast.get_start(body_expr))
-    self.bind_for_element(pat_or_sym, elem_place, elem_ty, body_expr)
+    self.bind_for_element(for_node, pat_or_sym, elem_place, elem_ty, body_expr)
 
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
@@ -2221,7 +2222,7 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, pat_or_sym: i32, iter_expr: i32,
     self.switch_to(exit_bb)
     self.unit_operand()
 
-fn MirBuilder.lower_for_vec(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
+fn MirBuilder.lower_for_vec(self: MirBuilder, for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
     // for x in vec → counter loop using VEC_LEN / VEC_GET intrinsics
     let iter_op = self.lower_expr(iter_expr)
     let iter_ty = self.expr_type(iter_expr)
@@ -2286,7 +2287,7 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, b
     self.switch_to(get_after_bb)
 
     // Bind loop variable
-    self.bind_for_element(pat_or_sym, elem_place, elem_ty, body_expr)
+    self.bind_for_element(for_node, pat_or_sym, elem_place, elem_ty, body_expr)
 
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
@@ -3777,7 +3778,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.lower_loop(self.ast.get_data0(node), node)
 
     if kind == NodeKind.NK_FOR:
-        return self.lower_for(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node))
+        return self.lower_for(node)
 
     if kind == NodeKind.NK_BREAK:
         return self.lower_break(node)

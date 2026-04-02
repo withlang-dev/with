@@ -545,7 +545,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let iterable = pool.get_data1(node)
         let body = pool.get_data2(node)
         var out = prefix ++ "for "
-        if is_pattern_node(pool, (binding) as NodeId):
+        if pool.for_binding_is_pattern(node):
             out = out ++ render_pattern(pool, intern, (binding) as NodeId)
         else:
             out = out ++ intern.resolve(binding)
@@ -985,26 +985,10 @@ fn local_let_type_ann(pool: AstPool, flags: i32) -> i32:
     0
 
 fn is_pattern_node(pool: AstPool, node: NodeId) -> bool:
-    if node <= 0:
-        return false
-    if node >= pool.node_count():
-        return false
-    is_pattern_kind(pool.kind(node))
+    pool.is_pattern_node(node as i32)
 
 fn is_pattern_kind(kind: i32) -> bool:
-    kind == NodeKind.NK_PAT_WILDCARD or
-    kind == NodeKind.NK_PAT_IDENT or
-    kind == NodeKind.NK_PAT_INT or
-    kind == NodeKind.NK_PAT_BOOL or
-    kind == NodeKind.NK_PAT_STRING or
-    kind == NodeKind.NK_PAT_VARIANT or
-    kind == NodeKind.NK_PAT_TUPLE or
-    kind == NodeKind.NK_PAT_STRUCT or
-    kind == NodeKind.NK_PAT_RANGE or
-    kind == NodeKind.NK_PAT_OR or
-    kind == NodeKind.NK_PAT_ENUM_SHORTHAND or
-    kind == NodeKind.NK_PAT_AT_BINDING or
-    kind == NodeKind.NK_PAT_SLICE
+    ast_is_pattern_kind(kind)
 
 fn bin_op_str(op: i32) -> str:
     if op == BinaryOp.OP_ADD: return "+"
