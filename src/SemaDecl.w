@@ -956,13 +956,23 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
         // no return type annotation → void
         let _ = 0
 
+    // For async functions, wrap return type in Task[T]
+    var sig_ret_type = ret_type
+    if (flags / FnFlags.ASYNC) % 2 == 1:
+        let task_sym = self.pool_intern("Task")
+        let task_args: Vec[i32] = Vec.new()
+        task_args.push(ret_type as i32)
+        let task_ty = self.ensure_generic_inst_type(task_sym, task_args, 1)
+        if task_ty != 0:
+            sig_ret_type = task_ty
+
     // Build fn type
     let fn_extra_start = self.type_extra.len() as i32
     for pi in 0..param_count:
         self.type_extra.push(self.sig_params.get((sig_param_start + pi) as i64))
-    let fn_tid = self.add_type(TypeKind.TY_FN, fn_extra_start, param_count, ret_type)
+    let fn_tid = self.add_type(TypeKind.TY_FN, fn_extra_start, param_count, sig_ret_type)
 
-    self.add_sig(fn_name, fn_tid, ret_type, sig_param_start, param_count, 0)
+    self.add_sig(fn_name, fn_tid, sig_ret_type, sig_param_start, param_count, 0)
     let fn_sig_idx = self.get_sig(fn_name)
     self.register_method_sig_alias(node, fn_name, fn_sig_idx)
 

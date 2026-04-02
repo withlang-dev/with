@@ -492,14 +492,10 @@ pub fn runtime_set_argv(argc: i32, argv: *const *const u8):
     saved_argv = argv
     rt_store_args(argc, argv)
 
-@[c_export("with_runtime_init")]
-pub fn runtime_init():
-    // No-op for now
-    let _ = 0
-
-@[c_export("with_runtime_shutdown")]
-pub fn runtime_shutdown():
-    let _ = 0
+// with_runtime_init, with_runtime_run, with_runtime_shutdown are provided
+// by C runtime stubs (support_runtime.c / with_runtime.c) as weak symbols.
+// The strong definitions come from fiber.c when the fiber runtime is linked.
+// rt_core.w does NOT provide these — it would create duplicate strong symbols.
 
 // ── Print functions ────────────────────────────────────────────────
 
@@ -2360,15 +2356,8 @@ pub fn net_udp_bind(port: i32) -> i32:
     let _ = port
     -1
 
-// ── Fiber stubs ────────────────────────────────────────────────────
-
-@[c_export("with_fiber_yield")]
-pub fn fiber_yield():
-    let _ = 0
-
-@[c_export("with_fiber_in_fiber")]
-pub fn fiber_in_fiber() -> i32:
-    0
+// Fiber stubs (with_fiber_yield, with_fiber_in_fiber) are provided by
+// C runtime as weak symbols. Strong definitions come from fiber.c.
 
 // ── cimport stubs ──────────────────────────────────────────────────
 

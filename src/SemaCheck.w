@@ -314,7 +314,16 @@ fn Sema.check_fn_body(self: Sema, node: i32):
         self.current_gen_yield_type = ret_type as TypeId
         self.has_gen_yield_type = 1
     else:
-        self.current_return_type = ret_type as TypeId
+        // For async functions, the sig return type is Task[T] but the
+        // body should type-check against the unwrapped T.
+        var body_ret_type = ret_type as TypeId
+        if (flags / FnFlags.ASYNC) % 2 == 1:
+            let resolved_ret = self.resolve_alias(ret_type as TypeId)
+            if self.get_type_kind(resolved_ret) == TypeKind.TY_GENERIC_INST:
+                let arg_count = self.get_generic_inst_arg_count(resolved_ret as i32)
+                if arg_count > 0:
+                    body_ret_type = self.get_generic_inst_arg(resolved_ret as i32, 0) as TypeId
+        self.current_return_type = body_ret_type
         self.current_gen_yield_type = 0 as TypeId
         self.has_gen_yield_type = 0
     let saved_comptime = self.in_comptime_fn
@@ -324,11 +333,13 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     if (flags / FnFlags.ASYNC) % 2 == 1:
         self.in_async_fn = self.in_async_fn + 1
 
-    // Check body — set expected type to return type for tail expression resolution
+    // Check body — set expected type to return type for tail expression resolution.
+    // For async functions, use the unwrapped body return type (T, not Task[T]).
+    let body_expected_ret = self.current_return_type
     let saved_expected_et = self.expected_expr_type
     let saved_has_et = self.has_expected_type
-    if ret_type != 0 and ret_type as TypeId != self.ty_void:
-        self.expected_expr_type = ret_type as TypeId
+    if body_expected_ret != 0 and body_expected_ret != self.ty_void:
+        self.expected_expr_type = body_expected_ret
         self.has_expected_type = 1
     let body_ty = self.check_expr(body)
     self.expected_expr_type = saved_expected_et
@@ -338,15 +349,15 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     if not has_ret_annotation:
         let inferred_ret = if body_ty != 0: body_ty else: self.ty_void
         self.set_sig_return_type(sig_idx, inferred_ret)
-    else if ret_type != 0 and body_ty != 0 and body_ty != self.ty_void and ret_type != self.ty_void:
-        // Check tail expression type against declared return type
-        let compat = self.types_compatible(ret_type, body_ty)
+    else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_void and body_expected_ret != self.ty_void:
+        // Check tail expression type against body's expected return type
+        let compat = self.types_compatible(body_expected_ret as i32, body_ty as i32)
         if compat == 0:
-            let arith = self.arithmetic_result_type(ret_type, body_ty)
+            let arith = self.arithmetic_result_type(body_expected_ret as i32, body_ty as i32)
             if arith == 0:
-                // Implicit Ok wrapping: if ret_type is Result[T, E] and body_ty is compatible with T
+                // Implicit Ok wrapping: if body_expected_ret is Result[T, E] and body_ty is compatible with T
                 var ok_wrapped = false
-                let ret_resolved = self.resolve_alias(ret_type)
+                let ret_resolved = self.resolve_alias(body_expected_ret)
                 if self.get_type_kind(ret_resolved) == TypeKind.TY_GENERIC_INST:
                     let base_sym = self.get_generic_inst_base(ret_resolved)
                     if base_sym == self.syms.result and self.get_generic_inst_arg_count(ret_resolved) == 2:

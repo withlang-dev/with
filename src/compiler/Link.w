@@ -275,7 +275,9 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
         let use_rt_core = link_stage_should_use_rt_core(obj_path)
         let needs_llvm = link_stage_object_needs_llvm_bridge(obj_path)
         if use_rt_core:
-            // Pure With program (no c_import) — rt_core.o only
+            // Pure With program — rt_core.o + platform backend + support_runtime
+            // (support_runtime has weak stubs for runtime init/shutdown/fiber
+            //  that fiber.o overrides with strong definitions when linked)
             let rt_core_path = link_stage_find_runtime_object_path("rt_core.o")
             if rt_core_path.len() == 0:
                 with_eprint("error: missing rt_core.o")
@@ -286,6 +288,10 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 with_eprint("error: missing rt_darwin_aarch64.o")
                 return false
             extras.push(rt_platform_path)
+            let support_rt_path = link_stage_find_runtime_object_path("support_runtime.o")
+            if support_rt_path.len() > 0:
+                let support_ar = link_stage_make_archive(support_rt_path)
+                extras.push(if support_ar.len() > 0: support_ar else: support_rt_path)
         else if needs_llvm:
             // Compiler build (lld path) — helpers.o + support_runtime.o only.
             // lld doesn't tolerate duplicate symbols, and the compiler doesn't

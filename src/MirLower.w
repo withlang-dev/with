@@ -4153,18 +4153,29 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             return self.lower_expr(inner)
         return self.unit_operand()
 
-    // spawn expr → with_fiber_spawn(fn_ptr, arg) → returns task_id (i32)
+    // spawn expr → evaluate (the async fn call already spawns a fiber),
+    // then discard the Task handle (fire-and-forget)
     if kind == NodeKind.NK_SPAWN:
         let inner = self.ast.get_data0(node)
-        let inner_op = self.lower_expr(inner)
-        // The spawn result is the inner call's result for now
-        // (proper fiber spawn requires packaging fn+args as a fiber entry)
-        return inner_op
+        let _ = self.lower_expr(inner)
+        return self.unit_operand()
 
-    // expr.await → with_fiber_await(task_id) → returns result
+    // expr.await → suspend until fiber completes, return result
     if kind == NodeKind.NK_AWAIT:
         let inner = self.ast.get_data0(node)
-        return self.lower_expr(inner)
+        let task_op = self.lower_expr(inner)
+        let await_args: Vec[i32] = Vec.new()
+        await_args.push(task_op)
+        let await_args_id = self.body.new_call_args(await_args)
+        self.body.set_call_intrinsic(await_args_id, MirIntrinsic.MIR_INTRINSIC_FIBER_AWAIT)
+        self.body.set_call_ast_node(await_args_id, node)
+        let result_ty = self.expr_type(node)
+        let result_local = self.new_temp(result_ty)
+        let result_place = self.place_for_local(result_local)
+        let next_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), await_args_id, result_place, next_bb)
+        self.switch_to(next_bb)
+        return self.body.new_operand(OperandKind.OK_COPY, result_place)
 
     // yield expr → for now, just evaluate the expression (state machine transform is future work)
     if kind == NodeKind.NK_YIELD:
