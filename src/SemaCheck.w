@@ -1367,7 +1367,7 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         let can_discard_task = stmt_kind == NodeKind.NK_CALL or stmt_kind == NodeKind.NK_IDENT or stmt_kind == NodeKind.NK_GROUPED or stmt_kind == NodeKind.NK_ASYNC_BLOCK or stmt_kind == NodeKind.NK_TUPLE
         let is_discarded_task = can_discard_task and stmt_kind != NodeKind.NK_SPAWN and self.expr_is_task_value(stmt) != 0 and self.expr_is_scoped_task_value(stmt) == 0
         if is_discarded_task:
-            self.emit_warning("E0801: unused Task value", stmt)
+            self.emit_error("E0801: unused Task value", stmt)
         self.expire_dead_borrows_in_block(extra_start, stmt_count, i + 1, tail)
 
     var result: TypeId = self.ty_void

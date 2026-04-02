@@ -76,7 +76,7 @@ int32_t with_fiber_in_fiber(void) {
 }
 
 int32_t with_fiber_is_cancelled(void) {
-    return (current_fiber && current_fiber->cancel_requested) ? 1 : 0;
+    return (current_fiber && __atomic_load_n(&current_fiber->cancel_requested, __ATOMIC_ACQUIRE)) ? 1 : 0;
 }
 
 // Assembly-implemented context switch
@@ -218,7 +218,9 @@ static void fiber_trampoline(void) {
     // to the scheduler directly — we never reach the code below.
     current_fiber->entry(current_fiber->arg, current_fiber->result_buf);
     // Fiber function returned normally — mark as done.
-    current_fiber->state = FIBER_DONE;
+    // Release fence ensures result buffer write is visible before DONE flag.
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+    __atomic_store_n(&current_fiber->state, FIBER_DONE, __ATOMIC_RELEASE);
     // Store in completed list for await.
     if (completed_count < MAX_FIBERS) {
         completed[completed_count++] = current_fiber;
@@ -382,12 +384,12 @@ void with_runtime_run(void) {
     while (ready_head || steal_head) {
         Fiber *f = dequeue_any();
         if (!f) break;
-        f->state = FIBER_RUNNING;
+        __atomic_store_n(&f->state, FIBER_RUNNING, __ATOMIC_RELEASE);
         current_fiber = f;
         with_fiber_switch(&scheduler_ctx, &f->ctx);
         current_fiber = NULL;
         // After switch back, check state.
-        if (f->state == FIBER_SUSPENDED) {
+        if (__atomic_load_n(&f->state, __ATOMIC_ACQUIRE) == FIBER_SUSPENDED) {
             // Re-enqueue and alternate queues to simulate work-stealing churn.
             if ((scheduler_round++ & 1) == 0) enqueue_steal(f);
             else enqueue(f);
@@ -414,8 +416,8 @@ void with_runtime_run(void) {
 // Yield the current fiber (cooperative scheduling point).
 void with_fiber_yield(void) {
     if (!current_fiber) return;
-    if (current_fiber->cancel_requested) {
-        current_fiber->state = FIBER_DONE;
+    if (__atomic_load_n(&current_fiber->cancel_requested, __ATOMIC_ACQUIRE)) {
+        __atomic_store_n(&current_fiber->state, FIBER_DONE, __ATOMIC_RELEASE);
         current_fiber->result = -1;
         if (completed_count < MAX_FIBERS) {
             completed[completed_count++] = current_fiber;
@@ -423,7 +425,7 @@ void with_fiber_yield(void) {
         with_fiber_switch(&current_fiber->ctx, &scheduler_ctx);
         return;
     }
-    current_fiber->state = FIBER_SUSPENDED;
+    __atomic_store_n(&current_fiber->state, FIBER_SUSPENDED, __ATOMIC_RELEASE);
     with_fiber_switch(&current_fiber->ctx, &scheduler_ctx);
 }
 
@@ -431,11 +433,11 @@ void with_fiber_yield(void) {
 static void run_one_fiber(void) {
     Fiber *f = dequeue_any();
     if (!f) return;
-    f->state = FIBER_RUNNING;
+    __atomic_store_n(&f->state, FIBER_RUNNING, __ATOMIC_RELEASE);
     current_fiber = f;
     with_fiber_switch(&scheduler_ctx, &f->ctx);
     current_fiber = NULL;
-    if (f->state == FIBER_SUSPENDED) {
+    if (__atomic_load_n(&f->state, __ATOMIC_ACQUIRE) == FIBER_SUSPENDED) {
         if ((scheduler_round++ & 1) == 0) enqueue_steal(f);
         else enqueue(f);
     }
@@ -507,7 +509,7 @@ int32_t with_fiber_cancel(int32_t fiber_id) {
     Fiber *cur = ready_head;
     while (cur) {
         if (cur->id == fiber_id) {
-            cur->cancel_requested = 1;
+            __atomic_store_n(&cur->cancel_requested, 1, __ATOMIC_RELEASE);
             return 1;
         }
         cur = cur->next;
@@ -517,7 +519,7 @@ int32_t with_fiber_cancel(int32_t fiber_id) {
     cur = steal_head;
     while (cur) {
         if (cur->id == fiber_id) {
-            cur->cancel_requested = 1;
+            __atomic_store_n(&cur->cancel_requested, 1, __ATOMIC_RELEASE);
             return 1;
         }
         cur = cur->next;
@@ -525,7 +527,7 @@ int32_t with_fiber_cancel(int32_t fiber_id) {
 
     // Best-effort handling if current fiber cancels itself.
     if (current_fiber && current_fiber->id == fiber_id) {
-        current_fiber->cancel_requested = 1;
+        __atomic_store_n(&current_fiber->cancel_requested, 1, __ATOMIC_RELEASE);
         return 1;
     }
 
@@ -554,7 +556,7 @@ void with_fiber_panic_capture(const char *msg, int32_t msg_len) {
     current_fiber->panic_msg = buf;
     current_fiber->panic_msg_len = msg_len;
     // Mark fiber as done and switch back to scheduler
-    current_fiber->state = FIBER_DONE;
+    __atomic_store_n(&current_fiber->state, FIBER_DONE, __ATOMIC_RELEASE);
     if (completed_count < MAX_FIBERS) {
         completed[completed_count++] = current_fiber;
     }
