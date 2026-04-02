@@ -380,6 +380,7 @@ $(CANONICAL_BIN): $(STAGE2_BIN) $(RT_WITH_ARTIFACTS) | $(OUT_BIN_DIR)
 test: $(STAGE2_BIN)
 	./scripts/run_tests.sh
 	WITH=$(STAGE2_BIN) ./scripts/run_cli_selfhost_tests.sh
+	./scripts/run_issue61_noop_local_regression.sh
 
 fixpoint: $(STAGE3_BIN)
 	@diff "$(STAGE2_BIN)" "$(STAGE3_BIN)" && echo "FIXPOINT"
