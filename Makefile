@@ -31,10 +31,11 @@ GEN_STAMP := $(OUT_GEN_DIR)/.generated-stamp
 
 RUNTIME_LINK := $(OUT_BIN_DIR)/runtime
 EMBEDDED_STDLIB_INC := $(OUT_LIB_DIR)/embedded_stdlib.inc.h
-EMBEDDED_OBJECTS_INC := $(OUT_LIB_DIR)/embedded_objects.inc.h
+EMBEDDED_OBJECTS_ASM := $(OUT_LIB_DIR)/embedded_objects.s
 HELPERS_OBJ := $(OUT_LIB_DIR)/helpers.o
-SUPPORT_RUNTIME_OBJ := $(OUT_LIB_DIR)/support_runtime.o
-WITH_RUNTIME_OBJ := $(OUT_LIB_DIR)/with_runtime.o
+COMPAT_RUNTIME_OBJ := $(OUT_LIB_DIR)/compat_runtime.o
+PANIC_RUNTIME_OBJ := $(OUT_LIB_DIR)/panic_runtime.o
+FIBER_STUBS_OBJ := $(OUT_LIB_DIR)/fiber_stubs.o
 FIBER_OBJ := $(OUT_LIB_DIR)/fiber.o
 FIBER_ASM_OBJ := $(OUT_LIB_DIR)/fiber_asm.o
 EMBEDDED_OBJECTS_OBJ := $(OUT_LIB_DIR)/embedded_objects.o
@@ -43,6 +44,7 @@ CLANG_BRIDGE_OBJ := $(OUT_LIB_DIR)/clang_bridge.o
 LLVM_LINK_RSP := $(OUT_LIB_DIR)/llvm_link.rsp
 LLVM_CC_FILE := $(OUT_LIB_DIR)/llvm_cc
 LLVM_LINK_STAMP := $(OUT_LIB_DIR)/.llvm-link-ready
+RUNTIME_C_ALLOWLIST_STAMP := $(OUT_GEN_DIR)/.runtime-c-allowlist
 
 STAGE1_BIN := $(OUT_BIN_DIR)/with-stage1
 STAGE2_BIN := $(OUT_BIN_DIR)/with-stage2
@@ -92,8 +94,9 @@ RT_DARWIN_AARCH64_OBJ := $(OUT_LIB_DIR)/rt_darwin_aarch64.o
 # Core runtime artifacts (needed by the compiler itself — all C/asm)
 RUNTIME_ARTIFACTS := \
 	$(HELPERS_OBJ) \
-	$(SUPPORT_RUNTIME_OBJ) \
-	$(WITH_RUNTIME_OBJ) \
+	$(COMPAT_RUNTIME_OBJ) \
+	$(PANIC_RUNTIME_OBJ) \
+	$(FIBER_STUBS_OBJ) \
 	$(FIBER_OBJ) \
 	$(FIBER_ASM_OBJ) \
 	$(EMBEDDED_OBJECTS_OBJ) \
@@ -221,14 +224,29 @@ STD_SOURCES := $(shell find lib/std -name '*.w' 2>/dev/null)
 $(EMBEDDED_STDLIB_INC): scripts/generate_embedded_stdlib.py $(STD_SOURCES) | $(OUT_LIB_DIR)
 	@python3 "$(ROOT_DIR)/scripts/generate_embedded_stdlib.py" "$(ROOT_DIR)" "$@"
 
+$(RUNTIME_C_ALLOWLIST_STAMP): scripts/check_runtime_c_allowlist.sh $(wildcard runtime/*.c) | $(OUT_GEN_DIR)
+	@bash "$(ROOT_DIR)/scripts/check_runtime_c_allowlist.sh" \
+		runtime/clang_bridge.c \
+		runtime/fiber.c \
+		runtime/helpers.c \
+		runtime/llvm_bridge.c \
+		runtime/with_runtime.c
+	@touch "$@"
+
 $(HELPERS_OBJ): runtime/helpers.c $(EMBEDDED_STDLIB_INC) | $(OUT_LIB_DIR)
 	$(call HOST_COMPILE,-DWITH_HAS_CURL)
 
-$(SUPPORT_RUNTIME_OBJ): runtime/support_runtime.c | $(OUT_LIB_DIR)
-	$(call HOST_COMPILE,)
+$(COMPAT_RUNTIME_OBJ): rt/compat_runtime.w | $(OUT_LIB_DIR)
+	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(WITH_RUNTIME_OBJ): runtime/with_runtime.c | $(OUT_LIB_DIR)
-	$(call HOST_COMPILE,)
+$(PANIC_RUNTIME_OBJ): rt/panic_runtime.w | $(OUT_LIB_DIR)
+	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+
+$(FIBER_STUBS_OBJ): rt/fiber_stubs.w | $(OUT_LIB_DIR)
+	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
 $(FIBER_OBJ): runtime/fiber.c | $(OUT_LIB_DIR)
 	$(call HOST_COMPILE,)
@@ -244,10 +262,10 @@ $(RT_CORE_OBJ): rt/rt_core.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
 $(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
 	$(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
-$(EMBEDDED_OBJECTS_INC): scripts/embed_runtime_objects.sh $(HELPERS_OBJ) $(SUPPORT_RUNTIME_OBJ) $(WITH_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) | $(OUT_LIB_DIR)
+$(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(HELPERS_OBJ) $(COMPAT_RUNTIME_OBJ) $(PANIC_RUNTIME_OBJ) $(FIBER_STUBS_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) | $(OUT_LIB_DIR)
 	@bash "$(ROOT_DIR)/scripts/embed_runtime_objects.sh" "$(OUT_LIB_DIR)" "$@"
 
-$(EMBEDDED_OBJECTS_OBJ): runtime/embedded_objects.c $(EMBEDDED_OBJECTS_INC) | $(OUT_LIB_DIR)
+$(EMBEDDED_OBJECTS_OBJ): $(EMBEDDED_OBJECTS_ASM) | $(OUT_LIB_DIR)
 	$(call HOST_COMPILE,)
 
 $(LLVM_BRIDGE_OBJ): runtime/llvm_bridge.c | $(OUT_LIB_DIR)
@@ -306,7 +324,7 @@ $(LLVM_LINK_STAMP): $(LLVM_BRIDGE_OBJ) $(CLANG_BRIDGE_OBJ) | $(OUT_LIB_DIR)
 	echo "clang bridge: $(CLANG_BRIDGE_OBJ) (libclang c_import support)"; \
 	touch "$@"
 
-$(RUNTIME_LINK): $(RUNTIME_ARTIFACTS) | $(OUT_BIN_DIR)
+$(RUNTIME_LINK): $(RUNTIME_ARTIFACTS) $(RUNTIME_C_ALLOWLIST_STAMP) | $(OUT_BIN_DIR)
 	@if [ -L "$@" ]; then rm -f "$@"; elif [ -e "$@" ]; then rm -rf "$@"; fi
 	@ln -s ../lib "$@"
 
@@ -367,13 +385,13 @@ $(STAGE3_BIN): $(STAGE2_BIN) $(GEN_STAMP) $(RUNTIME_LINK)
 	$(call build_stage,$(STAGE2_BIN),stage3,$(STAGE_BUILD_TMP),-O0)
 
 # Build the canonical binary with embedded runtime objects.
-# Phase 1 (during EMBEDDED_OBJECTS_INC): embeds C-compiled objects (helpers, etc.)
+# Phase 1 (during EMBEDDED_OBJECTS_ASM): embeds C-compiled objects (helpers, etc.)
 # Phase 2 (here): re-embeds with With-compiled rt_core + rt_darwin_aarch64,
-# recompiles embedded_objects.c, and has the compiler re-link itself.
+# recompiles the generated assembly payload, and has the compiler re-link itself.
 $(CANONICAL_BIN): $(STAGE2_BIN) $(RT_WITH_ARTIFACTS) | $(OUT_BIN_DIR)
 	@rm -f "$@" && rm -rf "$@.dSYM"
-	@bash "$(ROOT_DIR)/scripts/embed_runtime_objects.sh" "$(OUT_LIB_DIR)" "$(EMBEDDED_OBJECTS_INC)"
-	@$(HOST_CC) -c -O2 -o "$(EMBEDDED_OBJECTS_OBJ)" runtime/embedded_objects.c -I.
+	@bash "$(ROOT_DIR)/scripts/embed_runtime_objects.sh" "$(OUT_LIB_DIR)" "$(EMBEDDED_OBJECTS_ASM)"
+	@$(HOST_CC) -c -O2 -o "$(EMBEDDED_OBJECTS_OBJ)" "$(EMBEDDED_OBJECTS_ASM)"
 	@WITH_OUT_DIR="$(ROOT_DIR)/out" $(STAGE2_BIN) build $(GEN_MAIN_ENTRY) -O0 -o "$@"
 	@echo "build complete: $@"
 
@@ -381,6 +399,7 @@ test: $(STAGE2_BIN)
 	./scripts/run_tests.sh
 	WITH=$(STAGE2_BIN) ./scripts/run_cli_selfhost_tests.sh
 	./scripts/run_issue61_noop_local_regression.sh
+	./scripts/run_embedded_runtime_extract_regression.sh
 
 fixpoint: $(STAGE3_BIN)
 	@diff "$(STAGE2_BIN)" "$(STAGE3_BIN)" && echo "FIXPOINT"
@@ -401,6 +420,5 @@ update-seed: fixpoint
 
 clean:
 	rm -rf "$(OUT)/"
-	rm -f runtime/embedded_objects.inc.h
 
 FORCE:
