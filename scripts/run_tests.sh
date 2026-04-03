@@ -79,6 +79,7 @@ run_single_test() {
   local expect_build_fail=""
   local expect_check_stdout=""
   local expect_exit=""
+  local expect_stderr=""
   local check_only=0
   local extra_args=""
   local name
@@ -131,6 +132,9 @@ run_single_test() {
         ;;
       "//! expect-exit: "*)
         expect_exit="${line#//! expect-exit: }"
+        ;;
+      "//! expect-stderr: "*)
+        expect_stderr="${line#//! expect-stderr: }"
         ;;
       "//!"*)
         ;;
@@ -220,18 +224,27 @@ run_single_test() {
   fi
 
   if [[ -n "$expect_exit" ]]; then
-    # Expected non-zero exit code (e.g. panic tests)
-    if [[ "$rc" -eq "$expect_exit" ]]; then
-      if [[ -z "$expect_stdout" ]] || grep -Fq "$expect_stdout" "$my_tmp/out"; then
-        _emit_result "PASS $name"
-      else
-        local got
-        got="$(head -1 "$my_tmp/out" 2>/dev/null || echo "(empty)")"
-        _emit_result "FAIL $name (stdout mismatch, expected: $expect_stdout, got: $got)"
-      fi
-    else
+    # Expected non-zero exit code (e.g. panic tests, stack overflow)
+    if [[ "$rc" -ne "$expect_exit" ]]; then
       _emit_result "FAIL $name (exit code $rc, expected $expect_exit)"
+      rm -rf "$my_tmp"
+      return
     fi
+    if [[ -n "$expect_stdout" ]] && ! grep -Fq "$expect_stdout" "$my_tmp/out"; then
+      local got
+      got="$(head -1 "$my_tmp/out" 2>/dev/null || echo "(empty)")"
+      _emit_result "FAIL $name (stdout mismatch, expected: $expect_stdout, got: $got)"
+      rm -rf "$my_tmp"
+      return
+    fi
+    if [[ -n "$expect_stderr" ]] && ! grep -Fq "$expect_stderr" "$my_tmp/err"; then
+      local got_err
+      got_err="$(head -1 "$my_tmp/err" 2>/dev/null || echo "(empty)")"
+      _emit_result "FAIL $name (stderr mismatch, expected: $expect_stderr, got: $got_err)"
+      rm -rf "$my_tmp"
+      return
+    fi
+    _emit_result "PASS $name"
     rm -rf "$my_tmp"
     return
   fi
