@@ -2469,6 +2469,20 @@ fn MirBuilder.lower_single_await(self: MirBuilder, task_op: i32, result_ty: i32,
     self.switch_to(normal_bb)
     self.body.new_operand(OperandKind.OK_COPY, result_place)
 
+// Join a Task purely for cleanup: await completion and free its result buffer,
+// but do not propagate child-cancel status into the current fiber.
+fn MirBuilder.lower_cleanup_await(self: MirBuilder, task_op: i32, node: i32):
+    let await_args: Vec[i32] = Vec.new()
+    await_args.push(task_op)
+    let await_args_id = self.body.new_call_args(await_args)
+    self.body.set_call_intrinsic(await_args_id, MirIntrinsic.MIR_INTRINSIC_FIBER_AWAIT)
+    self.body.set_call_ast_node(await_args_id, node)
+    let ignored_local = self.new_temp(self.sema.ty_void as i32)
+    let ignored_place = self.place_for_local(ignored_local)
+    let after_await_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, self.unit_operand(), await_args_id, ignored_place, after_await_bb)
+    self.switch_to(after_await_bb)
+
 fn MirBuilder.lower_unreachable(self: MirBuilder) -> i32:
     self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
     self.switch_to(self.new_block())
@@ -4436,7 +4450,8 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             for li in 0..arm_count:
                 if li != ai:
                     let cancel_args: Vec[i32] = Vec.new()
-                    cancel_args.push(task_ops.get(li as i64))
+                    let loser_task = task_ops.get(li as i64)
+                    cancel_args.push(loser_task)
                     let cancel_call_id = self.body.new_call_args(cancel_args)
                     self.body.set_call_intrinsic(cancel_call_id, MirIntrinsic.MIR_INTRINSIC_FIBER_CANCEL)
                     self.body.set_call_ast_node(cancel_call_id, node)
@@ -4445,6 +4460,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                     let after_cancel_bb = self.new_block()
                     self.terminate(TermKind.TK_CALL, self.unit_operand(), cancel_call_id, cancel_result_place, after_cancel_bb)
                     self.switch_to(after_cancel_bb)
+                    self.lower_cleanup_await(loser_task, node)
 
             // Execute arm body
             let body_op = self.lower_expr(arm_body)
