@@ -296,7 +296,7 @@ $(RUNTIME_C_ALLOWLIST_STAMP): scripts/check_runtime_c_allowlist.sh $(wildcard ru
 	@touch "$@"
 
 $(HELPERS_OBJ): runtime/helpers.c | $(OUT_LIB_DIR)
-	$(call HOST_COMPILE,-DWITH_HAS_CURL)
+	$(call HOST_COMPILE,)
 
 $(COMPAT_RUNTIME_OBJ): $(COMPAT_RUNTIME_SRC) | $(OUT_LIB_DIR)
 	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi

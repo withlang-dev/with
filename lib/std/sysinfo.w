@@ -1,7 +1,7 @@
 // std.sysinfo — System information (OS, architecture, hostname)
 //
-// Pure With module backed by runtime C functions.
-// No external dependencies.
+// Pure With module backed by runtime exports.
+// No direct external dependencies.
 
 extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
