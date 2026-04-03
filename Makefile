@@ -110,6 +110,7 @@ RUNTIME_ARTIFACTS := \
 
 # With-language runtime objects (compiled by the With compiler, built after stage2)
 RT_WITH_ARTIFACTS := $(RT_CORE_OBJ) $(RT_DARWIN_AARCH64_OBJ)
+RT_WITH_REFRESH_STAMP := $(OUT_GEN_DIR)/.runtime-with-refresh
 
 # Version resolution:
 #   Source of truth: src/version (e.g., "v0.12.0")
@@ -274,6 +275,14 @@ $(RT_CORE_OBJ): rt/rt_core.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
 $(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
 	$(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
+$(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) rt/compat_runtime.w rt/panic_runtime.w rt/fiber_stubs.w rt/channel_runtime.w rt/fiber_runtime.w | $(OUT_LIB_DIR) $(OUT_GEN_DIR)
+	$(STAGE2_BIN) build rt/compat_runtime.w --emit-obj --no-prelude -O0 -o $(COMPAT_RUNTIME_OBJ)
+	$(STAGE2_BIN) build rt/panic_runtime.w --emit-obj --no-prelude -O0 -o $(PANIC_RUNTIME_OBJ)
+	$(STAGE2_BIN) build rt/fiber_stubs.w --emit-obj --no-prelude -O0 -o $(FIBER_STUBS_OBJ)
+	$(STAGE2_BIN) build rt/channel_runtime.w --emit-obj --no-prelude -O0 -o $(CHANNEL_RUNTIME_OBJ)
+	$(STAGE2_BIN) build rt/fiber_runtime.w --emit-obj --no-prelude -O0 -o $(FIBER_RUNTIME_OBJ)
+	@touch "$@"
+
 $(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(HELPERS_OBJ) $(COMPAT_RUNTIME_OBJ) $(PANIC_RUNTIME_OBJ) $(FIBER_STUBS_OBJ) $(CHANNEL_RUNTIME_OBJ) $(FIBER_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) | $(OUT_LIB_DIR)
 	@bash "$(ROOT_DIR)/scripts/embed_runtime_objects.sh" "$(OUT_LIB_DIR)" "$@"
 
@@ -400,7 +409,7 @@ $(STAGE3_BIN): $(STAGE2_BIN) $(GEN_STAMP) $(RUNTIME_LINK)
 # Phase 1 (during EMBEDDED_OBJECTS_ASM): embeds C-compiled objects (helpers, etc.)
 # Phase 2 (here): re-embeds with With-compiled rt_core + rt_darwin_aarch64,
 # recompiles the generated assembly payload, and has the compiler re-link itself.
-$(CANONICAL_BIN): $(STAGE2_BIN) $(RT_WITH_ARTIFACTS) | $(OUT_BIN_DIR)
+$(CANONICAL_BIN): $(STAGE2_BIN) $(RT_WITH_ARTIFACTS) $(RT_WITH_REFRESH_STAMP) | $(OUT_BIN_DIR)
 	@rm -f "$@" && rm -rf "$@.dSYM"
 	@bash "$(ROOT_DIR)/scripts/embed_runtime_objects.sh" "$(OUT_LIB_DIR)" "$(EMBEDDED_OBJECTS_ASM)"
 	@$(HOST_CC) -c -O2 -o "$(EMBEDDED_OBJECTS_OBJ)" "$(EMBEDDED_OBJECTS_ASM)"

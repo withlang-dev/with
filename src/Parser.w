@@ -734,7 +734,7 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     let fn_node = self.pool.add_node(NodeKind.NK_FN_DECL, start, self.pool.get_end(body), name, final_body, flags)
     let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT
     // @[c_export("name")] on non-extern fn: store callconv in tp_start slot
-    var final_tp_start = tp_start
+    var final_tp_start = if tp_count > 0: tp_start else: 0
     var final_tp_count = tp_count
     if self.pending_callconv != 0 and tp_count == 0:
         final_tp_start = self.pending_callconv
@@ -2167,7 +2167,8 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
 
         let fn_node = self.pool.add_node(NodeKind.NK_FN_DECL, method_start, self.prev_end(), mangled, body, flags)
         let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT
-        self.pool.add_fn_meta(fn_node, meta_flags, ret_type, m_params_start, param_count, m_tp_start, m_tp_count)
+        let final_m_tp_start = if m_tp_count > 0: m_tp_start else: 0
+        self.pool.add_fn_meta(fn_node, meta_flags, ret_type, m_params_start, param_count, final_m_tp_start, m_tp_count)
         self.pool.add_decl(fn_node)
         method_count = method_count + 1
         self.skip_newlines()

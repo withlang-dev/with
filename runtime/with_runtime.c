@@ -9,14 +9,37 @@
 #include <stdlib.h>
 
 extern void with_fiber_panic_capture(const char *msg, int32_t msg_len);
+extern void with_runtime_core_init(void) __attribute__((weak));
+extern void with_runtime_core_shutdown(void) __attribute__((weak));
+extern int32_t with_runtime_core_has_fibers(void) __attribute__((weak));
+extern void with_runtime_core_run_one_step(void) __attribute__((weak));
 
 __attribute__((weak)) void with_runtime_init(void) {
+    if (with_runtime_core_init) {
+        with_runtime_core_init();
+    }
 }
 
 __attribute__((weak)) void with_runtime_run(void) {
 }
 
 __attribute__((weak)) void with_runtime_shutdown(void) {
+    if (with_runtime_core_shutdown) {
+        with_runtime_core_shutdown();
+    }
+}
+
+__attribute__((weak)) int32_t with_runtime_has_fibers(void) {
+    if (with_runtime_core_has_fibers) {
+        return with_runtime_core_has_fibers();
+    }
+    return 0;
+}
+
+__attribute__((weak)) void with_runtime_run_one_step(void) {
+    if (with_runtime_core_run_one_step) {
+        with_runtime_core_run_one_step();
+    }
 }
 
 __attribute__((weak)) int32_t with_fiber_is_cancelled(void) {
