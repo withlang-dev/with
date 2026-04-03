@@ -462,6 +462,110 @@ Phase 4.
 
 ---
 
+## Current Migration Checklist — Legacy Runtime C Elimination
+
+This checklist tracks the active repository migration from handwritten
+runtime C to `With + assembly`. It is distinct from the platform-backend
+phases above.
+
+### Status
+
+- [x] Embedded runtime extraction moved out of C and into the compiler/link path
+- [x] `support_runtime.c` removed
+- [x] `embedded_objects.c` removed
+- [x] Native fiber core moved out of `runtime/fiber.c` into `rt/*.w`
+- [x] Embedded stdlib ownership moved out of `runtime/helpers.c`
+- [x] argv/env/process/system/tar-extract compatibility surface moved out of `runtime/helpers.c`
+- [x] Sysinfo ownership moved out of `runtime/helpers.c`
+- [ ] `runtime/helpers.c` drained completely
+- [ ] `runtime/with_runtime.c` reduced to zero or replaced by generated `With`-owned runtime output
+- [ ] `runtime/with_runtime.h` replaced by generated declarations
+- [ ] Only `runtime/llvm_bridge.c` and `runtime/clang_bridge.c` remain as handwritten C
+
+### Rules For This Checklist
+
+- One subsystem per commit.
+- No net-new feature work in handwritten C.
+- C may only change to:
+  - delete migrated code
+  - narrow a low-level boundary
+  - fix a root-cause correctness bug blocking the migration
+- After each subsystem slice:
+  - `make build`
+  - `make selfcheck`
+  - `make smoke`
+  - `make fixpoint`
+
+### Remaining Stage-5 Work
+
+#### 5.1 Duplicate Cleanup — Small, Low-Risk
+
+- [ ] Remove legacy codegen loop-state shims from `runtime/helpers.c`
+      Owner already exists in `rt/rt_core.w`.
+- [ ] Remove legacy string-builder shims from `runtime/helpers.c`
+      Owner already exists in `rt/rt_core.w`.
+- [ ] Remove duplicate bitwise/clock helpers from `runtime/helpers.c`
+      Owner already exists in `rt/rt_core.w`.
+
+#### 5.2 Duplicate Cleanup — Medium
+
+- [ ] Remove duplicate fs/random/stdin/stdout helpers from `runtime/helpers.c`
+      Owners already exist in `rt/rt_core.w` and `rt/compat_runtime.w`.
+- [ ] Remove duplicate vec compatibility helpers from `runtime/helpers.c`
+      Owner already exists in `rt/rt_core.w`.
+- [ ] Remove duplicate formatting helpers from `runtime/helpers.c`
+      Owner already exists in `rt/rt_core.w`.
+- [ ] Remove duplicate string algorithm helpers from `runtime/helpers.c`
+      Owner already exists in `rt/rt_core.w`.
+- [ ] Remove duplicate hashmap helpers from `runtime/helpers.c`
+      Owner already exists in `rt/rt_core.w`.
+
+#### 5.3 Real Migrations — No Existing With Owner Yet
+
+- [ ] Move the networking surface out of `runtime/helpers.c`
+      Surface:
+      `with_net_tcp_listen`, `with_net_tcp_accept`, `with_net_tcp_connect`,
+      `with_net_send`, `with_net_recv`, `with_net_close`, `with_net_udp_bind`
+- [ ] Decide and implement ownership for the `with_cimport_*` weak-stub family
+      Current location: `runtime/helpers.c`
+      Constraint: this must stay bootstrap-safe and must not depend on clang
+      in the runtime path
+
+#### 5.4 Shim Cleanup After helpers.c Drain
+
+- [ ] Audit `runtime/with_runtime.c` and remove anything now owned by `rt/*.w`
+- [ ] Replace handwritten `runtime/with_runtime.h` with generated declarations
+- [ ] Tighten the runtime C allowlist so only bridge C remains
+
+### Commit Order
+
+Work in this order unless a root-cause bug forces a different dependency:
+
+1. Codegen loop-state shims
+2. String builder
+3. Bitwise + clock helpers
+4. fs/random/stdin/stdout compatibility
+5. Vec compatibility
+6. Formatting helpers
+7. String algorithms
+8. HashMap
+9. Networking
+10. `with_cimport_*` weak stubs
+11. `with_runtime.c` / `with_runtime.h` cleanup
+
+### Definition of Done
+
+This migration track is done when:
+
+- `runtime/helpers.c` is deleted or empty
+- `runtime/with_runtime.c` is deleted or replaced by generated output
+- `runtime/with_runtime.h` is generated, not handwritten
+- the runtime C allowlist contains only:
+  - `runtime/llvm_bridge.c`
+  - `runtime/clang_bridge.c`
+
+---
+
 ## File Layout
 
 ```
