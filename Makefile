@@ -37,6 +37,7 @@ COMPAT_RUNTIME_OBJ := $(OUT_LIB_DIR)/compat_runtime.o
 PANIC_RUNTIME_OBJ := $(OUT_LIB_DIR)/panic_runtime.o
 FIBER_STUBS_OBJ := $(OUT_LIB_DIR)/fiber_stubs.o
 CHANNEL_RUNTIME_OBJ := $(OUT_LIB_DIR)/channel_runtime.o
+FIBER_RUNTIME_OBJ := $(OUT_LIB_DIR)/fiber_runtime.o
 FIBER_OBJ := $(OUT_LIB_DIR)/fiber.o
 FIBER_ASM_OBJ := $(OUT_LIB_DIR)/fiber_asm.o
 EMBEDDED_OBJECTS_OBJ := $(OUT_LIB_DIR)/embedded_objects.o
@@ -99,6 +100,7 @@ RUNTIME_ARTIFACTS := \
 	$(PANIC_RUNTIME_OBJ) \
 	$(FIBER_STUBS_OBJ) \
 	$(CHANNEL_RUNTIME_OBJ) \
+	$(FIBER_RUNTIME_OBJ) \
 	$(FIBER_OBJ) \
 	$(FIBER_ASM_OBJ) \
 	$(EMBEDDED_OBJECTS_OBJ) \
@@ -254,6 +256,10 @@ $(CHANNEL_RUNTIME_OBJ): rt/channel_runtime.w | $(OUT_LIB_DIR)
 	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
+$(FIBER_RUNTIME_OBJ): rt/fiber_runtime.w | $(OUT_LIB_DIR)
+	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+
 $(FIBER_OBJ): runtime/fiber.c | $(OUT_LIB_DIR)
 	$(call HOST_COMPILE,)
 
@@ -268,7 +274,7 @@ $(RT_CORE_OBJ): rt/rt_core.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
 $(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
 	$(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
-$(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(HELPERS_OBJ) $(COMPAT_RUNTIME_OBJ) $(PANIC_RUNTIME_OBJ) $(FIBER_STUBS_OBJ) $(CHANNEL_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) | $(OUT_LIB_DIR)
+$(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(HELPERS_OBJ) $(COMPAT_RUNTIME_OBJ) $(PANIC_RUNTIME_OBJ) $(FIBER_STUBS_OBJ) $(CHANNEL_RUNTIME_OBJ) $(FIBER_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) | $(OUT_LIB_DIR)
 	@bash "$(ROOT_DIR)/scripts/embed_runtime_objects.sh" "$(OUT_LIB_DIR)" "$@"
 
 $(EMBEDDED_OBJECTS_OBJ): $(EMBEDDED_OBJECTS_ASM) | $(OUT_LIB_DIR)

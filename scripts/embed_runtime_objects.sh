@@ -50,6 +50,7 @@ emit_blob() {
   emit_blob "panic_runtime.o" "panic_runtime_o"
   emit_blob "fiber_stubs.o" "fiber_stubs_o"
   emit_blob "channel_runtime.o" "channel_runtime_o"
+  emit_blob "fiber_runtime.o" "fiber_runtime_o"
   emit_blob "fiber.o" "fiber_o"
   emit_blob "fiber_asm.o" "fiber_asm_o"
   emit_blob "rt_core.o" "rt_core_o"

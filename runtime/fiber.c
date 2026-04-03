@@ -74,7 +74,7 @@ int32_t with_fiber_in_fiber(void) {
     return current_fiber != NULL;
 }
 
-int32_t with_fiber_is_cancelled(void) {
+int32_t with_runtime_current_cancel_requested(void) {
     return (current_fiber && __atomic_load_n(&current_fiber->cancel_requested, __ATOMIC_ACQUIRE)) ? 1 : 0;
 }
 
@@ -487,18 +487,9 @@ void with_fiber_await(int32_t fiber_id) {
     }
 }
 
-// Cancel a fiber by ID.
-// Returns 1 if canceled/found, 0 if the fiber ID is unknown.
-int32_t with_fiber_cancel(int32_t fiber_id) {
-    // If already completed, keep it in the completed list so a later await can
-    // still observe and drain it. `cancel()` is only a request; the await/drain
-    // path owns final recycling.
-    for (int i = 0; i < completed_count; i++) {
-        if (completed[i] && completed[i]->id == fiber_id) {
-            return 1;
-        }
-    }
-
+// Request cancellation for a non-completed fiber by ID.
+// Returns 1 if the fiber was found in a runnable/current location, 0 otherwise.
+int32_t with_runtime_request_cancel(int32_t fiber_id) {
     // Remove from ready queue if present.
     Fiber *cur = ready_head;
     while (cur) {
@@ -536,14 +527,13 @@ void with_fiber_set_result(int64_t value) {
 }
 
 // Cancellation propagation: set cancelled_return flag on current fiber.
-// Called by unwind path before returning from a cancelled fiber.
-void with_fiber_set_cancelled_return(void) {
+void with_runtime_current_set_cancelled_return(void) {
     if (!current_fiber) return;
     __atomic_store_n(&current_fiber->cancelled_return, 1, __ATOMIC_RELEASE);
 }
 
 // Check if a completed fiber returned due to cancellation (not normal completion).
-int32_t with_fiber_was_cancelled_return(int32_t fiber_id) {
+int32_t with_runtime_completed_cancelled_return(int32_t fiber_id) {
     for (int i = 0; i < completed_count; i++) {
         if (completed[i] && completed[i]->id == fiber_id)
             return __atomic_load_n(&completed[i]->cancelled_return, __ATOMIC_ACQUIRE);
@@ -552,7 +542,7 @@ int32_t with_fiber_was_cancelled_return(int32_t fiber_id) {
 }
 
 // Request self-cancellation (used when propagating child cancellation upward).
-void with_fiber_request_cancel_self(void) {
+void with_runtime_current_set_cancel_requested(void) {
     if (!current_fiber) return;
     __atomic_store_n(&current_fiber->cancel_requested, 1, __ATOMIC_RELEASE);
 }
@@ -617,6 +607,15 @@ void with_runtime_run_one_step(void) {
     }
 }
 
+int32_t with_runtime_fiber_is_completed(int32_t fiber_id) {
+    for (int i = 0; i < completed_count; i++) {
+        if (completed[i] && completed[i]->id == fiber_id) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 // Debug/introspection helpers for validating pool reuse behavior.
 int64_t with_fiber_pool_reuses(void) {
     return fiber_pool_reuse_count;
@@ -640,36 +639,4 @@ int32_t with_fiber_live_fibers(void) {
 
 int64_t with_fiber_steal_events(void) {
     return fiber_steal_events;
-}
-
-// ── Select Await ────────────────────────────────────────────────────
-
-// Select await: wait for the first of N fibers to complete.
-// Takes an array of fiber IDs, count, and pointer to store winner index.
-// Writes the 0-based index of the first completed fiber to *result_index.
-// The caller is responsible for loading the result from the winning task's
-// result buffer and cancelling/freeing the losers.
-void with_fiber_select(int32_t *fiber_ids, int32_t count, int32_t *result_index) {
-    while (1) {
-        // Check if any of the target fibers are completed.
-        for (int i = 0; i < count; i++) {
-            for (int j = 0; j < completed_count; j++) {
-                if (completed[j] && completed[j]->id == fiber_ids[i]) {
-                    *result_index = i;
-                    return;
-                }
-            }
-        }
-        // None done yet — yield or run a fiber.
-        if (current_fiber) {
-            with_fiber_yield();
-        } else {
-            if (with_runtime_has_fibers()) {
-                run_one_fiber();
-            } else {
-                *result_index = -1; // deadlock
-                return;
-            }
-        }
-    }
 }
