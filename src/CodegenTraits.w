@@ -1388,6 +1388,19 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
                 return
     let val = self.try_eval_const_int(value_node)
     if val != CONST_EVAL_FAIL():
+        if resolved_binding_ty != 0:
+            let binding_kind = self.sema.get_type_kind(resolved_binding_ty)
+            if binding_kind == TypeKind.TY_PTR or binding_kind == TypeKind.TY_REF:
+                let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
+                if global_ty != 0 and val == 0:
+                    let name_str = self.intern.resolve(name_sym)
+                    let global = wl_add_global(self.llmod, global_ty, name_str)
+                    wl_set_initializer(global, wl_const_null(global_ty))
+                    if is_mut == 0:
+                        wl_set_global_constant(global, 1)
+                    wl_set_linkage(global, wl_internal_linkage())
+                    self.module_constants.insert(name_sym, global)
+                    return
         if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TypeKind.TY_FLOAT:
             let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
             let name_str = self.intern.resolve(name_sym)
