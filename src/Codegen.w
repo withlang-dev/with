@@ -103,6 +103,7 @@ extern fn wl_get_undef(ty: i64) -> i64
 extern fn wl_const_string(ctx: i64, s: str, dont_null: i32) -> i64
 extern fn wl_const_struct(ctx: i64, vals_ptr: i64, count: i32, packed: i32) -> i64
 extern fn wl_const_named_struct(ty: i64, vals_ptr: i64, count: i32) -> i64
+extern fn wl_const_array(elem_ty: i64, vals_ptr: i64, count: i32) -> i64
 extern fn wl_const_bitcast(val: i64, ty: i64) -> i64
 extern fn wl_const_int_sext_val(v: i64) -> i64
 extern fn wl_is_constant(v: i64) -> i32
@@ -2463,6 +2464,13 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
         if cg_sym != 0:
             return self.resolve_named_type(cg_sym)
         return self.resolve_named_type(sym)
+    if tk == TypeKind.TY_ARRAY:
+        let elem_tid = self.sema.get_type_d0(resolved_tid)
+        let arr_len = self.sema.get_type_d1(resolved_tid)
+        var elem_ty = self.sema_type_to_llvm(elem_tid)
+        if elem_ty == 0:
+            elem_ty = self.type_fallback()
+        return wl_array_type(elem_ty, arr_len as i64)
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
         return wl_ptr_type(self.context)
     0

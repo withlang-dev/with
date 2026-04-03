@@ -15,6 +15,7 @@ LLVM_CC_BIN := $(LLVM_PREFIX)/bin/clang
 LLVM_CONFIG_BIN := $(LLVM_PREFIX)/bin/llvm-config
 HOST_CC ?= cc
 SDK_PATH := $(shell xcrun --show-sdk-path 2>/dev/null || true)
+UNAME_S := $(shell uname -s)
 UNAME_M := $(shell uname -m)
 
 OUT_BIN_DIR := $(OUT)/bin
@@ -86,6 +87,9 @@ endif
 ifeq ($(filter $(UNAME_M),x86_64 amd64),$(UNAME_M))
 FIBER_ASM_SRC := runtime/fiber_asm_x86_64.s
 endif
+ifeq ($(UNAME_S),Darwin)
+FIBER_CORE_SRC := rt/fiber_core_darwin.w
+endif
 
 LIBCLANG_FILE := $(firstword $(wildcard $(LLVM_PREFIX)/lib/libclang.dylib) $(wildcard $(LLVM_PREFIX)/lib/libclang.so))
 
@@ -93,7 +97,7 @@ LIBCLANG_FILE := $(firstword $(wildcard $(LLVM_PREFIX)/lib/libclang.dylib) $(wil
 RT_CORE_OBJ := $(OUT_LIB_DIR)/rt_core.o
 RT_DARWIN_AARCH64_OBJ := $(OUT_LIB_DIR)/rt_darwin_aarch64.o
 
-# Core runtime artifacts (needed by the compiler itself — all C/asm)
+# Core runtime artifacts needed by the compiler itself.
 RUNTIME_ARTIFACTS := \
 	$(HELPERS_OBJ) \
 	$(COMPAT_RUNTIME_OBJ) \
@@ -232,7 +236,6 @@ $(EMBEDDED_STDLIB_INC): scripts/generate_embedded_stdlib.py $(STD_SOURCES) | $(O
 $(RUNTIME_C_ALLOWLIST_STAMP): scripts/check_runtime_c_allowlist.sh $(wildcard runtime/*.c) | $(OUT_GEN_DIR)
 	@bash "$(ROOT_DIR)/scripts/check_runtime_c_allowlist.sh" \
 		runtime/clang_bridge.c \
-		runtime/fiber.c \
 		runtime/helpers.c \
 		runtime/llvm_bridge.c \
 		runtime/with_runtime.c
@@ -261,8 +264,10 @@ $(FIBER_RUNTIME_OBJ): rt/fiber_runtime.w | $(OUT_LIB_DIR)
 	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(FIBER_OBJ): runtime/fiber.c | $(OUT_LIB_DIR)
-	$(call HOST_COMPILE,)
+$(FIBER_OBJ): $(FIBER_CORE_SRC) | $(OUT_LIB_DIR)
+	@if [ -z "$(FIBER_CORE_SRC)" ]; then echo "error: unsupported host platform $(UNAME_S)/$(UNAME_M) for fiber runtime" >&2; exit 1; fi
+	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
 $(FIBER_ASM_OBJ): $(FIBER_ASM_SRC) | $(OUT_LIB_DIR)
 	@if [ -z "$(FIBER_ASM_SRC)" ]; then echo "error: unsupported host architecture $(UNAME_M) for fiber_asm.o" >&2; exit 1; fi
@@ -275,12 +280,13 @@ $(RT_CORE_OBJ): rt/rt_core.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
 $(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
 	$(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
-$(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) rt/compat_runtime.w rt/panic_runtime.w rt/fiber_stubs.w rt/channel_runtime.w rt/fiber_runtime.w | $(OUT_LIB_DIR) $(OUT_GEN_DIR)
+$(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) rt/compat_runtime.w rt/panic_runtime.w rt/fiber_stubs.w rt/channel_runtime.w rt/fiber_runtime.w $(FIBER_CORE_SRC) | $(OUT_LIB_DIR) $(OUT_GEN_DIR)
 	$(STAGE2_BIN) build rt/compat_runtime.w --emit-obj --no-prelude -O0 -o $(COMPAT_RUNTIME_OBJ)
 	$(STAGE2_BIN) build rt/panic_runtime.w --emit-obj --no-prelude -O0 -o $(PANIC_RUNTIME_OBJ)
 	$(STAGE2_BIN) build rt/fiber_stubs.w --emit-obj --no-prelude -O0 -o $(FIBER_STUBS_OBJ)
 	$(STAGE2_BIN) build rt/channel_runtime.w --emit-obj --no-prelude -O0 -o $(CHANNEL_RUNTIME_OBJ)
 	$(STAGE2_BIN) build rt/fiber_runtime.w --emit-obj --no-prelude -O0 -o $(FIBER_RUNTIME_OBJ)
+	$(STAGE2_BIN) build $(FIBER_CORE_SRC) --emit-obj --no-prelude -O0 -o $(FIBER_OBJ)
 	@touch "$@"
 
 $(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(HELPERS_OBJ) $(COMPAT_RUNTIME_OBJ) $(PANIC_RUNTIME_OBJ) $(FIBER_STUBS_OBJ) $(CHANNEL_RUNTIME_OBJ) $(FIBER_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) | $(OUT_LIB_DIR)

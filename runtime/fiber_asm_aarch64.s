@@ -24,6 +24,8 @@
 
 .globl _with_fiber_switch
 .globl with_fiber_switch
+.globl _with_fiber_prepare_initial_context
+.globl with_fiber_prepare_initial_context
 .p2align 2
 _with_fiber_switch:
 with_fiber_switch:
@@ -63,3 +65,33 @@ with_fiber_switch:
     ldp d14, d15, [x1, #152]
 
     ret
+
+.p2align 2
+_with_fiber_prepare_initial_context:
+with_fiber_prepare_initial_context:
+    // x0 = context pointer
+    // x1 = usable stack base
+    // x2 = usable stack size
+    add x3, x1, x2
+    and x3, x3, #-16
+    str x3, [x0, #96]              // sp
+    str x3, [x0, #80]              // x29/fp
+    adrp x4, _with_fiber_start@PAGE
+    add  x4, x4, _with_fiber_start@PAGEOFF
+    str x4, [x0, #88]              // x30/lr
+    ret
+
+.globl _with_fiber_start
+.p2align 2
+_with_fiber_start:
+    sub sp, sp, #32
+    mov x0, sp
+    add x1, sp, #8
+    add x2, sp, #16
+    bl _with_fiber_bootstrap_load
+    ldr x9, [sp]
+    ldr x0, [sp, #8]
+    ldr x1, [sp, #16]
+    blr x9
+    bl _with_fiber_bootstrap_finish
+    brk #0

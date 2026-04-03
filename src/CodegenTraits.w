@@ -1164,6 +1164,8 @@ fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
         return self.try_eval_const_int(self.pool.get_data0(node))
     if kind == NodeKind.NK_GROUPED:
         return self.try_eval_const_int(self.pool.get_data0(node))
+    if kind == NodeKind.NK_CAST:
+        return self.try_eval_const_int(self.pool.get_data0(node))
     if kind == NodeKind.NK_BOOL_LIT:
         return self.pool.get_data0(node) as i64
     if kind == NodeKind.NK_UNARY:
@@ -1241,6 +1243,111 @@ fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
                 return self.const_int_vals.get(ci as i64)
         return CONST_EVAL_FAIL()
     CONST_EVAL_FAIL()
+
+fn Codegen.try_eval_const_llvm(self: Codegen, node: i32, expected_tid: i32) -> i64:
+    if node == 0 or expected_tid <= 0:
+        return 0
+
+    var cur = node
+    while cur != 0:
+        let kind = self.pool.kind(cur)
+        if kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_GROUPED:
+            cur = self.pool.get_data0(cur)
+            continue
+        if kind == NodeKind.NK_CAST:
+            cur = self.pool.get_data0(cur)
+            continue
+        break
+
+    if cur == 0:
+        return 0
+
+    let resolved = self.sema.resolve_alias(expected_tid as TypeId)
+    let tk = self.sema.get_type_kind(resolved)
+
+    if tk == TypeKind.TY_ARRAY:
+        if self.pool.kind(cur) != NodeKind.NK_ARRAY_LIT:
+            return 0
+        let elem_tid = self.sema.get_type_d0(resolved)
+        let elem_llvm = self.sema_type_to_llvm(elem_tid)
+        if elem_llvm == 0:
+            return 0
+        let extra_start = self.pool.get_data0(cur)
+        let elem_count = self.pool.get_data1(cur)
+        if elem_count != self.sema.get_type_d1(resolved):
+            return 0
+        let elems: Vec[i64] = Vec.new()
+        for i in 0..elem_count:
+            let elem_node = self.pool.get_extra(extra_start + i)
+            let elem_val = self.try_eval_const_llvm(elem_node, elem_tid as i32)
+            if elem_val == 0:
+                return 0
+            elems.push(elem_val)
+        return wl_const_array(elem_llvm, vec_data_i64(&elems), elem_count)
+
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        if self.pool.kind(cur) == NodeKind.NK_NULL_LIT:
+            let ptr_ty = self.sema_type_to_llvm(resolved)
+            if ptr_ty != 0:
+                return wl_const_null(ptr_ty)
+            return 0
+        let ptr_zero = self.try_eval_const_int(cur)
+        if ptr_zero == 0:
+            let ptr_ty = self.sema_type_to_llvm(resolved)
+            if ptr_ty != 0:
+                return wl_const_null(ptr_ty)
+        return 0
+
+    if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL:
+        let val = self.try_eval_const_int(cur)
+        if val == CONST_EVAL_FAIL():
+            return 0
+        let llvm_ty = self.sema_type_to_llvm(resolved)
+        if llvm_ty == 0:
+            return 0
+        return wl_const_int(llvm_ty, val, 1)
+
+    if tk == TypeKind.TY_FLOAT:
+        var float_node = cur
+        var float_negate = false
+        if self.pool.kind(float_node) == NodeKind.NK_UNARY and self.pool.get_data0(float_node) == UnaryOp.UOP_NEGATE:
+            float_node = self.pool.get_data1(float_node)
+            float_negate = true
+        if self.pool.kind(float_node) != NodeKind.NK_FLOAT_LIT:
+            return 0
+        let str_idx = self.pool.get_data0(float_node)
+        if str_idx < 0 or str_idx >= self.pool.strings.len() as i32:
+            return 0
+        var fval = with_parse_float(self.pool.get_string(str_idx))
+        if float_negate:
+            fval = -fval
+        let llvm_ty = self.sema_type_to_llvm(resolved)
+        if llvm_ty == 0:
+            return 0
+        return wl_const_real(llvm_ty, fval)
+
+    0
+
+fn Codegen.emit_const_array_global(self: Codegen, name_sym: i32, array_tid: i32, value_node: i32, is_mut: i32) -> bool:
+    if array_tid <= 0:
+        return false
+    let resolved = self.sema.resolve_alias(array_tid as TypeId)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_ARRAY:
+        return false
+    let global_ty = self.sema_type_to_llvm(resolved)
+    if global_ty == 0:
+        return false
+    let init = self.try_eval_const_llvm(value_node, resolved as i32)
+    if init == 0:
+        return false
+    let name_str = self.intern.resolve(name_sym)
+    let global = wl_add_global(self.llmod, global_ty, name_str)
+    wl_set_initializer(global, init)
+    if is_mut == 0:
+        wl_set_global_constant(global, 1)
+    wl_set_linkage(global, wl_internal_linkage())
+    self.module_constants.insert(name_sym, global)
+    true
 
 fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     let name_sym = self.pool.get_data0(let_node)
@@ -1340,6 +1447,17 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     let vec_tid = self.try_resolve_vec_new_global_type(value_node, flags)
     if vec_tid > 0:
         if self.emit_vec_new_global(name_sym, vec_tid, is_mut):
+            return
+
+    let array_tid =
+        if resolved_binding_ty != 0:
+            resolved_binding_ty as i32
+        else if self.sema.typed_expr_types.contains(value_node):
+            self.sema.resolve_alias(self.sema.typed_expr_types.get(value_node).unwrap() as TypeId) as i32
+        else:
+            0
+    if array_tid > 0:
+        if self.emit_const_array_global(name_sym, array_tid, value_node, is_mut):
             return
 
     // Float constant: NodeKind.NK_FLOAT_LIT or unary negate of one
