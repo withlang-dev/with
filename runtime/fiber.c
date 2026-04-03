@@ -611,6 +611,12 @@ int32_t with_runtime_has_fibers(void) {
     return (ready_head != NULL) || (steal_head != NULL);
 }
 
+void with_runtime_run_one_step(void) {
+    if (ready_head || steal_head) {
+        run_one_fiber();
+    }
+}
+
 // Debug/introspection helpers for validating pool reuse behavior.
 int64_t with_fiber_pool_reuses(void) {
     return fiber_pool_reuse_count;
@@ -634,133 +640,6 @@ int32_t with_fiber_live_fibers(void) {
 
 int64_t with_fiber_steal_events(void) {
     return fiber_steal_events;
-}
-
-// ── Channels (sized element slots) ──────────────────────────────────
-
-#define CHAN_INITIAL_CAPACITY 16
-
-typedef struct {
-    uint8_t *buffer;           // ring buffer of elem_size-byte slots
-    int32_t  elem_size;        // bytes per element
-    int32_t  head;
-    int32_t  tail;
-    int32_t  count;
-    int32_t  capacity;         // allocated ring size (in elements)
-    int32_t  bounded_capacity; // >0 for bounded channels, 0 for unbounded
-    int32_t  closed;
-} Channel;
-
-static int channel_grow(Channel *ch) {
-    if (!ch || ch->bounded_capacity > 0) return 0;
-
-    int32_t old_cap = ch->capacity;
-    int32_t new_cap = old_cap > 0 ? old_cap * 2 : CHAN_INITIAL_CAPACITY;
-    if (new_cap < CHAN_INITIAL_CAPACITY) new_cap = CHAN_INITIAL_CAPACITY;
-
-    uint8_t *new_buf = (uint8_t *)malloc((size_t)ch->elem_size * (size_t)new_cap);
-    if (!new_buf) return 0;
-
-    // Linearize the ring buffer into new_buf.
-    for (int32_t i = 0; i < ch->count; i++) {
-        int32_t src_idx = (ch->head + i) % old_cap;
-        memcpy(new_buf + (size_t)i * ch->elem_size,
-               ch->buffer + (size_t)src_idx * ch->elem_size,
-               (size_t)ch->elem_size);
-    }
-
-    free(ch->buffer);
-    ch->buffer = new_buf;
-    ch->capacity = new_cap;
-    ch->head = 0;
-    ch->tail = ch->count;
-    return 1;
-}
-
-// Create a new channel with given capacity and element size.
-// capacity=0 means unbounded. elem_size is sizeof(element type).
-int64_t with_channel_create(int32_t capacity, int32_t elem_size) {
-    Channel *ch = (Channel *)malloc(sizeof(Channel));
-    if (!ch) return 0;
-    memset(ch, 0, sizeof(Channel));
-    ch->elem_size = elem_size > 0 ? elem_size : 1;
-
-    if (capacity > 0) {
-        ch->bounded_capacity = capacity;
-        ch->capacity = capacity;
-    } else {
-        ch->bounded_capacity = 0;
-        ch->capacity = CHAN_INITIAL_CAPACITY;
-    }
-
-    ch->buffer = (uint8_t *)malloc((size_t)ch->elem_size * (size_t)ch->capacity);
-    if (!ch->buffer) {
-        free(ch);
-        return 0;
-    }
-
-    return (int64_t)(uintptr_t)ch;
-}
-
-// Send a value to a channel. Copies elem_size bytes from value_ptr.
-// Blocks (yields) if channel is full.
-void with_channel_send(int64_t ch_handle, void *value_ptr) {
-    Channel *ch = (Channel *)(uintptr_t)ch_handle;
-    if (!ch || !ch->buffer) return;
-
-    while (ch->count >= ch->capacity) {
-        if (ch->closed) return;
-
-        // Unbounded channel: grow instead of blocking.
-        if (ch->bounded_capacity == 0) {
-            if (channel_grow(ch)) break;
-        }
-
-        if (current_fiber) {
-            with_fiber_yield();
-        } else {
-            if (with_runtime_has_fibers()) run_one_fiber();
-            else return; // deadlock prevention
-        }
-    }
-    if (ch->closed) return;
-    memcpy(ch->buffer + (size_t)ch->tail * ch->elem_size,
-           value_ptr, (size_t)ch->elem_size);
-    ch->tail = (ch->tail + 1) % ch->capacity;
-    ch->count++;
-}
-
-// Receive a value from a channel. Copies elem_size bytes to out_ptr.
-// Blocks (yields) if channel is empty. Returns 0 on success, -1 if closed+empty.
-int32_t with_channel_recv(int64_t ch_handle, void *out_ptr) {
-    Channel *ch = (Channel *)(uintptr_t)ch_handle;
-    if (!ch || !ch->buffer) return -1;
-    while (ch->count == 0) {
-        if (ch->closed) return -1;
-        if (current_fiber) {
-            with_fiber_yield();
-        } else {
-            if (with_runtime_has_fibers()) run_one_fiber();
-            else return -1; // deadlock prevention
-        }
-    }
-    memcpy(out_ptr, ch->buffer + (size_t)ch->head * ch->elem_size,
-           (size_t)ch->elem_size);
-    ch->head = (ch->head + 1) % ch->capacity;
-    ch->count--;
-    return 0;
-}
-
-// Try to receive without blocking. Returns 1 if got value, 0 if empty.
-int32_t with_channel_try_recv(int64_t ch_handle, void *out_ptr) {
-    Channel *ch = (Channel *)(uintptr_t)ch_handle;
-    if (!ch || !ch->buffer) return 0;
-    if (ch->count == 0) return 0;
-    memcpy(out_ptr, ch->buffer + (size_t)ch->head * ch->elem_size,
-           (size_t)ch->elem_size);
-    ch->head = (ch->head + 1) % ch->capacity;
-    ch->count--;
-    return 1;
 }
 
 // ── Select Await ────────────────────────────────────────────────────
@@ -793,18 +672,4 @@ void with_fiber_select(int32_t *fiber_ids, int32_t count, int32_t *result_index)
             }
         }
     }
-}
-
-// Close the channel.
-void with_channel_close(int64_t ch_handle) {
-    Channel *ch = (Channel *)(uintptr_t)ch_handle;
-    if (ch) ch->closed = 1;
-}
-
-// Free channel memory.
-void with_channel_destroy(int64_t ch_handle) {
-    Channel *ch = (Channel *)(uintptr_t)ch_handle;
-    if (!ch) return;
-    free(ch->buffer);
-    free(ch);
 }

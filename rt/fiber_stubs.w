@@ -16,9 +16,17 @@ pub fn runtime_run():
 pub fn runtime_shutdown():
     let _ = 0
 
+@[c_export("with_runtime_run_one_step")]
+pub fn runtime_run_one_step():
+    let _ = 0
+
 @[c_export("with_fiber_yield")]
 pub fn fiber_yield():
     let _ = 0
+
+@[c_export("with_runtime_has_fibers")]
+pub fn runtime_has_fibers() -> i32:
+    0
 
 @[c_export("with_fiber_in_fiber")]
 pub fn fiber_in_fiber() -> i32:

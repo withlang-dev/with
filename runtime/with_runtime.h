@@ -188,6 +188,7 @@ void with_runtime_init(void);
 void with_runtime_shutdown(void);
 void with_runtime_run(void);
 int32_t with_runtime_has_fibers(void);
+void with_runtime_run_one_step(void);
 
 // ── Fiber / Task runtime ───────────────────────────────────────────
 
