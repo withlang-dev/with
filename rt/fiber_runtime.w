@@ -3,8 +3,10 @@
 
 extern fn with_fiber_in_fiber() -> i32
 extern fn with_fiber_yield() -> void
-extern fn with_runtime_has_fibers() -> i32
-extern fn with_runtime_run_one_step() -> void
+extern fn with_runtime_core_init() -> void
+extern fn with_runtime_core_shutdown() -> void
+extern fn with_runtime_core_has_fibers() -> i32
+extern fn with_runtime_core_run_one_step() -> void
 extern fn with_runtime_fiber_is_completed(fiber_id: i32) -> i32
 extern fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32
 extern fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32) -> i32
@@ -53,10 +55,26 @@ fn fiber_report_unhandled_panics() -> i32:
             with_ewrite("(null)")
         with_ewrite("\n")
 
+@[c_export("with_runtime_init")]
+pub fn runtime_init():
+    with_runtime_core_init()
+
+@[c_export("with_runtime_shutdown")]
+pub fn runtime_shutdown():
+    with_runtime_core_shutdown()
+
+@[c_export("with_runtime_has_fibers")]
+pub fn runtime_has_fibers() -> i32:
+    with_runtime_core_has_fibers()
+
+@[c_export("with_runtime_run_one_step")]
+pub fn runtime_run_one_step():
+    with_runtime_core_run_one_step()
+
 @[c_export("with_runtime_run")]
 pub fn runtime_run():
-    while with_runtime_has_fibers() != 0:
-        with_runtime_run_one_step()
+    while with_runtime_core_has_fibers() != 0:
+        with_runtime_core_run_one_step()
 
     if fiber_report_unhandled_panics() != 0:
         _exit(1)
@@ -75,8 +93,8 @@ pub fn fiber_select(fiber_ids: *const i32, count: i32, result_index: *mut i32):
 
         if with_fiber_in_fiber() != 0:
             with_fiber_yield()
-        else if with_runtime_has_fibers() != 0:
-            with_runtime_run_one_step()
+        else if with_runtime_core_has_fibers() != 0:
+            with_runtime_core_run_one_step()
         else:
             unsafe:
                 *result_index = -1
@@ -103,8 +121,8 @@ pub fn fiber_await(fiber_id: i32):
                 last_await_cancelled_return = 0
                 return
             with_fiber_yield()
-        else if with_runtime_has_fibers() != 0:
-            with_runtime_run_one_step()
+        else if with_runtime_core_has_fibers() != 0:
+            with_runtime_core_run_one_step()
         else:
             last_await_fiber_id = fiber_id
             last_await_cancelled_return = 0
@@ -127,8 +145,8 @@ pub fn fiber_cleanup_await(fiber_id: i32):
 
         if with_fiber_in_fiber() != 0:
             with_fiber_yield()
-        else if with_runtime_has_fibers() != 0:
-            with_runtime_run_one_step()
+        else if with_runtime_core_has_fibers() != 0:
+            with_runtime_core_run_one_step()
         else:
             last_await_fiber_id = fiber_id
             last_await_cancelled_return = 0

@@ -38,7 +38,7 @@ typedef struct Fiber {
     int32_t      cancelled_return; // Set by unwind path — parent sees child was cancelled
     void       (*entry)(void*, void*); // Entry: trampoline(args, result_buf)
     void        *arg;          // Argument to entry function
-    struct Fiber *next;        // For scheduler queue
+    struct Fiber *next;        // For free-pool list
     int32_t      id;
     int32_t      slot;
     // Panic capture
@@ -58,22 +58,28 @@ typedef struct Fiber {
 #error "FIBER_SLOT_BITS must match MAX_FIBERS"
 #endif
 
-static Fiber *ready_head = NULL;
-static Fiber *ready_tail = NULL;
-static Fiber *steal_head = NULL;
-static Fiber *steal_tail = NULL;
 static Fiber *current_fiber = NULL;
 static FiberContext scheduler_ctx;
 static Fiber *free_pool_head = NULL;
+static size_t fiber_page_size = 0;
 static int64_t fiber_pool_reuse_count = 0;
 static int64_t fiber_pool_alloc_count = 0;
 static int32_t live_fiber_count = 0;
 static int64_t fiber_steal_events = 0;
 static int64_t scheduler_round = 0;
+static Fiber *ready_queue[MAX_FIBERS];
+static int32_t ready_queue_head = 0;
+static int32_t ready_queue_count = 0;
+static Fiber *steal_queue[MAX_FIBERS];
+static int32_t steal_queue_head = 0;
+static int32_t steal_queue_count = 0;
 static Fiber *fibers_by_slot[MAX_FIBERS];
 static uint32_t fiber_slot_generations[MAX_FIBERS];
 static int32_t free_fiber_slots[MAX_FIBERS];
 static int32_t free_fiber_slot_count = 0;
+static int32_t panicked_fiber_ids[MAX_FIBERS];
+static int32_t panicked_fiber_head = 0;
+static int32_t panicked_fiber_count = 0;
 
 int32_t with_fiber_in_fiber(void) {
     return current_fiber != NULL;
@@ -95,6 +101,10 @@ static int32_t fiber_compose_id(int32_t slot, uint32_t generation) {
 static int32_t fiber_slot_from_id(int32_t fiber_id) {
     if (fiber_id <= 0) return -1;
     return fiber_id & FIBER_SLOT_MASK;
+}
+
+static int32_t fiber_ring_index(int32_t index) {
+    return index & FIBER_SLOT_MASK;
 }
 
 static Fiber *fiber_lookup(int32_t fiber_id) {
@@ -129,41 +139,43 @@ static void unregister_fiber(Fiber *f) {
     f->slot = -1;
 }
 
+static void enqueue_panicked_fiber(int32_t fiber_id) {
+    if (fiber_id <= 0) return;
+    if (panicked_fiber_count >= MAX_FIBERS) return;
+    int32_t tail = fiber_ring_index(panicked_fiber_head + panicked_fiber_count);
+    panicked_fiber_ids[tail] = fiber_id;
+    panicked_fiber_count++;
+}
+
 static void enqueue(Fiber *f) {
-    f->next = NULL;
-    if (ready_tail) {
-        ready_tail->next = f;
-    } else {
-        ready_head = f;
-    }
-    ready_tail = f;
+    if (ready_queue_count >= MAX_FIBERS) abort();
+    int32_t tail = fiber_ring_index(ready_queue_head + ready_queue_count);
+    ready_queue[tail] = f;
+    ready_queue_count++;
 }
 
 static Fiber *dequeue(void) {
-    if (!ready_head) return NULL;
-    Fiber *f = ready_head;
-    ready_head = f->next;
-    if (!ready_head) ready_tail = NULL;
-    f->next = NULL;
+    if (ready_queue_count <= 0) return NULL;
+    Fiber *f = ready_queue[ready_queue_head];
+    ready_queue[ready_queue_head] = NULL;
+    ready_queue_head = fiber_ring_index(ready_queue_head + 1);
+    ready_queue_count--;
     return f;
 }
 
 static void enqueue_steal(Fiber *f) {
-    f->next = NULL;
-    if (steal_tail) {
-        steal_tail->next = f;
-    } else {
-        steal_head = f;
-    }
-    steal_tail = f;
+    if (steal_queue_count >= MAX_FIBERS) abort();
+    int32_t tail = fiber_ring_index(steal_queue_head + steal_queue_count);
+    steal_queue[tail] = f;
+    steal_queue_count++;
 }
 
 static Fiber *dequeue_steal(void) {
-    if (!steal_head) return NULL;
-    Fiber *f = steal_head;
-    steal_head = f->next;
-    if (!steal_head) steal_tail = NULL;
-    f->next = NULL;
+    if (steal_queue_count <= 0) return NULL;
+    Fiber *f = steal_queue[steal_queue_head];
+    steal_queue[steal_queue_head] = NULL;
+    steal_queue_head = fiber_ring_index(steal_queue_head + 1);
+    steal_queue_count--;
     return f;
 }
 
@@ -176,8 +188,10 @@ static Fiber *dequeue_any(void) {
 }
 
 static size_t guard_page_size(void) {
+    if (fiber_page_size != 0) return fiber_page_size;
     long ps = sysconf(_SC_PAGESIZE);
-    return ps > 0 ? (size_t)ps : 4096;
+    fiber_page_size = ps > 0 ? (size_t)ps : 4096;
+    return fiber_page_size;
 }
 
 static Fiber *acquire_fiber(void) {
@@ -342,22 +356,28 @@ static void fiber_install_signal_handlers(void) {
 // Forward declaration
 void with_fiber_panic_capture(const char *msg, int32_t msg_len);
 
-void with_runtime_init(void) {
-    ready_head = NULL;
-    ready_tail = NULL;
-    steal_head = NULL;
-    steal_tail = NULL;
+void with_runtime_core_init(void) {
     current_fiber = NULL;
+    fiber_page_size = guard_page_size();
     fiber_pool_reuse_count = 0;
     fiber_pool_alloc_count = 0;
     live_fiber_count = 0;
     fiber_steal_events = 0;
     scheduler_round = 0;
+    ready_queue_head = 0;
+    ready_queue_count = 0;
+    steal_queue_head = 0;
+    steal_queue_count = 0;
     free_fiber_slot_count = MAX_FIBERS;
+    panicked_fiber_head = 0;
+    panicked_fiber_count = 0;
     for (int i = 0; i < MAX_FIBERS; i++) {
+        ready_queue[i] = NULL;
+        steal_queue[i] = NULL;
         fibers_by_slot[i] = NULL;
         fiber_slot_generations[i] = 0u;
         free_fiber_slots[i] = MAX_FIBERS - 1 - i;
+        panicked_fiber_ids[i] = 0;
     }
     fiber_install_signal_handlers();
 }
@@ -491,24 +511,30 @@ int32_t with_runtime_take_panicked_fiber(int32_t *fiber_id_out, const char **pan
     if (panic_msg_out) *panic_msg_out = NULL;
     if (panic_msg_len_out) *panic_msg_len_out = 0;
 
-    for (int i = 0; i < MAX_FIBERS; i++) {
-        Fiber *f = fibers_by_slot[i];
-        if (f && __atomic_load_n(&f->state, __ATOMIC_ACQUIRE) == FIBER_DONE && f->has_panic) {
-            if (fiber_id_out) {
-                *fiber_id_out = f->id;
-            }
-            if (panic_msg_out) {
-                *panic_msg_out = f->panic_msg;
-            }
-            if (panic_msg_len_out) {
-                *panic_msg_len_out = f->panic_msg_len;
-            }
-            f->panic_msg = NULL;
-            f->has_panic = 0;
-            unregister_fiber(f);
-            recycle_fiber(f);
-            return 1;
+    while (panicked_fiber_count > 0) {
+        int32_t fiber_id = panicked_fiber_ids[panicked_fiber_head];
+        panicked_fiber_ids[panicked_fiber_head] = 0;
+        panicked_fiber_head = fiber_ring_index(panicked_fiber_head + 1);
+        panicked_fiber_count--;
+
+        Fiber *f = fiber_lookup(fiber_id);
+        if (!f || __atomic_load_n(&f->state, __ATOMIC_ACQUIRE) != FIBER_DONE || !f->has_panic) {
+            continue;
         }
+        if (fiber_id_out) {
+            *fiber_id_out = f->id;
+        }
+        if (panic_msg_out) {
+            *panic_msg_out = f->panic_msg;
+        }
+        if (panic_msg_len_out) {
+            *panic_msg_len_out = f->panic_msg_len;
+        }
+        f->panic_msg = NULL;
+        f->has_panic = 0;
+        unregister_fiber(f);
+        recycle_fiber(f);
+        return 1;
     }
     return 0;
 }
@@ -566,13 +592,14 @@ void with_fiber_panic_capture(const char *msg, int32_t msg_len) {
     current_fiber->panic_msg_len = msg_len;
     // Mark fiber as done and switch back to scheduler
     __atomic_store_n(&current_fiber->state, FIBER_DONE, __ATOMIC_RELEASE);
+    enqueue_panicked_fiber(current_fiber->id);
     with_fiber_switch(&current_fiber->ctx, &scheduler_ctx);
     // Should never reach here — scheduler won't re-run this fiber
     __builtin_unreachable();
 }
 
 // Shutdown the runtime (cleanup).
-void with_runtime_shutdown(void) {
+void with_runtime_core_shutdown(void) {
     for (int i = 0; i < MAX_FIBERS; i++) {
         Fiber *f = fibers_by_slot[i];
         if (f) {
@@ -580,21 +607,23 @@ void with_runtime_shutdown(void) {
             recycle_fiber(f);
         }
     }
-    ready_head = NULL;
-    ready_tail = NULL;
-    steal_head = NULL;
-    steal_tail = NULL;
+    ready_queue_head = 0;
+    ready_queue_count = 0;
+    steal_queue_head = 0;
+    steal_queue_count = 0;
     current_fiber = NULL;
+    panicked_fiber_head = 0;
+    panicked_fiber_count = 0;
     free_fiber_pool();
 }
 
 // Check if any fibers are still running.
-int32_t with_runtime_has_fibers(void) {
-    return (ready_head != NULL) || (steal_head != NULL);
+int32_t with_runtime_core_has_fibers(void) {
+    return ready_queue_count > 0 || steal_queue_count > 0;
 }
 
-void with_runtime_run_one_step(void) {
-    if (ready_head || steal_head) {
+void with_runtime_core_run_one_step(void) {
+    if (ready_queue_count > 0 || steal_queue_count > 0) {
         run_one_fiber();
     }
 }
