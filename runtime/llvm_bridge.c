@@ -182,6 +182,10 @@ int64_t wl_const_named_struct(int64_t ty, int64_t vals_ptr, int32_t count) {
     return P2I(LLVMConstNamedStruct(T(ty),
         (LLVMValueRef*)(intptr_t)vals_ptr, (unsigned)count));
 }
+int64_t wl_const_array(int64_t elem_ty, int64_t vals_ptr, int32_t count) {
+    return P2I(LLVMConstArray2(T(elem_ty),
+        (LLVMValueRef*)(intptr_t)vals_ptr, (uint64_t)count));
+}
 int64_t wl_const_bitcast(int64_t val, int64_t ty) {
     return P2I(LLVMConstBitCast(V(val), T(ty)));
 }
