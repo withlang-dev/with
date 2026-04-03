@@ -161,6 +161,10 @@ static int with_wait_for_child_process(pid_t pid) {
     for (;;) {
         pid_t waited = waitpid(pid, &status, 0);
         if (waited == pid) {
+            if (WIFEXITED(status))
+                return WEXITSTATUS(status);
+            if (WIFSIGNALED(status))
+                return 128 + WTERMSIG(status);
             return status;
         }
         if (waited < 0 && errno == EINTR) {

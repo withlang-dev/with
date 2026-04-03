@@ -78,6 +78,7 @@ run_single_test() {
   local expect_check_fail=""
   local expect_build_fail=""
   local expect_check_stdout=""
+  local expect_exit=""
   local check_only=0
   local extra_args=""
   local name
@@ -127,6 +128,9 @@ run_single_test() {
         ;;
       "//! args: "*)
         extra_args="${line#//! args: }"
+        ;;
+      "//! expect-exit: "*)
+        expect_exit="${line#//! expect-exit: }"
         ;;
       "//!"*)
         ;;
@@ -211,6 +215,23 @@ run_single_test() {
 
   if [[ "$rc" -eq 124 ]]; then
     _emit_result "FAIL $name (timeout after ${RUN_TIMEOUT_SECS}s)"
+    rm -rf "$my_tmp"
+    return
+  fi
+
+  if [[ -n "$expect_exit" ]]; then
+    # Expected non-zero exit code (e.g. panic tests)
+    if [[ "$rc" -eq "$expect_exit" ]]; then
+      if [[ -z "$expect_stdout" ]] || grep -Fq "$expect_stdout" "$my_tmp/out"; then
+        _emit_result "PASS $name"
+      else
+        local got
+        got="$(head -1 "$my_tmp/out" 2>/dev/null || echo "(empty)")"
+        _emit_result "FAIL $name (stdout mismatch, expected: $expect_stdout, got: $got)"
+      fi
+    else
+      _emit_result "FAIL $name (exit code $rc, expected $expect_exit)"
+    fi
     rm -rf "$my_tmp"
     return
   fi
