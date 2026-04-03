@@ -44,12 +44,12 @@ type RtStatBuf:
 // ── Argv storage ────────────────────────────────────────────────
 
 var rt_argc: i32 = 0
-var rt_argv: *const *const u8 = 0 as *const *const u8
+var rt_argv_raw: i64 = 0
 
 @[c_export("rt_store_args")]
 pub fn store_args(argc_val: i32, argv_val: *const *const u8):
     rt_argc = argc_val
-    rt_argv = argv_val
+    rt_argv_raw = argv_val as i64
 
 // ── I/O ─────────────────────────────────────────────────────────
 
@@ -160,7 +160,7 @@ pub fn rt_exit_impl(code: i32):
 
 @[c_export("rt_args")]
 pub fn rt_args_impl() -> (*const *const u8, i32):
-    (rt_argv, rt_argc)
+    (rt_argv_raw as *const *const u8, rt_argc)
 
 // ── Time ────────────────────────────────────────────────────────
 

@@ -4517,8 +4517,12 @@ fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:
     lower_fn_with_sig(builder, fn_node, sig_idx)
 
 fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody:
+    let fn_flags = builder.ast.get_data2(fn_node)
     if sig_idx >= 0:
-        builder.body.local_type_ids.set_i32(0, builder.sema.sig_return_type(sig_idx))
+        var body_ret_ty = builder.sema.sig_return_type(sig_idx)
+        if (fn_flags / FnFlags.ASYNC) % 2 == 1:
+            body_ret_ty = builder.sema.unwrap_task_type(body_ret_ty as TypeId) as i32
+        builder.body.local_type_ids.set_i32(0, body_ret_ty)
     else:
         // No sig — try to get return type from typed_expr_types on body expression
         let body_expr = builder.ast.get_data1(fn_node)
@@ -4594,7 +4598,6 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
 
     // Self-tail-call optimization for @[tailrec] functions.
-    let fn_flags = builder.ast.get_data2(fn_node)
     if (fn_flags / FnFlags.TAILREC) % 2 == 1:
         optimize_self_tail_calls(&mut builder.body)
 

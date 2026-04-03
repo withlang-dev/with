@@ -59,6 +59,7 @@ make stage1      # seed → stage1
 make stage2      # stage1 → stage2
 make build       # stage1 + stage2 + runtime objects
 make stage3      # stage2 → stage3
+make selfcheck   # locked ./out/bin/with-stage2 check src/main.w
 make fixpoint    # verify stage2 == stage3 (byte-identical)
 make test        # run test suite
 make smoke       # quick smoke test
@@ -70,6 +71,32 @@ Fixpoint invariant: `stage2 == stage3`. If fixpoint fails,
 code generation is nondeterministic. Stop and fix.
 
 **If the build breaks, fixing the build is the top priority.**
+
+### Build serialization
+
+Top-level build and verification commands must run **serially**.
+
+Never start any of these while another one is still running:
+
+```
+make stage1
+make stage2
+make build
+make stage3
+make selfcheck
+make smoke
+make test
+make fixpoint
+make install
+make install-user
+make clean
+```
+
+Use the locked Makefile targets, not ad-hoc parallel commands.
+Routine verification must use `make selfcheck`, not a direct
+`./out/bin/with-stage2 check src/main.w` in another terminal.
+The Makefile now enforces this with a repo-wide lock and fails
+fast if a second top-level command is started early.
 
 ---
 
@@ -118,6 +145,7 @@ possible.
 After each change:
 ```
 make build          # must pass
+make selfcheck      # must pass
 make fixpoint       # must pass
 ```
 
@@ -136,7 +164,7 @@ old_string doesn't match due to stale context.
 
 ### Quick repro
 ```
-time ./out/bin/with-stage2 check src/main.w
+time make selfcheck
 ```
 
 ### LLDB (preferred)
@@ -225,6 +253,7 @@ A change is acceptable only if:
 
 ```
 make build      # compiles
+make selfcheck  # stage2 checks src/main.w
 make fixpoint   # stage2 == stage3
 make test       # no regressions
 ```

@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 
-.PHONY: all build stage1 stage2 stage3 smoke test fixpoint install install-user clean seed runtime print-version FORCE
+.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test fixpoint install install-user update-seed clean seed print-version FORCE \
+	__build __stage1 __stage2 __stage3 __runtime __selfcheck __smoke __test __fixpoint __install __install-user __update-seed __clean __seed
 
 ROOT_DIR := $(CURDIR)
 REPO_FULL_NAME ?= QuixiAI/with
@@ -31,7 +32,8 @@ GEN_VERSION_FILE := $(OUT_GEN_DIR)/version.txt
 GEN_STAMP := $(OUT_GEN_DIR)/.generated-stamp
 
 RUNTIME_LINK := $(OUT_BIN_DIR)/runtime
-EMBEDDED_STDLIB_INC := $(OUT_LIB_DIR)/embedded_stdlib.inc.h
+EMBEDDED_STDLIB_RUNTIME_SRC := $(OUT_GEN_DIR)/embedded_stdlib_runtime.w
+COMPAT_RUNTIME_SRC := $(OUT_GEN_DIR)/compat_runtime.w
 EMBEDDED_OBJECTS_ASM := $(OUT_LIB_DIR)/embedded_objects.s
 HELPERS_OBJ := $(OUT_LIB_DIR)/helpers.o
 COMPAT_RUNTIME_OBJ := $(OUT_LIB_DIR)/compat_runtime.o
@@ -170,23 +172,72 @@ endef
 
 all: build
 
-build: $(CANONICAL_BIN)
+REPO_SERIAL_LOCK := $(OUT_TMP_DIR)/repo-serial.lock
 
-stage1: $(STAGE1_BIN)
+define WITH_REPO_LOCK
+	@set -euo pipefail; \
+	lock="$(REPO_SERIAL_LOCK)"; \
+	owner_file="$$lock/owner"; \
+	if mkdir "$$lock" 2>/dev/null; then \
+		trap 'rm -rf "$$lock"' EXIT INT TERM HUP; \
+		printf 'target=%s pid=%s started=%s\n' "$@" "$$" "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$$owner_file"; \
+		$(1); \
+	else \
+		if [ -f "$$owner_file" ]; then \
+			owner="$$(cat "$$owner_file")"; \
+		else \
+			owner="target=<unknown> pid=<unknown> started=<unknown>"; \
+		fi; \
+		echo "error: another top-level build/check/test/install target is already running: $$owner" >&2; \
+		echo "run build, selfcheck, smoke, test, fixpoint, install, and clean serially" >&2; \
+		exit 1; \
+	fi
+endef
 
-stage2: $(STAGE2_BIN)
+build: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __build)
 
-stage3: $(STAGE3_BIN)
+stage1: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __stage1)
 
-runtime: $(RUNTIME_LINK)
+stage2: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __stage2)
 
-smoke: $(STAGE2_BIN)
-	./out/bin/with-stage2 check src/main.w
+stage3: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __stage3)
+
+runtime: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __runtime)
+
+selfcheck: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __selfcheck)
+
+smoke: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __smoke)
 
 print-version:
 	@$(RESOLVE_VERSION_SH)
 
-seed:
+seed: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __seed)
+
+__build: $(CANONICAL_BIN)
+
+__stage1: $(STAGE1_BIN)
+
+__stage2: $(STAGE2_BIN)
+
+__stage3: $(STAGE3_BIN)
+
+__runtime: $(RUNTIME_LINK)
+
+__selfcheck: $(STAGE2_BIN)
+	./out/bin/with-stage2 check src/main.w
+
+__smoke: $(STAGE2_BIN)
+	./out/bin/with-stage2 check src/main.w
+
+__seed:
 	@set -euo pipefail; \
 	dest="$(SEED_PATH)"; \
 	repo="$(REPO_FULL_NAME)"; \
@@ -230,8 +281,11 @@ $(GEN_STAMP): FORCE | $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR
 	touch "$@"
 
 STD_SOURCES := $(shell find lib/std -name '*.w' 2>/dev/null)
-$(EMBEDDED_STDLIB_INC): scripts/generate_embedded_stdlib.py $(STD_SOURCES) | $(OUT_LIB_DIR)
+$(EMBEDDED_STDLIB_RUNTIME_SRC): scripts/generate_embedded_stdlib.py $(STD_SOURCES) | $(OUT_GEN_DIR)
 	@python3 "$(ROOT_DIR)/scripts/generate_embedded_stdlib.py" "$(ROOT_DIR)" "$@"
+
+$(COMPAT_RUNTIME_SRC): rt/compat_runtime.w $(EMBEDDED_STDLIB_RUNTIME_SRC) | $(OUT_GEN_DIR)
+	@cat "$(ROOT_DIR)/rt/compat_runtime.w" "$(EMBEDDED_STDLIB_RUNTIME_SRC)" > "$@"
 
 $(RUNTIME_C_ALLOWLIST_STAMP): scripts/check_runtime_c_allowlist.sh $(wildcard runtime/*.c) | $(OUT_GEN_DIR)
 	@bash "$(ROOT_DIR)/scripts/check_runtime_c_allowlist.sh" \
@@ -241,10 +295,10 @@ $(RUNTIME_C_ALLOWLIST_STAMP): scripts/check_runtime_c_allowlist.sh $(wildcard ru
 		runtime/with_runtime.c
 	@touch "$@"
 
-$(HELPERS_OBJ): runtime/helpers.c $(EMBEDDED_STDLIB_INC) | $(OUT_LIB_DIR)
+$(HELPERS_OBJ): runtime/helpers.c | $(OUT_LIB_DIR)
 	$(call HOST_COMPILE,-DWITH_HAS_CURL)
 
-$(COMPAT_RUNTIME_OBJ): rt/compat_runtime.w | $(OUT_LIB_DIR)
+$(COMPAT_RUNTIME_OBJ): $(COMPAT_RUNTIME_SRC) | $(OUT_LIB_DIR)
 	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
@@ -280,8 +334,8 @@ $(RT_CORE_OBJ): rt/rt_core.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
 $(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
 	$(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
-$(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) rt/compat_runtime.w rt/panic_runtime.w rt/fiber_stubs.w rt/channel_runtime.w rt/fiber_runtime.w $(FIBER_CORE_SRC) | $(OUT_LIB_DIR) $(OUT_GEN_DIR)
-	$(STAGE2_BIN) build rt/compat_runtime.w --emit-obj --no-prelude -O0 -o $(COMPAT_RUNTIME_OBJ)
+$(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) $(COMPAT_RUNTIME_SRC) rt/panic_runtime.w rt/fiber_stubs.w rt/channel_runtime.w rt/fiber_runtime.w $(FIBER_CORE_SRC) | $(OUT_LIB_DIR) $(OUT_GEN_DIR)
+	$(STAGE2_BIN) build $(COMPAT_RUNTIME_SRC) --emit-obj --no-prelude -O0 -o $(COMPAT_RUNTIME_OBJ)
 	$(STAGE2_BIN) build rt/panic_runtime.w --emit-obj --no-prelude -O0 -o $(PANIC_RUNTIME_OBJ)
 	$(STAGE2_BIN) build rt/fiber_stubs.w --emit-obj --no-prelude -O0 -o $(FIBER_STUBS_OBJ)
 	$(STAGE2_BIN) build rt/channel_runtime.w --emit-obj --no-prelude -O0 -o $(CHANNEL_RUNTIME_OBJ)
@@ -422,30 +476,48 @@ $(CANONICAL_BIN): $(STAGE2_BIN) $(RT_WITH_ARTIFACTS) $(RT_WITH_REFRESH_STAMP) | 
 	@WITH_OUT_DIR="$(ROOT_DIR)/out" $(STAGE2_BIN) build $(GEN_MAIN_ENTRY) -O0 -o "$@"
 	@echo "build complete: $@"
 
-test: $(STAGE2_BIN)
+test: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __test)
+
+__test: $(STAGE2_BIN)
 	./scripts/run_tests.sh
 	WITH=$(STAGE2_BIN) ./scripts/run_cli_selfhost_tests.sh
 	./scripts/run_issue61_noop_local_regression.sh
 	./scripts/run_embedded_runtime_extract_regression.sh
 
-fixpoint: $(STAGE3_BIN)
+fixpoint: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __fixpoint)
+
+__fixpoint: $(STAGE3_BIN)
 	@diff "$(STAGE2_BIN)" "$(STAGE3_BIN)" && echo "FIXPOINT"
 
-install: $(STAGE2_BIN)
+install: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __install)
+
+__install: $(STAGE2_BIN)
 	install -d "$(INSTALL_BINDIR)"
 	install -d "$(INSTALL_LIBDIR)"
 	install -m 0755 "$(STAGE2_BIN)" "$(INSTALL_BINDIR)/with"
 	cp -R "$(OUT_LIB_DIR)/." "$(INSTALL_LIBDIR)/"
 
-install-user: $(CANONICAL_BIN)
+install-user: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __install-user)
+
+__install-user: $(CANONICAL_BIN)
 	install -d "$(USER_BINDIR)"
 	install -m 0755 "$(CANONICAL_BIN)" "$(USER_BINDIR)/with"
 
-update-seed: fixpoint
+update-seed: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __update-seed)
+
+__update-seed: __fixpoint
 	@cp "$(STAGE2_BIN)" "$(SEED_PATH)"
 	@echo "seed updated: $(SEED_PATH)"
 
-clean:
+clean: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __clean)
+
+__clean:
 	rm -rf "$(OUT)/"
 
 FORCE:

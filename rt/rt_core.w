@@ -484,12 +484,12 @@ fn write_all(fd: i32, buf: *const u8, len: i64):
 // ── Lifecycle ──────────────────────────────────────────────────────
 
 var saved_argc: i32 = 0
-var saved_argv: *const *const u8 = 0 as *const *const u8
+var saved_argv_raw: i64 = 0
 
 @[c_export("with_runtime_set_argv")]
 pub fn runtime_set_argv(argc: i32, argv: *const *const u8):
     saved_argc = argc
-    saved_argv = argv
+    saved_argv_raw = argv as i64
     rt_store_args(argc, argv)
 
 // with_runtime_init, with_runtime_run, with_runtime_shutdown come from the
@@ -1310,9 +1310,9 @@ pub fn arg_count() -> i32:
 
 @[c_export("with_arg_at")]
 pub fn arg_at(idx: i32) -> str:
-    if idx < 0 or idx >= saved_argc or saved_argv as i64 == 0:
+    if idx < 0 or idx >= saved_argc or saved_argv_raw == 0:
         return make_str("" as *const u8, 0)
-    let s = *((saved_argv as i64 + idx as i64 * 8) as *const *const u8)
+    let s = *((saved_argv_raw + idx as i64 * 8) as *const *const u8)
     make_str(s, cstr_len(s))
 
 @[c_export("with_getenv_str")]
