@@ -3602,7 +3602,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_AWAIT:
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_AWAIT or intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_CLEANUP_AWAIT:
         // Await: extract fiber_id and result_buf from Task struct,
         // call with_fiber_await(fiber_id), load result from buffer, free buffer.
         // Cancellation checks are at MIR level (IS_CANCELLED / WAS_CANCELLED_RETURN
@@ -3624,13 +3624,14 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let fid = wl_build_load(self.builder, wl_i32_type(self.context), fid_ptr)
         let rbuf_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 1)
         let rbuf = wl_build_load(self.builder, wl_ptr_type(self.context), rbuf_ptr)
-        // Call with_fiber_await(fiber_id)
-        var await_fn = wl_get_named_function(self.llmod, "with_fiber_await")
+        // Call the appropriate runtime await helper.
+        let await_fn_name = if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_CLEANUP_AWAIT: "with_fiber_cleanup_await" else: "with_fiber_await"
+        var await_fn = wl_get_named_function(self.llmod, await_fn_name)
         if await_fn == 0:
             let ap: Vec[i64] = Vec.new()
             ap.push(wl_i32_type(self.context))
             let aft = wl_function_type(wl_void_type(self.context), vec_data_i64(&ap), 1, 0)
-            await_fn = wl_add_function(self.llmod, "with_fiber_await", aft)
+            await_fn = wl_add_function(self.llmod, await_fn_name, aft)
         let await_ft = wl_global_get_value_type(await_fn)
         let aa: Vec[i64] = Vec.new()
         aa.push(fid)

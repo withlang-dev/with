@@ -2415,8 +2415,9 @@ fn MirBuilder.lower_single_await(self: MirBuilder, task_op: i32, result_ty: i32,
     self.terminate(TermKind.TK_CALL, self.unit_operand(), ic_args_id, ic_place, check_self_bb)
     self.switch_to(check_self_bb)
 
-    // Branch: 0 → check child, else → unwind
+    // Branch: 0 → check child, else → self-cancel cleanup
     let check_child_bb = self.new_block()
+    let self_cancel_bb = self.new_block()
     let unwind_bb = self.new_block()
     let normal_bb = self.new_block()
     let sw_vals1: Vec[i32] = Vec.new()
@@ -2425,9 +2426,24 @@ fn MirBuilder.lower_single_await(self: MirBuilder, task_op: i32, result_ty: i32,
     sw_tgts1.push(check_child_bb)
     let sw1 = self.body.new_switch_table(sw_vals1, sw_tgts1)
     let ic_op = self.body.new_operand(OperandKind.OK_COPY, ic_place)
-    self.terminate(TermKind.TK_SWITCH_INT, ic_op, sw1, unwind_bb, 0)
+    self.terminate(TermKind.TK_SWITCH_INT, ic_op, sw1, self_cancel_bb, 0)
 
-    // 3. Check child-cancellation: extract fiber_id from task
+    // 3. Self-cancel BB: cancel child, join it for cleanup, then unwind.
+    self.switch_to(self_cancel_bb)
+    let cancel_args: Vec[i32] = Vec.new()
+    cancel_args.push(task_op)
+    let cancel_call_id = self.body.new_call_args(cancel_args)
+    self.body.set_call_intrinsic(cancel_call_id, MirIntrinsic.MIR_INTRINSIC_FIBER_CANCEL)
+    self.body.set_call_ast_node(cancel_call_id, node)
+    let cancel_result_local = self.new_temp(self.sema.ty_i32)
+    let cancel_result_place = self.place_for_local(cancel_result_local)
+    let after_cancel_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, self.unit_operand(), cancel_call_id, cancel_result_place, after_cancel_bb)
+    self.switch_to(after_cancel_bb)
+    self.lower_cleanup_await(task_op, node)
+    self.terminate(TermKind.TK_GOTO, unwind_bb, 0, 0, 0)
+
+    // 4. Check child-cancellation: extract fiber_id from task
     self.switch_to(check_child_bb)
     let task_place = self.materialize_operand(task_op, task_ty, span)
     let fid_place = self.body.new_field_place(task_place, 0, self.sema.ty_i32 as i32)
@@ -2451,7 +2467,7 @@ fn MirBuilder.lower_single_await(self: MirBuilder, task_op: i32, result_ty: i32,
     let wcr_op = self.body.new_operand(OperandKind.OK_COPY, wcr_place)
     self.terminate(TermKind.TK_SWITCH_INT, wcr_op, sw2, unwind_bb, 0)
 
-    // 4. Unwind BB: set cancelled_return, emit defers+drops, return
+    // 5. Unwind BB: set cancelled_return, emit defers+drops, return
     self.switch_to(unwind_bb)
     let scr_args: Vec[i32] = Vec.new()
     let scr_args_id = self.body.new_call_args(scr_args)
@@ -2465,7 +2481,7 @@ fn MirBuilder.lower_single_await(self: MirBuilder, task_op: i32, result_ty: i32,
     self.emit_drops_for_return()
     self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
 
-    // 5. Normal BB: continue with result
+    // 6. Normal BB: continue with result
     self.switch_to(normal_bb)
     self.body.new_operand(OperandKind.OK_COPY, result_place)
 
@@ -2475,7 +2491,7 @@ fn MirBuilder.lower_cleanup_await(self: MirBuilder, task_op: i32, node: i32):
     let await_args: Vec[i32] = Vec.new()
     await_args.push(task_op)
     let await_args_id = self.body.new_call_args(await_args)
-    self.body.set_call_intrinsic(await_args_id, MirIntrinsic.MIR_INTRINSIC_FIBER_AWAIT)
+    self.body.set_call_intrinsic(await_args_id, MirIntrinsic.MIR_INTRINSIC_FIBER_CLEANUP_AWAIT)
     self.body.set_call_ast_node(await_args_id, node)
     let ignored_local = self.new_temp(self.sema.ty_void as i32)
     let ignored_place = self.place_for_local(ignored_local)

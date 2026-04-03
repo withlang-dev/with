@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <signal.h>
@@ -41,6 +40,7 @@ typedef struct Fiber {
     void        *arg;          // Argument to entry function
     struct Fiber *next;        // For scheduler queue
     int32_t      id;
+    int32_t      slot;
     // Panic capture
     int32_t      has_panic;
     const char  *panic_msg;
@@ -51,6 +51,12 @@ typedef struct Fiber {
 
 #define MAX_FIBERS 1024
 #define FIBER_STACK_SIZE (64 * 1024) // 64KB per fiber
+#define FIBER_SLOT_BITS 10
+#define FIBER_SLOT_MASK (MAX_FIBERS - 1)
+
+#if MAX_FIBERS != (1 << FIBER_SLOT_BITS)
+#error "FIBER_SLOT_BITS must match MAX_FIBERS"
+#endif
 
 static Fiber *ready_head = NULL;
 static Fiber *ready_tail = NULL;
@@ -58,17 +64,16 @@ static Fiber *steal_head = NULL;
 static Fiber *steal_tail = NULL;
 static Fiber *current_fiber = NULL;
 static FiberContext scheduler_ctx;
-static int32_t next_fiber_id = 1;
 static Fiber *free_pool_head = NULL;
 static int64_t fiber_pool_reuse_count = 0;
 static int64_t fiber_pool_alloc_count = 0;
 static int32_t live_fiber_count = 0;
 static int64_t fiber_steal_events = 0;
 static int64_t scheduler_round = 0;
-
-// Completed fibers indexed by ID for join/await
-static Fiber *completed[MAX_FIBERS];
-static int completed_count = 0;
+static Fiber *fibers_by_slot[MAX_FIBERS];
+static uint32_t fiber_slot_generations[MAX_FIBERS];
+static int32_t free_fiber_slots[MAX_FIBERS];
+static int32_t free_fiber_slot_count = 0;
 
 int32_t with_fiber_in_fiber(void) {
     return current_fiber != NULL;
@@ -82,6 +87,47 @@ int32_t with_runtime_current_cancel_requested(void) {
 extern void with_fiber_switch(FiberContext *save, FiberContext *restore);
 
 // ── Internal helpers ─────────────────────────────────────────────────
+
+static int32_t fiber_compose_id(int32_t slot, uint32_t generation) {
+    return (int32_t)((generation << FIBER_SLOT_BITS) | (uint32_t)slot);
+}
+
+static int32_t fiber_slot_from_id(int32_t fiber_id) {
+    if (fiber_id <= 0) return -1;
+    return fiber_id & FIBER_SLOT_MASK;
+}
+
+static Fiber *fiber_lookup(int32_t fiber_id) {
+    int32_t slot = fiber_slot_from_id(fiber_id);
+    if (slot < 0 || slot >= MAX_FIBERS) return NULL;
+    Fiber *f = fibers_by_slot[slot];
+    if (!f || f->id != fiber_id) return NULL;
+    return f;
+}
+
+static int32_t allocate_fiber_slot(void) {
+    if (free_fiber_slot_count <= 0) return -1;
+    int32_t slot = free_fiber_slots[--free_fiber_slot_count];
+    uint32_t generation = fiber_slot_generations[slot] + 1u;
+    if (generation == 0u) generation = 1u;
+    fiber_slot_generations[slot] = generation;
+    return slot;
+}
+
+static void release_fiber_slot(int32_t slot) {
+    if (slot < 0 || slot >= MAX_FIBERS) return;
+    if (free_fiber_slot_count >= MAX_FIBERS) return;
+    fibers_by_slot[slot] = NULL;
+    free_fiber_slots[free_fiber_slot_count++] = slot;
+}
+
+static void unregister_fiber(Fiber *f) {
+    if (!f) return;
+    if (f->slot >= 0 && f->slot < MAX_FIBERS && fibers_by_slot[f->slot] == f) {
+        release_fiber_slot(f->slot);
+    }
+    f->slot = -1;
+}
 
 static void enqueue(Fiber *f) {
     f->next = NULL;
@@ -147,6 +193,7 @@ static Fiber *acquire_fiber(void) {
         f->arg = NULL;
         f->next = NULL;
         f->id = 0;
+        f->slot = -1;
         fiber_pool_reuse_count++;
         return f;
     }
@@ -155,6 +202,7 @@ static Fiber *acquire_fiber(void) {
     if (!f) return NULL;
     memset(f, 0, sizeof(Fiber));
     f->stack_size = FIBER_STACK_SIZE;
+    f->slot = -1;
 
     // Allocate stack with guard page via mmap.
     // Layout: [guard page (PROT_NONE)] [usable stack (PROT_READ|PROT_WRITE)]
@@ -187,6 +235,7 @@ static void recycle_fiber(Fiber *f) {
     f->entry = NULL;
     f->arg = NULL;
     f->id = 0;
+    f->slot = -1;
     if (f->panic_msg) { free((void *)f->panic_msg); f->panic_msg = NULL; }
     f->has_panic = 0;
     f->panic_msg_len = 0;
@@ -222,10 +271,7 @@ static void fiber_trampoline(void) {
     // Release fence ensures result buffer write is visible before DONE flag.
     __atomic_thread_fence(__ATOMIC_RELEASE);
     __atomic_store_n(&current_fiber->state, FIBER_DONE, __ATOMIC_RELEASE);
-    // Store in completed list for await.
-    if (completed_count < MAX_FIBERS) {
-        completed[completed_count++] = current_fiber;
-    }
+    // The fiber stays addressable by slot until await/drain recycles it.
     // Switch back to scheduler.
     with_fiber_switch(&current_fiber->ctx, &scheduler_ctx);
     // Should never reach here.
@@ -302,13 +348,17 @@ void with_runtime_init(void) {
     steal_head = NULL;
     steal_tail = NULL;
     current_fiber = NULL;
-    completed_count = 0;
-    next_fiber_id = 1;
     fiber_pool_reuse_count = 0;
     fiber_pool_alloc_count = 0;
     live_fiber_count = 0;
     fiber_steal_events = 0;
     scheduler_round = 0;
+    free_fiber_slot_count = MAX_FIBERS;
+    for (int i = 0; i < MAX_FIBERS; i++) {
+        fibers_by_slot[i] = NULL;
+        fiber_slot_generations[i] = 0u;
+        free_fiber_slots[i] = MAX_FIBERS - 1 - i;
+    }
     fiber_install_signal_handlers();
 }
 
@@ -322,8 +372,13 @@ int32_t with_fiber_spawn(void (*entry_fn)(void*, void*), void *arg,
                           void *result_buf, int32_t result_size,
                           int32_t stack_size) {
     if (live_fiber_count >= MAX_FIBERS) return -1;
+    int32_t slot = allocate_fiber_slot();
+    if (slot < 0) return -1;
     Fiber *f = acquire_fiber();
-    if (!f) return -1;
+    if (!f) {
+        release_fiber_slot(slot);
+        return -1;
+    }
 
     // Honor custom stack size if requested and this is a fresh allocation.
     // Pooled fibers keep their original stack — reallocating would be wasteful.
@@ -334,7 +389,11 @@ int32_t with_fiber_spawn(void (*entry_fn)(void*, void*), void *arg,
         size_t total = page_sz + f->stack_size;
         void *region = mmap(NULL, total, PROT_READ | PROT_WRITE,
                             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if (region == MAP_FAILED) { free(f); return -1; }
+        if (region == MAP_FAILED) {
+            release_fiber_slot(slot);
+            free(f);
+            return -1;
+        }
         mprotect(region, page_sz, PROT_NONE);
         f->stack = (char *)region + page_sz;
     }
@@ -344,9 +403,11 @@ int32_t with_fiber_spawn(void (*entry_fn)(void*, void*), void *arg,
     f->result_buf = result_buf;
     f->result_size = result_size;
     f->state = FIBER_READY;
-    f->id = next_fiber_id++;
+    f->slot = slot;
+    f->id = fiber_compose_id(slot, fiber_slot_generations[slot]);
     f->result = 0;
     f->cancel_requested = 0;
+    fibers_by_slot[slot] = f;
     live_fiber_count++;
 
     // Set up initial context with ABI-correct stack alignment.
@@ -374,52 +435,9 @@ int32_t with_fiber_spawn(void (*entry_fn)(void*, void*), void *arg,
     return f->id;
 }
 
-// Run the scheduler until all fibers complete.
-void with_runtime_run(void) {
-    while (ready_head || steal_head) {
-        Fiber *f = dequeue_any();
-        if (!f) break;
-        __atomic_store_n(&f->state, FIBER_RUNNING, __ATOMIC_RELEASE);
-        current_fiber = f;
-        with_fiber_switch(&scheduler_ctx, &f->ctx);
-        current_fiber = NULL;
-        // After switch back, check state.
-        if (__atomic_load_n(&f->state, __ATOMIC_ACQUIRE) == FIBER_SUSPENDED) {
-            // Re-enqueue and alternate queues to simulate work-stealing churn.
-            if ((scheduler_round++ & 1) == 0) enqueue_steal(f);
-            else enqueue(f);
-        }
-        // FIBER_DONE fibers are in the completed list.
-    }
-
-    // Report unhandled panics from fire-and-forget fibers
-    int had_unhandled_panic = 0;
-    for (int i = 0; i < completed_count; i++) {
-        if (completed[i] && completed[i]->has_panic) {
-            fprintf(stderr, "unhandled panic in fiber #%d: %.*s\n",
-                    completed[i]->id,
-                    (int)completed[i]->panic_msg_len,
-                    completed[i]->panic_msg ? completed[i]->panic_msg : "(null)");
-            had_unhandled_panic = 1;
-        }
-    }
-    if (had_unhandled_panic) {
-        _exit(1);
-    }
-}
-
 // Yield the current fiber (cooperative scheduling point).
 void with_fiber_yield(void) {
     if (!current_fiber) return;
-    if (__atomic_load_n(&current_fiber->cancel_requested, __ATOMIC_ACQUIRE)) {
-        __atomic_store_n(&current_fiber->state, FIBER_DONE, __ATOMIC_RELEASE);
-        current_fiber->result = -1;
-        if (completed_count < MAX_FIBERS) {
-            completed[completed_count++] = current_fiber;
-        }
-        with_fiber_switch(&current_fiber->ctx, &scheduler_ctx);
-        return;
-    }
     __atomic_store_n(&current_fiber->state, FIBER_SUSPENDED, __ATOMIC_RELEASE);
     with_fiber_switch(&current_fiber->ctx, &scheduler_ctx);
 }
@@ -438,85 +456,71 @@ static void run_one_fiber(void) {
     }
 }
 
-// Await a fiber by ID.
-// If called from a fiber, yields until target completes.
-// If called from main thread, runs scheduler inline until target completes.
-// Result is read from the fiber's heap-allocated result_buf by codegen, not returned here.
-void with_fiber_await(int32_t fiber_id) {
-    while (1) {
-        // Check if fiber is completed.
-        for (int i = 0; i < completed_count; i++) {
-            if (completed[i] && completed[i]->id == fiber_id) {
-                // Check if the fiber panicked — re-raise in awaiter's context
-                if (completed[i]->has_panic) {
-                    // Take ownership of panic message before recycling
-                    const char *msg = completed[i]->panic_msg;
-                    int32_t msg_len = completed[i]->panic_msg_len;
-                    completed[i]->panic_msg = NULL; // prevent double-free in recycle
-                    completed[i]->has_panic = 0;
-                    recycle_fiber(completed[i]);
-                    completed[i] = completed[completed_count - 1];
-                    completed_count--;
-                    // Re-raise: print message and abort
-                    if (msg && msg_len > 0) {
-                        fprintf(stderr, "%.*s\n", (int)msg_len, msg);
-                        free((void *)msg);
-                    }
-                    abort();
-                }
-                // Recycle for stack/Fiber reuse.
-                recycle_fiber(completed[i]);
-                completed[i] = completed[completed_count - 1];
-                completed_count--;
-                return;
-            }
+// If a fiber is completed, transfer its completion metadata out and recycle it.
+// Returns 1 when the fiber was found, 0 otherwise.
+int32_t with_runtime_take_completed_fiber(int32_t fiber_id, const char **panic_msg_out, int32_t *panic_msg_len_out, int32_t *cancelled_return_out) {
+    if (panic_msg_out) *panic_msg_out = NULL;
+    if (panic_msg_len_out) *panic_msg_len_out = 0;
+    if (cancelled_return_out) *cancelled_return_out = 0;
+
+    Fiber *f = fiber_lookup(fiber_id);
+    if (!f) return 0;
+    if (__atomic_load_n(&f->state, __ATOMIC_ACQUIRE) != FIBER_DONE) return 0;
+    if (cancelled_return_out) {
+        *cancelled_return_out = __atomic_load_n(&f->cancelled_return, __ATOMIC_ACQUIRE);
+    }
+    if (f->has_panic) {
+        if (panic_msg_out) {
+            *panic_msg_out = f->panic_msg;
         }
-        // Not done yet.
-        if (current_fiber) {
-            // Inside a fiber: yield back to scheduler.
-            with_fiber_yield();
-        } else {
-            // On main thread: run one scheduler step inline.
-            if (ready_head || steal_head) {
-                run_one_fiber();
-            } else {
-                // No more fibers to run and target not done — shouldn't happen.
-                return;
+        if (panic_msg_len_out) {
+            *panic_msg_len_out = f->panic_msg_len;
+        }
+        f->panic_msg = NULL; // prevent double-free in recycle
+        f->has_panic = 0;
+    }
+    unregister_fiber(f);
+    recycle_fiber(f);
+    return 1;
+}
+
+// Take the next completed fiber that still carries an unhandled panic.
+// Returns 1 when a panicked fiber was found, 0 otherwise.
+int32_t with_runtime_take_panicked_fiber(int32_t *fiber_id_out, const char **panic_msg_out, int32_t *panic_msg_len_out) {
+    if (fiber_id_out) *fiber_id_out = 0;
+    if (panic_msg_out) *panic_msg_out = NULL;
+    if (panic_msg_len_out) *panic_msg_len_out = 0;
+
+    for (int i = 0; i < MAX_FIBERS; i++) {
+        Fiber *f = fibers_by_slot[i];
+        if (f && __atomic_load_n(&f->state, __ATOMIC_ACQUIRE) == FIBER_DONE && f->has_panic) {
+            if (fiber_id_out) {
+                *fiber_id_out = f->id;
             }
+            if (panic_msg_out) {
+                *panic_msg_out = f->panic_msg;
+            }
+            if (panic_msg_len_out) {
+                *panic_msg_len_out = f->panic_msg_len;
+            }
+            f->panic_msg = NULL;
+            f->has_panic = 0;
+            unregister_fiber(f);
+            recycle_fiber(f);
+            return 1;
         }
     }
+    return 0;
 }
 
 // Request cancellation for a non-completed fiber by ID.
-// Returns 1 if the fiber was found in a runnable/current location, 0 otherwise.
+// Returns 1 if the fiber is still live, 0 otherwise.
 int32_t with_runtime_request_cancel(int32_t fiber_id) {
-    // Remove from ready queue if present.
-    Fiber *cur = ready_head;
-    while (cur) {
-        if (cur->id == fiber_id) {
-            __atomic_store_n(&cur->cancel_requested, 1, __ATOMIC_RELEASE);
-            return 1;
-        }
-        cur = cur->next;
-    }
-
-    // Search steal queue as well.
-    cur = steal_head;
-    while (cur) {
-        if (cur->id == fiber_id) {
-            __atomic_store_n(&cur->cancel_requested, 1, __ATOMIC_RELEASE);
-            return 1;
-        }
-        cur = cur->next;
-    }
-
-    // Best-effort handling if current fiber cancels itself.
-    if (current_fiber && current_fiber->id == fiber_id) {
-        __atomic_store_n(&current_fiber->cancel_requested, 1, __ATOMIC_RELEASE);
-        return 1;
-    }
-
-    return 0;
+    Fiber *f = fiber_lookup(fiber_id);
+    if (!f) return 0;
+    if (__atomic_load_n(&f->state, __ATOMIC_ACQUIRE) == FIBER_DONE) return 0;
+    __atomic_store_n(&f->cancel_requested, 1, __ATOMIC_RELEASE);
+    return 1;
 }
 
 // Set the result of the current fiber (called before returning).
@@ -534,11 +538,10 @@ void with_runtime_current_set_cancelled_return(void) {
 
 // Check if a completed fiber returned due to cancellation (not normal completion).
 int32_t with_runtime_completed_cancelled_return(int32_t fiber_id) {
-    for (int i = 0; i < completed_count; i++) {
-        if (completed[i] && completed[i]->id == fiber_id)
-            return __atomic_load_n(&completed[i]->cancelled_return, __ATOMIC_ACQUIRE);
-    }
-    return 0;
+    Fiber *f = fiber_lookup(fiber_id);
+    if (!f) return 0;
+    if (__atomic_load_n(&f->state, __ATOMIC_ACQUIRE) != FIBER_DONE) return 0;
+    return __atomic_load_n(&f->cancelled_return, __ATOMIC_ACQUIRE);
 }
 
 // Request self-cancellation (used when propagating child cancellation upward).
@@ -563,9 +566,6 @@ void with_fiber_panic_capture(const char *msg, int32_t msg_len) {
     current_fiber->panic_msg_len = msg_len;
     // Mark fiber as done and switch back to scheduler
     __atomic_store_n(&current_fiber->state, FIBER_DONE, __ATOMIC_RELEASE);
-    if (completed_count < MAX_FIBERS) {
-        completed[completed_count++] = current_fiber;
-    }
     with_fiber_switch(&current_fiber->ctx, &scheduler_ctx);
     // Should never reach here — scheduler won't re-run this fiber
     __builtin_unreachable();
@@ -573,26 +573,18 @@ void with_fiber_panic_capture(const char *msg, int32_t msg_len) {
 
 // Shutdown the runtime (cleanup).
 void with_runtime_shutdown(void) {
-    // Free any remaining completed fibers.
-    for (int i = 0; i < completed_count; i++) {
-        if (completed[i]) {
-            recycle_fiber(completed[i]);
-        }
-    }
-    completed_count = 0;
-    // Free any remaining ready fibers.
-    while (ready_head) {
-        Fiber *f = dequeue();
+    for (int i = 0; i < MAX_FIBERS; i++) {
+        Fiber *f = fibers_by_slot[i];
         if (f) {
+            unregister_fiber(f);
             recycle_fiber(f);
         }
     }
-    while (steal_head) {
-        Fiber *f = dequeue_steal();
-        if (f) {
-            recycle_fiber(f);
-        }
-    }
+    ready_head = NULL;
+    ready_tail = NULL;
+    steal_head = NULL;
+    steal_tail = NULL;
+    current_fiber = NULL;
     free_fiber_pool();
 }
 
@@ -608,12 +600,9 @@ void with_runtime_run_one_step(void) {
 }
 
 int32_t with_runtime_fiber_is_completed(int32_t fiber_id) {
-    for (int i = 0; i < completed_count; i++) {
-        if (completed[i] && completed[i]->id == fiber_id) {
-            return 1;
-        }
-    }
-    return 0;
+    Fiber *f = fiber_lookup(fiber_id);
+    if (!f) return 0;
+    return __atomic_load_n(&f->state, __ATOMIC_ACQUIRE) == FIBER_DONE;
 }
 
 // Debug/introspection helpers for validating pool reuse behavior.

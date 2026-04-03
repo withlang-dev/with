@@ -190,6 +190,8 @@ void with_runtime_run(void);
 int32_t with_runtime_has_fibers(void);
 void with_runtime_run_one_step(void);
 int32_t with_runtime_fiber_is_completed(int32_t fiber_id);
+int32_t with_runtime_take_completed_fiber(int32_t fiber_id, const char **panic_msg_out, int32_t *panic_msg_len_out, int32_t *cancelled_return_out);
+int32_t with_runtime_take_panicked_fiber(int32_t *fiber_id_out, const char **panic_msg_out, int32_t *panic_msg_len_out);
 int32_t with_runtime_request_cancel(int32_t fiber_id);
 int32_t with_runtime_current_cancel_requested(void);
 void with_runtime_current_set_cancel_requested(void);
@@ -203,6 +205,7 @@ int32_t with_fiber_spawn(void (*entry_fn)(void *, void *), void *arg,
                           int32_t stack_size);
 void with_fiber_yield(void);
 void with_fiber_await(int32_t fiber_id);
+void with_fiber_cleanup_await(int32_t fiber_id);
 int32_t with_fiber_cancel(int32_t fiber_id);
 void with_fiber_set_result(int64_t value);
 int32_t with_fiber_in_fiber(void);
