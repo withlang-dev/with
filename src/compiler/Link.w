@@ -15,6 +15,8 @@ extern let with_embedded_fiber_stubs_o_start: u8
 extern let with_embedded_fiber_stubs_o_end: u8
 extern let with_embedded_channel_runtime_o_start: u8
 extern let with_embedded_channel_runtime_o_end: u8
+extern let with_embedded_fiber_runtime_o_start: u8
+extern let with_embedded_fiber_runtime_o_end: u8
 extern let with_embedded_fiber_o_start: u8
 extern let with_embedded_fiber_o_end: u8
 extern let with_embedded_fiber_asm_o_start: u8
@@ -51,6 +53,8 @@ fn link_stage_embedded_runtime_object(name: str) -> str:
         return link_stage_embedded_obj_slice(&with_embedded_fiber_stubs_o_start as *const u8, &with_embedded_fiber_stubs_o_end as *const u8)
     if name == "channel_runtime.o":
         return link_stage_embedded_obj_slice(&with_embedded_channel_runtime_o_start as *const u8, &with_embedded_channel_runtime_o_end as *const u8)
+    if name == "fiber_runtime.o":
+        return link_stage_embedded_obj_slice(&with_embedded_fiber_runtime_o_start as *const u8, &with_embedded_fiber_runtime_o_end as *const u8)
     if name == "fiber.o":
         return link_stage_embedded_obj_slice(&with_embedded_fiber_o_start as *const u8, &with_embedded_fiber_o_end as *const u8)
     if name == "fiber_asm.o":
@@ -328,6 +332,11 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
             with_eprint("error: missing runtime/channel_runtime.o")
             return false
         extras.push(channel_runtime_path)
+        let fiber_runtime_path = link_stage_find_runtime_object_path("fiber_runtime.o")
+        if fiber_runtime_path.len() == 0:
+            with_eprint("error: missing runtime/fiber_runtime.o")
+            return false
+        extras.push(fiber_runtime_path)
         let fiber_path = link_stage_find_runtime_object_path("fiber.o")
         if fiber_path.len() == 0:
             with_eprint("error: missing runtime/fiber.o")

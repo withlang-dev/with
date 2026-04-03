@@ -189,6 +189,12 @@ void with_runtime_shutdown(void);
 void with_runtime_run(void);
 int32_t with_runtime_has_fibers(void);
 void with_runtime_run_one_step(void);
+int32_t with_runtime_fiber_is_completed(int32_t fiber_id);
+int32_t with_runtime_request_cancel(int32_t fiber_id);
+int32_t with_runtime_current_cancel_requested(void);
+void with_runtime_current_set_cancel_requested(void);
+void with_runtime_current_set_cancelled_return(void);
+int32_t with_runtime_completed_cancelled_return(int32_t fiber_id);
 
 // ── Fiber / Task runtime ───────────────────────────────────────────
 
