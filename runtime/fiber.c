@@ -490,12 +490,11 @@ void with_fiber_await(int32_t fiber_id) {
 // Cancel a fiber by ID.
 // Returns 1 if canceled/found, 0 if the fiber ID is unknown.
 int32_t with_fiber_cancel(int32_t fiber_id) {
-    // If already completed, clean it up now.
+    // If already completed, keep it in the completed list so a later await can
+    // still observe and drain it. `cancel()` is only a request; the await/drain
+    // path owns final recycling.
     for (int i = 0; i < completed_count; i++) {
         if (completed[i] && completed[i]->id == fiber_id) {
-            recycle_fiber(completed[i]);
-            completed[i] = completed[completed_count - 1];
-            completed_count--;
             return 1;
         }
     }
