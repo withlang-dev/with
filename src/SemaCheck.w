@@ -15,7 +15,6 @@ extern fn with_write(s: str) -> void
 extern fn with_eprint(s: str) -> void
 extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_str_eq(a: str, b: str) -> i32
-extern fn int_to_string(n: i32) -> str
 
 fn sema_dirname(path: str) -> str:
     var last_slash = 0 - 1

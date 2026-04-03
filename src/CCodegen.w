@@ -10,7 +10,6 @@ use InternPool
 use Sema
 use Source
 
-extern fn int_to_string(n: i32) -> str
 extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
 extern fn with_interrupt_requested() -> i32

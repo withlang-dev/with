@@ -5,8 +5,6 @@
 
 use InternPool
 
-extern fn int_to_string(n: i32) -> str
-
 // Async body flavors.
 enum AsyncBodyKind: i32:
     Sync = 0

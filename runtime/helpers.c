@@ -462,11 +462,6 @@ with_str i32_to_str(int32_t n) {
     return with_i32_to_str(n);
 }
 
-// Alias used by self-hosted compiler (extern fn int_to_string).
-with_str int_to_string(int32_t n) {
-    return with_i32_to_str(n);
-}
-
 // Alias used by self-hosted compiler (extern fn i64_to_string).
 with_str i64_to_string(int64_t n) {
     char tmp[32];

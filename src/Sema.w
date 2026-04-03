@@ -17,7 +17,6 @@ extern fn with_eprint(s: str) -> void
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_str_clone(s: str) -> str
-extern fn int_to_string(n: i32) -> str
 extern fn with_hashmap_new(key_size: i64, val_size: i64) -> *i8
 
 // ── Type kind constants ──────────────────────────────────────────

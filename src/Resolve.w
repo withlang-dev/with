@@ -12,7 +12,6 @@ use Span
 use compiler.EmbeddedStdlib
 
 extern fn with_fs_read_file(path: str) -> str
-extern fn int_to_string(n: i32) -> str
 extern fn with_write(s: str) -> void
 
 enum ImportKind: i32:

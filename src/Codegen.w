@@ -339,7 +339,6 @@ extern fn wl_di_create_lexical_block(b: i64, scope: i64, file: i64, line: i32, c
 extern fn with_str_concat(a: str, b: str) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_write(s: str) -> void
-extern fn eprint(s: str) -> void
 
 // ── Codegen state ─────────────────────────────────────────────────
 
@@ -3186,8 +3185,10 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     let function = wl_add_function(self.llmod, effective_name, fn_type)
     self.apply_noalias_param_attrs(function, param_start, param_count)
 
-    // Mark non-main functions internal so the linker can dead-strip them.
-    if effective_name != "main":
+    // Prelude functions keep external linkage so they survive LLVM inlining.
+    // The declaration pass already tracks each decl's source file context.
+    let is_prelude = self.current_decl_source_file.contains("lib/std/")
+    if effective_name != "main" and not is_prelude:
         wl_set_linkage(function, wl_internal_linkage())
 
     // @[c_export] overrides internal linkage to external for C/linker visibility
