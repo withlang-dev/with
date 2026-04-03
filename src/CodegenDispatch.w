@@ -3635,8 +3635,17 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let aa: Vec[i64] = Vec.new()
         aa.push(fid)
         wl_build_call(self.builder, await_ft, await_fn, vec_data_i64(&aa), 1)
-        // Load result from buffer, free buffer, store to dest
+        // Load result from buffer unless MIR marked this await as cleanup-only.
+        var ignore_result = false
         if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+            let dst_local = body.place_locals.get(dest_place as i64)
+            if dst_local >= 0 and dst_local < body.local_type_ids.len() as i32:
+                let dst_sema_ty = body.local_type_ids.get(dst_local as i64)
+                let dst_resolved = self.mir_input.mir_resolve_alias(dst_sema_ty)
+                if dst_resolved > 0 and self.mir_input.mir_get_type_kind(dst_resolved) == TypeKind.TY_VOID:
+                    ignore_result = true
+        // Load result from buffer, free buffer, store to dest
+        if not ignore_result and dest_place >= 0 and dest_place < body.place_locals.len() as i32:
             var dst_llvm_ty: i64 = 0
             if task_mir_local >= 0:
                 let trt_opt = self.async_task_result_types.get(task_mir_local)
@@ -3732,15 +3741,15 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         return true
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_CANCEL:
-        // Cancel: extract fiber_id from Task, call with_fiber_cancel, free result_buf
+        // Cancel: extract fiber_id from Task and request cancellation.
+        // The caller is responsible for later awaiting/draining the Task and
+        // freeing its result buffer once the fiber has actually unwound.
         let task_op = self.mir_intrinsic_arg(body, args_id, 0)
         let task_ty = wl_type_of(task_op)
         let task_alloca = self.create_entry_alloca(task_ty)
         wl_build_store(self.builder, task_op, task_alloca)
         let fid_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 0)
         let fid = wl_build_load(self.builder, wl_i32_type(self.context), fid_ptr)
-        let rbuf_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 1)
-        let rbuf = wl_build_load(self.builder, wl_ptr_type(self.context), rbuf_ptr)
 
         // Call with_fiber_cancel(fiber_id)
         let cancel_fn_name = "with_fiber_cancel"
@@ -3753,20 +3762,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let cft = wl_global_get_value_type(cancel_fn)
         let ca: Vec[i64] = Vec.new()
         ca.push(fid)
-        wl_build_call(self.builder, cft, cancel_fn, vec_data_i64(&ca), 1)
-
-        // Free result buffer
-        let free_fn_name = "with_free"
-        var free_fn = wl_get_named_function(self.llmod, free_fn_name)
-        if free_fn == 0:
-            let fp: Vec[i64] = Vec.new()
-            fp.push(wl_ptr_type(self.context))
-            let fft = wl_function_type(wl_void_type(self.context), vec_data_i64(&fp), 1, 0)
-            free_fn = wl_add_function(self.llmod, free_fn_name, fft)
-        let fft = wl_global_get_value_type(free_fn)
-        let fa: Vec[i64] = Vec.new()
-        fa.push(rbuf)
-        wl_build_call(self.builder, fft, free_fn, vec_data_i64(&fa), 1)
+        result = wl_build_call(self.builder, cft, cancel_fn, vec_data_i64(&ca), 1)
 
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
