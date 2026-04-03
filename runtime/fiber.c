@@ -293,9 +293,6 @@ static void fiber_install_signal_handlers(void) {
 // ── Public API (called from generated code) ─────────────────────────
 
 // Initialize the runtime (called once before main if async is used).
-// Panic hooks — defined in support_runtime.c, set here during init
-extern void (*with_fiber_panic_hook)(const char *msg, int32_t msg_len);
-extern int32_t (*with_fiber_in_fiber_hook)(void);
 // Forward declaration
 void with_fiber_panic_capture(const char *msg, int32_t msg_len);
 
@@ -313,9 +310,6 @@ void with_runtime_init(void) {
     fiber_steal_events = 0;
     scheduler_round = 0;
     fiber_install_signal_handlers();
-    // Register panic hooks so with_panic captures inside fibers
-    with_fiber_panic_hook = with_fiber_panic_capture;
-    with_fiber_in_fiber_hook = with_fiber_in_fiber;
 }
 
 // Create a new fiber. Returns fiber ID.

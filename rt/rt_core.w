@@ -492,10 +492,9 @@ pub fn runtime_set_argv(argc: i32, argv: *const *const u8):
     saved_argv = argv
     rt_store_args(argc, argv)
 
-// with_runtime_init, with_runtime_run, with_runtime_shutdown are provided
-// by C runtime stubs (support_runtime.c / with_runtime.c) as weak symbols.
-// The strong definitions come from fiber.c when the fiber runtime is linked.
-// rt_core.w does NOT provide these — it would create duplicate strong symbols.
+// with_runtime_init, with_runtime_run, with_runtime_shutdown come from the
+// small runtime stub object when async is absent, or from fiber.c when the
+// fiber runtime is linked. rt_core.w does not provide them directly.
 
 // ── Print functions ────────────────────────────────────────────────
 
@@ -2356,8 +2355,8 @@ pub fn net_udp_bind(port: i32) -> i32:
     let _ = port
     -1
 
-// Fiber stubs (with_fiber_yield, with_fiber_in_fiber) are provided by
-// C runtime as weak symbols. Strong definitions come from fiber.c.
+// Fiber stubs come from the small runtime stub object when async is absent.
+// Strong definitions come from fiber.c when the fiber runtime is linked.
 
 // ── cimport stubs ──────────────────────────────────────────────────
 
@@ -2369,6 +2368,8 @@ pub fn cimport_available() -> i32:
 pub fn extract_runtime_obj(name: str, path: str) -> i32:
     let _ = name
     let _ = path
+    // The real extractor is compiler-owned and linked into the self-contained
+    // compiler binary. User programs keep a stub here.
     1
 
 // ── Sysinfo ────────────────────────────────────────────────────────

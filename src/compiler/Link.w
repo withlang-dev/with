@@ -1,9 +1,69 @@
 extern fn with_system(cmd: str) -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_eprint(s: str) -> void
-extern fn with_extract_runtime_obj(name: str, path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
+
+extern let with_embedded_helpers_o_start: u8
+extern let with_embedded_helpers_o_end: u8
+extern let with_embedded_compat_runtime_o_start: u8
+extern let with_embedded_compat_runtime_o_end: u8
+extern let with_embedded_panic_runtime_o_start: u8
+extern let with_embedded_panic_runtime_o_end: u8
+extern let with_embedded_fiber_stubs_o_start: u8
+extern let with_embedded_fiber_stubs_o_end: u8
+extern let with_embedded_fiber_o_start: u8
+extern let with_embedded_fiber_o_end: u8
+extern let with_embedded_fiber_asm_o_start: u8
+extern let with_embedded_fiber_asm_o_end: u8
+extern let with_embedded_rt_core_o_start: u8
+extern let with_embedded_rt_core_o_end: u8
+extern let with_embedded_rt_darwin_aarch64_o_start: u8
+extern let with_embedded_rt_darwin_aarch64_o_end: u8
+
+fn link_stage_str_from_raw_parts(ptr: *const u8, len: i64) -> str:
+    if ptr as i64 == 0 or len <= 0:
+        return ""
+    var out: str = ""
+    unsafe:
+        let sp = &mut out as *mut u8
+        *(sp as *mut u64) = ptr as u64
+        *((sp + 8u64) as *mut i64) = len
+    out
+
+fn link_stage_embedded_obj_slice(start: *const u8, end: *const u8) -> str:
+    let len = end as i64 - start as i64
+    if len <= 0:
+        return ""
+    link_stage_str_from_raw_parts(start, len)
+
+fn link_stage_embedded_runtime_object(name: str) -> str:
+    if name == "helpers.o":
+        return link_stage_embedded_obj_slice(&with_embedded_helpers_o_start as *const u8, &with_embedded_helpers_o_end as *const u8)
+    if name == "compat_runtime.o":
+        return link_stage_embedded_obj_slice(&with_embedded_compat_runtime_o_start as *const u8, &with_embedded_compat_runtime_o_end as *const u8)
+    if name == "panic_runtime.o":
+        return link_stage_embedded_obj_slice(&with_embedded_panic_runtime_o_start as *const u8, &with_embedded_panic_runtime_o_end as *const u8)
+    if name == "fiber_stubs.o":
+        return link_stage_embedded_obj_slice(&with_embedded_fiber_stubs_o_start as *const u8, &with_embedded_fiber_stubs_o_end as *const u8)
+    if name == "fiber.o":
+        return link_stage_embedded_obj_slice(&with_embedded_fiber_o_start as *const u8, &with_embedded_fiber_o_end as *const u8)
+    if name == "fiber_asm.o":
+        return link_stage_embedded_obj_slice(&with_embedded_fiber_asm_o_start as *const u8, &with_embedded_fiber_asm_o_end as *const u8)
+    if name == "rt_core.o":
+        return link_stage_embedded_obj_slice(&with_embedded_rt_core_o_start as *const u8, &with_embedded_rt_core_o_end as *const u8)
+    if name == "rt_darwin_aarch64.o":
+        return link_stage_embedded_obj_slice(&with_embedded_rt_darwin_aarch64_o_start as *const u8, &with_embedded_rt_darwin_aarch64_o_end as *const u8)
+    ""
+
+fn link_stage_extract_runtime_obj(name: str, path: str) -> i32:
+    let data = link_stage_embedded_runtime_object(name)
+    if data.len() == 0:
+        return 1
+    if with_fs_write_file(path, data) != 0:
+        return 1
+    0
 
 fn link_stage_link(obj_path: str, bin_path: str) -> bool:
     let extras: Vec[str] = Vec.new()
@@ -156,7 +216,7 @@ fn link_stage_find_runtime_object_path(name: str) -> str:
     let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
     let _ = ("mkdir -p " ++ tmp_dir) |> with_system
     let tmp_path = tmp_dir ++ "/" ++ name
-    if with_extract_runtime_obj(name, tmp_path) == 0:
+    if link_stage_extract_runtime_obj(name, tmp_path) == 0:
         return tmp_path
     ""
 
@@ -275,9 +335,9 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
         let use_rt_core = link_stage_should_use_rt_core(obj_path)
         let needs_llvm = link_stage_object_needs_llvm_bridge(obj_path)
         if use_rt_core:
-            // Pure With program — rt_core.o + platform backend + support_runtime
-            // (support_runtime has weak stubs for runtime init/shutdown/fiber
-            //  that fiber.o overrides with strong definitions when linked)
+            // Pure With program — rt_core.o + platform backend + panic runtime.
+            // Non-async builds also link fiber_stubs.o for lifecycle and fiber
+            // fallback symbols; async builds bring fiber.o instead.
             let rt_core_path = link_stage_find_runtime_object_path("rt_core.o")
             if rt_core_path.len() == 0:
                 with_eprint("error: missing rt_core.o")
@@ -288,19 +348,39 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 with_eprint("error: missing rt_darwin_aarch64.o")
                 return false
             extras.push(rt_platform_path)
-            let support_rt_path = link_stage_find_runtime_object_path("support_runtime.o")
-            if support_rt_path.len() > 0:
-                let support_ar = link_stage_make_archive(support_rt_path)
-                extras.push(if support_ar.len() > 0: support_ar else: support_rt_path)
-        else if needs_llvm:
-            // Compiler build (lld path) — helpers.o + support_runtime.o only.
-            // lld doesn't tolerate duplicate symbols, and the compiler doesn't
-            // need rt_core.o (helpers.o provides its entire runtime).
-            let support_runtime_path = link_stage_find_runtime_object_path("support_runtime.o")
-            if support_runtime_path.len() == 0:
-                with_eprint("error: missing runtime/support_runtime.o")
+            let panic_rt_path = link_stage_find_runtime_object_path("panic_runtime.o")
+            if panic_rt_path.len() == 0:
+                with_eprint("error: missing runtime/panic_runtime.o")
                 return false
-            extras.push(support_runtime_path)
+            let panic_ar = link_stage_make_archive(panic_rt_path)
+            extras.push(if panic_ar.len() > 0: panic_ar else: panic_rt_path)
+            if needs_fiber_runtime == 0:
+                let fiber_stubs_path = link_stage_find_runtime_object_path("fiber_stubs.o")
+                if fiber_stubs_path.len() == 0:
+                    with_eprint("error: missing runtime/fiber_stubs.o")
+                    return false
+                let fiber_stubs_ar = link_stage_make_archive(fiber_stubs_path)
+                extras.push(if fiber_stubs_ar.len() > 0: fiber_stubs_ar else: fiber_stubs_path)
+        else if needs_llvm:
+            // Compiler build (lld path) — helpers.o + panic runtime, plus
+            // non-async fiber stubs when fiber.o is absent. rt_core.o stays out
+            // because helpers.o provides the compiler runtime surface.
+            let compat_runtime_path = link_stage_find_runtime_object_path("compat_runtime.o")
+            if compat_runtime_path.len() == 0:
+                with_eprint("error: missing runtime/compat_runtime.o")
+                return false
+            extras.push(compat_runtime_path)
+            let panic_runtime_path = link_stage_find_runtime_object_path("panic_runtime.o")
+            if panic_runtime_path.len() == 0:
+                with_eprint("error: missing runtime/panic_runtime.o")
+                return false
+            extras.push(panic_runtime_path)
+            if needs_fiber_runtime == 0:
+                let fiber_stubs_path = link_stage_find_runtime_object_path("fiber_stubs.o")
+                if fiber_stubs_path.len() == 0:
+                    with_eprint("error: missing runtime/fiber_stubs.o")
+                    return false
+                extras.push(fiber_stubs_path)
             let helpers_path = link_stage_find_runtime_object_path("helpers.o")
             if helpers_path.len() == 0:
                 with_eprint("error: missing runtime/helpers.o")
@@ -320,17 +400,24 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 with_eprint("error: missing rt_darwin_aarch64.o")
                 return false
             extras.push(rt_platform_path)
-            let support_runtime_path = link_stage_find_runtime_object_path("support_runtime.o")
-            if support_runtime_path.len() == 0:
-                with_eprint("error: missing runtime/support_runtime.o")
+            let panic_runtime_path = link_stage_find_runtime_object_path("panic_runtime.o")
+            if panic_runtime_path.len() == 0:
+                with_eprint("error: missing runtime/panic_runtime.o")
                 return false
+            let panic_ar = link_stage_make_archive(panic_runtime_path)
+            extras.push(if panic_ar.len() > 0: panic_ar else: panic_runtime_path)
+            if needs_fiber_runtime == 0:
+                let fiber_stubs_path = link_stage_find_runtime_object_path("fiber_stubs.o")
+                if fiber_stubs_path.len() == 0:
+                    with_eprint("error: missing runtime/fiber_stubs.o")
+                    return false
+                let fiber_stubs_ar = link_stage_make_archive(fiber_stubs_path)
+                extras.push(if fiber_stubs_ar.len() > 0: fiber_stubs_ar else: fiber_stubs_path)
             let helpers_path = link_stage_find_runtime_object_path("helpers.o")
             if helpers_path.len() == 0:
                 with_eprint("error: missing runtime/helpers.o")
                 return false
-            let support_ar = link_stage_make_archive(support_runtime_path)
             let helpers_ar = link_stage_make_archive(helpers_path)
-            extras.push(if support_ar.len() > 0: support_ar else: support_runtime_path)
             extras.push(if helpers_ar.len() > 0: helpers_ar else: helpers_path)
 
     // Link libcurl when HTTP functions are used (package management)
