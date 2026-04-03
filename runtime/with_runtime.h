@@ -161,14 +161,6 @@ void with_lines_out(with_vec *out, with_str s);
 with_str with_getenv_str(with_str name);
 int32_t with_setenv_str(with_str name, with_str value);
 
-// ── HTTP (libcurl) ──────────────────────────────────────────────
-
-// GET a URL, return response body as str. Returns empty on error.
-with_str with_http_get(with_str url);
-
-// Download a URL to a file path. Returns 0 on success, -1 on error.
-int32_t with_http_download(with_str url, with_str path);
-
 // Extract a .tgz archive to dest directory. Returns 0 on success.
 int32_t with_extract_tgz(with_str archive, with_str dest);
 

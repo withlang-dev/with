@@ -17,6 +17,7 @@ extern fn execv(path: *const u8, argv: *const *const u8) -> i32
 extern fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32
 extern fn getrlimit(resource: i32, lim: *mut u8) -> i32
 extern fn setrlimit(resource: i32, lim: *const u8) -> i32
+extern fn gethostname(name: *mut u8, len: u64) -> i32
 extern fn _exit(code: i32) -> void
 extern fn __error() -> *mut i32
 
@@ -65,6 +66,17 @@ fn str_to_c_buf(s: str) -> *mut u8:
         let _ = memcpy(out, *sp, s.len() as u64)
     *((out as i64 + s.len()) as *mut u8) = 0
     out
+
+fn clone_c_str(s: *const u8) -> str:
+    if s as i64 == 0:
+        return ""
+    let len = strlen(s)
+    let out = malloc((len + 1) as u64)
+    if out as i64 == 0:
+        return ""
+    let _ = memcpy(out, s, len as u64)
+    *((out as i64 + len) as *mut u8) = 0
+    make_str(out as *const u8, len)
 
 fn restore_default_signal_handler(signo: i32):
     var sa: [16]u8 = [0 as u8; 16]
@@ -316,3 +328,20 @@ pub fn extract_tgz(archive: str, dest: str) -> i32:
     if rc == 0:
         return 0
     -1
+
+@[c_export("with_sysinfo_os")]
+pub fn sysinfo_os() -> str:
+    "Macos"
+
+@[c_export("with_sysinfo_arch")]
+pub fn sysinfo_arch() -> str:
+    "armv8"
+
+@[c_export("with_sysinfo_hostname")]
+pub fn sysinfo_hostname() -> str:
+    var buf: [256]u8 = [0 as u8; 256]
+    let buf_ptr = (&mut buf) as *mut [256]u8 as *mut u8
+    if gethostname(buf_ptr, 256 as u64) != 0:
+        return "unknown"
+    buf[255] = 0
+    clone_c_str(buf_ptr as *const u8)

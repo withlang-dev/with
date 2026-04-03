@@ -27,6 +27,7 @@ extern fn rt_nanosleep(ns: i64) -> i32
 extern fn rt_getpid() -> i32
 extern fn rt_raise(sig: i32) -> i32
 extern fn rt_sysinfo(out: *mut u8) -> i32
+extern fn gethostname(name: *mut u8, len: u64) -> i32
 
 // Filesystem extras (provided by platform backend)
 extern fn rt_mkdir(path: *const u8, mode: i32) -> i32
@@ -2376,15 +2377,20 @@ pub fn extract_runtime_obj(name: str, path: str) -> i32:
 
 @[c_export("with_sysinfo_os")]
 pub fn sysinfo_os() -> str:
-    make_str("darwin" as *const u8, 6)
+    make_str("Macos" as *const u8, 5)
 
 @[c_export("with_sysinfo_arch")]
 pub fn sysinfo_arch() -> str:
-    make_str("aarch64" as *const u8, 7)
+    make_str("armv8" as *const u8, 5)
 
 @[c_export("with_sysinfo_hostname")]
 pub fn sysinfo_hostname() -> str:
-    make_str("localhost" as *const u8, 9)
+    var buf: [256]u8 = [0 as u8; 256]
+    let buf_ptr = (&mut buf) as *mut [256]u8 as *mut u8
+    if gethostname(buf_ptr, 256 as u64) != 0:
+        return make_str("unknown" as *const u8, 7)
+    buf[255] = 0
+    alloc_str(buf_ptr as *const u8, cstr_len(buf_ptr as *const u8))
 
 // rt_sysinfo wrapper — fills {cpu_cores: i32, memory_total: i64, page_size: i64}
 @[c_export("with_sysinfo")]
