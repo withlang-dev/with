@@ -35,7 +35,6 @@ with_str with_i32_to_str(int32_t n);
 with_str with_i64_to_str(int64_t n);
 with_str with_bool_to_str(bool b);
 int64_t with_parse_i64(with_str s);
-with_str int_to_string(int32_t n);
 with_str i64_to_string(int64_t n);
 with_str str_from_byte(int32_t b);
 
@@ -133,7 +132,6 @@ void with_println_i32(int32_t n);
 void with_println_i64(int64_t n);
 void with_println_bool(bool b);
 void with_print_str(with_str s);
-void print(with_str s);
 void with_eprintln(with_str s);
 void with_eprint(with_str s);
 void with_write(with_str s);

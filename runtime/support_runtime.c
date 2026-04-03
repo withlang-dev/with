@@ -100,10 +100,6 @@ void with_print_str(with_str s) {
     }
 }
 
-void print(with_str s) {
-    with_print_str(s);
-}
-
 void with_assert(bool cond, const char *msg, const char *file, int line) {
     if (!cond) {
         fprintf(stderr, "assertion failed: %s at %s:%d\n", msg, file, line);

@@ -94,7 +94,6 @@ extern fn with_ci_cursor_pointee_type(session: i64, cursor: i32) -> str
 extern fn with_cimport_struct_field_align(session: i64, idx: i32, field: i32) -> i64
 extern fn with_cimport_struct_align(session: i64, idx: i32) -> i64
 
-extern fn int_to_string(n: i32) -> str
 extern fn i64_to_string(n: i64) -> str
 extern fn with_eprint(s: str) -> void
 

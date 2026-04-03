@@ -8,7 +8,6 @@ use InternPool
 use render
 
 extern fn with_eprint(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
 // ── Diagnostics ──────────────────────────────────────────────────
 
