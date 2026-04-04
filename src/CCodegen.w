@@ -941,7 +941,8 @@ fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
                 self.fail("unsupported str field access in C backend: " ++ field_name)
                 current_tid = 0
                 continue
-            out = f"{out}.f{pd}"
+            let field_name = cc_intern_resolve(self.intern, pd)
+            out = out ++ "." ++ field_name
             if tk == TypeKind.TY_STRUCT:
                 let ft_raw = self.struct_field_tid(resolved as i32, pd)
                 let ft = self.effective_field_tid(resolved as i32, pd, ft_raw)
@@ -1128,6 +1129,8 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
             return "(-(" ++ inner ++ "))"
         if d0 == UnaryOp.UOP_NOT:
             return "(!(" ++ inner ++ "))"
+        if d0 == UnaryOp.UOP_BIT_NOT:
+            return "(~(" ++ inner ++ "))"
         self.fail(f"unsupported unary op {d0}")
         return inner
     if rk == RvalueKind.RK_REF:
@@ -4341,7 +4344,7 @@ fn CCodegen.emit_term(self: CCodegen, body: MirBody, bb: i32) -> str:
     self.fail(f"unsupported terminator kind {tk}")
     "    abort();"
 
-fn CCodegen.collect_struct_types_from_tid(self: CCodegen, out: Vec[i32], seen_names: HashMap[i32, i32], tid: i32):
+fn CCodegen.collect_struct_types_from_tid(self: CCodegen, out: &mut Vec[i32], seen_names: &mut HashMap[i32, i32], tid: i32):
     let resolved = self.sema.resolve_alias(tid)
     if resolved == 0:
         return
@@ -4357,8 +4360,8 @@ fn CCodegen.collect_struct_types_from_tid(self: CCodegen, out: Vec[i32], seen_na
         self.collect_struct_types_from_tid(out, seen_names, inner_tid)
 
 fn CCodegen.collect_used_struct_types(self: CCodegen) -> Vec[i32]:
-    let out: Vec[i32] = Vec.new()
-    let seen_names: HashMap[i32, i32] = HashMap.new()
+    var out: Vec[i32] = Vec.new()
+    var seen_names: HashMap[i32, i32] = HashMap.new()
 
     for bi in 0..self.mir_mod.bodies.len() as i32:
         if self.check_interrupted() != 0:
@@ -4368,15 +4371,15 @@ fn CCodegen.collect_used_struct_types(self: CCodegen) -> Vec[i32]:
             if self.check_interrupted() != 0:
                 return out
             let tid = body.local_type_ids.get(li as i64)
-            self.collect_struct_types_from_tid(out, seen_names, tid)
+            self.collect_struct_types_from_tid(&mut out, &mut seen_names, tid)
         let sig_idx = self.body_sig_index(body.fn_sym)
         if sig_idx >= 0:
             let ret_tid = self.sema.sig_return_type(sig_idx)
-            self.collect_struct_types_from_tid(out, seen_names, ret_tid)
+            self.collect_struct_types_from_tid(&mut out, &mut seen_names, ret_tid)
             let param_count = self.sema.sig_get_param_count(sig_idx)
             for pi in 0..param_count:
                 let p_tid = self.sema.sig_param_type(sig_idx, pi)
-                self.collect_struct_types_from_tid(out, seen_names, p_tid)
+                self.collect_struct_types_from_tid(&mut out, &mut seen_names, p_tid)
 
     var i = 0
     while i < out.len() as i32:
@@ -4390,7 +4393,7 @@ fn CCodegen.collect_used_struct_types(self: CCodegen) -> Vec[i32]:
             if self.check_interrupted() != 0:
                 return out
             let raw_field_tid = self.sema.type_extra.get((start + fi * 3 + 1) as i64)
-            self.collect_struct_types_from_tid(out, seen_names, raw_field_tid)
+            self.collect_struct_types_from_tid(&mut out, &mut seen_names, raw_field_tid)
 
     out
 
@@ -4469,7 +4472,8 @@ fn CCodegen.emit_struct_type_defs(self: CCodegen) -> str:
             let field_sym = self.sema.type_extra.get((start + fi * 3) as i64)
             let raw_field_tid = self.sema.type_extra.get((start + fi * 3 + 1) as i64)
             let field_tid = self.effective_field_tid(resolved, field_sym, raw_field_tid)
-            out = out ++ "    " ++ self.c_type(field_tid, 0) ++ f" f{field_sym};\n"
+            let field_name = cc_intern_resolve(self.intern, field_sym)
+            out = out ++ "    " ++ self.c_type(field_tid, 0) ++ " " ++ field_name ++ ";\n"
         out = out ++ cc_rbrace() ++ ";\n\n"
     out
 

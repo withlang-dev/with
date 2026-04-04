@@ -485,6 +485,21 @@ __test: $(STAGE2_BIN)
 	./scripts/run_issue61_noop_local_regression.sh
 	./scripts/run_embedded_runtime_extract_regression.sh
 
+emit-c-test: build
+	@echo "=== emit-c test ==="
+	rm -rf out/emit-c-test
+	mkdir -p out/emit-c-test
+	./out/bin/with build out/gen/main.w --emit-c -o out/emit-c-test/main.c
+	cd out/emit-c-test && zig cc -o with-from-c main.c \
+		../../runtime/with_runtime.c \
+		-I../../runtime \
+		-lc
+	./out/emit-c-test/with-from-c --version
+	@echo "=== emit-c byte equality ==="
+	./out/emit-c-test/with-from-c build out/gen/main.w -o out/emit-c-test/stage2-from-c -O0
+	diff <(nm out/bin/with-stage2 | sort) <(nm out/emit-c-test/stage2-from-c | sort) \
+		&& echo "EMIT-C FIXPOINT" || echo "EMIT-C DIVERGED"
+
 fixpoint: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __fixpoint)
 
