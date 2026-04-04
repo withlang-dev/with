@@ -2827,6 +2827,10 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
                     if recv_hint == 0:
                         recv_hint = self.sema.ty_i64 as i32
             if self.place_is_direct_local(body, dest_place, local_id) != 0:
+                // Map get/contains/len return int64_t, not the receiver type
+                let call_kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
+                if call_kind == cc_builtin_map_get() or call_kind == cc_builtin_map_contains() or call_kind == cc_builtin_map_len() or call_kind == cc_builtin_opt_is_some():
+                    return self.sema.ty_i64 as i32
                 let rt = self.call_return_tid(body, bb, callee_operand, args_id, dest_place)
                 if rt != 0 and self.is_void_tid(rt) == 0:
                     return rt
