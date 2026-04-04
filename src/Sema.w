@@ -1531,7 +1531,7 @@ fn Sema.literal_suffix_type(self: Sema, suffix: i32) -> i32:
     if suffix == LiteralSuffix.F64: return self.ty_f64 as i32
     0
 
-fn Sema.int_literal_fits_type(self: Sema, value: i64, tid: i32) -> bool:
+fn Sema.int_literal_fits_type(self: Sema, node: i32, tid: i32) -> bool:
     let resolved = self.resolve_alias(tid)
     let kind = self.get_type_kind(resolved)
     if kind == TypeKind.TY_FLOAT:
@@ -1540,6 +1540,12 @@ fn Sema.int_literal_fits_type(self: Sema, value: i64, tid: i32) -> bool:
         return false
     let bits = self.get_type_d0(resolved)
     let signed = self.get_type_d1(resolved)
+    if self.ast.has_int_literal_exact(node as NodeId):
+        let value = self.ast.int_literal_exact_value(node as NodeId)
+        if signed != 0:
+            return exact_int_fits_signed_magnitude_bits(value, bits)
+        return exact_int_fits_unsigned_bits(value, bits)
+    let value = self.ast.int_lit_value(node)
     if bits >= 64:
         if signed != 0:
             return true
@@ -1562,13 +1568,13 @@ fn Sema.int_literal_fits_type(self: Sema, value: i64, tid: i32) -> bool:
         return value <= 4294967295
     true
 
-fn Sema.numeric_literal_expected_type(self: Sema, node: i32, value: i64) -> i32:
+fn Sema.numeric_literal_expected_type(self: Sema, node: i32) -> i32:
     if self.has_expected_type == 0 or self.expected_expr_type == 0:
         return 0
     let expected = self.numeric_operand_type(self.expected_expr_type as i32)
     if not self.is_numeric_type(expected):
         return 0
-    if not self.int_literal_fits_type(value, expected):
+    if not self.int_literal_fits_type(node, expected):
         self.emit_error("integer literal does not fit expected type", node)
     expected
 

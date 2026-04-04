@@ -70,6 +70,7 @@ enum ConstKind: i32:
     CK_FN = 6
     CK_CLOSURE = 7
     CK_ASYNC_BLOCK = 8
+    CK_INT_EXACT = 9
 
 // ── Call intrinsic kinds ─────────────────────────────────────────
 // Attached to TermKind.TK_CALL terminators to mark known container/builtin
@@ -970,6 +971,28 @@ fn mir_operand_text(body: MirBody, operand_id: i32, pool: InternPool, sema: Sema
 
     f"op<{k}>({d0})"
 
+fn mir_exact_int_text(ast: AstPool, node: i32) -> str:
+    if node == 0:
+        return "<exact-int>"
+    let kind = ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_CAST:
+        return mir_exact_int_text(ast, ast.get_data0(node))
+    if kind == NodeKind.NK_UNARY and ast.get_data0(node) == UnaryOp.UOP_NEGATE:
+        return "-" ++ mir_exact_int_text(ast, ast.get_data1(node))
+    if kind == NodeKind.NK_INT_LIT and ast.has_int_literal_exact(node as NodeId):
+        let digits = ast.int_literal_digits(node as NodeId)
+        let radix = ast.int_literal_radix(node as NodeId)
+        if radix == 16:
+            return "0x" ++ digits
+        if radix == 8:
+            return "0o" ++ digits
+        if radix == 2:
+            return "0b" ++ digits
+        return digits
+    if kind == NodeKind.NK_INT_LIT:
+        return with_i64_to_str(ast.int_lit_value(node as NodeId))
+    "<exact-int>"
+
 fn mir_const_text(body: MirBody, const_id: i32, pool: InternPool, sema: Sema) -> str:
     if const_id < 0 or const_id >= body.const_kinds.len() as i32:
         return "const<?>"
@@ -981,6 +1004,10 @@ fn mir_const_text(body: MirBody, const_id: i32, pool: InternPool, sema: Sema) ->
     if k == ConstKind.CK_INT:
         let ty_name = if ty != 0: f"ty{ty}" else: "i32"
         return f"const {with_i64_to_str(mir_const_int_value(body, const_id))}{ty_name}"
+
+    if k == ConstKind.CK_INT_EXACT:
+        let ty_name = if ty != 0: f"ty{ty}" else: "int"
+        return "const " ++ mir_exact_int_text(sema.ast, d0) ++ ty_name
 
     if k == ConstKind.CK_BOOL:
         return if d0 != 0: "const true" else: "const false"
@@ -1369,7 +1396,7 @@ fn validate_mir_body(body: MirBody) -> str:
 
     for ci in 0..const_count:
         let ck = body.const_kinds.get(ci as i64)
-        if ck == ConstKind.CK_INT or ck == ConstKind.CK_BOOL or ck == ConstKind.CK_STR or ck == ConstKind.CK_UNIT or ck == ConstKind.CK_FLOAT or ck == ConstKind.CK_ZERO_SIZED or ck == ConstKind.CK_FN or ck == ConstKind.CK_CLOSURE or ck == ConstKind.CK_ASYNC_BLOCK:
+        if ck == ConstKind.CK_INT or ck == ConstKind.CK_BOOL or ck == ConstKind.CK_STR or ck == ConstKind.CK_UNIT or ck == ConstKind.CK_FLOAT or ck == ConstKind.CK_ZERO_SIZED or ck == ConstKind.CK_FN or ck == ConstKind.CK_CLOSURE or ck == ConstKind.CK_ASYNC_BLOCK or ck == ConstKind.CK_INT_EXACT:
             continue
         return f"const{ci}: unknown const kind {ck}"
 

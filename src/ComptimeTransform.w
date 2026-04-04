@@ -32,6 +32,8 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
             src.get_data2(src_node)
         )
         out.set_literal_suffix(node, src.literal_suffix(src_node))
+        if src.has_int_literal_exact(src_node):
+            out.set_int_literal_exact(node, src.int_literal_digit_idx(src_node), src.int_literal_radix(src_node))
 
     for di in 0..src.decl_count():
         out.add_decl(src.get_decl(di))
@@ -149,7 +151,7 @@ fn ct_new_node_copy(pool: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32
     node as i32
 
 fn ct_clone_leaf(pool: &mut AstPool, node: i32) -> i32:
-    ct_new_node_copy(
+    let cloned = ct_new_node_copy(
         pool,
         pool.kind(node),
         pool.get_start(node),
@@ -159,6 +161,9 @@ fn ct_clone_leaf(pool: &mut AstPool, node: i32) -> i32:
         pool.get_data2(node),
         pool.literal_suffix(node)
     )
+    if pool.has_int_literal_exact(node):
+        pool.set_int_literal_exact(cloned as NodeId, pool.int_literal_digit_idx(node), pool.int_literal_radix(node))
+    cloned
 
 fn ct_empty_block(pool: &mut AstPool, node: i32) -> i32:
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), pool.extra_len(), 0, 0) as i32
@@ -853,6 +858,8 @@ fn ct_rewrite_comptime(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema,
     if inner == 0:
         return ct_empty_block(pool, node)
     let inner_kind = pool.kind(inner)
+    if inner_kind == NodeKind.NK_INT_LIT:
+        return inner
     if inner_kind == NodeKind.NK_IF_EXPR:
         return ct_rewrite_comptime_if(source_ast, pool, sema, intern, diags, node, inner)
     if inner_kind == NodeKind.NK_FOR:

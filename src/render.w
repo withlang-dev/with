@@ -289,6 +289,16 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
     let prefix = if kind == NodeKind.NK_BLOCK: "" else: make_indent(indent)
 
     if kind == NodeKind.NK_INT_LIT:
+        if pool.has_int_literal_exact(node):
+            let digits = pool.int_literal_digits(node)
+            let radix = pool.int_literal_radix(node)
+            if radix == 16:
+                return prefix ++ "0x" ++ digits
+            if radix == 8:
+                return prefix ++ "0o" ++ digits
+            if radix == 2:
+                return prefix ++ "0b" ++ digits
+            return prefix ++ digits
         return f"{prefix}{pool.int_lit_value(node)}"
 
     if kind == NodeKind.NK_FLOAT_LIT:

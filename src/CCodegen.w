@@ -976,6 +976,56 @@ fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
         self.fail(f"unsupported place projection kind {pk}")
     out
 
+fn cc_hex_digit(nibble: i32) -> str:
+    if nibble < 10:
+        return str_from_byte(48 + nibble)
+    str_from_byte(87 + nibble)
+
+fn cc_hex_u64(value: i64) -> str:
+    var out = ""
+    var shift: i32 = 60
+    var started = 0
+    while shift >= 0:
+        let nibble = (exact_int_logical_shr_word(value, shift) & 15) as i32
+        if nibble != 0 or started != 0 or shift == 0:
+            out = out ++ cc_hex_digit(nibble)
+            started = 1
+        if shift == 0:
+            break
+        shift = shift - 4
+    out
+
+fn cc_exact_uint_expr(lo: i64, hi: i64) -> str:
+    if hi == 0:
+        return "((uint64_t)0x" ++ cc_hex_u64(lo) ++ "ULL)"
+    "((((unsigned __int128)0x" ++ cc_hex_u64(hi) ++ "ULL) << 64) | ((unsigned __int128)0x" ++ cc_hex_u64(lo) ++ "ULL))"
+
+fn CCodegen.exact_int_const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
+    let node = body.const_d0.get(const_id as i64)
+    let tid = body.const_types.get(const_id as i64)
+    if tid == 0:
+        return "0"
+    let resolved = self.sema.resolve_alias(tid)
+    let tk = self.sema.get_type_kind(resolved)
+    let cty = self.c_type(tid, 0)
+    if tk == TypeKind.TY_FLOAT:
+        let expr = self.ast.int_literal_exact_expr(node)
+        if expr.ok == 0 or expr.overflow != 0:
+            return "0.0"
+        let mag = exact_int_expr_magnitude(expr)
+        let mag_text = cc_exact_uint_expr(mag.lo, mag.hi)
+        if expr.negative != 0:
+            return "(-((" ++ cty ++ ")(" ++ mag_text ++ ")))"
+        return "((" ++ cty ++ ")(" ++ mag_text ++ "))"
+    if tk != TypeKind.TY_INT and tk != TypeKind.TY_BOOL:
+        return "0"
+    let bits = if tk == TypeKind.TY_BOOL: 1 else: self.sema.get_type_d0(resolved)
+    let signed = if tk == TypeKind.TY_INT: self.sema.get_type_d1(resolved) else: 0
+    let words = self.ast.int_literal_expr_bits(node, bits, signed)
+    if words.ok == 0 or words.overflow != 0:
+        return "0"
+    "((" ++ cty ++ ")(" ++ cc_exact_uint_expr(words.lo, words.hi) ++ "))"
+
 fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
     if const_id < 0 or const_id >= body.const_kinds.len() as i32:
         self.fail(f"invalid const id {const_id}")
@@ -984,6 +1034,8 @@ fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
     let cd = body.const_d0.get(const_id as i64)
     if ck == ConstKind.CK_INT:
         return with_i64_to_str(mir_const_int_value(body, const_id))
+    if ck == ConstKind.CK_INT_EXACT:
+        return self.exact_int_const_text(body, const_id)
     if ck == ConstKind.CK_BOOL:
         return if cd != 0: "true" else: "false"
     if ck == ConstKind.CK_STR:

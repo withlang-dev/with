@@ -2551,17 +2551,61 @@ fn numeric_literal_core(text: str) -> str:
         return text.slice(0, numeric_literal_suffix_start(text, "f32") as i64)
     text
 
+fn int_literal_core_radix(core: str) -> i32:
+    if core.len() > 2 and core.byte_at(0) == 48 and (core.byte_at(1) == 120 or core.byte_at(1) == 88):
+        return 16
+    if core.len() > 2 and core.byte_at(0) == 48 and (core.byte_at(1) == 98 or core.byte_at(1) == 66):
+        return 2
+    if core.len() > 2 and core.byte_at(0) == 48 and (core.byte_at(1) == 111 or core.byte_at(1) == 79):
+        return 8
+    10
+
+fn int_literal_core_digit_start(core: str) -> i32:
+    let radix = int_literal_core_radix(core)
+    if radix == 10:
+        return 0
+    2
+
+fn normalize_int_literal_digits(core: str) -> str:
+    let len = core.len() as i32
+    let start = int_literal_core_digit_start(core)
+    var digits = ""
+    var i = start
+    while i < len:
+        let ch = core.byte_at(i as i64)
+        if ch != 95:
+            digits = digits ++ str_from_byte(ch)
+        i = i + 1
+    digits
+
+fn int_literal_fast_i64(core: str) -> ExactIntI64:
+    let digits = normalize_int_literal_digits(core)
+    exact_int_try_i64(exact_int_parse_digits(digits, int_literal_core_radix(core)))
+
+fn Parser.build_int_literal_node(self: Parser, start: i32, end: i32, text: str) -> NodeId:
+    let suffix = numeric_literal_suffix_code(text)
+    let core = numeric_literal_core(text)
+    let digits = normalize_int_literal_digits(core)
+    let radix = int_literal_core_radix(core)
+    let fast = exact_int_try_i64(exact_int_parse_digits(digits, radix))
+    let node = self.pool.add_node(
+        NodeKind.NK_INT_LIT,
+        start,
+        end,
+        ast_int_part0(if fast.ok != 0: fast.value else: 0),
+        ast_int_part1(if fast.ok != 0: fast.value else: 0),
+        ast_int_part2(if fast.ok != 0: fast.value else: 0)
+    )
+    self.pool.set_literal_suffix(node, suffix)
+    self.pool.set_int_literal_exact(node, self.pool.add_string(digits), radix)
+    node
+
 fn Parser.parse_int_literal(self: Parser) -> NodeId:
     let start = self.current_start()
     let end = self.current_end()
     let text = self.source.slice(start as i64, end as i64)
-    let suffix = numeric_literal_suffix_code(text)
-    let core = numeric_literal_core(text)
     self.advance()
-    let val = parse_i64(core)
-    let node = self.pool.add_node(NodeKind.NK_INT_LIT, start, end, ast_int_part0(val), ast_int_part1(val), ast_int_part2(val))
-    self.pool.set_literal_suffix(node, suffix)
-    node
+    self.build_int_literal_node(start, end, text)
 
 fn Parser.parse_float_literal(self: Parser) -> NodeId:
     let start = self.current_start()
@@ -3565,9 +3609,11 @@ fn Parser.parse_unary_negate(self: Parser) -> NodeId:
         let end = self.current_end()
         let text = self.source.slice(start as i64 + 1, end as i64)
         if numeric_literal_suffix_code(text) == LiteralSuffix.None:
-            let value = 0 - parse_i64(text)
-            self.advance()
-            return self.pool.add_node(NodeKind.NK_INT_LIT, start, end, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value))
+            let fast = int_literal_fast_i64(text)
+            if fast.ok != 0:
+                let value = 0 - fast.value
+                self.advance()
+                return self.pool.add_node(NodeKind.NK_INT_LIT, start, end, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value))
     let operand = self.parse_primary()
     self.pool.add_node(NodeKind.NK_UNARY, start, self.prev_end(), UnaryOp.UOP_NEGATE, operand, 0)
 
@@ -4371,7 +4417,6 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
         let text = self.source.slice(start as i64, end as i64)
         self.advance()
         let val = parse_int(text)
-        // Range pattern
         if self.peek() == TokenKind.TK_DOT_DOT or self.peek() == TokenKind.TK_DOT_DOT_EQ:
             let inclusive = if self.peek() == TokenKind.TK_DOT_DOT_EQ: 1 else: 0
             self.advance()
@@ -4384,16 +4429,19 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
         return self.pool.add_node(NodeKind.NK_PAT_INT, start, end, val, 0, 0)
 
     if t == TokenKind.TK_TRUE:
+        let pat_end = self.current_end()
         self.advance()
-        return self.pool.add_node(NodeKind.NK_PAT_BOOL, start, end, 1, 0, 0)
+        return self.pool.add_node(NodeKind.NK_PAT_BOOL, start, pat_end, 1, 0, 0)
     if t == TokenKind.TK_FALSE:
+        let pat_end = self.current_end()
         self.advance()
-        return self.pool.add_node(NodeKind.NK_PAT_BOOL, start, end, 0, 0, 0)
+        return self.pool.add_node(NodeKind.NK_PAT_BOOL, start, pat_end, 0, 0, 0)
     if t == TokenKind.TK_STRING_LIT:
-        let raw = self.source.slice((start + 1) as i64, (end - 1) as i64)
+        let pat_end = self.current_end()
+        let raw = self.source.slice((start + 1) as i64, (pat_end - 1) as i64)
         let sym = self.intern.intern(raw)
         self.advance()
-        return self.pool.add_node(NodeKind.NK_PAT_STRING, start, end, sym, 0, 0)
+        return self.pool.add_node(NodeKind.NK_PAT_STRING, start, pat_end, sym, 0, 0)
     if t == TokenKind.TK_MINUS:
         self.advance()
         let ns = self.current_start()
@@ -4401,11 +4449,9 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
         let text = self.source.slice(ns as i64, ne as i64)
         self.expect(TokenKind.TK_INT_LIT)
         let val = 0 - parse_int(text)
-        // Check for range pattern after negative number
         if self.peek() == TokenKind.TK_DOT_DOT or self.peek() == TokenKind.TK_DOT_DOT_EQ:
             let inclusive = if self.peek() == TokenKind.TK_DOT_DOT_EQ: 1 else: 0
             self.advance()
-            // Parse range end (may also be negative)
             var eval = 0
             if self.peek() == TokenKind.TK_MINUS:
                 self.advance()
@@ -4502,7 +4548,8 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
         return self.pool.add_node(NodeKind.NK_PAT_IDENT, start, self.prev_end(), name, 0, 0)
 
     if t == TokenKind.TK_DOT_IDENT:
-        let text = self.source.slice((start + 1) as i64, end as i64)
+        let dot_end = self.current_end()
+        let text = self.source.slice((start + 1) as i64, dot_end as i64)
         let name = self.intern.intern(text)
         self.advance()
         if self.peek() == TokenKind.TK_L_PAREN:
@@ -4935,7 +4982,9 @@ fn Parser.parse_array_literal(self: Parser) -> NodeId:
             // For now, evaluate N as a constant and emit N copies
             var fill_count = 0
             if self.pool.kind(count_expr) == NodeKind.NK_INT_LIT:
-                fill_count = self.pool.int_lit_value(count_expr) as i32
+                let fast = self.pool.int_literal_fast_i64(count_expr)
+                if fast.ok != 0:
+                    fill_count = fast.value as i32
             if fill_count <= 0:
                 fill_count = 1
             let extra_start = self.pool.extra_len()

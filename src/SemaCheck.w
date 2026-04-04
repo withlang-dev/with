@@ -614,17 +614,22 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     let kind = self.ast.kind(node)
 
     if kind == NodeKind.NK_INT_LIT:
-        let value = self.ast.int_lit_value(node)
         let suffix_ty = self.literal_suffix_type(self.ast.literal_suffix(node))
         if suffix_ty != 0:
-            if not self.int_literal_fits_type(value, suffix_ty):
+            if not self.int_literal_fits_type(node, suffix_ty):
                 self.emit_error("integer literal does not fit suffix type", node)
             self.typed_expr_types.insert(node, suffix_ty)
             return suffix_ty as TypeId
-        let expected_ty = self.numeric_literal_expected_type(node, value)
+        let expected_ty = self.numeric_literal_expected_type(node)
         if expected_ty != 0:
             self.typed_expr_types.insert(node, expected_ty)
             return expected_ty as TypeId
+        let fast = self.ast.int_literal_fast_i64(node as NodeId)
+        if fast.ok == 0:
+            self.emit_error("integer literal does not fit default type", node)
+            self.typed_expr_types.insert(node, self.ty_i64 as i32)
+            return self.ty_i64
+        let value = fast.value
         let ty = if value < -2147483648 or value > 2147483647: self.ty_i64 else: self.ty_i32
         self.typed_expr_types.insert(node, ty as i32)
         return ty

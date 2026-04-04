@@ -300,6 +300,8 @@ type AstPool {
     data1: Vec[i32],
     data2: Vec[i32],
     literal_suffixes: Vec[i32],
+    int_literal_digit_idxs: Vec[i32],
+    int_literal_radices: Vec[i32],
 
     // Extra data for variable-length lists (params, fields, arms, etc.)
     extra: Vec[i32],
@@ -401,6 +403,8 @@ fn AstPool.new -> AstPool:
         data1: Vec.new(),
         data2: Vec.new(),
         literal_suffixes: Vec.new(),
+        int_literal_digit_idxs: Vec.new(),
+        int_literal_radices: Vec.new(),
         extra: Vec.new(),
         decls: Vec.new(),
         local_decl_count: 0 - 1,
@@ -448,6 +452,8 @@ fn AstPool.new -> AstPool:
     pool.data1.push(0)
     pool.data2.push(0)
     pool.literal_suffixes.push(LiteralSuffix.None)
+    pool.int_literal_digit_idxs.push(0 - 1)
+    pool.int_literal_radices.push(0)
     pool
 
 // Mark the pool as immutable. Any subsequent mutation will print an error.
@@ -466,6 +472,8 @@ fn AstPool.add_node(self: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32
     self.data1.push(d1)
     self.data2.push(d2)
     self.literal_suffixes.push(LiteralSuffix.None)
+    self.int_literal_digit_idxs.push(0 - 1)
+    self.int_literal_radices.push(0)
     idx as NodeId
 
 // Add extra data, returns the index in the extra array.
@@ -504,6 +512,25 @@ fn AstPool.literal_suffix(self: &AstPool, idx: NodeId) -> i32:
 fn AstPool.set_literal_suffix(self: &mut AstPool, idx: NodeId, suffix: i32):
     self.literal_suffixes.set_i32((idx as i32) as i64, suffix)
 
+fn AstPool.int_literal_digit_idx(self: &AstPool, idx: NodeId) -> i32:
+    self.int_literal_digit_idxs.get((idx as i32) as i64)
+
+fn AstPool.int_literal_radix(self: &AstPool, idx: NodeId) -> i32:
+    self.int_literal_radices.get((idx as i32) as i64)
+
+fn AstPool.set_int_literal_exact(self: &mut AstPool, idx: NodeId, digit_idx: i32, radix: i32):
+    self.int_literal_digit_idxs.set_i32((idx as i32) as i64, digit_idx)
+    self.int_literal_radices.set_i32((idx as i32) as i64, radix)
+
+fn AstPool.has_int_literal_exact(self: &AstPool, idx: NodeId) -> bool:
+    self.int_literal_digit_idx(idx) >= 0 and self.int_literal_radix(idx) >= 2
+
+fn AstPool.int_literal_digits(self: &AstPool, idx: NodeId) -> str:
+    let digit_idx = self.int_literal_digit_idx(idx)
+    if digit_idx < 0:
+        return ""
+    self.get_string(digit_idx)
+
 const AST_INT_PART_BASE: i64 = 2097152
 const AST_INT_PART_BASE2: i64 = 4398046511104
 
@@ -521,6 +548,335 @@ fn ast_int_from_parts(d0: i32, d1: i32, d2: i32) -> i64:
 
 fn AstPool.int_lit_value(self: &AstPool, idx: NodeId) -> i64:
     ast_int_from_parts(self.get_data0(idx), self.get_data1(idx), self.get_data2(idx))
+
+type ExactIntValue {
+    ok: i32,
+    overflow: i32,
+    lo: i64,
+    hi: i64,
+}
+
+type ExactIntExpr {
+    ok: i32,
+    overflow: i32,
+    negative: i32,
+    lo: i64,
+    hi: i64,
+}
+
+type ExactIntI64 {
+    ok: i32,
+    value: i64,
+}
+
+fn exact_int_invalid() -> ExactIntValue:
+    ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
+
+fn exact_int_overflow() -> ExactIntValue:
+    ExactIntValue { ok: 1, overflow: 1, lo: 0, hi: 0 }
+
+fn exact_int_value(lo: i64, hi: i64) -> ExactIntValue:
+    ExactIntValue { ok: 1, overflow: 0, lo, hi }
+
+fn exact_int_expr_invalid() -> ExactIntExpr:
+    ExactIntExpr { ok: 0, overflow: 1, negative: 0, lo: 0, hi: 0 }
+
+fn exact_int_expr_value(lo: i64, hi: i64, negative: i32) -> ExactIntExpr:
+    ExactIntExpr { ok: 1, overflow: 0, negative, lo, hi }
+
+fn exact_int_expr_magnitude(expr: ExactIntExpr) -> ExactIntValue:
+    ExactIntValue { ok: expr.ok, overflow: expr.overflow, lo: expr.lo, hi: expr.hi }
+
+fn exact_int_sign_bit() -> i64:
+    0 - 9223372036854775807 - 1
+
+fn exact_int_uword_lt(lhs: i64, rhs: i64) -> bool:
+    let sign_bit = exact_int_sign_bit()
+    (lhs ^ sign_bit) < (rhs ^ sign_bit)
+
+fn exact_int_uword_lte(lhs: i64, rhs: i64) -> bool:
+    let sign_bit = exact_int_sign_bit()
+    (lhs ^ sign_bit) <= (rhs ^ sign_bit)
+
+fn exact_int_low_mask(bits: i32) -> i64:
+    if bits <= 0:
+        return 0
+    if bits >= 64:
+        return 0 - 1
+    if bits == 63:
+        return 9223372036854775807
+    ((1 as i64) << bits) - 1
+
+fn exact_int_pow2_word(bit: i32) -> i64:
+    if bit < 0 or bit >= 64:
+        return 0
+    if bit == 63:
+        return exact_int_sign_bit()
+    (1 as i64) << bit
+
+fn exact_int_logical_shr_word(value: i64, shift: i32) -> i64:
+    if shift <= 0:
+        return value
+    if shift >= 64:
+        return 0
+    (value >> shift) & exact_int_low_mask(64 - shift)
+
+fn exact_int_shl_word(value: i64, shift: i32) -> i64:
+    if shift <= 0:
+        return value
+    if shift >= 64:
+        return 0
+    var out = value
+    for i in 0..shift:
+        out = out +% out
+    out
+
+fn exact_int_word_to_f64(value: i64) -> f64:
+    if value >= 0:
+        return value as f64
+    9223372036854775808.0 + ((value ^ exact_int_sign_bit()) as f64)
+
+fn exact_int_is_zero(value: ExactIntValue) -> bool:
+    value.ok != 0 and value.overflow == 0 and value.lo == 0 and value.hi == 0
+
+fn exact_int_cmp(lhs: ExactIntValue, rhs: ExactIntValue) -> i32:
+    if exact_int_uword_lt(lhs.hi, rhs.hi):
+        return 0 - 1
+    if exact_int_uword_lt(rhs.hi, lhs.hi):
+        return 1
+    if exact_int_uword_lt(lhs.lo, rhs.lo):
+        return 0 - 1
+    if exact_int_uword_lt(rhs.lo, lhs.lo):
+        return 1
+    0
+
+fn exact_int_add_values(lhs: ExactIntValue, rhs: ExactIntValue) -> ExactIntValue:
+    if lhs.ok == 0 or rhs.ok == 0:
+        return exact_int_invalid()
+    if lhs.overflow != 0 or rhs.overflow != 0:
+        return exact_int_overflow()
+    let lo = lhs.lo +% rhs.lo
+    let carry = if exact_int_uword_lt(lo, lhs.lo): 1 as i64 else: 0 as i64
+    let hi = lhs.hi +% rhs.hi
+    if exact_int_uword_lt(hi, lhs.hi):
+        return exact_int_overflow()
+    let hi2 = hi +% carry
+    if exact_int_uword_lt(hi2, hi):
+        return exact_int_overflow()
+    exact_int_value(lo, hi2)
+
+fn exact_int_add_small(value: ExactIntValue, digit: i64) -> ExactIntValue:
+    exact_int_add_values(value, exact_int_value(digit, 0))
+
+fn exact_int_shl_small(value: ExactIntValue, shift: i32) -> ExactIntValue:
+    if value.ok == 0:
+        return exact_int_invalid()
+    if value.overflow != 0:
+        return exact_int_overflow()
+    if shift < 0 or shift >= 64:
+        return exact_int_invalid()
+    if shift == 0:
+        return value
+    if exact_int_logical_shr_word(value.hi, 64 - shift) != 0:
+        return exact_int_overflow()
+    let hi = exact_int_shl_word(value.hi, shift) | exact_int_logical_shr_word(value.lo, 64 - shift)
+    let lo = exact_int_shl_word(value.lo, shift)
+    exact_int_value(lo, hi)
+
+fn exact_int_mul_small(value: ExactIntValue, factor: i32) -> ExactIntValue:
+    if value.ok == 0:
+        return exact_int_invalid()
+    if value.overflow != 0:
+        return exact_int_overflow()
+    if factor < 0:
+        return exact_int_invalid()
+    var result = exact_int_value(0, 0)
+    var addend = value
+    var mul = factor
+    while mul > 0:
+        if (mul & 1) != 0:
+            result = exact_int_add_values(result, addend)
+            if result.overflow != 0:
+                return result
+        mul = mul >> 1
+        if mul > 0:
+            addend = exact_int_shl_small(addend, 1)
+            if addend.overflow != 0:
+                return addend
+    result
+
+fn exact_int_mask_bits(value: ExactIntValue, bits: i32) -> ExactIntValue:
+    if value.ok == 0:
+        return exact_int_invalid()
+    if value.overflow != 0:
+        return exact_int_overflow()
+    if bits <= 0:
+        return exact_int_value(0, 0)
+    if bits >= 128:
+        return value
+    if bits < 64:
+        let mask = exact_int_low_mask(bits)
+        return exact_int_value(value.lo & mask, 0)
+    if bits == 64:
+        return exact_int_value(value.lo, 0)
+    let hi_bits = bits - 64
+    let hi_mask = exact_int_low_mask(hi_bits)
+    exact_int_value(value.lo, value.hi & hi_mask)
+
+fn exact_int_digit_value(ch: i32) -> i32:
+    if ch >= 48 and ch <= 57:
+        return ch - 48
+    if ch >= 97 and ch <= 102:
+        return ch - 87
+    if ch >= 65 and ch <= 70:
+        return ch - 55
+    0 - 1
+
+fn exact_int_parse_digits(digits: str, radix: i32) -> ExactIntValue:
+    if radix < 2 or radix > 16:
+        return exact_int_invalid()
+    var acc = exact_int_value(0, 0)
+    for i in 0..digits.len() as i32:
+        let digit = exact_int_digit_value(digits.byte_at(i as i64))
+        if digit < 0 or digit >= radix:
+            return exact_int_invalid()
+        acc = exact_int_mul_small(acc, radix)
+        if acc.overflow != 0:
+            return acc
+        acc = exact_int_add_small(acc, digit as i64)
+        if acc.overflow != 0:
+            return acc
+    acc
+
+fn exact_int_fits_unsigned_bits(value: ExactIntValue, bits: i32) -> bool:
+    if value.ok == 0 or value.overflow != 0:
+        return false
+    if bits <= 0:
+        return false
+    if bits >= 128:
+        return true
+    if bits < 64:
+        if value.hi != 0:
+            return false
+        let max_lo = exact_int_low_mask(bits)
+        return exact_int_uword_lte(value.lo, max_lo)
+    if bits == 64:
+        return value.hi == 0
+    let hi_bits = bits - 64
+    let max_hi = exact_int_low_mask(hi_bits)
+    exact_int_uword_lte(value.hi, max_hi)
+
+fn exact_int_fits_signed_magnitude_bits(value: ExactIntValue, bits: i32) -> bool:
+    if value.ok == 0 or value.overflow != 0:
+        return false
+    if bits <= 0:
+        return false
+    if bits == 1:
+        return exact_int_is_zero(value)
+    exact_int_fits_unsigned_bits(value, bits - 1)
+
+fn exact_int_fits_signed_negative_bits(value: ExactIntValue, bits: i32) -> bool:
+    if value.ok == 0 or value.overflow != 0:
+        return false
+    if bits <= 0:
+        return false
+    let mag_bits = bits - 1
+    if mag_bits < 64:
+        if value.hi != 0:
+            return false
+        return exact_int_uword_lte(value.lo, exact_int_pow2_word(mag_bits))
+    if mag_bits == 64:
+        if value.hi == 0:
+            return true
+        return value.hi == 1 and value.lo == 0
+    let limit_hi = exact_int_pow2_word(mag_bits - 64)
+    if exact_int_uword_lt(value.hi, limit_hi):
+        return true
+    value.hi == limit_hi and value.lo == 0
+
+fn exact_int_try_i64(value: ExactIntValue) -> ExactIntI64:
+    if value.ok == 0 or value.overflow != 0:
+        return ExactIntI64 { ok: 0, value: 0 }
+    if value.hi != 0 or value.lo < 0:
+        return ExactIntI64 { ok: 0, value: 0 }
+    ExactIntI64 { ok: 1, value: value.lo }
+
+fn exact_int_twos_complement_bits(value: ExactIntValue, bits: i32) -> ExactIntValue:
+    if value.ok == 0 or value.overflow != 0:
+        return exact_int_invalid()
+    let lo = (~value.lo) +% 1
+    let carry = if lo == 0: 1 as i64 else: 0 as i64
+    let hi = (~value.hi) +% carry
+    let neg = exact_int_value(lo, hi)
+    if bits >= 128:
+        return neg
+    exact_int_mask_bits(neg, bits)
+
+fn AstPool.int_literal_exact_value(self: &AstPool, idx: NodeId) -> ExactIntValue:
+    if not self.has_int_literal_exact(idx):
+        return exact_int_invalid()
+    exact_int_parse_digits(self.int_literal_digits(idx), self.int_literal_radix(idx))
+
+fn AstPool.int_literal_fast_i64(self: &AstPool, idx: NodeId) -> ExactIntI64:
+    if self.has_int_literal_exact(idx):
+        return exact_int_try_i64(self.int_literal_exact_value(idx))
+    ExactIntI64 { ok: 1, value: self.int_lit_value(idx) }
+
+fn AstPool.int_literal_expr_i64(self: &AstPool, node: i32) -> ExactIntI64:
+    if node == 0:
+        return ExactIntI64 { ok: 0, value: 0 }
+    let kind = self.kind(node)
+    if kind == NodeKind.NK_INT_LIT and not self.has_int_literal_exact(node as NodeId):
+        return ExactIntI64 { ok: 1, value: self.int_lit_value(node as NodeId) }
+    let expr = self.int_literal_exact_expr(node)
+    if expr.ok == 0 or expr.overflow != 0:
+        return ExactIntI64 { ok: 0, value: 0 }
+    let mag = exact_int_expr_magnitude(expr)
+    if expr.negative == 0:
+        return exact_int_try_i64(mag)
+    if not exact_int_fits_signed_negative_bits(mag, 64):
+        return ExactIntI64 { ok: 0, value: 0 }
+    if mag.hi == 0 and mag.lo == exact_int_sign_bit():
+        return ExactIntI64 { ok: 1, value: 0 - 9223372036854775807 - 1 }
+    ExactIntI64 { ok: 1, value: 0 - mag.lo }
+
+fn AstPool.int_literal_exact_expr(self: &AstPool, node: i32) -> ExactIntExpr:
+    if node == 0:
+        return exact_int_expr_invalid()
+    let kind = self.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_CAST:
+        return self.int_literal_exact_expr(self.get_data0(node))
+    if kind == NodeKind.NK_UNARY and self.get_data0(node) == UnaryOp.UOP_NEGATE:
+        let inner = self.int_literal_exact_expr(self.get_data1(node))
+        if inner.ok == 0 or inner.overflow != 0:
+            return inner
+        return exact_int_expr_value(inner.lo, inner.hi, if inner.negative != 0: 0 else: 1)
+    if kind != NodeKind.NK_INT_LIT:
+        return exact_int_expr_invalid()
+    if self.has_int_literal_exact(node):
+        let parsed = self.int_literal_exact_value(node)
+        return ExactIntExpr { ok: parsed.ok, overflow: parsed.overflow, negative: 0, lo: parsed.lo, hi: parsed.hi }
+    let raw = self.int_lit_value(node)
+    if raw < 0:
+        return exact_int_expr_invalid()
+    exact_int_expr_value(raw, 0, 0)
+
+fn AstPool.int_literal_expr_bits(self: &AstPool, node: i32, bits: i32, signed: i32) -> ExactIntValue:
+    let expr = self.int_literal_exact_expr(node)
+    if expr.ok == 0 or expr.overflow != 0:
+        return exact_int_invalid()
+    let mag = exact_int_expr_magnitude(expr)
+    if expr.negative == 0:
+        if signed != 0:
+            if not exact_int_fits_signed_magnitude_bits(mag, bits):
+                return exact_int_invalid()
+        else:
+            if not exact_int_fits_unsigned_bits(mag, bits):
+                return exact_int_invalid()
+        return mag
+    if signed == 0 or not exact_int_fits_signed_negative_bits(mag, bits):
+        return exact_int_invalid()
+    exact_int_twos_complement_bits(mag, bits)
 
 fn AstPool.has_comptime_nodes(self: &AstPool) -> bool:
     for ni in 1..self.node_count():
