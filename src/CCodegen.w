@@ -4327,9 +4327,14 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
             let rv_tid = self.rvalue_tid(body, d1)
             let rv_resolved = if rv_tid != 0: self.sema.resolve_alias(rv_tid) else: 0
             let rv_tk = if rv_resolved != 0: self.sema.get_type_kind(rv_resolved) else: 0
-            var needs_wrap = rv_tk == TypeKind.TY_INT or rv_tk == TypeKind.TY_BOOL or rv_tid == 0
+            var needs_wrap = rv_tk == TypeKind.TY_INT or rv_tk == TypeKind.TY_BOOL or rv_tk == TypeKind.TY_ENUM
             if not needs_wrap and rv_resolved != 0 and rv_resolved != dst_resolved:
                 needs_wrap = rv_tk != dst_tk
+            // If rvalue type is unknown but the rvalue text looks like a simple scalar, wrap it
+            if not needs_wrap and rv_tid == 0:
+                let rv_looks_scalar = rval.len() > 0 and rval.byte_at(0) != 40 and rval.byte_at(0) != 123
+                if rv_looks_scalar and rval != self.zero_value_text(dst_tid):
+                    needs_wrap = true
             if needs_wrap:
                 let dst_c = self.c_type(dst_tid, 0)
                 return "    " ++ dst_place ++ " = (" ++ dst_c ++ ")" ++ cc_lbrace() ++ rval ++ cc_rbrace() ++ ";"
