@@ -1805,7 +1805,17 @@ fn Sema.ensure_generic_substitutions(self: Sema, tp_start: i32, tp_count: i32, p
         pos = pos + 2 + bound_count
 
 fn Sema.primitive_type_by_sym(self: Sema, sym: i32) -> i32:
+    let named_tid = self.lookup_named_type_visible(sym)
+    if named_tid != 0:
+        let named_resolved = self.resolve_alias(named_tid)
+        let named_kind = self.get_type_kind(named_resolved)
+        if named_kind == TypeKind.TY_INT or named_kind == TypeKind.TY_FLOAT or named_kind == TypeKind.TY_BOOL or named_kind == TypeKind.TY_VOID or named_kind == TypeKind.TY_STR or named_kind == TypeKind.TY_NEVER:
+            return named_tid
+        if named_tid == self.ty_str_view:
+            return named_tid
     let name = self.pool_resolve_symbol(sym)
+    if sema_str_has_data(name) == 0:
+        return 0
     if with_str_eq(name, "i8") != 0: return self.ty_i8 as i32
     if with_str_eq(name, "i16") != 0: return self.ty_i16 as i32
     if with_str_eq(name, "i32") != 0: return self.ty_i32 as i32

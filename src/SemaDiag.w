@@ -87,6 +87,9 @@ fn Sema.unknown_type_message(self: Sema, sym: i32) -> str:
     "unknown type '" ++ name ++ "'"
 
 fn Sema.emit_unknown_type_error(self: Sema, sym: i32, node: i32):
+    if sym <= 0:
+        self.emit_error("unknown type", node)
+        return
     let target_name = self.pool_resolve(sym)
     let suggestion = self.suggest_type_name(target_name, node)
     self.emit_error_with_suggestion(self.unknown_type_message(sym), node, suggestion)
