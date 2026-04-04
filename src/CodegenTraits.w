@@ -60,13 +60,10 @@ fn Codegen.collect_trait_info(self: Codegen, trait_node: i32):
 
         self.trait_method_names.push(method_sym)
         self.trait_method_param_starts.push(method_param_start)
-        if method_ret_node != 0:
-            var trait_ret_ty = self.resolve_type(method_ret_node)
-            if trait_ret_ty == 0:
-                trait_ret_ty = wl_i32_type(self.context)
-            self.trait_method_ret_types.push(trait_ret_ty)
-        else:
-            self.trait_method_ret_types.push(wl_void_type(self.context))
+        // Trait signatures may mention Self, associated types, or the trait's
+        // own type parameters. Those only become concrete in an impl-specific
+        // context, so collecting trait metadata must not try to lower them.
+        self.trait_method_ret_types.push(0)
         self.trait_method_ret_nodes.push(method_ret_node)
         self.trait_method_param_counts.push(method_param_count)
         self.trait_method_default_bodies.push(method_default_body)
@@ -258,6 +255,8 @@ fn Codegen.generate_default_trait_method_for_impl_ext(self: Codegen, impl_type_s
     let saved_tys = self.type_binding_types
     let saved_len = self.type_bindings_len
     let body_node = self.trait_method_default_bodies.get(method_idx as i64)
+    if body_node == 0:
+        return
 
     if trait_sym != 0 and impl_node != 0:
         let tp_count_opt = self.trait_tp_counts.get(trait_sym)

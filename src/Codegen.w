@@ -3232,6 +3232,18 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
 
     self.current_method_owner_sym = saved_owner
 
+fn Codegen.is_method_on_generic_struct(self: Codegen, name_sym: i32) -> bool:
+    if name_sym <= 0:
+        return false
+    let name_str = self.intern.resolve(name_sym)
+    if name_str.len() == 0:
+        return false
+    for di in 0..name_str.len() as i32:
+        if name_str.byte_at(di as i64) == 46:
+            let owner_sym = self.intern.intern(name_str.slice(0, di as i64))
+            return self.generic_structs.contains(owner_sym)
+    false
+
 fn Codegen.is_ref_param(self: Codegen, fn_sym: i32, param_idx: i32) -> bool:
     let start_opt = self.fn_ref_param_starts.get(fn_sym)
     if not start_opt.is_some():
@@ -4139,11 +4151,17 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             continue
         let flags = self.pool.get_data2(decl)
         let meta = self.pool.find_fn_meta(decl)
-        // Skip generic functions (store for monomorphization)
+        let is_sema_generic = self.sema.generic_fn_nodes.contains(name_sym)
+        let is_generic_struct_method = self.is_method_on_generic_struct(name_sym)
+        // Skip sema-generic functions unless they use the generic-struct
+        // lazy path in declare_function(). Blanket impl methods borrow type
+        // params from impl context, so eager declaration resolves unbound names.
         if meta >= 0:
             let tp_count = self.pool.fn_meta_tp_count(meta)
             if tp_count > 0:
                 self.generic_fns.insert(name_sym, decl as i32)
+            else if is_sema_generic and not is_generic_struct_method:
+                continue
             else if (flags / FnFlags.ASYNC) % 2 == 1:
                 self.declare_async_function(decl)
             else:
@@ -4171,7 +4189,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             let meta = self.pool.find_fn_meta(decl)
             if meta >= 0:
                 let tp_count = self.pool.fn_meta_tp_count(meta)
-                if tp_count == 0:
+                if tp_count == 0 and not self.sema.generic_fn_nodes.contains(name_sym):
                     self.gen_function_dispatch(decl)
 
     if self.had_error != 0:

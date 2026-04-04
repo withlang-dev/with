@@ -1934,10 +1934,25 @@ fn Sema.prepare_for_comptime_transform(self: Sema):
 
 // ── Utility functions ────────────────────────────────────────────
 
+fn sema_str_has_data(text: str) -> i32:
+    if text.len() <= 0:
+        return 0
+    let ptr_ptr = &text as *const *const u8
+    if ptr_ptr as i64 == 0:
+        return 0
+    let data_ptr = *ptr_ptr
+    if data_ptr as i64 == 0:
+        return 0
+    1
+
 fn sema_str_contains_char(text: str, needle: i32) -> i32:
-    for i in 0..text.len():
-        if text[i] == needle:
+    if sema_str_has_data(text) == 0:
+        return 0
+    var i = 0
+    while i < text.len() as i32:
+        if text.byte_at(i as i64) == needle:
             return 1
+        i = i + 1
     0
 
 // ── "Did you mean?" suggestions ─────────────────────────────────
@@ -1998,7 +2013,8 @@ fn Sema.suggest_name(self: Sema, target: str, node: i32) -> str:
     best_name
 
 fn Sema.suggest_type_name(self: Sema, target: str, node: i32) -> str:
-    if target.len() == 0: return ""
+    if target.len() == 0 or sema_str_has_data(target) == 0:
+        return ""
     let max_dist = if target.len() as i32 <= 3: 1 else: 2
     var best_name = ""
     var best_dist = max_dist + 1
@@ -2007,9 +2023,9 @@ fn Sema.suggest_type_name(self: Sema, target: str, node: i32) -> str:
         let tk = self.type_kinds.get(ti)
         if tk == TypeKind.TY_STRUCT as i32 or tk == TypeKind.TY_ENUM as i32:
             let sym = self.type_d0.get(ti)
-            if sym > 0:
+            if sym > 0 and sym < self.pool.symbol_texts.len() as i32:
                 let name = self.pool_resolve(sym)
-                if name.len() > 0 and not sema_str_contains_char(name, 46) != 0:
+                if sema_str_has_data(name) != 0 and not sema_str_contains_char(name, 46) != 0:
                     let d = sema_levenshtein(target, name, max_dist)
                     if d < best_dist:
                         best_dist = d
