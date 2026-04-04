@@ -56,7 +56,7 @@ fn compilation_debug_pool_flow_enabled() -> i32:
 fn compilation_debug_pool_flow(label: str, pool: InternPool, typed_pool: AstPool, sema: Sema):
     if compilation_debug_pool_flow_enabled() == 0:
         return
-    with_eprint(f"[comp] {label} pool.symbols={pool.symbol_texts.len() as i32} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
+    with_eprint(f"[comp] {label} pool.symbols={pool.state.symbol_texts.len() as i32} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.state.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
 
 fn compilation_debug_type_names_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_TYPE_NAMES")

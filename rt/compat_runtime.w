@@ -1,7 +1,7 @@
-// rt/compat_runtime.w -- tiny compiler/runtime compatibility surface needed on
-// the helpers-based path before the full runtime is pure With.
+// rt/compat_runtime.w -- compiler-only runtime functions that need libc.
+// These supplement rt_core.w for the compiler build (lld path).
+// The embedded stdlib functions are appended by generate_embedded_stdlib.py.
 
-extern fn strlen(s: *const u8) -> i64
 extern fn malloc(size: u64) -> *mut u8
 extern fn free(ptr: *mut u8) -> void
 extern fn memcpy(dst: *mut u8, src: *const u8, n: u64) -> *mut u8
@@ -17,7 +17,7 @@ extern fn execv(path: *const u8, argv: *const *const u8) -> i32
 extern fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32
 extern fn getrlimit(resource: i32, lim: *mut u8) -> i32
 extern fn setrlimit(resource: i32, lim: *const u8) -> i32
-extern fn gethostname(name: *mut u8, len: u64) -> i32
+extern fn strlen(s: *const u8) -> i64
 extern fn _exit(code: i32) -> void
 extern fn __error() -> *mut i32
 
@@ -36,8 +36,6 @@ let RLIMIT_SIZE: i64 = 16
 let RLIMIT_OFF_CUR: i64 = 0
 let RLIMIT_OFF_MAX: i64 = 8
 
-var saved_argc: i32 = 0
-var saved_argv_raw: i64 = 0
 var interrupt_flag: i32 = 0
 var active_child_pgid: i32 = 0
 
@@ -66,17 +64,6 @@ fn str_to_c_buf(s: str) -> *mut u8:
         let _ = memcpy(out, *sp, s.len() as u64)
     *((out as i64 + s.len()) as *mut u8) = 0
     out
-
-fn clone_c_str(s: *const u8) -> str:
-    if s as i64 == 0:
-        return ""
-    let len = strlen(s)
-    let out = malloc((len + 1) as u64)
-    if out as i64 == 0:
-        return ""
-    let _ = memcpy(out, s, len as u64)
-    *((out as i64 + len) as *mut u8) = 0
-    make_str(out as *const u8, len)
 
 fn restore_default_signal_handler(signo: i32):
     var sa: [16]u8 = [0 as u8; 16]
@@ -151,89 +138,6 @@ fn interrupt_signal_handler(signo: i32):
     if active_child_pgid > 0:
         let _ = kill(0 - active_child_pgid, signo)
     _exit(128 + signo)
-
-@[c_export("with_str_from_cstr")]
-pub fn str_from_cstr(s: *const u8) -> str:
-    if s as i64 == 0:
-        return ""
-    make_str(s, strlen(s))
-
-fn i64_to_buf(n: i64, buf: *mut u8) -> i64:
-    var tmp: [21]u8 = [0 as u8; 21]
-    var pos: i32 = 20
-    var neg: i32 = 0
-    var un: u64 = 0
-    if n < 0:
-        neg = 1
-        un = ((0 - (n + 1)) as u64) + 1
-    else:
-        un = n as u64
-    if un == 0:
-        tmp[pos] = 48
-        pos = pos - 1
-    else:
-        while un > 0:
-            tmp[pos] = (48 + (un % 10) as u8) as u8
-            un = un / 10
-            pos = pos - 1
-    if neg != 0:
-        tmp[pos] = 45
-        pos = pos - 1
-    let len = 20 - pos as i64
-    var i: i64 = 0
-    while i < len:
-        *((buf as i64 + i) as *mut u8) = tmp[(pos + 1) as i64 + i]
-        i = i + 1
-    len
-
-@[c_export("with_i64_to_str")]
-pub fn i64_to_str(n: i64) -> str:
-    var buf: [24]u8 = [0 as u8; 24]
-    let len = i64_to_buf(n, &buf as *mut u8)
-    let out = malloc((len + 1) as u64)
-    if out as i64 == 0:
-        return ""
-    var i: i64 = 0
-    while i < len:
-        *((out as i64 + i) as *mut u8) = buf[i]
-        i = i + 1
-    *((out as i64 + len) as *mut u8) = 0
-    make_str(out as *const u8, len)
-
-@[c_export("with_bool_to_str")]
-pub fn bool_to_str(b: i32) -> str:
-    if b != 0:
-        return "true"
-    "false"
-
-@[c_export("with_runtime_set_argv")]
-pub fn runtime_set_argv(argc: i32, argv: *const *const u8):
-    saved_argc = argc
-    saved_argv_raw = argv as i64
-
-@[c_export("with_arg_count")]
-pub fn arg_count() -> i32:
-    saved_argc
-
-@[c_export("with_arg_at")]
-pub fn arg_at(idx: i32) -> str:
-    if idx < 0 or idx >= saved_argc or saved_argv_raw == 0:
-        return ""
-    let s = *((saved_argv_raw + idx as i64 * 8) as *const *const u8)
-    if s as i64 == 0:
-        return ""
-    make_str(s, strlen(s))
-
-@[c_export("with_getenv_str")]
-pub fn getenv_str(name: str) -> str:
-    let name_buf = str_to_c_buf(name)
-    if name_buf as i64 == 0:
-        return ""
-    let val = getenv(name_buf as *const u8)
-    free(name_buf)
-    if val as i64 == 0:
-        return ""
-    make_str(val, strlen(val))
 
 @[c_export("with_setenv_str")]
 pub fn setenv_str(name: str, value: str) -> i32:
@@ -328,20 +232,3 @@ pub fn extract_tgz(archive: str, dest: str) -> i32:
     if rc == 0:
         return 0
     -1
-
-@[c_export("with_sysinfo_os")]
-pub fn sysinfo_os() -> str:
-    "Macos"
-
-@[c_export("with_sysinfo_arch")]
-pub fn sysinfo_arch() -> str:
-    "armv8"
-
-@[c_export("with_sysinfo_hostname")]
-pub fn sysinfo_hostname() -> str:
-    var buf: [256]u8 = [0 as u8; 256]
-    let buf_ptr = (&mut buf) as *mut [256]u8 as *mut u8
-    if gethostname(buf_ptr, 256 as u64) != 0:
-        return "unknown"
-    buf[255] = 0
-    clone_c_str(buf_ptr as *const u8)

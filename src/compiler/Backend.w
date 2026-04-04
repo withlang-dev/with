@@ -22,7 +22,7 @@ fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, outpu
     var backend_intern = self.pool
     if self.last_sema.ast.decl_count() > 0:
         backend_pool = self.last_sema.ast
-    if self.last_sema.pool.symbol_texts.len() as i32 > 1:
+    if self.last_sema.pool.state.symbol_texts.len() as i32 > 1:
         backend_intern = self.last_sema.pool
     var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, self.last_sema)
     cg.source_file = self.current_source_path
@@ -31,13 +31,13 @@ fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, outpu
     cg.current_decl_source_file = self.current_source_path
     if not debug_info:
         cg.debug_info = 0
-    if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
-        with_eprint(f"[backend] zcu.pool symbols={self.pool.symbol_texts.len() as i32}")
-        with_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.symbol_texts.len() as i32}")
-        with_eprint(f"[backend] sema.pool symbols={self.last_sema.pool.symbol_texts.len() as i32}")
+    if self.pool.state.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.state.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
+        with_eprint(f"[backend] zcu.pool symbols={self.pool.state.symbol_texts.len() as i32}")
+        with_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.state.symbol_texts.len() as i32}")
+        with_eprint(f"[backend] sema.pool symbols={self.last_sema.pool.state.symbol_texts.len() as i32}")
         with_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={self.last_sema.ast.decl_count()}")
-    if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or cg.intern.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
-        with_eprint(f"[backend] cg.intern symbols={cg.intern.symbol_texts.len() as i32}")
+    if self.pool.state.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.state.symbol_texts.len() as i32 <= 4 or cg.intern.state.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
+        with_eprint(f"[backend] cg.intern symbols={cg.intern.state.symbol_texts.len() as i32}")
     if backend_debug_pool_flow_enabled() != 0:
         with_eprint(f"[backend-diag] pool.extra_len={backend_pool.extra_len()} pool.nodes={backend_pool.node_count()}")
         backend_dump_struct_extras(backend_pool, backend_intern)
@@ -74,20 +74,20 @@ fn Zcu.emit_ir_backend(self: Zcu, pool: AstPool, opt_level: i32) -> bool:
     var backend_intern = self.pool
     if self.last_sema.ast.decl_count() > 0:
         backend_pool = self.last_sema.ast
-    if self.last_sema.pool.symbol_texts.len() as i32 > 1:
+    if self.last_sema.pool.state.symbol_texts.len() as i32 > 1:
         backend_intern = self.last_sema.pool
     var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, self.last_sema)
     cg.source_file = self.current_source_path
     cg.source_text = self.current_source_text
     cg.decl_source_paths = self.decl_source_paths
     cg.current_decl_source_file = self.current_source_path
-    if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
-        with_eprint(f"[backend] zcu.pool symbols={self.pool.symbol_texts.len() as i32}")
-        with_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.symbol_texts.len() as i32}")
-        with_eprint(f"[backend] sema.pool symbols={self.last_sema.pool.symbol_texts.len() as i32}")
+    if self.pool.state.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.state.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
+        with_eprint(f"[backend] zcu.pool symbols={self.pool.state.symbol_texts.len() as i32}")
+        with_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.state.symbol_texts.len() as i32}")
+        with_eprint(f"[backend] sema.pool symbols={self.last_sema.pool.state.symbol_texts.len() as i32}")
         with_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={self.last_sema.ast.decl_count()}")
-    if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or cg.intern.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
-        with_eprint(f"[backend] cg.intern symbols={cg.intern.symbol_texts.len() as i32}")
+    if self.pool.state.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.state.symbol_texts.len() as i32 <= 4 or cg.intern.state.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
+        with_eprint(f"[backend] cg.intern symbols={cg.intern.state.symbol_texts.len() as i32}")
     let result = cg.gen_module_from_mir(self.last_mir_module, backend_pool)
     if result != 0:
         with_eprint("error: code generation failed")

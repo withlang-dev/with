@@ -418,9 +418,7 @@ fn Sema.debug_unknown_type(self: Sema, sym: i32, node: i32, context: str):
     with_eprint(f"[unknown-type] {context} sym={sym} name={name} prim={prim} named={named} collecting={self.collecting_types} node_kind={self.ast.kind(node)}")
 
 fn Sema.pool_resolve_symbol(self: Sema, sym: i32) -> str:
-    if sym <= 0 or sym >= self.pool.symbol_texts.len() as i32:
-        return ""
-    self.pool.symbol_texts.get(sym as i64)
+    self.pool.resolve_symbol(sym)
 
 fn Sema.pool_resolve(self: Sema, sym: i32) -> str:
     self.pool_resolve_symbol(sym)
@@ -428,13 +426,13 @@ fn Sema.pool_resolve(self: Sema, sym: i32) -> str:
 fn Sema.pool_lookup_symbol(self: Sema, name: str) -> i32:
     if name.len() == 0:
         return 0
-    let existing = self.pool.symbol_map.get(name)
+    let existing = self.pool.state.symbol_map.get(name)
     if existing.is_some():
         return existing.unwrap()
 
     var i = 1
-    while i < self.pool.symbol_texts.len() as i32:
-        let existing_text = self.pool.symbol_texts.get(i as i64)
+    while i < self.pool.state.symbol_texts.len() as i32:
+        let existing_text = self.pool.state.symbol_texts.get(i as i64)
         if sema_str_eq(existing_text, name) != 0:
             return i
         i = i + 1
@@ -447,22 +445,22 @@ fn Sema.pool_intern(self: &mut Sema, name: str) -> i32:
             return existing
         with_eprint("BUG: Sema.pool_intern called after symbol freeze")
         return 0
-    let existing = self.pool.symbol_map.get(name)
+    let existing = self.pool.state.symbol_map.get(name)
     if existing.is_some():
         return existing.unwrap()
 
     var i = 1
-    while i < self.pool.symbol_texts.len() as i32:
-        let existing_text = self.pool.symbol_texts.get(i as i64)
+    while i < self.pool.state.symbol_texts.len() as i32:
+        let existing_text = self.pool.state.symbol_texts.get(i as i64)
         if sema_str_eq(existing_text, name) != 0:
-            self.pool.symbol_map.insert(existing_text, i)
+            self.pool.state.symbol_map.insert(existing_text, i)
             return i
         i = i + 1
 
-    let id = self.pool.symbol_texts.len() as i32
+    let id = self.pool.state.symbol_texts.len() as i32
     let owned = sema_owned_text(name)
-    self.pool.symbol_texts.push(owned)
-    self.pool.symbol_map.insert(owned, id)
+    self.pool.state.symbol_texts.push(owned)
+    self.pool.state.symbol_map.insert(owned, id)
     id
 
 fn sema_new_map_i32_i32 -> HashMap[i32, i32]:
@@ -2023,7 +2021,7 @@ fn Sema.suggest_type_name(self: Sema, target: str, node: i32) -> str:
         let tk = self.type_kinds.get(ti)
         if tk == TypeKind.TY_STRUCT as i32 or tk == TypeKind.TY_ENUM as i32:
             let sym = self.type_d0.get(ti)
-            if sym > 0 and sym < self.pool.symbol_texts.len() as i32:
+            if sym > 0 and sym < self.pool.state.symbol_texts.len() as i32:
                 let name = self.pool_resolve(sym)
                 if sema_str_has_data(name) != 0 and not sema_str_contains_char(name, 46) != 0:
                     let d = sema_levenshtein(target, name, max_dist)
