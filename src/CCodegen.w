@@ -2904,13 +2904,53 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
         return ""
     let start = body.call_arg_starts.get(args_id as i64)
     let count = body.call_arg_counts.get(args_id as i64)
+    // Resolve callee signature to know which params expect pointers
+    let callee_sig = self.call_args_callee_sig(body, args_id)
     var out = ""
     for i in 0..count:
         if i > 0:
             out = out ++ ", "
         let op_id = body.call_arg_operands.get((start + i) as i64)
-        out = out ++ self.operand_text(body, op_id)
+        let arg_text = self.operand_text(body, op_id)
+        // If the argument is a struct value but the callee expects a pointer, emit &
+        let arg_tid = self.operand_tid(body, op_id)
+        let arg_resolved = self.sema.resolve_alias(arg_tid)
+        let arg_tk = self.sema.get_type_kind(arg_resolved)
+        if arg_tk == TypeKind.TY_STRUCT:
+            // Check if callee param is a pointer type
+            var param_is_ptr = 0
+            if callee_sig >= 0 and i < self.sema.sig_get_param_count(callee_sig):
+                let p_tid = self.sema.sig_param_type(callee_sig, i)
+                let p_resolved = self.sema.resolve_alias(p_tid)
+                let p_tk = self.sema.get_type_kind(p_resolved)
+                if p_tk == TypeKind.TY_PTR or p_tk == TypeKind.TY_REF:
+                    param_is_ptr = 1
+            if param_is_ptr != 0:
+                out = out ++ "&(" ++ arg_text ++ ")"
+                continue
+        out = out ++ arg_text
     out
+
+fn CCodegen.call_args_callee_sig(self: CCodegen, body: MirBody, args_id: i32) -> i32:
+    // Find the callee's signature index for the call that uses args_id.
+    // Walk basic blocks looking for a TK_CALL whose args match.
+    for bb in 0..body.block_count():
+        if body.term_kind(bb) != TermKind.TK_CALL:
+            continue
+        let t_d1 = body.term_d1(bb)
+        if t_d1 != args_id:
+            continue
+        let t_d0 = body.term_d0(bb)
+        // d0 is the callee operand
+        let ok = body.operand_kinds.get(t_d0 as i64)
+        if ok == OperandKind.OK_CONSTANT:
+            let cd = body.operand_d0.get(t_d0 as i64)
+            let ck = body.const_kinds.get(cd as i64)
+            if ck == ConstKind.CK_FN:
+                let fn_sym = body.const_d0.get(cd as i64)
+                return self.body_sig_index(fn_sym)
+        return 0 - 1
+    0 - 1
 
 fn cc_builtin_from_mir_intrinsic(intrinsic: i32) -> i32:
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_NEW: return cc_builtin_vec_new()
