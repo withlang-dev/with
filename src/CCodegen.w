@@ -4453,6 +4453,11 @@ fn CCodegen.emit_struct_type_defs(self: CCodegen) -> str:
         if self.check_interrupted() != 0:
             return ""
         let tid = ordered.get(i as i64)
+        let resolved = self.sema.resolve_alias(tid)
+        let name_sym = self.sema.get_type_d0(resolved)
+        let count = self.sema.get_type_d2(resolved)
+        if count == 1 and self.sema.distinct_type_names.contains(name_sym):
+            continue  // distinct types get their typedef in the definition pass
         let name = self.struct_c_name(tid)
         out = out ++ "typedef struct " ++ name ++ " " ++ name ++ ";\n"
     out = out ++ "\n"
@@ -4465,6 +4470,14 @@ fn CCodegen.emit_struct_type_defs(self: CCodegen) -> str:
         let name = self.struct_c_name(resolved)
         let start = self.sema.get_type_d1(resolved)
         let count = self.sema.get_type_d2(resolved)
+        // Distinct types (single-field wrapper) → emit as typedef to underlying C type
+        let name_sym = self.sema.get_type_d0(resolved)
+        if count == 1 and self.sema.distinct_type_names.contains(name_sym):
+            let raw_field_tid = self.sema.type_extra.get((start + 1) as i64)
+            let field_sym = self.sema.type_extra.get(start as i64)
+            let field_tid = self.effective_field_tid(resolved, field_sym, raw_field_tid)
+            out = out ++ "typedef " ++ self.c_type(field_tid, 0) ++ " " ++ name ++ ";\n\n"
+            continue
         out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
         for fi in 0..count:
             if self.check_interrupted() != 0:
