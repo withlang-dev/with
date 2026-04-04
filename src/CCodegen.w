@@ -821,7 +821,21 @@ fn CCodegen.c_type(self: CCodegen, tid: i32, as_return: i32) -> str:
         if tk == TypeKind.TY_REF and self.sema.get_type_d1(resolved) == 0:
             return "const " ++ base ++ "*"
         return base ++ "*"
-    // Conservative fallback for currently unsupported higher-level layouts.
+    if tk == TypeKind.TY_GENERIC_INST:
+        // Generic instances: Vec[T] → with_vec, HashMap[K,V] → void* (opaque handle)
+        let base_sym = self.sema.get_type_d0(resolved)
+        let base_name = cc_intern_resolve(self.intern, base_sym)
+        if base_name == "Vec":
+            return "with_vec"
+        if base_name == "HashMap":
+            return "int64_t"  // opaque handle, passed as int64_t to runtime functions
+        // Other generic types: treat as opaque struct
+        return self.struct_c_name(resolved)
+    if tk == TypeKind.TY_ARRAY:
+        return "int64_t"  // arrays lowered as pointer+len in C
+    if tk == TypeKind.TY_TUPLE:
+        return "int64_t"  // tuples lowered conservatively
+    // Conservative fallback
     "int64_t"
 
 fn CCodegen.place_local_id(self: CCodegen, body: MirBody, place_id: i32) -> i32:
@@ -1079,6 +1093,22 @@ fn CCodegen.operand_text(self: CCodegen, body: MirBody, operand_id: i32) -> str:
         return self.const_text(body, od)
     self.fail(f"unsupported operand kind {ok}")
     "0"
+
+fn CCodegen.rvalue_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32:
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        return 0
+    let rk = body.rval_kinds.get(rval_id as i64)
+    let d0 = body.rval_d0.get(rval_id as i64)
+    let d1 = body.rval_d1.get(rval_id as i64)
+    if rk == RvalueKind.RK_USE:
+        return self.operand_tid(body, d0)
+    if rk == RvalueKind.RK_CAST:
+        return d0
+    if rk == RvalueKind.RK_BIN_OP:
+        return self.operand_tid(body, d1)
+    if rk == RvalueKind.RK_UN_OP:
+        return self.operand_tid(body, d1)
+    0
 
 fn CCodegen.binop_token(self: CCodegen, op: i32) -> str:
     if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_ADD_SAT: return "+"
@@ -4283,7 +4313,27 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
         if self.is_unit_rvalue(body, d1) != 0:
             let dst_tid = self.place_tid(body, d0)
             return "    " ++ self.place_text(body, d0) ++ " = " ++ self.zero_value_text(dst_tid) ++ ";"
-        return "    " ++ self.place_text(body, d0) ++ " = " ++ self.rvalue_text(body, d1) ++ ";"
+        let rval = self.rvalue_text(body, d1)
+        let dst_tid = self.place_tid(body, d0)
+        let dst_resolved = self.sema.resolve_alias(dst_tid)
+        let dst_tk = self.sema.get_type_kind(dst_resolved)
+        let dst_place = self.place_text(body, d0)
+        // If destination is struct/str/vec and rvalue looks like a scalar, wrap it
+        let dst_is_compound = dst_tk == TypeKind.TY_STRUCT or dst_tk == TypeKind.TY_STR or dst_tid == cc_pseudo_tid_vec() or dst_resolved == cc_pseudo_tid_vec()
+        if dst_is_compound:
+            if rval == "0" or rval == "0LL":
+                return "    " ++ dst_place ++ " = " ++ self.zero_value_text(dst_tid) ++ ";"
+            // If the rvalue type doesn't match the struct destination, wrap
+            let rv_tid = self.rvalue_tid(body, d1)
+            let rv_resolved = if rv_tid != 0: self.sema.resolve_alias(rv_tid) else: 0
+            let rv_tk = if rv_resolved != 0: self.sema.get_type_kind(rv_resolved) else: 0
+            var needs_wrap = rv_tk == TypeKind.TY_INT or rv_tk == TypeKind.TY_BOOL or rv_tid == 0
+            if not needs_wrap and rv_resolved != 0 and rv_resolved != dst_resolved:
+                needs_wrap = rv_tk != dst_tk
+            if needs_wrap:
+                let dst_c = self.c_type(dst_tid, 0)
+                return "    " ++ dst_place ++ " = (" ++ dst_c ++ ")" ++ cc_lbrace() ++ rval ++ cc_rbrace() ++ ";"
+        return "    " ++ dst_place ++ " = " ++ rval ++ ";"
     if sk == StmtKind.StorageLive:
         return f"    /* StorageLive(_{d0}); */"
     if sk == StmtKind.StorageDead:
@@ -4669,7 +4719,15 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out = out ++ "extern void fmt_buf_write_str(int64_t, with_str);\n"
     out = out ++ "extern with_str fmt_buf_finish(int64_t);\n"
     out = out ++ "extern void* with_alloc(int64_t);\n"
-    out = out ++ "extern void with_free(void*);\n\n"
+    out = out ++ "extern void with_free(void*);\n"
+    out = out ++ "extern void with_memcpy(void*, const void*, int64_t);\n"
+    out = out ++ "extern int64_t with_clock_nanos(void);\n"
+    out = out ++ "extern with_str with_sysinfo_os(void);\n"
+    out = out ++ "extern with_str with_sysinfo_arch(void);\n"
+    out = out ++ "extern with_str with_str_trim(with_str);\n"
+    out = out ++ "extern with_str with_str_clone(with_str);\n"
+    out = out ++ "extern with_str with_embedded_std_source(with_str);\n"
+    out = out ++ "extern with_str with_embedded_std_list_modules(void);\n\n"
 
     out = out ++ self.emit_struct_type_defs()
     if self.had_error != 0:
