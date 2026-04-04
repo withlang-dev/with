@@ -2070,15 +2070,15 @@ fn codegen_owned_text(text: str) -> str:
 
 fn Codegen.capture_sema_symbol_texts(self: &mut Codegen):
     let texts: Vec[str] = Vec.new()
-    for i in 0..self.sema.pool.symbol_texts.len() as i32:
-        texts.push(codegen_owned_text(self.sema.pool.symbol_texts.get(i as i64)))
+    for i in 0..self.sema.pool.state.symbol_texts.len() as i32:
+        texts.push(codegen_owned_text(self.sema.pool.state.symbol_texts.get(i as i64)))
     self.sema_symbol_texts = texts
 
 fn Codegen.sema_symbol_text(self: Codegen, sym: i32) -> str:
     if sym > 0 and sym < self.sema_symbol_texts.len() as i32:
         return self.sema_symbol_texts.get(sym as i64)
-    if sym > 0 and sym < self.sema.pool.symbol_texts.len() as i32:
-        return self.sema.pool.symbol_texts.get(sym as i64)
+    if sym > 0 and sym < self.sema.pool.state.symbol_texts.len() as i32:
+        return self.sema.pool.state.symbol_texts.get(sym as i64)
     self.sema.pool_resolve(sym)
 
 // ── Resolve type expression → LLVM type ───────────────────────────

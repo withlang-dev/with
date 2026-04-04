@@ -380,9 +380,19 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 let fiber_stubs_ar = link_stage_make_archive(fiber_stubs_path)
                 extras.push(if fiber_stubs_ar.len() > 0: fiber_stubs_ar else: fiber_stubs_path)
         else if needs_llvm:
-            // Compiler build (lld path) — helpers.o + panic runtime, plus
-            // non-async fiber stubs when fiber.o is absent. rt_core.o stays out
-            // because helpers.o provides the compiler runtime surface.
+            // Compiler build (lld path) — rt_core.o provides the runtime,
+            // compat_runtime.o has libc-dependent functions (system, signals),
+            // helpers.o has c_import/fiber weak stubs.
+            let rt_core_path = link_stage_find_runtime_object_path("rt_core.o")
+            if rt_core_path.len() == 0:
+                with_eprint("error: missing rt_core.o")
+                return false
+            extras.push(rt_core_path)
+            let rt_platform_path = link_stage_find_runtime_object_path("rt_darwin_aarch64.o")
+            if rt_platform_path.len() == 0:
+                with_eprint("error: missing rt_darwin_aarch64.o")
+                return false
+            extras.push(rt_platform_path)
             let compat_runtime_path = link_stage_find_runtime_object_path("compat_runtime.o")
             if compat_runtime_path.len() == 0:
                 with_eprint("error: missing runtime/compat_runtime.o")

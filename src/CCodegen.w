@@ -15,9 +15,7 @@ extern fn str_from_byte(b: i32) -> str
 extern fn with_interrupt_requested() -> i32
 
 fn cc_intern_resolve(intern: InternPool, sym: i32) -> str:
-    if sym <= 0 or sym >= intern.symbol_texts.len() as i32:
-        return ""
-    intern.symbol_texts.get(sym as i64)
+    intern.resolve_symbol(sym)
 
 fn cc_intern_intern(intern: &mut InternPool, s: str) -> i32:
     intern.intern(s)

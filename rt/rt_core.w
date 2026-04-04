@@ -1267,13 +1267,28 @@ pub fn str_hash(s: str) -> u64:
 pub fn i32_to_str(n: i32) -> str:
     fmt_i32(n)
 
+@[c_export("i32_to_str")]
+pub fn i32_to_str_alias(n: i32) -> str:
+    fmt_i32(n)
+
 @[c_export("with_i64_to_str")]
 pub fn i64_to_str(n: i64) -> str:
+    fmt_i64(n)
+
+@[c_export("i64_to_string")]
+pub fn i64_to_string_alias(n: i64) -> str:
     fmt_i64(n)
 
 @[c_export("with_bool_to_str")]
 pub fn bool_to_str(b: i32) -> str:
     fmt_bool(b)
+
+@[c_export("str_from_byte")]
+pub fn str_from_byte_export(b: i32) -> str:
+    let buf = rt_alloc(2)
+    *buf = (b & 255) as u8
+    *((buf as i64 + 1) as *mut u8) = 0
+    make_str(buf as *const u8, 1)
 
 @[c_export("with_parse_i64")]
 pub fn parse_i64(s: str) -> i64:
@@ -1356,11 +1371,7 @@ pub fn getenv_str(name: str) -> str:
 pub fn getenv_impl(name: str) -> str:
     getenv_str(name)
 
-@[c_export("with_setenv_str")]
-pub fn setenv_str(name: str, value: str):
-    // Stub: setenv requires libc on macOS
-    let _ = name
-    let _ = value
+// with_setenv_str: provided by compat_runtime.w (needs libc)
 
 // ── Vec operations ─────────────────────────────────────────────────
 //
@@ -1678,8 +1689,9 @@ pub fn hashmap_new_out(out: *mut *mut u8, key_size: i64, val_size: i64):
     *out = hashmap_new(key_size, val_size)
 
 @[c_export("with_hashmap_new_at")]
-pub fn hashmap_new_at(out: *mut *mut u8, key_size: i64, val_size: i64):
-    *out = hashmap_new(key_size, val_size)
+pub fn hashmap_new_at(base: *mut u8, offset: i64, key_size: i64, val_size: i64):
+    let slot = (base as i64 + offset) as *mut *mut u8
+    *slot = hashmap_new(key_size, val_size)
 
 @[c_export("with_hashmap_insert")]
 pub fn hashmap_insert(map: *mut u8, key: *const u8, val: *const u8, is_str_key: i64):
@@ -2285,11 +2297,7 @@ pub fn abs_i32(n: i32) -> i32:
 pub fn fill_random(buf: *mut u8, len: i64):
     arc4random_buf(buf, len as u64)
 
-@[c_export("with_system")]
-pub fn system_cmd(cmd: str) -> i32:
-    let _ = cmd
-    // Stub -- system() requires libc
-    -1
+// with_system: provided by compat_runtime.w (needs libc fork/exec)
 
 // ── Codegen loop state ─────────────────────────────────────────────
 // Used by LLVM codegen for break/continue within loops.
@@ -2331,19 +2339,8 @@ pub fn codegen_loop_get_result(idx: i32) -> i64:
         return loop_result_bbs[idx]
     0
 
-// ── Signal handling stubs ──────────────────────────────────────────
-
-@[c_export("with_install_interrupt_handlers")]
-pub fn install_interrupt_handlers():
-    let _ = 0
-
-@[c_export("with_raise_stack_limit")]
-pub fn raise_stack_limit():
-    let _ = 0
-
-@[c_export("with_interrupt_requested")]
-pub fn interrupt_requested() -> i32:
-    0
+// with_install_interrupt_handlers, with_raise_stack_limit,
+// with_interrupt_requested: provided by compat_runtime.w (need libc sigaction)
 
 // ── Network stubs ──────────────────────────────────────────────────
 
@@ -2389,9 +2386,7 @@ pub fn net_udp_bind(port: i32) -> i32:
 
 // ── cimport stubs ──────────────────────────────────────────────────
 
-@[c_export("with_cimport_available")]
-pub fn cimport_available() -> i32:
-    0
+// with_cimport_available: provided by helpers.o (weak) / clang_bridge.o (strong)
 
 @[c_export("with_extract_runtime_obj")]
 pub fn extract_runtime_obj(name: str, path: str) -> i32:

@@ -267,7 +267,7 @@ fn Zcu.set_frontend_pool(self: Zcu, pool: InternPool):
 
 fn Zcu.sync_from_sema(self: Zcu, sema: Sema):
     if zcu_debug_pool_flow_enabled() != 0:
-        with_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.symbol_texts.len() as i32} sema.pool={sema.pool.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
+        with_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.state.symbol_texts.len() as i32} sema.pool={sema.pool.state.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
     self.pool = sema.pool
     self.diagnostics = sema.diags
     self.typed_expr_types = sema.typed_expr_types
@@ -276,7 +276,7 @@ fn Zcu.sync_from_sema(self: Zcu, sema: Sema):
     self.typed_binding_muts = sema.typed_binding_muts
     self.last_sema = sema
     if zcu_debug_pool_flow_enabled() != 0:
-        with_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.symbol_texts.len() as i32} last_sema.pool={self.last_sema.pool.symbol_texts.len() as i32} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
+        with_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.state.symbol_texts.len() as i32} last_sema.pool={self.last_sema.pool.state.symbol_texts.len() as i32} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
 
 fn Zcu.set_resolve_snapshot(self: Zcu, result: ResolveResult, root_path: str):
     self.last_resolved = result

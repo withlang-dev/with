@@ -169,7 +169,7 @@ fn ct_empty_block(pool: &mut AstPool, node: i32) -> i32:
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), pool.extra_len(), 0, 0) as i32
 
 fn ct_fresh_sym(intern: &mut InternPool, prefix: str, seed: i32) -> i32:
-    intern.intern(prefix ++ f"{seed}" ++ "_" ++ f"{intern.symbol_texts.len() as i32}")
+    intern.intern(prefix ++ f"{seed}" ++ "_" ++ f"{intern.symbol_count() + 1}")
 
 fn ct_build_type_expr(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, type_id: i32, node: i32) -> i32:
     let resolved = sema.resolve_alias(type_id)
