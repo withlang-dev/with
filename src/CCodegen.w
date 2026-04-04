@@ -4596,6 +4596,25 @@ fn CCodegen.emit_fn_decl(self: CCodegen, body: MirBody) -> str:
     out = out ++ ")"
     out
 
+fn CCodegen.local_receives_ref(self: CCodegen, body: MirBody, local_id: i32) -> bool:
+    for bb in 0..body.block_count():
+        let start = body.bb_stmt_starts.get(bb as i64)
+        let count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..count:
+            let stmt_id = start + si
+            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.Assign:
+                continue
+            let dst_place = body.stmt_d0.get(stmt_id as i64)
+            if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                continue
+            let rval_id = body.stmt_d1.get(stmt_id as i64)
+            if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+                continue
+            let rk = body.rval_kinds.get(rval_id as i64)
+            if rk == RvalueKind.RK_REF or rk == RvalueKind.RK_ADDR_OF:
+                return true
+    false
+
 fn CCodegen.emit_fn_body(self: CCodegen, body: MirBody) -> str:
     if self.check_interrupted() != 0:
         return ""
@@ -4657,7 +4676,14 @@ fn CCodegen.emit_fn_body(self: CCodegen, body: MirBody) -> str:
             let inferred_kind = self.sema.get_type_kind(self.sema.resolve_alias(inferred_tid))
             if self.is_void_tid(use_tid) != 0 or use_kind != inferred_kind or self.strict_type_match(use_tid, inferred_tid) == 0:
                 use_tid = inferred_tid
-        let local_ty = if li == 0 and self.is_void_tid(use_tid) != 0: "int32_t" else: self.c_type(use_tid, 0)
+        var local_ty = if li == 0 and self.is_void_tid(use_tid) != 0: "int32_t" else: self.c_type(use_tid, 0)
+        // If this local is assigned from RK_REF/RK_ADDR_OF, declare as pointer
+        if self.local_receives_ref(body, li):
+            let base_ty = local_ty
+            if base_ty == "void":
+                local_ty = "uint8_t*"
+            else:
+                local_ty = base_ty ++ "*"
         out = out ++ "    " ++ local_ty ++ f" _{li} __attribute__((unused)) = " ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";\n"
     if body.block_count() == 0:
         self.fail("function has no basic blocks: " ++ cc_intern_resolve(self.intern, fn_sym))
@@ -4676,8 +4702,32 @@ fn CCodegen.emit_fn_body(self: CCodegen, body: MirBody) -> str:
                 return ""
             out = out ++ self.line_directive(body, start + si) ++ self.emit_stmt_line(body, start + si) ++ "\n"
         out = out ++ self.emit_term(body, bb) ++ "\n"
+    // Emit stub labels for any BB indices referenced beyond block_count
+    let max_ref = self.max_referenced_bb(body)
+    var stub_bb = body.block_count()
+    while stub_bb <= max_ref:
+        out = out ++ f"bb{stub_bb}: ;\n"
+        stub_bb = stub_bb + 1
     out = out ++ cc_rbrace() ++ "\n"
     out
+
+fn CCodegen.max_referenced_bb(self: CCodegen, body: MirBody) -> i32:
+    var max_bb = body.block_count() - 1
+    for bb in 0..body.block_count():
+        let tk = body.term_kind(bb)
+        let d0 = body.term_data0(bb)
+        let d1 = body.term_data1(bb)
+        let d2 = body.term_data2(bb)
+        let d3 = body.term_data3(bb)
+        if d2 > max_bb: max_bb = d2
+        if d3 > max_bb: max_bb = d3
+        if tk == TermKind.TK_SWITCH_INT and d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
+            let start = body.switch_table_starts.get(d1 as i64)
+            let count = body.switch_table_counts.get(d1 as i64)
+            for i in 0..count:
+                let tgt = body.switch_table_targets.get((start + i) as i64)
+                if tgt > max_bb: max_bb = tgt
+    max_bb
 
 fn CCodegen.find_main_sym(self: CCodegen) -> i32:
     for i in 0..self.mir_mod.body_fn_syms.len() as i32:
