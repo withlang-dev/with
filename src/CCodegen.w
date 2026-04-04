@@ -1041,6 +1041,9 @@ fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
         let text = if cd != 0: cc_intern_resolve(self.intern, cd) else: ""
         return "WITH_STR_LIT(\"" ++ cc_escape_c_string(text) ++ "\")"
     if ck == ConstKind.CK_UNIT:
+        let unit_tid = body.const_types.get(const_id as i64)
+        if unit_tid != 0:
+            return self.zero_value_text(unit_tid)
         return "0"
     if ck == ConstKind.CK_FLOAT:
         if cd != 0:
@@ -1049,6 +1052,9 @@ fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
                 return lit
         return "0.0"
     if ck == ConstKind.CK_ZERO_SIZED:
+        let zs_tid = body.const_types.get(const_id as i64)
+        if zs_tid != 0:
+            return self.zero_value_text(zs_tid)
         return "0"
     if ck == ConstKind.CK_FN:
         if cd == 0:
@@ -2899,13 +2905,14 @@ fn CCodegen.infer_local_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32
     self.local_infer_cache_store(body.fn_sym, local_id, declared)
     declared
 
-fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_operand: i32) -> str:
     if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
         return ""
     let start = body.call_arg_starts.get(args_id as i64)
     let count = body.call_arg_counts.get(args_id as i64)
     // Resolve callee signature to know which params expect pointers
-    let callee_sig = self.call_args_callee_sig(body, args_id)
+    let callee_sig = self.callee_sig_from_operand(body, callee_operand)
+    let callee_param_count = if callee_sig >= 0: self.sema.sig_get_param_count(callee_sig) else: 0
     var out = ""
     for i in 0..count:
         if i > 0:
@@ -2913,43 +2920,31 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
         let op_id = body.call_arg_operands.get((start + i) as i64)
         let arg_text = self.operand_text(body, op_id)
         // If the argument is a struct value but the callee expects a pointer, emit &
-        let arg_tid = self.operand_tid(body, op_id)
-        let arg_resolved = self.sema.resolve_alias(arg_tid)
-        let arg_tk = self.sema.get_type_kind(arg_resolved)
-        if arg_tk == TypeKind.TY_STRUCT:
-            // Check if callee param is a pointer type
-            var param_is_ptr = 0
-            if callee_sig >= 0 and i < self.sema.sig_get_param_count(callee_sig):
-                let p_tid = self.sema.sig_param_type(callee_sig, i)
-                let p_resolved = self.sema.resolve_alias(p_tid)
-                let p_tk = self.sema.get_type_kind(p_resolved)
-                if p_tk == TypeKind.TY_PTR or p_tk == TypeKind.TY_REF:
-                    param_is_ptr = 1
-            if param_is_ptr != 0:
-                out = out ++ "&(" ++ arg_text ++ ")"
-                continue
+        if i < callee_param_count:
+            let p_tid = self.sema.sig_param_type(callee_sig, i)
+            let p_resolved = self.sema.resolve_alias(p_tid)
+            let p_tk = self.sema.get_type_kind(p_resolved)
+            if p_tk == TypeKind.TY_PTR or p_tk == TypeKind.TY_REF:
+                let arg_tid = self.operand_tid(body, op_id)
+                let arg_resolved = self.sema.resolve_alias(arg_tid)
+                let arg_tk = self.sema.get_type_kind(arg_resolved)
+                if arg_tk == TypeKind.TY_STRUCT:
+                    out = out ++ "&(" ++ arg_text ++ ")"
+                    continue
         out = out ++ arg_text
     out
 
-fn CCodegen.call_args_callee_sig(self: CCodegen, body: MirBody, args_id: i32) -> i32:
-    // Find the callee's signature index for the call that uses args_id.
-    // Walk basic blocks looking for a TK_CALL whose args match.
-    for bb in 0..body.block_count():
-        if body.term_kind(bb) != TermKind.TK_CALL:
-            continue
-        let t_d1 = body.term_d1(bb)
-        if t_d1 != args_id:
-            continue
-        let t_d0 = body.term_d0(bb)
-        // d0 is the callee operand
-        let ok = body.operand_kinds.get(t_d0 as i64)
-        if ok == OperandKind.OK_CONSTANT:
-            let cd = body.operand_d0.get(t_d0 as i64)
+fn CCodegen.callee_sig_from_operand(self: CCodegen, body: MirBody, callee_op: i32) -> i32:
+    if callee_op < 0 or callee_op >= body.operand_kinds.len() as i32:
+        return 0 - 1
+    let ok = body.operand_kinds.get(callee_op as i64)
+    if ok == OperandKind.OK_CONSTANT:
+        let cd = body.operand_d0.get(callee_op as i64)
+        if cd >= 0 and cd < body.const_kinds.len() as i32:
             let ck = body.const_kinds.get(cd as i64)
             if ck == ConstKind.CK_FN:
                 let fn_sym = body.const_d0.get(cd as i64)
                 return self.body_sig_index(fn_sym)
-        return 0 - 1
     0 - 1
 
 fn cc_builtin_from_mir_intrinsic(intrinsic: i32) -> i32:
@@ -4363,7 +4358,7 @@ fn CCodegen.emit_term(self: CCodegen, body: MirBody, bb: i32) -> str:
                 out = out ++ "    /* unresolved call elided */\n"
             out = out ++ f"    goto bb{d3};"
             return out
-        let args = self.call_args_text(body, d1)
+        let args = self.call_args_text(body, d1, d0)
         var out = ""
         if self.is_void_tid(ret_tid) != 0:
             out = out ++ "    " ++ callee ++ "(" ++ args ++ ");\n"
@@ -4668,6 +4663,13 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out = out ++ "#include <stdlib.h>\n"
     out = out ++ "#include <string.h>\n"
     out = out ++ "#include \"with_runtime.h\"\n\n"
+    // Extra declarations for functions used by emitted C but not in with_runtime.h
+    out = out ++ "/* Extra runtime declarations */\n"
+    out = out ++ "extern int64_t fmt_buf_new(void);\n"
+    out = out ++ "extern void fmt_buf_write_str(int64_t, with_str);\n"
+    out = out ++ "extern with_str fmt_buf_finish(int64_t);\n"
+    out = out ++ "extern void* with_alloc(int64_t);\n"
+    out = out ++ "extern void with_free(void*);\n\n"
 
     out = out ++ self.emit_struct_type_defs()
     if self.had_error != 0:
