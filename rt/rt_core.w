@@ -257,13 +257,17 @@ fn rt_memset(dst: *mut u8, c: u8, n: i64):
 
 // ── Freelist allocator backed by rt_mmap/rt_munmap ─────────────────
 //
-// Small allocations (<= 4096): freelist with 9 size classes.
-// Large allocations (> 4096): direct rt_mmap with 16-byte header.
+// Small allocations (payload <= 4096): freelist with 9 size classes.
+// Every allocation has a 16-byte header; the first word stores the aligned
+// payload size for allocated blocks and doubles as the freelist next pointer
+// while a small block is free.
+// Large allocations (> 4096 payload bytes): direct rt_mmap with 16-byte header.
 // All allocations are 16-byte aligned minimum.
 
 let RT_PAGE_SIZE: i64 = 65536
 let RT_LARGE_THRESHOLD: i64 = 4096
 let RT_NUM_SIZE_CLASSES: i32 = 9
+let RT_ALLOC_HEADER_SIZE: i64 = 16
 
 // Freelist node: just a pointer to next
 // We store this in the freed memory itself.
@@ -326,91 +330,112 @@ fn size_class_size(idx: i32) -> i64:
     if idx == 7: return 2048
     4096
 
-fn rt_alloc(size_arg: i64) -> *mut u8:
+fn alloc_align_size(size_arg: i64) -> i64:
     var size = size_arg
     if size <= 0:
         size = 1
-    // Align to 16 bytes
-    size = (size + 15) & (0 - 16)
+    (size + 15) & (0 - 16)
+
+fn size_class_block_size(idx: i32) -> i64:
+    size_class_size(idx) + RT_ALLOC_HEADER_SIZE
+
+fn alloc_header_ptr(ptr: *const u8) -> *mut u8:
+    (ptr as i64 - RT_ALLOC_HEADER_SIZE) as *mut u8
+
+fn alloc_payload_size(ptr: *const u8) -> i64:
+    *(alloc_header_ptr(ptr) as *const i64)
+
+fn alloc_store_small_header(block: i64, size: i64):
+    *(block as *mut i64) = size
+
+fn small_block_ptr(block: i64) -> *mut u8:
+    (block + RT_ALLOC_HEADER_SIZE) as *mut u8
+
+fn free_small_block(block: i64, idx: i32):
+    let old_head = get_freelist(idx)
+    *(block as *mut i64) = old_head
+    set_freelist(idx, block)
+
+fn rt_alloc(size_arg: i64) -> *mut u8:
+    let size = alloc_align_size(size_arg)
 
     if size > RT_LARGE_THRESHOLD:
         // Large allocation: direct rt_mmap with 16-byte header storing size
-        let total = size + 16
+        let total = size + RT_ALLOC_HEADER_SIZE
         let p = rt_mmap(total as u64)
         if p as i64 == 0:
             rt_exit(99)
         // Store allocation size in header
         *(p as *mut i64) = size
-        return (p as i64 + 16) as *mut u8
+        return (p as i64 + RT_ALLOC_HEADER_SIZE) as *mut u8
 
-    // Small allocation: check freelist
+    // Small allocation: check freelist keyed by payload size class.
     let idx = size_class_index(size)
     let cls_size = size_class_size(idx)
+    let block_size = size_class_block_size(idx)
 
     let head = get_freelist(idx)
     if head != 0:
         // Pop from freelist. The first 8 bytes of the node store 'next'.
         let next = *(head as *const i64)
         set_freelist(idx, next)
-        return head as *mut u8
+        alloc_store_small_header(head, cls_size)
+        return small_block_ptr(head)
 
     // Carve from slab
-    if slab_remaining < cls_size:
+    if slab_remaining < block_size:
         let new_slab = rt_mmap(RT_PAGE_SIZE as u64)
         if new_slab as i64 == 0:
             rt_exit(99)
         slab_ptr = new_slab as i64
         slab_remaining = RT_PAGE_SIZE
 
-    let p = slab_ptr
-    slab_ptr = slab_ptr + cls_size
-    slab_remaining = slab_remaining - cls_size
-    p as *mut u8
+    let block = slab_ptr
+    slab_ptr = slab_ptr + block_size
+    slab_remaining = slab_remaining - block_size
+    alloc_store_small_header(block, cls_size)
+    small_block_ptr(block)
 
 fn rt_free(ptr: *mut u8):
-    // Without size info, we can't return to freelist.
-    // For small allocs this is a no-op (leak). Callers should use rt_free_sized.
-    let _ = ptr
-
-fn rt_free_sized(ptr: *mut u8, size_arg: i64):
     if ptr as i64 == 0:
         return
-    var size = (size_arg + 15) & (0 - 16)
-
+    let block = alloc_header_ptr(ptr as *const u8) as i64
+    let size = *(block as *const i64)
     if size > RT_LARGE_THRESHOLD:
-        // Large: munmap the whole region (header is 16 bytes before ptr)
-        let base = (ptr as i64 - 16) as *mut u8
-        let total = size + 16
-        rt_munmap(base, total as u64)
+        rt_munmap(block as *mut u8, (size + RT_ALLOC_HEADER_SIZE) as u64)
         return
-
-    // Small: return to freelist
     let idx = size_class_index(size)
-    let old_head = get_freelist(idx)
-    // Store 'next' pointer in the freed block
-    *(ptr as *mut i64) = old_head
-    set_freelist(idx, ptr as i64)
+    free_small_block(block, idx)
+
+fn rt_free_sized(ptr: *mut u8, size_arg: i64):
+    let _ = size_arg
+    rt_free(ptr)
 
 fn rt_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8:
     if ptr as i64 == 0:
         return rt_alloc(new_size)
     if new_size <= 0:
-        rt_free_sized(ptr, old_size)
+        let _ = old_size
+        rt_free(ptr)
         return 0 as *mut u8
 
+    let stored_old_size = alloc_payload_size(ptr as *const u8)
+    let new_aligned = alloc_align_size(new_size)
+
     // If both are in the same size class, no-op
-    if old_size <= RT_LARGE_THRESHOLD and new_size <= RT_LARGE_THRESHOLD:
-        let old_aligned = (old_size + 15) & (0 - 16)
-        let new_aligned = (new_size + 15) & (0 - 16)
-        let old_idx = size_class_index(old_aligned)
+    if stored_old_size <= RT_LARGE_THRESHOLD and new_aligned <= RT_LARGE_THRESHOLD:
+        let old_idx = size_class_index(stored_old_size)
         let new_idx = size_class_index(new_aligned)
         if old_idx == new_idx:
             return ptr
 
     let new_ptr = rt_alloc(new_size)
-    let copy_size = if old_size < new_size: old_size else: new_size
+    var copy_old_size = stored_old_size
+    if old_size > 0 and old_size < copy_old_size:
+        copy_old_size = old_size
+    let copy_size = if copy_old_size < new_size: copy_old_size else: new_size
     rt_memcpy(new_ptr, ptr as *const u8, copy_size)
-    rt_free_sized(ptr, old_size)
+    rt_free(ptr)
     new_ptr
 
 // Null-terminate a str for syscalls
@@ -430,7 +455,10 @@ pub fn alloc_export(size: i64) -> *mut u8:
 @[c_export("with_alloc_zeroed")]
 pub fn alloc_zeroed_export(count: i64, size: i64) -> *mut u8:
     let total = count * size
-    rt_alloc(total)  // rt_mmap returns zeroed memory for large allocs; small allocs from slab are also zeroed
+    let ptr = rt_alloc(total)
+    if ptr as i64 != 0 and total > 0:
+        rt_memset(ptr, 0, total)
+    ptr
 
 @[c_export("with_realloc")]
 pub fn realloc_export(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8:
