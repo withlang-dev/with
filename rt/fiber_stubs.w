@@ -42,6 +42,10 @@ pub fn runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *mut *
         *panic_msg_len_out = 0
     0
 
+@[c_export("with_fiber_await")]
+pub fn fiber_await(fiber_id: i32):
+    let _ = fiber_id
+
 @[c_export("with_fiber_cleanup_await")]
 pub fn fiber_cleanup_await(fiber_id: i32):
     let _ = fiber_id
