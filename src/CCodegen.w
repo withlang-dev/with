@@ -4318,6 +4318,9 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
         let dst_resolved = self.sema.resolve_alias(dst_tid)
         let dst_tk = self.sema.get_type_kind(dst_resolved)
         let dst_place = self.place_text(body, d0)
+        // Vec zero-init: c_type returns "with_vec" for TY_GENERIC_INST(Vec)
+        if (rval == "0" or rval == "0LL") and self.c_type(dst_tid, 0) == "with_vec":
+            return "    " ++ dst_place ++ " = (with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";"
         // If destination is struct/str/vec and rvalue looks like a scalar, wrap it
         let dst_is_compound = dst_tk == TypeKind.TY_STRUCT or dst_tk == TypeKind.TY_STR or dst_tid == cc_pseudo_tid_vec() or dst_resolved == cc_pseudo_tid_vec()
         if dst_is_compound:
