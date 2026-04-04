@@ -422,9 +422,13 @@ fn cc_escape_c_string(text: str) -> str:
         if b >= 32 and b <= 126:
             out = out ++ text.slice(i as i64, (i + 1) as i64)
             continue
-        let hi = b / 16
-        let lo = b % 16
-        out = out ++ "\\x" ++ cc_hex_digit(hi) ++ cc_hex_digit(lo)
+        // Octal escapes for non-ASCII bytes: no hex continuation ambiguity,
+        // and handles signed byte_at values (byte > 127 returns negative i32).
+        let ub = if b < 0: b + 256 else: b
+        let d2 = ub / 64
+        let d1 = (ub % 64) / 8
+        let d0 = ub % 8
+        out = out ++ "\\" ++ f"{d2}" ++ f"{d1}" ++ f"{d0}"
     out
 
 fn cc_sanitize_ident(raw: str) -> str:
