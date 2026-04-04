@@ -166,6 +166,12 @@ int32_t wl_function_value_kind(void){ return LLVMFunctionValueKind; }
 int64_t wl_const_int(int64_t ty, int64_t val, int32_t sign_ext) {
     return P2I(LLVMConstInt(T(ty), (unsigned long long)val, sign_ext));
 }
+int64_t wl_const_int_words(int64_t ty, int64_t lo, int64_t hi, int32_t word_count) {
+    uint64_t words[2];
+    words[0] = (uint64_t)lo;
+    words[1] = (uint64_t)hi;
+    return P2I(LLVMConstIntOfArbitraryPrecision(T(ty), (unsigned)word_count, words));
+}
 int64_t wl_const_real(int64_t ty, double val) {
     return P2I(LLVMConstReal(T(ty), val));
 }

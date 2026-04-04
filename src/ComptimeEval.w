@@ -1407,7 +1407,13 @@ fn ComptimeEvaluator.eval_expr(self: ComptimeEvaluator, diags: &mut DiagnosticLi
 
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_INT_LIT:
-        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), self.ast.int_lit_value(node)))
+        let fast = self.ast.int_literal_fast_i64(node as NodeId)
+        if fast.ok == 0:
+            let exact = self.ast.int_literal_exact_value(node as NodeId)
+            if exact.ok == 0 or exact.overflow != 0:
+                return self.fail(diags, node, "comptime integer literal too large")
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), exact.lo))
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), fast.value))
     if kind == NodeKind.NK_BOOL_LIT:
         return comptime_control_value(comptime_value_bool(self.ast.get_data0(node)))
     if kind == NodeKind.NK_STRING_LIT:

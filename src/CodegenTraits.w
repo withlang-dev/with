@@ -257,6 +257,7 @@ fn Codegen.generate_default_trait_method_for_impl_ext(self: Codegen, impl_type_s
     let saved_syms = self.type_binding_syms
     let saved_tys = self.type_binding_types
     let saved_len = self.type_bindings_len
+    let body_node = self.trait_method_default_bodies.get(method_idx as i64)
 
     if trait_sym != 0 and impl_node != 0:
         let tp_count_opt = self.trait_tp_counts.get(trait_sym)
@@ -1156,10 +1157,59 @@ fn Codegen.module_const_contains_runtime_collection(self: Codegen, node: i32) ->
         return self.module_const_contains_runtime_collection(self.pool.get_data2(node))
     false
 
+fn Codegen.module_const_value_node(self: Codegen, sym: i32) -> i32:
+    for di in 0..self.pool.decl_count():
+        let decl = self.pool.get_decl(di)
+        if self.pool.kind(decl) != NodeKind.NK_LET_DECL:
+            continue
+        if self.pool.get_data0(decl) != sym:
+            continue
+        let flags = self.pool.get_data2(decl)
+        let is_mut = flags % 2
+        if is_mut != 0:
+            continue
+        var value_node = self.pool.get_data1(decl)
+        if value_node == 0:
+            continue
+        if self.pool.kind(value_node) == NodeKind.NK_COMPTIME:
+            value_node = self.pool.get_data0(value_node)
+        return value_node
+    0
+
+fn Codegen.exact_int_const_llvm(self: Codegen, node: i32, sema_tid: i32) -> i64:
+    if node == 0 or sema_tid == 0:
+        return 0
+    let resolved = self.sema.resolve_alias(sema_tid as TypeId)
+    let tk = self.sema.get_type_kind(resolved)
+    if tk != TypeKind.TY_INT and tk != TypeKind.TY_BOOL:
+        return 0
+    let bits = if tk == TypeKind.TY_BOOL: 1 else: self.sema.get_type_d0(resolved)
+    let signed = if tk == TypeKind.TY_INT: self.sema.get_type_d1(resolved) else: 0
+    let words = self.pool.int_literal_expr_bits(node, bits, signed)
+    if words.ok == 0 or words.overflow != 0:
+        return 0
+    let llvm_ty = self.sema_type_to_llvm(resolved)
+    if llvm_ty == 0:
+        return 0
+    wl_const_int_words(llvm_ty, words.lo, words.hi, if bits > 64: 2 else: 1)
+
+fn Codegen.exact_int_expr_to_f64(self: Codegen, node: i32) -> f64:
+    let expr = self.pool.int_literal_exact_expr(node)
+    if expr.ok == 0 or expr.overflow != 0:
+        return 0.0
+    let mag = exact_int_expr_magnitude(expr)
+    var out = exact_int_word_to_f64(mag.hi) * 18446744073709551616.0 + exact_int_word_to_f64(mag.lo)
+    if expr.negative != 0:
+        out = -out
+    out
+
 fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
     let kind = self.pool.kind(node)
     if kind == NodeKind.NK_INT_LIT:
-        return self.pool.int_lit_value(node)
+        let fast = self.pool.int_literal_fast_i64(node as NodeId)
+        if fast.ok == 0:
+            return CONST_EVAL_FAIL()
+        return fast.value
     if kind == NodeKind.NK_COMPTIME:
         return self.try_eval_const_int(self.pool.get_data0(node))
     if kind == NodeKind.NK_GROUPED:
@@ -1265,6 +1315,11 @@ fn Codegen.try_eval_const_llvm(self: Codegen, node: i32, expected_tid: i32) -> i
     let resolved = self.sema.resolve_alias(expected_tid as TypeId)
     let tk = self.sema.get_type_kind(resolved)
 
+    if self.pool.kind(cur) == NodeKind.NK_IDENT:
+        let value_node = self.module_const_value_node(self.pool.get_data0(cur))
+        if value_node != 0 and value_node != cur:
+            return self.try_eval_const_llvm(value_node, expected_tid)
+
     if tk == TypeKind.TY_ARRAY:
         if self.pool.kind(cur) != NodeKind.NK_ARRAY_LIT:
             return 0
@@ -1299,6 +1354,9 @@ fn Codegen.try_eval_const_llvm(self: Codegen, node: i32, expected_tid: i32) -> i
         return 0
 
     if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL:
+        let exact = self.exact_int_const_llvm(cur, resolved as i32)
+        if exact != 0:
+            return exact
         let val = self.try_eval_const_int(cur)
         if val == CONST_EVAL_FAIL():
             return 0
@@ -1308,6 +1366,12 @@ fn Codegen.try_eval_const_llvm(self: Codegen, node: i32, expected_tid: i32) -> i
         return wl_const_int(llvm_ty, val, 1)
 
     if tk == TypeKind.TY_FLOAT:
+        let exact_expr = self.pool.int_literal_exact_expr(cur)
+        if exact_expr.ok != 0 and exact_expr.overflow == 0:
+            let llvm_ty = self.sema_type_to_llvm(resolved)
+            if llvm_ty == 0:
+                return 0
+            return wl_const_real(llvm_ty, self.exact_int_expr_to_f64(cur))
         var float_node = cur
         var float_negate = false
         if self.pool.kind(float_node) == NodeKind.NK_UNARY and self.pool.get_data0(float_node) == UnaryOp.UOP_NEGATE:
@@ -1428,6 +1492,22 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         wl_set_linkage(global, wl_internal_linkage())
         self.module_constants.insert(name_sym, global)
         return
+
+    if resolved_binding_ty != 0:
+        let binding_kind = self.sema.get_type_kind(resolved_binding_ty)
+        if binding_kind == TypeKind.TY_INT or binding_kind == TypeKind.TY_BOOL or binding_kind == TypeKind.TY_FLOAT:
+            let init = self.try_eval_const_llvm(value_node, resolved_binding_ty as i32)
+            if init != 0:
+                let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
+                if global_ty != 0:
+                    let name_str = self.intern.resolve(name_sym)
+                    let global = wl_add_global(self.llmod, global_ty, name_str)
+                    wl_set_initializer(global, init)
+                    if is_mut == 0:
+                        wl_set_global_constant(global, 1)
+                    wl_set_linkage(global, wl_internal_linkage())
+                    self.module_constants.insert(name_sym, global)
+                    return
 
     let str_value = self.try_eval_const_string(value_node, self.current_decl_source_file, 0)
     if str_value.ok:

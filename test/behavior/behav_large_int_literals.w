@@ -1,0 +1,16 @@
+//! expect-stdout: ok
+
+const DEC_TOP_U64: u64 = 9223372036854775808u64
+const HEX_TOP_U64: u64 = 0x8000000000000000u64
+const MAX_U64: u64 = 18446744073709551615u64
+const DEC_TOP_U128: u128 = 18446744073709551616u128
+const MAX_U128: u128 = 340282366920938463463374607431768211455u128
+
+fn main:
+    assert(DEC_TOP_U64 >> 63 == 1u64)
+    assert(HEX_TOP_U64 >> 63 == 1u64)
+    assert(MAX_U64 == 18446744073709551615u64)
+
+    assert(DEC_TOP_U128 >> 64 == 1u128)
+    assert(MAX_U128 >> 127 == 1u128)
+    print("ok")

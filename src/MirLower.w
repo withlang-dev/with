@@ -653,7 +653,13 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
             return recv_ty
         return self.sema.ty_void as i32
     if kind == NodeKind.NK_INT_LIT:
-        let value = self.ast.int_lit_value(node)
+        let suffix_ty = self.sema.literal_suffix_type(self.ast.literal_suffix(node as NodeId))
+        if suffix_ty != 0:
+            return suffix_ty
+        let fast = self.ast.int_literal_fast_i64(node as NodeId)
+        if fast.ok == 0:
+            return self.sema.ty_i64 as i32
+        let value = fast.value
         if value < -2147483648 or value > 2147483647:
             return self.sema.ty_i64 as i32
         return self.sema.ty_i32 as i32
@@ -890,13 +896,20 @@ fn MirBuilder.int_const_operand(self: MirBuilder, value: i64, type_id: i32) -> i
     let c = self.body.new_const(ConstKind.CK_INT, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value), type_id)
     self.body.new_operand(OperandKind.OK_CONSTANT, c)
 
+fn MirBuilder.exact_int_const_operand(self: MirBuilder, node: i32, type_id: i32) -> i32:
+    let c = self.body.new_const(ConstKind.CK_INT_EXACT, node, 0, 0, type_id)
+    self.body.new_operand(OperandKind.OK_CONSTANT, c)
+
 fn MirBuilder.unit_operand(self: MirBuilder) -> i32:
     self.const_operand(ConstKind.CK_UNIT, 0, self.sema.ty_void)
 
 fn MirBuilder.try_eval_const(self: MirBuilder, node: i32) -> i64:
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_INT_LIT:
-        return self.ast.int_lit_value(node)
+        let fast = self.ast.int_literal_fast_i64(node as NodeId)
+        if fast.ok == 0:
+            return -9223372036854775807
+        return fast.value
     if kind == NodeKind.NK_COMPTIME:
         return self.try_eval_const(self.ast.get_data0(node))
     if kind == NodeKind.NK_GROUPED:
@@ -934,6 +947,29 @@ fn MirBuilder.try_eval_const(self: MirBuilder, node: i32) -> i64:
         let ref_sym = self.ast.get_data0(node)
         return self.try_resolve_module_const_val(ref_sym)
     -9223372036854775807
+
+fn MirBuilder.try_resolve_module_const_node(self: MirBuilder, sym: i32) -> i32:
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
+            continue
+        if self.ast.get_data0(decl) != sym:
+            continue
+        let flags = self.ast.get_data2(decl)
+        let is_mut = flags % 2
+        if is_mut != 0:
+            continue
+        var value_node = self.ast.get_data1(decl)
+        if value_node == 0:
+            continue
+        if self.ast.kind(value_node) == NodeKind.NK_COMPTIME:
+            value_node = self.ast.get_data0(value_node)
+        if self.ast.kind(value_node) == NodeKind.NK_IDENT:
+            let target = self.try_resolve_module_const_node(self.ast.get_data0(value_node))
+            if target != 0:
+                return target
+        return value_node
+    0
 
 fn MirBuilder.try_resolve_module_const_val(self: MirBuilder, sym: i32) -> i64:
     for di in 0..self.ast.decl_count():
@@ -1002,6 +1038,18 @@ fn MirBuilder.mark_unsupported(self: MirBuilder):
 fn MirBuilder.lower_int_lit(self: MirBuilder, value: i64, type_id: i32) -> i32:
     let ty = if type_id == 0 or self.sema.get_type_kind(type_id) == TypeKind.TY_VOID: self.sema.ty_i32 else: type_id
     self.int_const_operand(value, ty)
+
+fn MirBuilder.lower_int_lit_node(self: MirBuilder, node: i32, type_id: i32) -> i32:
+    let ty = if type_id == 0 or self.sema.get_type_kind(type_id) == TypeKind.TY_VOID: self.sema.ty_i32 else: type_id
+    let exact = self.ast.int_literal_exact_expr(node)
+    if exact.ok != 0:
+        let fast = exact_int_try_i64(exact_int_expr_magnitude(exact))
+        if exact.negative != 0 or fast.ok == 0:
+            return self.exact_int_const_operand(node, ty)
+    let fast = self.ast.int_literal_fast_i64(node as NodeId)
+    if fast.ok != 0:
+        return self.int_const_operand(fast.value, ty)
+    self.exact_int_const_operand(node, ty)
 
 fn MirBuilder.lower_bool_lit(self: MirBuilder, value: i32) -> i32:
     self.const_operand(ConstKind.CK_BOOL, value, self.sema.ty_bool)
@@ -1290,6 +1338,19 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
     // Generic function reference (monomorphized at codegen time)
     if self.sema.generic_fn_nodes.contains(sym):
         return self.const_operand(ConstKind.CK_FN, sym, type_id)
+
+    let const_node = self.try_resolve_module_const_node(sym)
+    if const_node != 0:
+        let inferred_ty = self.try_resolve_module_const_type(sym)
+        let ty = if inferred_ty != 0:
+            inferred_ty
+        else:
+            if type_id != 0: type_id else: self.sema.ty_i32 as i32
+        let exact = self.ast.int_literal_exact_expr(const_node)
+        if exact.ok != 0:
+            let fast = exact_int_try_i64(exact_int_expr_magnitude(exact))
+            if exact.negative != 0 or fast.ok == 0:
+                return self.exact_int_const_operand(const_node, ty)
 
     // Try module-level constant (const X = 42)
     let const_val = self.try_resolve_module_const_val(sym)
@@ -3736,7 +3797,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     let kind = self.ast.kind(node)
 
     if kind == NodeKind.NK_INT_LIT:
-        return self.lower_int_lit(self.ast.int_lit_value(node), self.expr_type(node))
+        return self.lower_int_lit_node(node, self.expr_type(node))
 
     if kind == NodeKind.NK_BOOL_LIT:
         return self.lower_bool_lit(self.ast.get_data0(node))

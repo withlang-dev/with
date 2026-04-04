@@ -643,6 +643,16 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
             int_ty = if int_value < -2147483648 or int_value > 2147483647: wl_i64_type(self.context) else: wl_i32_type(self.context)
         return wl_const_int(int_ty, int_value, 1)
 
+    if ck == ConstKind.CK_INT_EXACT:
+        if materialize_ty != 0:
+            let ek = wl_get_type_kind(materialize_ty)
+            if ek == wl_float_type_kind() or ek == wl_double_type_kind():
+                return wl_const_real(materialize_ty, self.exact_int_expr_to_f64(cd))
+        let exact = self.exact_int_const_llvm(cd, body.const_types.get(const_id as i64))
+        if exact != 0:
+            return exact
+        return wl_get_undef(fallback_ty)
+
     if ck == ConstKind.CK_BOOL:
         return wl_const_int(wl_i1_type(self.context), cd as i64, 0)
 
@@ -843,6 +853,12 @@ fn Codegen.mir_operand_is_unsigned(self: Codegen, body: MirBody, operand_id: i32
                     let resolved = self.mir_input.mir_resolve_alias(sema_ty)
                     if self.mir_input.mir_get_type_kind(resolved) == TypeKind.TY_INT:
                         return self.mir_input.mir_get_type_d1(resolved) == 0
+    if ok == OperandKind.OK_CONSTANT:
+        let const_ty = body.const_types.get(od as i64)
+        if const_ty > 0:
+            let resolved = self.mir_input.mir_resolve_alias(const_ty)
+            if self.mir_input.mir_get_type_kind(resolved) == TypeKind.TY_INT:
+                return self.mir_input.mir_get_type_d1(resolved) == 0
     false
 
 fn Codegen.mir_sema_type_is_unsigned(self: Codegen, sema_ty: i32) -> bool:

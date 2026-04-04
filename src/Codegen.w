@@ -97,6 +97,7 @@ extern fn wl_function_value_kind() -> i32
 
 // Constants
 extern fn wl_const_int(ty: i64, val: i64, sign_ext: i32) -> i64
+extern fn wl_const_int_words(ty: i64, lo: i64, hi: i64, word_count: i32) -> i64
 extern fn wl_const_real(ty: i64, val: f64) -> i64
 extern fn wl_const_null(ty: i64) -> i64
 extern fn wl_get_undef(ty: i64) -> i64
@@ -2311,6 +2312,10 @@ fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
     if node == 0:
         return 0
     let nk = self.pool.kind(node)
+    if self.sema.typed_expr_types.contains(node):
+        let typed = self.sema.typed_expr_types.get(node).unwrap()
+        if typed > 0:
+            return typed
     if nk == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(node)
         let opt = self.local_sema_types.get(sym)
@@ -2327,16 +2332,17 @@ fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
     if nk == NodeKind.NK_FSTRING:
         return self.sema.ty_str as i32
     if nk == NodeKind.NK_INT_LIT:
+        let suffix_ty = self.sema.literal_suffix_type(self.pool.literal_suffix(node as NodeId))
+        if suffix_ty != 0:
+            return suffix_ty
+        let fast = self.pool.int_literal_fast_i64(node as NodeId)
+        if fast.ok != 0 and (fast.value < -2147483648 or fast.value > 2147483647):
+            return self.sema.ty_i64 as i32
         return self.sema.ty_i32 as i32
     if nk == NodeKind.NK_FLOAT_LIT:
         return self.sema.ty_f64 as i32
     if nk == NodeKind.NK_BOOL_LIT:
         return self.sema.ty_bool as i32
-    // Fall back to sema's typed_expr_types (populated by check_ident)
-    if self.sema.typed_expr_types.contains(node):
-        let typed = self.sema.typed_expr_types.get(node).unwrap()
-        if typed > 0:
-            return typed
     0
 
 // Extract LLVM type of the i'th generic arg from a sema TypeKind.TY_GENERIC_INST type.
