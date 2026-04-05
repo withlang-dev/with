@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test fixpoint install install-user update-seed clean seed print-version FORCE \
+.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test fixpoint install install-user update-seed clean seed print-version emit-c-test cross FORCE \
 	__build __stage1 __stage2 __stage3 __runtime __selfcheck __smoke __test __fixpoint __install __install-user __update-seed __clean __seed
 
 ROOT_DIR := $(CURDIR)
@@ -485,20 +485,60 @@ __test: $(STAGE2_BIN)
 	./scripts/run_issue61_noop_local_regression.sh
 	./scripts/run_embedded_runtime_extract_regression.sh
 
+# Generate LLVM bridge stubs for C-only builds (no LLVM available).
+# Two files: wl_decls.h (declarations) and wl_stubs.c (stub implementations).
+WL_STUBS_DIR := $(OUT_GEN_DIR)
+WL_STUBS := $(WL_STUBS_DIR)/wl_stubs.c
+WL_DECLS := $(WL_STUBS_DIR)/wl_decls.h
+
 emit-c-test: build
 	@echo "=== emit-c test ==="
 	rm -rf out/emit-c-test
 	mkdir -p out/emit-c-test
 	./out/bin/with build out/gen/main.w --emit-c -o out/emit-c-test/main.c
+	@bash "$(ROOT_DIR)/scripts/generate_wl_stubs.sh" runtime/llvm_bridge.c out/emit-c-test/main.c $(WL_STUBS_DIR)
 	cd out/emit-c-test && zig cc -o with-from-c main.c \
+		../../$(WL_STUBS) \
 		../../runtime/with_runtime.c \
 		-I../../runtime \
+		-include ../../$(WL_DECLS) \
 		-lc
 	./out/emit-c-test/with-from-c --version
-	@echo "=== emit-c byte equality ==="
-	./out/emit-c-test/with-from-c build out/gen/main.w -o out/emit-c-test/stage2-from-c -O0
-	diff <(nm out/bin/with-stage2 | sort) <(nm out/emit-c-test/stage2-from-c | sort) \
+	@echo "=== emit-c fixpoint ==="
+	./out/emit-c-test/with-from-c build out/gen/main.w --emit-c -o out/emit-c-test/main2.c
+	diff out/emit-c-test/main.c out/emit-c-test/main2.c \
 		&& echo "EMIT-C FIXPOINT" || echo "EMIT-C DIVERGED"
+
+# Cross-compile the With compiler to any target zig supports.
+# Usage: make cross CROSS_TARGET=aarch64-linux
+CROSS_TARGET ?=
+
+cross: build
+	@if [ -z "$(CROSS_TARGET)" ]; then \
+		echo "usage: make cross CROSS_TARGET=aarch64-linux"; \
+		echo ""; \
+		echo "examples:"; \
+		echo "  make cross CROSS_TARGET=aarch64-linux"; \
+		echo "  make cross CROSS_TARGET=x86_64-linux"; \
+		echo "  make cross CROSS_TARGET=riscv64-linux"; \
+		echo "  make cross CROSS_TARGET=wasm32-wasi"; \
+		exit 1; \
+	fi
+	@echo "=== cross-compile: $(CROSS_TARGET) ==="
+	mkdir -p out/cross/$(CROSS_TARGET)
+	./out/bin/with build out/gen/main.w --emit-c -o out/cross/$(CROSS_TARGET)/with.c
+	@bash "$(ROOT_DIR)/scripts/generate_wl_stubs.sh" runtime/llvm_bridge.c out/cross/$(CROSS_TARGET)/with.c $(WL_STUBS_DIR)
+	cd out/cross/$(CROSS_TARGET) && zig cc \
+		-target $(CROSS_TARGET) \
+		-o with \
+		with.c \
+		../../../$(WL_STUBS) \
+		../../../runtime/with_runtime.c \
+		-I../../../runtime \
+		-include ../../../$(WL_DECLS) \
+		-lc
+	@echo "=== built: out/cross/$(CROSS_TARGET)/with ==="
+	@file out/cross/$(CROSS_TARGET)/with
 
 fixpoint: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __fixpoint)
