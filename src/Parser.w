@@ -38,6 +38,7 @@ type Parser {
     pending_flags: i32,
     pending_packed: i32,
     pending_bitpacked: i32,
+    pending_weak: i32,
     pending_callconv: i32,
     pending_stack_size: i32,
     pending_unsafe_fn: i32,
@@ -80,6 +81,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_flags: 0,
         pending_packed: 0,
         pending_bitpacked: 0,
+        pending_weak: 0,
         pending_callconv: 0,
         pending_stack_size: 0,
         pending_unsafe_fn: 0,
@@ -290,6 +292,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_flags = 0
     self.pending_packed = 0
     self.pending_bitpacked = 0
+    self.pending_weak = 0
     self.pending_callconv = 0
     self.pending_stack_size = 0
     var derive_syms: Vec[i32] = Vec.new()
@@ -317,6 +320,8 @@ fn Parser.skip_attributes(self: Parser):
                 self.pending_packed = 1
             if attr_text == "bitpacked":
                 self.pending_bitpacked = 1
+            if attr_text == "weak":
+                self.pending_weak = 1
 
         if self.is_ident_named("derive"):
             self.advance()
@@ -746,6 +751,9 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     if self.pending_stack_size > 0:
         self.pool.fn_stack_sizes.insert(fn_node as i32, self.pending_stack_size)
         self.pending_stack_size = 0
+    if self.pending_weak != 0:
+        self.pool.fn_weak_flags.insert(fn_node as i32, 1)
+        self.pending_weak = 0
     fn_node
 
 // ── extern fn ────────────────────────────────────────────────────

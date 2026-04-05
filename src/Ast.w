@@ -389,6 +389,9 @@ type AstPool {
     // @[stack_size(N)] annotation: fn_node → stack size in bytes
     fn_stack_sizes: HashMap[i32, i32],
 
+    // @[weak] annotation: fn_node → 1 if weak linkage
+    fn_weak_flags: HashMap[i32, i32],
+
     // Frozen flag: set to 1 after construction completes.
     // When frozen, mutation methods (add_node, add_extra, etc.) will error.
     frozen: i32,
@@ -442,6 +445,7 @@ fn AstPool.new -> AstPool:
         non_escaping_closure_set: HashMap.new(),
         call_named_args: HashMap.new(),
         fn_stack_sizes: HashMap.new(),
+        fn_weak_flags: HashMap.new(),
         frozen: 0,
     }
     // Reserve node 0 as null sentinel
