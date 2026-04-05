@@ -1,21 +1,27 @@
 // rt/darwin_aarch64.w — macOS aarch64 runtime backend
 //
 // Implements the 13 rt_* functions by calling libSystem.
-// Uses extern fn declarations for libSystem symbols (stable ABI).
+// All libSystem symbols declared as extern fn (no c_import, no libc headers).
 //
 // Error convention: negative return = negated errno.
 // EINTR rule: retry internally on EINTR.
 // rt_mmap returns null on failure (not MAP_FAILED).
 
 // ── libSystem declarations ──────────────────────────────────────
-// c_import gives correct ABI for variadic functions (open).
-// Non-variadic functions declared as extern fn.
+// These are stable ABI symbols from libSystem.B.dylib.
+// __open is the non-variadic internal symbol (open is variadic in C,
+// which has a different calling convention on aarch64).
 
-use c_import("unistd.h")
-use c_import("fcntl.h")
-use c_import("sys/mman.h")
-use c_import("stdlib.h")
-
+extern fn write(fd: i32, buf: *const u8, len: u64) -> i64
+extern fn read(fd: i32, buf: *mut u8, len: u64) -> i64
+extern fn __open(path: *const u8, flags: i32, mode: i32) -> i32
+extern fn close(fd: i32) -> i32
+extern fn lseek(fd: i32, offset: i64, whence: i32) -> i64
+extern fn getcwd(buf: *mut u8, size: u64) -> *mut u8
+extern fn mmap(addr: *mut u8, len: u64, prot: i32, flags: i32, fd: i32, offset: i64) -> *mut u8
+extern fn munmap(addr: *mut u8, len: u64) -> i32
+extern fn getenv(name: *const u8) -> *const u8
+extern fn sysconf(name: i32) -> i64
 extern fn lstat(path: *const u8, buf: *mut u8) -> i32
 extern fn _exit(code: i32) -> void
 extern fn mach_absolute_time() -> u64
@@ -57,7 +63,7 @@ pub fn store_args(argc_val: i32, argv_val: *const *const u8):
 pub fn rt_write_impl(fd: i32, buf: *const u8, len: i64) -> i64:
     var r: i64 = 0
     loop:
-        r = write(fd, buf as *const c_void, len as u64)
+        r = write(fd, buf, len as u64)
         if r >= 0 or get_errno() != 4:
             break
     if r < 0:
@@ -68,7 +74,7 @@ pub fn rt_write_impl(fd: i32, buf: *const u8, len: i64) -> i64:
 pub fn rt_read_impl(fd: i32, buf: *mut u8, len: i64) -> i64:
     var r: i64 = 0
     loop:
-        r = read(fd, buf as *mut c_void, len as u64)
+        r = read(fd, buf, len as u64)
         if r >= 0 or get_errno() != 4:
             break
     if r < 0:
@@ -86,7 +92,7 @@ pub fn rt_open_impl(path: *const u8, flags: i32, mode: i32) -> i32:
     if (flags & 0x800) != 0: native = native | 0x008
     var r: i32 = 0
     loop:
-        r = open(path, native, mode)
+        r = __open(path, native, mode)
         if r >= 0 or get_errno() != 4:
             break
     if r < 0:
@@ -133,7 +139,7 @@ pub fn rt_stat_impl(path: *const u8, out: *mut RtStatBuf) -> i32:
 
 @[c_export("rt_getcwd")]
 pub fn rt_getcwd_impl(buf: *mut u8, size: i64) -> i32:
-    let r = getcwd(buf as *mut i8, size as u64)
+    let r = getcwd(buf, size as u64)
     if r as i64 == 0:
         return -get_errno()
     0
@@ -143,14 +149,14 @@ pub fn rt_getcwd_impl(buf: *mut u8, size: i64) -> i32:
 @[c_export("rt_mmap")]
 pub fn rt_mmap_impl(size: i64) -> *mut u8:
     // PROT_READ|PROT_WRITE = 3, MAP_PRIVATE|MAP_ANON = 0x1002
-    let p = mmap(0 as *mut c_void, size as u64, 3, 0x1002, -1, 0)
+    let p = mmap(0 as *mut u8, size as u64, 3, 0x1002, -1, 0)
     if p as i64 == -1:  // MAP_FAILED
         return 0 as *mut u8
-    p as *mut u8
+    p
 
 @[c_export("rt_munmap")]
 pub fn rt_munmap_impl(ptr: *mut u8, size: i64):
-    let _ = munmap(ptr as *mut c_void, size as u64)
+    let _ = munmap(ptr, size as u64)
 
 // ── Process ─────────────────────────────────────────────────────
 
@@ -264,8 +270,6 @@ pub fn rt_access_impl(path: *const u8, mode: i32) -> i32:
     if r < 0:
         return -get_errno()
     0
-
-// ── Environment ─────────────────────────────────────────────────
 
 // ── System info ─────────────────────────────────────────────────
 
