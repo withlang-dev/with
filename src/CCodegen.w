@@ -3301,7 +3301,8 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             return "    abort();"
         let opt_text = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
         let dst = self.place_text(body, dest_place)
-        var out = "    " ++ dst ++ " = ((" ++ opt_text ++ ") - 1);\n"
+        // Option unwrap: value = encoded - 1. Use memcpy to handle with_str/with_vec destinations.
+        var out = "    " ++ cc_lbrace() ++ " int64_t __uw = ((" ++ opt_text ++ ") - 1); memcpy(&(" ++ dst ++ "), &__uw, sizeof(" ++ dst ++ ") < sizeof(__uw) ? sizeof(" ++ dst ++ ") : sizeof(__uw)); " ++ cc_rbrace() ++ "\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
 
@@ -4678,7 +4679,6 @@ fn CCodegen.local_receives_arith(self: CCodegen, body: MirBody, local_id: i32) -
             let dst_place = body.stmt_d0.get(stmt_id as i64)
             if self.place_is_direct_local(body, dst_place, local_id) == 0:
                 continue
-            let rval_id = body.stmt_d1.get(stmt_id as i64)
             if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
                 continue
             let rk = body.rval_kinds.get(rval_id as i64)
