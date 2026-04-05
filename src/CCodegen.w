@@ -3272,10 +3272,13 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         let key_ty = self.c_type(key_tid, 0)
         let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
         let dst = self.place_text(body, dest_place)
+        // Map.get returns Option[V] encoded as int64_t (0 = None, value+1 = Some).
+        // Use a local int64_t temp to avoid type mismatch when dst is with_str/with_vec.
         var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; int64_t __with_v = 0;"
+        out = out ++ " int64_t __with_r = 0;"
         out = out ++ " if ((" ++ recv ++ ") != 0 && with_hashmap_get((void*)(intptr_t)(" ++ recv ++ "), &__with_k, &__with_v, " ++ is_str_key ++ ") != 0) "
-        out = out ++ cc_lbrace() ++ " " ++ dst ++ " = (__with_v + 1); " ++ cc_rbrace() ++ " else " ++ cc_lbrace() ++ " " ++ dst ++ " = 0; " ++ cc_rbrace()
-        out = out ++ " " ++ cc_rbrace() ++ "\n"
+        out = out ++ cc_lbrace() ++ " __with_r = (__with_v + 1); " ++ cc_rbrace()
+        out = out ++ " memcpy(&(" ++ dst ++ "), &__with_r, sizeof(__with_r) < sizeof(" ++ dst ++ ") ? sizeof(__with_r) : sizeof(" ++ dst ++ ")); " ++ cc_rbrace() ++ "\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
 
@@ -4659,6 +4662,27 @@ fn CCodegen.local_receives_ref(self: CCodegen, body: MirBody, local_id: i32) -> 
                 return true
     false
 
+fn CCodegen.local_receives_arith(self: CCodegen, body: MirBody, local_id: i32) -> bool:
+    for bb in 0..body.block_count():
+        let start = body.bb_stmt_starts.get(bb as i64)
+        let count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..count:
+            let stmt_id = start + si
+            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.Assign:
+                continue
+            let dst_place = body.stmt_d0.get(stmt_id as i64)
+            if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                continue
+            let rval_id = body.stmt_d1.get(stmt_id as i64)
+            if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+                continue
+            let rk = body.rval_kinds.get(rval_id as i64)
+            if rk == RvalueKind.RK_BIN_OP:
+                let op = body.rval_d0.get(rval_id as i64)
+                if op != BinaryOp.OP_CONCAT:
+                    return true
+    false
+
 fn CCodegen.emit_fn_body(self: CCodegen, body: MirBody) -> str:
     if self.check_interrupted() != 0:
         return ""
@@ -4728,6 +4752,10 @@ fn CCodegen.emit_fn_body(self: CCodegen, body: MirBody) -> str:
                 local_ty = "uint8_t*"
             else:
                 local_ty = base_ty ++ "*"
+        // If declared as compound type but receives arithmetic result, force int64_t
+        let is_compound_local = local_ty == "with_str" or local_ty == "with_vec"
+        if is_compound_local and self.local_receives_arith(body, li):
+            local_ty = "int64_t"
         // Array types: emit T _N[size] = {0} instead of T* _N = {0}
         let use_resolved = self.sema.resolve_alias(use_tid)
         let use_kind = self.sema.get_type_kind(use_resolved)
