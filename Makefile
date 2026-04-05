@@ -491,6 +491,7 @@ WL_STUBS_DIR := $(OUT_GEN_DIR)
 WL_STUBS := $(WL_STUBS_DIR)/wl_stubs.c
 WL_DECLS := $(WL_STUBS_DIR)/wl_decls.h
 
+## Fast smoke test for the emitted-C path.
 emit-c-test: build
 	@echo "=== emit-c: emit compiler as C ==="
 	rm -rf out/emit-c-test
@@ -522,14 +523,16 @@ emit-c-test: build
 		../../$(HELPERS_OBJ) \
 		-I../../runtime \
 		-lc
-	./out/emit-c-test/hello_test | grep -q "hello"
+	./out/emit-c-test/hello_test | grep -qx "hello"
 	@echo "EMIT-C OK"
 
+## Slow manual verification that the emitted compiler is self-consistent.
 emit-c-fixpoint: emit-c-test
 	@echo "=== emit-c fixpoint (slow) ==="
 	./out/emit-c-test/with-from-c build out/gen/main.w --emit-c -o out/emit-c-test/main2.c
 	diff out/emit-c-test/main.c out/emit-c-test/main2.c \
-		&& echo "EMIT-C FIXPOINT" || echo "EMIT-C DIVERGED"
+		&& echo "EMIT-C FIXPOINT" \
+		|| { echo "EMIT-C DIVERGED"; exit 1; }
 
 # Cross-compile the With compiler to any target zig supports.
 # Usage: make cross CROSS_TARGET=aarch64-linux
