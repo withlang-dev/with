@@ -3205,12 +3205,19 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     if effective_name != "main" and not is_prelude:
         wl_set_linkage(function, wl_internal_linkage())
 
+    // @[weak] — set weak linkage (LLVMWeakAnyLinkage = 5)
+    // Must be checked before c_export which also sets linkage.
+    let is_weak = self.pool.fn_weak_flags.contains(fn_node)
+
     // @[c_export] overrides internal linkage to external for C/linker visibility
     let cc_sym = self.pool.fn_meta_tp_start(meta)
     if cc_sym != 0:
         let cc_name = self.intern.resolve(cc_sym)
         if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
-            wl_set_linkage(function, 0)
+            if is_weak:
+                wl_set_linkage(function, 5)  // LLVMWeakAnyLinkage
+            else:
+                wl_set_linkage(function, 0)
             let export_name = cc_name.slice(9, cc_name.len() as i64)
             if export_name.len() > 0 and export_name != effective_name:
                 wl_set_value_name(function, export_name)
@@ -3336,6 +3343,8 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
             let cc_id = self.resolve_callconv(cc_name)
             if cc_id >= 0:
                 wl_set_call_conv(function, cc_id)
+
+    // (weak linkage applied earlier, near function creation)
 
     let actual_fn_type = wl_global_get_value_type(function)
     self.fn_values.insert(name_sym, function)
