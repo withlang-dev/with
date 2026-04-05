@@ -2827,7 +2827,8 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
             let args_id = body.term_data1(bb)
             let dest_place = body.term_data2(bb)
             let recv_place = self.call_first_arg_place_id(body, args_id)
-            if allow_container_receiver_infer != 0 and self.place_is_direct_local(body, recv_place, local_id) != 0:
+            // Don't infer container type if this local is the call destination (it's the result, not the receiver)
+            if allow_container_receiver_infer != 0 and self.place_is_direct_local(body, recv_place, local_id) != 0 and self.place_is_direct_local(body, dest_place, local_id) == 0:
                 let kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
                 if kind == cc_builtin_vec_new() or kind == cc_builtin_vec_push() or kind == cc_builtin_vec_get() or kind == cc_builtin_vec_len() or kind == cc_builtin_vec_set_i32() or kind == cc_builtin_vec_remove() or kind == cc_builtin_vec_clear() or kind == cc_builtin_vec_pop():
                     if recv_hint == 0:
