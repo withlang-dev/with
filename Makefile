@@ -5,6 +5,7 @@ SHELL := /bin/bash
 
 ROOT_DIR := $(CURDIR)
 REPO_FULL_NAME ?= QuixiAI/with
+WITH_BUILD_ENV := WITH_OUT_DIR="$(ROOT_DIR)/out"
 
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
@@ -117,6 +118,19 @@ RUNTIME_ARTIFACTS := \
 # With-language runtime objects (compiled by the With compiler, built after stage2)
 RT_WITH_ARTIFACTS := $(RT_CORE_OBJ) $(RT_DARWIN_AARCH64_OBJ)
 RT_WITH_REFRESH_STAMP := $(OUT_GEN_DIR)/.runtime-with-refresh
+STRAY_BUILD_ARTIFACTS := \
+	src/main.c \
+	src/main.o \
+	src/bootstrap_main.c \
+	src/bootstrap_main.o \
+	src/main_emit_temp.c \
+	src/main_emit_temp.o \
+	main.c \
+	main.o \
+	bootstrap_main.c \
+	bootstrap_main.o \
+	main_emit_temp.c \
+	main_emit_temp.o
 
 # Version resolution:
 #   Source of truth: src/version (e.g., "v0.12.0")
@@ -300,47 +314,47 @@ $(HELPERS_OBJ): runtime/helpers.c | $(OUT_LIB_DIR)
 
 $(COMPAT_RUNTIME_OBJ): $(COMPAT_RUNTIME_SRC) | $(OUT_LIB_DIR)
 	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
 $(PANIC_RUNTIME_OBJ): rt/panic_runtime.w | $(OUT_LIB_DIR)
 	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
 $(FIBER_STUBS_OBJ): rt/fiber_stubs.w | $(OUT_LIB_DIR)
 	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
 $(CHANNEL_RUNTIME_OBJ): rt/channel_runtime.w | $(OUT_LIB_DIR)
 	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
 $(FIBER_RUNTIME_OBJ): rt/fiber_runtime.w | $(OUT_LIB_DIR)
 	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
 $(FIBER_OBJ): $(FIBER_CORE_SRC) | $(OUT_LIB_DIR)
 	@if [ -z "$(FIBER_CORE_SRC)" ]; then echo "error: unsupported host platform $(UNAME_S)/$(UNAME_M) for fiber runtime" >&2; exit 1; fi
 	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
 $(FIBER_ASM_OBJ): $(FIBER_ASM_SRC) | $(OUT_LIB_DIR)
 	@if [ -z "$(FIBER_ASM_SRC)" ]; then echo "error: unsupported host architecture $(UNAME_M) for fiber_asm.o" >&2; exit 1; fi
 	$(call HOST_COMPILE,)
 
 $(RT_CORE_OBJ): rt/rt_core.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
-	$(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
 # Compile With runtime backend to .o using the With compiler (after stage2 exists)
 $(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
-	$(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
 $(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) $(COMPAT_RUNTIME_SRC) rt/panic_runtime.w rt/fiber_stubs.w rt/channel_runtime.w rt/fiber_runtime.w $(FIBER_CORE_SRC) | $(OUT_LIB_DIR) $(OUT_GEN_DIR)
-	$(STAGE2_BIN) build $(COMPAT_RUNTIME_SRC) --emit-obj --no-prelude -O0 -o $(COMPAT_RUNTIME_OBJ)
-	$(STAGE2_BIN) build rt/panic_runtime.w --emit-obj --no-prelude -O0 -o $(PANIC_RUNTIME_OBJ)
-	$(STAGE2_BIN) build rt/fiber_stubs.w --emit-obj --no-prelude -O0 -o $(FIBER_STUBS_OBJ)
-	$(STAGE2_BIN) build rt/channel_runtime.w --emit-obj --no-prelude -O0 -o $(CHANNEL_RUNTIME_OBJ)
-	$(STAGE2_BIN) build rt/fiber_runtime.w --emit-obj --no-prelude -O0 -o $(FIBER_RUNTIME_OBJ)
-	$(STAGE2_BIN) build $(FIBER_CORE_SRC) --emit-obj --no-prelude -O0 -o $(FIBER_OBJ)
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $(COMPAT_RUNTIME_SRC) --emit-obj --no-prelude -O0 -o $(COMPAT_RUNTIME_OBJ)
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/panic_runtime.w --emit-obj --no-prelude -O0 -o $(PANIC_RUNTIME_OBJ)
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/fiber_stubs.w --emit-obj --no-prelude -O0 -o $(FIBER_STUBS_OBJ)
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/channel_runtime.w --emit-obj --no-prelude -O0 -o $(CHANNEL_RUNTIME_OBJ)
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/fiber_runtime.w --emit-obj --no-prelude -O0 -o $(FIBER_RUNTIME_OBJ)
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $(FIBER_CORE_SRC) --emit-obj --no-prelude -O0 -o $(FIBER_OBJ)
 	@touch "$@"
 
 $(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(HELPERS_OBJ) $(COMPAT_RUNTIME_OBJ) $(PANIC_RUNTIME_OBJ) $(FIBER_STUBS_OBJ) $(CHANNEL_RUNTIME_OBJ) $(FIBER_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) | $(OUT_LIB_DIR)
@@ -437,7 +451,7 @@ define build_stage
 	trap 'cleanup_build_stage 129 HUP' HUP; \
 	rm -f "$$tmp" "$$gen_bin" "$@"; \
 	rm -rf "$$dsym" "$$gen_dsym" "$@.dSYM"; \
-	$(1) build $(GEN_MAIN_ENTRY) -o "$$tmp" $(4) & \
+	$(WITH_BUILD_ENV) $(1) build $(GEN_MAIN_ENTRY) -o "$$tmp" $(4) & \
 	child_pid="$$!"; \
 	wait "$$child_pid"; \
 	rc=$$?; \
@@ -473,7 +487,7 @@ $(CANONICAL_BIN): $(STAGE2_BIN) $(RT_WITH_ARTIFACTS) $(RT_WITH_REFRESH_STAMP) | 
 	@rm -f "$@" && rm -rf "$@.dSYM"
 	@bash "$(ROOT_DIR)/scripts/embed_runtime_objects.sh" "$(OUT_LIB_DIR)" "$(EMBEDDED_OBJECTS_ASM)"
 	@$(HOST_CC) -c -O2 -o "$(EMBEDDED_OBJECTS_OBJ)" "$(EMBEDDED_OBJECTS_ASM)"
-	@WITH_OUT_DIR="$(ROOT_DIR)/out" $(STAGE2_BIN) build $(GEN_MAIN_ENTRY) -O0 -o "$@"
+	@$(WITH_BUILD_ENV) $(STAGE2_BIN) build $(GEN_MAIN_ENTRY) -O0 -o "$@"
 	@echo "build complete: $@"
 
 test: | $(OUT_TMP_DIR)
@@ -496,7 +510,7 @@ emit-c-test: build
 	@echo "=== emit-c: emit compiler as C ==="
 	rm -rf out/emit-c-test
 	mkdir -p out/emit-c-test
-	./out/bin/with build out/gen/main.w --emit-c -o out/emit-c-test/main.c
+	$(WITH_BUILD_ENV) ./out/bin/with build out/gen/main.w --emit-c -o out/emit-c-test/main.c
 	@echo "=== emit-c: generate stubs ==="
 	@bash "$(ROOT_DIR)/scripts/generate_wl_stubs.sh" runtime/llvm_bridge.c out/emit-c-test/main.c $(WL_STUBS_DIR)
 	@echo "=== emit-c: compile with zig cc ==="
@@ -513,7 +527,7 @@ emit-c-test: build
 		-lc
 	@echo "=== emit-c: verify binary works ==="
 	./out/emit-c-test/with-from-c --version
-	./out/emit-c-test/with-from-c build test/hello.w --emit-c --no-prelude -o out/emit-c-test/hello_test.c
+	$(WITH_BUILD_ENV) ./out/emit-c-test/with-from-c build test/hello.w --emit-c --no-prelude -o out/emit-c-test/hello_test.c
 	cd out/emit-c-test && zig cc -O2 -o hello_test hello_test.c \
 		../../$(RT_CORE_OBJ) \
 		../../$(RT_DARWIN_AARCH64_OBJ) \
@@ -529,7 +543,7 @@ emit-c-test: build
 ## Slow manual verification that the emitted compiler is self-consistent.
 emit-c-fixpoint: emit-c-test
 	@echo "=== emit-c fixpoint (slow) ==="
-	./out/emit-c-test/with-from-c build out/gen/main.w --emit-c -o out/emit-c-test/main2.c
+	$(WITH_BUILD_ENV) ./out/emit-c-test/with-from-c build out/gen/main.w --emit-c -o out/emit-c-test/main2.c
 	diff out/emit-c-test/main.c out/emit-c-test/main2.c \
 		&& echo "EMIT-C FIXPOINT" \
 		|| { echo "EMIT-C DIVERGED"; exit 1; }
@@ -551,7 +565,7 @@ cross: build
 	fi
 	@echo "=== cross-compile: $(CROSS_TARGET) ==="
 	mkdir -p out/cross/$(CROSS_TARGET)
-	./out/bin/with build out/gen/main.w --emit-c -o out/cross/$(CROSS_TARGET)/with.c
+	$(WITH_BUILD_ENV) ./out/bin/with build out/gen/main.w --emit-c -o out/cross/$(CROSS_TARGET)/with.c
 	@bash "$(ROOT_DIR)/scripts/generate_wl_stubs.sh" runtime/llvm_bridge.c out/cross/$(CROSS_TARGET)/with.c $(WL_STUBS_DIR)
 	cd out/cross/$(CROSS_TARGET) && zig cc \
 		-target $(CROSS_TARGET) \
@@ -599,5 +613,6 @@ clean: | $(OUT_TMP_DIR)
 
 __clean:
 	rm -rf "$(OUT)/"
+	rm -f $(STRAY_BUILD_ARTIFACTS)
 
 FORCE:
