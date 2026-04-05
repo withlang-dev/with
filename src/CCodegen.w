@@ -4361,7 +4361,8 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
         if (rval == "0" or rval == "0LL") and self.c_type(dst_tid, 0) == "with_vec":
             return "    " ++ dst_place ++ " = (with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";"
         // If destination is struct/str/vec and rvalue looks like a scalar, wrap it
-        let dst_is_compound = dst_tk == TypeKind.TY_STRUCT or dst_tk == TypeKind.TY_STR or dst_tid == cc_pseudo_tid_vec() or dst_resolved == cc_pseudo_tid_vec()
+        let dst_c_type = self.c_type(dst_tid, 0)
+        let dst_is_compound = dst_tk == TypeKind.TY_STRUCT or dst_tk == TypeKind.TY_STR or dst_tid == cc_pseudo_tid_vec() or dst_resolved == cc_pseudo_tid_vec() or dst_c_type == "with_str" or dst_c_type == "with_vec"
         if dst_is_compound:
             if rval == "0" or rval == "0LL":
                 return "    " ++ dst_place ++ " = " ++ self.zero_value_text(dst_tid) ++ ";"
@@ -4384,6 +4385,9 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
                     needs_wrap = true
             if needs_wrap:
                 let dst_c = self.c_type(dst_tid, 0)
+                if dst_c == "with_str" or dst_c == "with_vec":
+                    // Scalar to str/vec: bitwise copy via memcpy (compound literal won't work)
+                    return "    " ++ cc_lbrace() ++ " int64_t __tmp = (int64_t)(" ++ rval ++ "); memcpy(&(" ++ dst_place ++ "), &__tmp, sizeof(" ++ dst_place ++ ") < sizeof(__tmp) ? sizeof(" ++ dst_place ++ ") : sizeof(__tmp)); " ++ cc_rbrace()
                 return "    " ++ dst_place ++ " = (" ++ dst_c ++ ")" ++ cc_lbrace() ++ rval ++ cc_rbrace() ++ ";"
         return "    " ++ dst_place ++ " = " ++ rval ++ ";"
     if sk == StmtKind.StorageLive:
@@ -4664,6 +4668,7 @@ fn CCodegen.local_receives_ref(self: CCodegen, body: MirBody, local_id: i32) -> 
 
 fn CCodegen.local_receives_arith(self: CCodegen, body: MirBody, local_id: i32) -> bool:
     for bb in 0..body.block_count():
+        // Check statements
         let start = body.bb_stmt_starts.get(bb as i64)
         let count = body.bb_stmt_counts.get(bb as i64)
         for si in 0..count:
@@ -4680,6 +4685,16 @@ fn CCodegen.local_receives_arith(self: CCodegen, body: MirBody, local_id: i32) -
             if rk == RvalueKind.RK_BIN_OP:
                 let op = body.rval_d0.get(rval_id as i64)
                 if op != BinaryOp.OP_CONCAT:
+                    return true
+        // Check terminators: if this local is the dest of a map-get call, it's int64
+        let tk = body.term_kind(bb)
+        if tk == TermKind.TK_CALL:
+            let dest_place = body.term_data2(bb)
+            if self.place_is_direct_local(body, dest_place, local_id) != 0:
+                let callee_op = body.term_data0(bb)
+                let args_id = body.term_data1(bb)
+                let kind = self.call_builtin_kind(body, callee_op, args_id, dest_place)
+                if kind == cc_builtin_map_get() or kind == cc_builtin_map_contains() or kind == cc_builtin_map_len():
                     return true
     false
 
