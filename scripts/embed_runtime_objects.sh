@@ -45,7 +45,7 @@ emit_blob() {
     echo ".section .rodata"
   fi
   echo ""
-  emit_blob "helpers.o" "helpers_o"
+  emit_blob "cimport_stubs.o" "cimport_stubs_o"
   emit_blob "compat_runtime.o" "compat_runtime_o"
   emit_blob "panic_runtime.o" "panic_runtime_o"
   emit_blob "fiber_stubs.o" "fiber_stubs_o"

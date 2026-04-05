@@ -5,8 +5,8 @@ extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
 
-extern let with_embedded_helpers_o_start: u8
-extern let with_embedded_helpers_o_end: u8
+extern let with_embedded_cimport_stubs_o_start: u8
+extern let with_embedded_cimport_stubs_o_end: u8
 extern let with_embedded_compat_runtime_o_start: u8
 extern let with_embedded_compat_runtime_o_end: u8
 extern let with_embedded_panic_runtime_o_start: u8
@@ -43,8 +43,8 @@ fn link_stage_embedded_obj_slice(start: *const u8, end: *const u8) -> str:
     link_stage_str_from_raw_parts(start, len)
 
 fn link_stage_embedded_runtime_object(name: str) -> str:
-    if name == "helpers.o":
-        return link_stage_embedded_obj_slice(&with_embedded_helpers_o_start as *const u8, &with_embedded_helpers_o_end as *const u8)
+    if name == "cimport_stubs.o":
+        return link_stage_embedded_obj_slice(&with_embedded_cimport_stubs_o_start as *const u8, &with_embedded_cimport_stubs_o_end as *const u8)
     if name == "compat_runtime.o":
         return link_stage_embedded_obj_slice(&with_embedded_compat_runtime_o_start as *const u8, &with_embedded_compat_runtime_o_end as *const u8)
     if name == "panic_runtime.o":
@@ -409,7 +409,7 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                     with_eprint("error: missing runtime/fiber_stubs.o")
                     return false
                 extras.push(fiber_stubs_path)
-            let helpers_path = link_stage_find_runtime_object_path("helpers.o")
+            let helpers_path = link_stage_find_runtime_object_path("cimport_stubs.o")
             if helpers_path.len() == 0:
                 with_eprint("error: missing runtime/helpers.o")
                 return false
@@ -441,7 +441,7 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                     return false
                 let fiber_stubs_ar = link_stage_make_archive(fiber_stubs_path)
                 extras.push(if fiber_stubs_ar.len() > 0: fiber_stubs_ar else: fiber_stubs_path)
-            let helpers_path = link_stage_find_runtime_object_path("helpers.o")
+            let helpers_path = link_stage_find_runtime_object_path("cimport_stubs.o")
             if helpers_path.len() == 0:
                 with_eprint("error: missing runtime/helpers.o")
                 return false
