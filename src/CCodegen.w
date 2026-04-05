@@ -973,11 +973,18 @@ fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
                 out = f"{out}.ptr[_{pd}]"
                 current_tid = self.sema.ty_i32 as i32
                 continue
-            out = f"{out}[_{pd}]"
             if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+                out = f"{out}[_{pd}]"
                 current_tid = self.sema.get_type_d0(resolved)
-            else:
-                current_tid = 0
+                continue
+            // Vec or other generic container: use with_vec_get_ptr runtime call
+            let base_c = self.c_type(current_tid, 0)
+            if base_c == "with_vec":
+                out = "(*((int64_t*)with_vec_get_ptr(&(" ++ out ++ f"), (int64_t)(_{pd}))))"
+                current_tid = self.sema.ty_i64 as i32
+                continue
+            out = f"{out}[_{pd}]"
+            current_tid = 0
             continue
         if pk == ProjKind.PK_DEREF:
             out = "(*" ++ out ++ ")"
@@ -2968,6 +2975,14 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_o
                 let arg_tk = self.sema.get_type_kind(arg_resolved)
                 if arg_tk == TypeKind.TY_STRUCT:
                     out = out ++ "&(" ++ arg_text ++ ")"
+                    continue
+            // Reverse: callee expects struct by value but arg is a pointer — dereference
+            if p_tk == TypeKind.TY_STRUCT:
+                let arg_tid = self.operand_tid(body, op_id)
+                let arg_resolved = self.sema.resolve_alias(arg_tid)
+                let arg_tk = self.sema.get_type_kind(arg_resolved)
+                if arg_tk == TypeKind.TY_PTR or arg_tk == TypeKind.TY_REF:
+                    out = out ++ "(*(" ++ arg_text ++ "))"
                     continue
         out = out ++ arg_text
     out
