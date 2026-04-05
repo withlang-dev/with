@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test fixpoint install install-user update-seed clean seed print-version emit-c-test cross FORCE \
+.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test fixpoint install install-user update-seed clean seed print-version emit-c-test emit-c-fixpoint cross FORCE \
 	__build __stage1 __stage2 __stage3 __runtime __selfcheck __smoke __test __fixpoint __install __install-user __update-seed __clean __seed
 
 ROOT_DIR := $(CURDIR)
@@ -492,19 +492,41 @@ WL_STUBS := $(WL_STUBS_DIR)/wl_stubs.c
 WL_DECLS := $(WL_STUBS_DIR)/wl_decls.h
 
 emit-c-test: build
-	@echo "=== emit-c test ==="
+	@echo "=== emit-c: emit compiler as C ==="
 	rm -rf out/emit-c-test
 	mkdir -p out/emit-c-test
 	./out/bin/with build out/gen/main.w --emit-c -o out/emit-c-test/main.c
+	@echo "=== emit-c: generate stubs ==="
 	@bash "$(ROOT_DIR)/scripts/generate_wl_stubs.sh" runtime/llvm_bridge.c out/emit-c-test/main.c $(WL_STUBS_DIR)
-	cd out/emit-c-test && zig cc -o with-from-c main.c \
+	@echo "=== emit-c: compile with zig cc ==="
+	cd out/emit-c-test && zig cc -O2 -o with-from-c main.c \
 		../../$(WL_STUBS) \
-		../../runtime/with_runtime.c \
+		../../$(RT_CORE_OBJ) \
+		../../$(RT_DARWIN_AARCH64_OBJ) \
+		../../$(COMPAT_RUNTIME_OBJ) \
+		../../$(PANIC_RUNTIME_OBJ) \
+		../../$(FIBER_STUBS_OBJ) \
+		../../$(HELPERS_OBJ) \
 		-I../../runtime \
 		-include ../../$(WL_DECLS) \
 		-lc
+	@echo "=== emit-c: verify binary works ==="
 	./out/emit-c-test/with-from-c --version
-	@echo "=== emit-c fixpoint ==="
+	./out/emit-c-test/with-from-c build test/hello.w --emit-c --no-prelude -o out/emit-c-test/hello_test.c
+	cd out/emit-c-test && zig cc -O2 -o hello_test hello_test.c \
+		../../$(RT_CORE_OBJ) \
+		../../$(RT_DARWIN_AARCH64_OBJ) \
+		../../$(COMPAT_RUNTIME_OBJ) \
+		../../$(PANIC_RUNTIME_OBJ) \
+		../../$(FIBER_STUBS_OBJ) \
+		../../$(HELPERS_OBJ) \
+		-I../../runtime \
+		-lc
+	./out/emit-c-test/hello_test | grep -q "hello"
+	@echo "EMIT-C OK"
+
+emit-c-fixpoint: emit-c-test
+	@echo "=== emit-c fixpoint (slow) ==="
 	./out/emit-c-test/with-from-c build out/gen/main.w --emit-c -o out/emit-c-test/main2.c
 	diff out/emit-c-test/main.c out/emit-c-test/main2.c \
 		&& echo "EMIT-C FIXPOINT" || echo "EMIT-C DIVERGED"
