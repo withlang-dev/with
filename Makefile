@@ -36,7 +36,7 @@ RUNTIME_LINK := $(OUT_BIN_DIR)/runtime
 EMBEDDED_STDLIB_RUNTIME_SRC := $(OUT_GEN_DIR)/embedded_stdlib_runtime.w
 COMPAT_RUNTIME_SRC := $(OUT_GEN_DIR)/compat_runtime.w
 EMBEDDED_OBJECTS_ASM := $(OUT_LIB_DIR)/embedded_objects.s
-HELPERS_OBJ := $(OUT_LIB_DIR)/helpers.o
+CIMPORT_STUBS_OBJ := $(OUT_LIB_DIR)/cimport_stubs.o
 COMPAT_RUNTIME_OBJ := $(OUT_LIB_DIR)/compat_runtime.o
 PANIC_RUNTIME_OBJ := $(OUT_LIB_DIR)/panic_runtime.o
 FIBER_STUBS_OBJ := $(OUT_LIB_DIR)/fiber_stubs.o
@@ -102,7 +102,7 @@ RT_DARWIN_AARCH64_OBJ := $(OUT_LIB_DIR)/rt_darwin_aarch64.o
 
 # Core runtime artifacts needed by the compiler itself.
 RUNTIME_ARTIFACTS := \
-	$(HELPERS_OBJ) \
+	$(CIMPORT_STUBS_OBJ) \
 	$(COMPAT_RUNTIME_OBJ) \
 	$(PANIC_RUNTIME_OBJ) \
 	$(FIBER_STUBS_OBJ) \
@@ -304,13 +304,11 @@ $(COMPAT_RUNTIME_SRC): rt/compat_runtime.w $(EMBEDDED_STDLIB_RUNTIME_SRC) | $(OU
 $(RUNTIME_C_ALLOWLIST_STAMP): scripts/check_runtime_c_allowlist.sh $(wildcard runtime/*.c) | $(OUT_GEN_DIR)
 	@bash "$(ROOT_DIR)/scripts/check_runtime_c_allowlist.sh" \
 		runtime/clang_bridge.c \
-		runtime/helpers.c \
-		runtime/llvm_bridge.c \
-		runtime/with_runtime.c
+		runtime/llvm_bridge.c
 	@touch "$@"
 
-$(HELPERS_OBJ): runtime/helpers.c | $(OUT_LIB_DIR)
-	$(call HOST_COMPILE,)
+$(CIMPORT_STUBS_OBJ): rt/cimport_stubs.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
+	$(STAGE2_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
 $(COMPAT_RUNTIME_OBJ): $(COMPAT_RUNTIME_SRC) | $(OUT_LIB_DIR)
 	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
@@ -357,7 +355,7 @@ $(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) $(COMPAT_RUNTIME_SRC) rt/panic_runtime.w
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $(FIBER_CORE_SRC) --emit-obj --no-prelude -O0 -o $(FIBER_OBJ)
 	@touch "$@"
 
-$(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(HELPERS_OBJ) $(COMPAT_RUNTIME_OBJ) $(PANIC_RUNTIME_OBJ) $(FIBER_STUBS_OBJ) $(CHANNEL_RUNTIME_OBJ) $(FIBER_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) | $(OUT_LIB_DIR)
+$(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(CIMPORT_STUBS_OBJ) $(COMPAT_RUNTIME_OBJ) $(PANIC_RUNTIME_OBJ) $(FIBER_STUBS_OBJ) $(CHANNEL_RUNTIME_OBJ) $(FIBER_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) | $(OUT_LIB_DIR)
 	@bash "$(ROOT_DIR)/scripts/embed_runtime_objects.sh" "$(OUT_LIB_DIR)" "$@"
 
 $(EMBEDDED_OBJECTS_OBJ): $(EMBEDDED_OBJECTS_ASM) | $(OUT_LIB_DIR)
@@ -521,7 +519,7 @@ emit-c-test: build
 		../../$(COMPAT_RUNTIME_OBJ) \
 		../../$(PANIC_RUNTIME_OBJ) \
 		../../$(FIBER_STUBS_OBJ) \
-		../../$(HELPERS_OBJ) \
+		../../$(CIMPORT_STUBS_OBJ) \
 		-I../../runtime \
 		-include ../../$(WL_DECLS) \
 		-lc
@@ -534,7 +532,7 @@ emit-c-test: build
 		../../$(COMPAT_RUNTIME_OBJ) \
 		../../$(PANIC_RUNTIME_OBJ) \
 		../../$(FIBER_STUBS_OBJ) \
-		../../$(HELPERS_OBJ) \
+		../../$(CIMPORT_STUBS_OBJ) \
 		-I../../runtime \
 		-lc
 	./out/emit-c-test/hello_test | grep -qx "hello"
