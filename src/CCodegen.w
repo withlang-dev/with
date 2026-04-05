@@ -836,7 +836,8 @@ fn CCodegen.c_type(self: CCodegen, tid: i32, as_return: i32) -> str:
         // Other generic types: treat as opaque struct
         return self.struct_c_name(resolved)
     if tk == TypeKind.TY_ARRAY:
-        return "int64_t"  // arrays lowered as pointer+len in C
+        let elem_tid = self.sema.get_type_d0(resolved)
+        return self.c_type(elem_tid, 0) ++ "*"
     if tk == TypeKind.TY_TUPLE:
         return "int64_t"  // tuples lowered conservatively
     // Conservative fallback
@@ -4341,6 +4342,17 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
         let dst_resolved = self.sema.resolve_alias(dst_tid)
         let dst_tk = self.sema.get_type_kind(dst_resolved)
         let dst_place = self.place_text(body, d0)
+        // Array assignment: use memcpy/memset (C arrays are not assignable)
+        if dst_tk == TypeKind.TY_ARRAY:
+            if rval == "0" or rval == "0LL":
+                return "    memset(" ++ dst_place ++ ", 0, sizeof(" ++ dst_place ++ "));"
+            let rv_tid = self.rvalue_tid(body, d1)
+            let rv_resolved = if rv_tid != 0: self.sema.resolve_alias(rv_tid) else: 0
+            let rv_tk = if rv_resolved != 0: self.sema.get_type_kind(rv_resolved) else: 0
+            if rv_tk == TypeKind.TY_ARRAY:
+                return "    memcpy(" ++ dst_place ++ ", " ++ rval ++ ", sizeof(" ++ dst_place ++ "));"
+            // Scalar to array: write scalar bytes into array via temp
+            return "    " ++ cc_lbrace() ++ " __typeof__(" ++ rval ++ ") __tmp = " ++ rval ++ "; memcpy(" ++ dst_place ++ ", &__tmp, sizeof(" ++ dst_place ++ ") < sizeof(__tmp) ? sizeof(" ++ dst_place ++ ") : sizeof(__tmp)); " ++ cc_rbrace()
         // Vec zero-init: c_type returns "with_vec" for TY_GENERIC_INST(Vec)
         if (rval == "0" or rval == "0LL") and self.c_type(dst_tid, 0) == "with_vec":
             return "    " ++ dst_place ++ " = (with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";"
@@ -4715,7 +4727,16 @@ fn CCodegen.emit_fn_body(self: CCodegen, body: MirBody) -> str:
                 local_ty = "uint8_t*"
             else:
                 local_ty = base_ty ++ "*"
-        out = out ++ "    " ++ local_ty ++ f" _{li} __attribute__((unused)) = " ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";\n"
+        // Array types: emit T _N[size] = {0} instead of T* _N = {0}
+        let use_resolved = self.sema.resolve_alias(use_tid)
+        let use_kind = self.sema.get_type_kind(use_resolved)
+        if use_kind == TypeKind.TY_ARRAY:
+            let elem_tid = self.sema.get_type_d0(use_resolved)
+            let arr_size = self.sema.get_type_d1(use_resolved)
+            let elem_c = self.c_type(elem_tid, 0)
+            out = out ++ f"    {elem_c} _{li}[{arr_size}] __attribute__((unused)) = " ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";\n"
+        else:
+            out = out ++ "    " ++ local_ty ++ f" _{li} __attribute__((unused)) = " ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";\n"
     if body.block_count() == 0:
         self.fail("function has no basic blocks: " ++ cc_intern_resolve(self.intern, fn_sym))
         out = out ++ "    abort();\n"
