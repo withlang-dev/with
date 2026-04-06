@@ -63,6 +63,23 @@ fn test_fn_metadata:
     let ret_ty = pool.fn_meta_ret(meta)
     assert(pool.kind(ret_ty) == NodeKind.NK_TYPE_NAMED())
 
+fn test_callconv_metadata_unquotes_string_literal:
+    let src = "@[callconv(\"c\")]\nfn visit(x: i32) -> i32:\n    x\n"
+    var lexer = Lexer.init(src, 0)
+    let tokens = lexer.tokenize()
+    var intern = InternPool.init()
+    var diags = DiagnosticList.init()
+    var parser = Parser.init(tokens, src, 0, intern, diags)
+    let pool = parser.parse_module()
+    assert(not parser.diags.has_errors())
+    intern = parser.intern
+    let decl = pool.get_decl(0)
+    let meta = pool.find_fn_meta(decl)
+    assert(meta >= 0)
+    let cc_sym = pool.fn_meta_tp_start(meta)
+    assert(cc_sym != 0)
+    assert(intern.resolve(cc_sym) == "c")
+
 fn test_type_param_layout:
     let src = "fn id[T: Show + Hash](x: T) -> T:\n    x\n"
     let pool = parse_module(src)
@@ -242,6 +259,7 @@ fn main:
     test_byte_char_literal_lowering()
     test_precedence()
     test_fn_metadata()
+    test_callconv_metadata_unquotes_string_literal()
     test_type_param_layout()
     test_local_let_type_annotation_storage()
     test_compose_lowering()
