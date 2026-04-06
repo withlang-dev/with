@@ -928,10 +928,10 @@ fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, 
 
 fn run_migrate_command(argc: i32) -> i32:
     if argc < 3:
-        with_eprint("usage: with migrate <file.c> [-o output.w]")
+        eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir]")
         return 1
 
-    // Parse source path (first non-flag argument after "migrate")
+    // Parse arguments
     var source_path = ""
     var output_path = ""
     var ai = 2
@@ -945,15 +945,30 @@ fn run_migrate_command(argc: i32) -> i32:
             with_cimport_add_include_path(with_arg_at(ai + 1))
             ai = ai + 2
             continue
+        if arg == "-D" and ai + 1 < argc:
+            ai = ai + 2  // TODO: pass defines to libclang
+            continue
+        if arg == "--check" or arg == "--diff" or arg == "--stats":
+            ai = ai + 1
+            continue  // TODO: implement modes
         if arg.len() > 0 and arg.byte_at(0) != 45:  // not a flag
             source_path = arg
         ai = ai + 1
 
     if source_path.len() == 0:
-        with_eprint("error: no source file specified")
+        eprint("error: no source file specified")
         return 1
 
-    // Default output: replace .c with .w
+    // Detect if source is a directory (ends with / or doesn't end with .c/.h)
+    let is_dir = (source_path.len() > 0 and source_path.byte_at(source_path.len() - 1) == 47) or (source_path.len() > 2 and source_path.slice(source_path.len() - 2, source_path.len()) != ".c" and source_path.slice(source_path.len() - 2, source_path.len()) != ".h")
+
+    if is_dir:
+        // Directory mode
+        if output_path.len() == 0:
+            output_path = source_path ++ "_migrated"
+        return migrate_c_directory(source_path, output_path)
+
+    // Single file mode — default output: replace .c with .w
     if output_path.len() == 0:
         if source_path.len() > 2 and source_path.slice(source_path.len() - 2, source_path.len()) == ".c":
             output_path = source_path.slice(0, source_path.len() - 2) ++ ".w"
