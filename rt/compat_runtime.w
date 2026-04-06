@@ -1,11 +1,14 @@
-// rt/compat_runtime.w -- compiler-only runtime functions that need libc.
+// rt/compat_runtime.w -- compiler-only runtime functions.
 // These supplement rt_core.w for the compiler build (lld path).
 // The embedded stdlib functions are appended by generate_embedded_stdlib.py.
+//
+// No libc dependency: uses with_alloc/with_free/with_memcpy/with_memset
+// from rt_core.w. All other extern fns are libSystem (stable Darwin ABI).
 
-extern fn malloc(size: u64) -> *mut u8
-extern fn free(ptr: *mut u8) -> void
-extern fn memcpy(dst: *mut u8, src: *const u8, n: u64) -> *mut u8
-extern fn memset(dst: *mut u8, c: i32, n: u64) -> *mut u8
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8) -> void
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
+extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> void
 extern fn getenv(name: *const u8) -> *const u8
 extern fn setenv(name: *const u8, value: *const u8, overwrite: i32) -> i32
 extern fn sigaction(sig: i32, act: *const u8, old_act: *mut u8) -> i32
@@ -17,7 +20,6 @@ extern fn execv(path: *const u8, argv: *const *const u8) -> i32
 extern fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32
 extern fn getrlimit(resource: i32, lim: *mut u8) -> i32
 extern fn setrlimit(resource: i32, lim: *const u8) -> i32
-extern fn strlen(s: *const u8) -> i64
 extern fn _exit(code: i32) -> void
 extern fn __error() -> *mut i32
 
@@ -56,19 +58,19 @@ fn signal_bit(signo: i32) -> u32:
     (1 as u32) << ((signo - 1) as u32)
 
 fn str_to_c_buf(s: str) -> *mut u8:
-    let out = malloc((s.len() + 1) as u64)
+    let out = with_alloc(s.len() + 1)
     if out as i64 == 0:
         return 0 as *mut u8
     if s.len() > 0:
         let sp = &s as *const *const u8
-        let _ = memcpy(out, *sp, s.len() as u64)
+        with_memcpy(out, *sp, s.len())
     *((out as i64 + s.len()) as *mut u8) = 0
     out
 
 fn restore_default_signal_handler(signo: i32):
     var sa: [16]u8 = [0 as u8; 16]
     let sa_base = (&mut sa) as *mut [16]u8 as i64
-    let _ = memset(sa_base as *mut u8, 0, SIGACTION_SIZE as u64)
+    with_memset(sa_base as *mut u8, 0, SIGACTION_SIZE)
     let _ = sigaction(signo, sa_base as *const u8, 0 as *mut u8)
 
 fn block_interrupt_signals(prev_mask: *mut u32) -> i32:
@@ -146,18 +148,18 @@ pub fn setenv_str(name: str, value: str) -> i32:
         return -1
     let value_buf = str_to_c_buf(value)
     if value_buf as i64 == 0:
-        free(name_buf)
+        with_free(name_buf)
         return -1
     let rc = setenv(name_buf as *const u8, value_buf as *const u8, 1)
-    free(name_buf)
-    free(value_buf)
+    with_free(name_buf)
+    with_free(value_buf)
     rc
 
 @[c_export("with_install_interrupt_handlers")]
 pub fn install_interrupt_handlers():
     var sa: [16]u8 = [0 as u8; 16]
     let sa_base = (&mut sa) as *mut [16]u8 as i64
-    let _ = memset(sa_base as *mut u8, 0, SIGACTION_SIZE as u64)
+    with_memset(sa_base as *mut u8, 0, SIGACTION_SIZE)
     store_i64(sa_base, SIGACTION_OFF_HANDLER, interrupt_signal_handler as i64)
     let _ = sigaction(SIGINT, sa_base as *const u8, 0 as *mut u8)
     let _ = sigaction(SIGTERM, sa_base as *const u8, 0 as *mut u8)
@@ -188,13 +190,13 @@ pub fn system_str(cmd: str) -> i32:
     if buf as i64 == 0:
         return -1
     if interrupt_flag != 0:
-        free(buf)
+        with_free(buf)
         let errp = __error()
         if errp as i64 != 0:
             *errp = EINTR
         return -1
     let rc = run_shell_command(buf as *const u8)
-    free(buf)
+    with_free(buf)
     rc
 
 @[c_export("with_extract_tgz")]
@@ -206,29 +208,29 @@ pub fn extract_tgz(archive: str, dest: str) -> i32:
     let middle_len = 7 as i64
     let suffix_len = 1 as i64
     let total = prefix_len + archive.len() + middle_len + dest.len() + suffix_len
-    let cmd = malloc((total + 1) as u64)
+    let cmd = with_alloc(total + 1)
     if cmd as i64 == 0:
         return -1
     let archive_ptr = *(&archive as *const *const u8)
     let dest_ptr = *(&dest as *const *const u8)
     var pos: i64 = 0
-    let _ = memcpy((cmd as i64 + pos) as *mut u8, prefix, prefix_len as u64)
+    with_memcpy((cmd as i64 + pos) as *mut u8, prefix, prefix_len)
     pos = pos + prefix_len
     if archive.len() > 0:
-        let _ = memcpy((cmd as i64 + pos) as *mut u8, archive_ptr, archive.len() as u64)
+        with_memcpy((cmd as i64 + pos) as *mut u8, archive_ptr, archive.len())
         pos = pos + archive.len()
-    let _ = memcpy((cmd as i64 + pos) as *mut u8, middle, middle_len as u64)
+    with_memcpy((cmd as i64 + pos) as *mut u8, middle, middle_len)
     pos = pos + middle_len
     if dest.len() > 0:
-        let _ = memcpy((cmd as i64 + pos) as *mut u8, dest_ptr, dest.len() as u64)
+        with_memcpy((cmd as i64 + pos) as *mut u8, dest_ptr, dest.len())
         pos = pos + dest.len()
-    let _ = memcpy((cmd as i64 + pos) as *mut u8, suffix, suffix_len as u64)
+    with_memcpy((cmd as i64 + pos) as *mut u8, suffix, suffix_len)
     *((cmd as i64 + total) as *mut u8) = 0
     if interrupt_flag != 0:
-        free(cmd)
+        with_free(cmd)
         return -1
     let rc = run_shell_command(cmd as *const u8)
-    free(cmd)
+    with_free(cmd)
     if rc == 0:
         return 0
     -1
