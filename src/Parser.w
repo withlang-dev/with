@@ -3638,12 +3638,23 @@ fn Parser.parse_unary_not(self: Parser) -> NodeId:
     self.pool.add_node(NodeKind.NK_UNARY, start, self.prev_end(), UnaryOp.UOP_NOT, operand, 0)
 
 fn Parser.build_unary_with_outer_cast(self: Parser, start: i32, op: i32, operand: i32) -> NodeId:
-    if operand != 0 and self.pool.kind(operand) == NodeKind.NK_CAST:
-        let inner = self.pool.get_data0(operand)
-        let target_type = self.pool.get_data1(operand)
-        let unary = self.pool.add_node(NodeKind.NK_UNARY, start, self.pool.get_end(inner), op, inner, 0)
-        return self.pool.add_node(NodeKind.NK_CAST, start, self.pool.get_end(operand), unary, target_type, 0)
-    self.pool.add_node(NodeKind.NK_UNARY, start, self.pool.get_end(operand), op, operand, 0)
+    if operand == 0:
+        return self.pool.add_node(NodeKind.NK_UNARY, start, self.prev_end(), op, operand, 0)
+
+    let cast_targets: Vec[i32] = Vec.new()
+    let cast_ends: Vec[i32] = Vec.new()
+    var inner = operand
+    while inner != 0 and self.pool.kind(inner) == NodeKind.NK_CAST:
+        cast_targets.push(self.pool.get_data1(inner))
+        cast_ends.push(self.pool.get_end(inner))
+        inner = self.pool.get_data0(inner)
+
+    var out = self.pool.add_node(NodeKind.NK_UNARY, start, self.pool.get_end(inner), op, inner, 0)
+    var i = cast_targets.len() as i32 - 1
+    while i >= 0:
+        out = self.pool.add_node(NodeKind.NK_CAST, start, cast_ends.get(i as i64), out, cast_targets.get(i as i64), 0)
+        i = i - 1
+    out
 
 fn Parser.parse_ref_of(self: Parser) -> NodeId:
     let start = self.current_start()
