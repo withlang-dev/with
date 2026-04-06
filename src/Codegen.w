@@ -421,7 +421,7 @@ type Codegen {
     // Declared functions: sym → value/type
     fn_values: HashMap[i32, i64],
     fn_fn_types: HashMap[i32, i64],
-    // Extern fn ABI: fns with large struct params/returns transformed for C ABI.
+    // C ABI: fns with large struct params/returns transformed for C ABI.
     // Maps fn sym → 1 if the fn has an sret return (first param is hidden sret ptr).
     extern_fn_has_sret: HashMap[i32, i32],
     // Maps fn sym → bitmask of param indices that are byval (after sret shift).
@@ -3202,7 +3202,40 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         param_types.push(p_ty)
         pi = pi + 1
 
-    let fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, 0)
+    let cc_name = self.fn_callconv_name(meta)
+    let uses_c_abi = self.fn_uses_c_abi(cc_name)
+    let actual_param_types: Vec[i64] = Vec.new()
+    let byval_types: Vec[i64] = Vec.new()
+    let ptr_ty = wl_ptr_type(self.context)
+    var actual_ret_ty = ret_ty
+    var has_sret = 0
+    var sret_ty: i64 = 0
+    var byval_mask: i64 = 0
+    if uses_c_abi:
+        if ret_ty != 0 and wl_get_type_kind(ret_ty) == wl_struct_type_kind():
+            let ret_size = self.abi_size_of(ret_ty)
+            if ret_size > 16:
+                has_sret = 1
+                sret_ty = ret_ty
+                actual_ret_ty = wl_void_type(self.context)
+        if has_sret != 0:
+            actual_param_types.push(ptr_ty)
+        for abi_pi in 0..param_count:
+            let source_ty = param_types.get(abi_pi as i64)
+            if wl_get_type_kind(source_ty) == wl_struct_type_kind():
+                let p_size = self.abi_size_of(source_ty)
+                if p_size > 16:
+                    actual_param_types.push(ptr_ty)
+                    byval_mask = byval_mask | (1 << (abi_pi as i64))
+                    byval_types.push(source_ty)
+                    continue
+            actual_param_types.push(source_ty)
+            byval_types.push(0)
+    else:
+        for abi_pi in 0..param_count:
+            actual_param_types.push(param_types.get(abi_pi as i64))
+    let actual_param_count = actual_param_types.len() as i32
+    let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&actual_param_types), actual_param_count, 0)
 
     // Use "main" for @[entry] functions
     var effective_name = self.function_symbol_name(name_sym)
@@ -3212,7 +3245,9 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         effective_name = "main"
 
     let function = wl_add_function(self.llmod, effective_name, fn_type)
-    self.apply_noalias_param_attrs(function, param_start, param_count)
+    if has_sret != 0:
+        wl_add_sret_attr(self.context, function, 0, sret_ty)
+    self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret != 0: 1 else: 0)
 
     // Prelude functions keep external linkage so they survive LLVM inlining.
     // The declaration pass already tracks each decl's source file context.
@@ -3225,9 +3260,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     let is_weak = self.pool.fn_weak_flags.contains(fn_node)
 
     // @[c_export] overrides internal linkage to external for C/linker visibility
-    let cc_sym = self.pool.fn_meta_tp_start(meta)
-    if cc_sym != 0:
-        let cc_name = self.intern.resolve(cc_sym)
+    if cc_name.len() > 0:
         if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
             if is_weak:
                 wl_set_linkage(function, 5)  // LLVMWeakAnyLinkage
@@ -3236,12 +3269,34 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             let export_name = cc_name.slice(9, cc_name.len() as i64)
             if export_name.len() > 0 and export_name != effective_name:
                 wl_set_value_name(function, export_name)
+            wl_set_call_conv(function, wl_cc_c())
+        else:
+            let cc_id = self.resolve_callconv(cc_name)
+            if cc_id >= 0:
+                wl_set_call_conv(function, cc_id)
 
     // Apply attributes
     if (flags / FnFlags.INLINE) % 2 == 1:
         wl_add_fn_attr(self.context, function, "alwaysinline")
     if (flags / FnFlags.NOINLINE) % 2 == 1:
         wl_add_fn_attr(self.context, function, "noinline")
+
+    if has_sret != 0 or byval_mask != 0:
+        self.extern_fn_has_sret.insert(name_sym, has_sret)
+        self.extern_fn_byval_params.insert(name_sym, byval_mask)
+        self.extern_fn_byval_types.insert(name_sym, byval_types)
+        if has_sret != 0:
+            self.extern_fn_sret_type.insert(name_sym, sret_ty)
+        if alias_sym != 0:
+            self.extern_fn_has_sret.insert(alias_sym, has_sret)
+            self.extern_fn_byval_params.insert(alias_sym, byval_mask)
+            if has_sret != 0:
+                self.extern_fn_sret_type.insert(alias_sym, sret_ty)
+        if method_key_sym != 0:
+            self.extern_fn_has_sret.insert(method_key_sym, has_sret)
+            self.extern_fn_byval_params.insert(method_key_sym, byval_mask)
+            if has_sret != 0:
+                self.extern_fn_sret_type.insert(method_key_sym, sret_ty)
 
     self.fn_values.insert(name_sym, function)
     self.fn_fn_types.insert(name_sym, fn_type)
@@ -3286,6 +3341,9 @@ fn Codegen.record_ref_param(self: Codegen, fn_sym: i32, idx: i32, count: i32):
     self.fn_ref_param_data.set_i32((base + idx) as i64, 1)
 
 fn Codegen.apply_noalias_param_attrs(self: Codegen, function: i64, param_start: i32, param_count: i32):
+    self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, 0)
+
+fn Codegen.apply_noalias_param_attrs_with_offset(self: Codegen, function: i64, param_start: i32, param_count: i32, param_offset: i32):
     if function == 0 or param_start < 0 or param_count <= 0:
         return
     let fn_type = wl_global_get_value_type(function)
@@ -3293,15 +3351,16 @@ fn Codegen.apply_noalias_param_attrs(self: Codegen, function: i64, param_start: 
         let flags = self.pool.fn_param_flags(param_start, pi)
         if fn_param_is_noalias(flags) == 0:
             continue
-        var param_ty = if fn_type != 0: wl_get_fn_param_type(fn_type, pi) else: 0
+        let actual_idx = pi + param_offset
+        var param_ty = if fn_type != 0: wl_get_fn_param_type(fn_type, actual_idx) else: 0
         if param_ty == 0:
-            let param = wl_get_param(function, pi)
+            let param = wl_get_param(function, actual_idx)
             if param == 0:
                 continue
             param_ty = wl_type_of(param)
         if wl_get_type_kind(param_ty) != wl_pointer_type_kind():
             continue
-        wl_add_param_attr(self.context, function, pi, "noalias")
+        wl_add_param_attr(self.context, function, actual_idx, "noalias")
 
 fn Codegen.record_dyn_param(self: Codegen, fn_sym: i32, idx: i32, count: i32, trait_sym: i32):
     if not self.fn_dyn_param_starts.get(fn_sym).is_some():
@@ -3311,6 +3370,20 @@ fn Codegen.record_dyn_param(self: Codegen, fn_sym: i32, idx: i32, count: i32, tr
             self.fn_dyn_param_data.push(0)
     let base = self.fn_dyn_param_starts.get(fn_sym).unwrap()
     self.fn_dyn_param_data.set_i32((base + idx) as i64, trait_sym)
+
+fn Codegen.fn_callconv_name(self: Codegen, meta: i32) -> str:
+    if meta < 0:
+        return ""
+    let cc_sym = self.pool.fn_meta_tp_start(meta)
+    if cc_sym == 0:
+        return ""
+    let cc_name = self.intern.resolve(cc_sym)
+    if cc_name.len() >= 2 and cc_name.byte_at(0) == 34 and cc_name.byte_at(cc_name.len() - 1) == 34:
+        return cc_name.slice(1, cc_name.len() - 1)
+    cc_name
+
+fn Codegen.fn_uses_c_abi(self: Codegen, cc_name: str) -> bool:
+    cc_name == "c" or (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:")
 
 // ── Declare extern fn ─────────────────────────────────────────────
 
@@ -3397,12 +3470,11 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
         if has_sret != 0:
             self.extern_fn_sret_type.insert(name_sym, sret_ty)
 
-    self.apply_noalias_param_attrs(function, param_start, param_count)
+    self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret != 0: 1 else: 0)
 
     // Apply calling convention or c_export if specified
-    let cc_sym = self.pool.fn_meta_tp_start(meta)
-    if cc_sym != 0:
-        let cc_name = self.intern.resolve(cc_sym)
+    let cc_name = self.fn_callconv_name(meta)
+    if cc_name.len() > 0:
         if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
             // @[c_export("name")] — set external linkage for C visibility
             // External linkage = 0 in LLVM (default for non-internal functions)

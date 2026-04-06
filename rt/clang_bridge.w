@@ -786,6 +786,7 @@ fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32) -> *mu
 // ── Visitor callbacks ───────────────────────────────────────────
 // These receive CXCursor by pointer (With calling convention matches C ABI for >16B structs)
 
+@[callconv("c")]
 fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     let s = data as *mut CImportSession
     let kind = clang_getCursorKind(cursor)
@@ -812,6 +813,7 @@ fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     (*s).decl_count = (*s).decl_count + 1
     CXChildVisit_Continue
 
+@[callconv("c")]
 fn collect_field(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     // data points to: [*mut FieldInfo, i32 count, i32 cap]
     let fc = data
@@ -863,6 +865,7 @@ fn ensure_fields_cached(s: *mut CImportSession, idx: i32):
     (*cache).fields = fc_fields
     (*cache).field_count = fc_count
 
+@[callconv("c")]
 fn collect_enum_const(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     let ec = data
     if clang_getCursorKind(cursor) != CXCursor_EnumConstantDecl:
@@ -1817,6 +1820,7 @@ fn store_type(s: *mut CImportSession, ty: CXType) -> i32:
     (*s).type_count = (*s).type_count + 1
     idx
 
+@[callconv("c")]
 fn collect_child_cursor(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     // data = ChildCollector: { *mut CImportSession, *mut i32 indices, i32 count, i32 cap }
     let cc = data

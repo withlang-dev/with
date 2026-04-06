@@ -395,7 +395,8 @@ fn Parser.skip_attributes(self: Parser):
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
                 if self.peek() == TokenKind.TK_STRING_LIT:
-                    self.pending_callconv = self.intern_current()
+                    let cc_name = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
+                    self.pending_callconv = self.intern.intern(cc_name)
                     self.advance()
                 if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
