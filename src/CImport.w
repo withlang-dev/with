@@ -4377,7 +4377,14 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
             init_scope = init_scope ++ "|" ++ ci_escape_reserved(pname) ++ "|"
         pi = pi + 1
 
-    // Translate the body
+    // Check for gotos — use state machine transform if present
+    if ci_has_goto(session, body_cursor):
+        let body = ci_trans_goto_body(session, body_cursor, 1, init_scope)
+        if body.len() == 0:
+            return ""
+        return body
+
+    // Normal structured translation
     let body = ci_trans_stmt(session, body_cursor, 1, init_scope)
     if body.len() == 0:
         return ""
@@ -4951,6 +4958,310 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n    comptime_error(\"body translation failed\")\n\n"
 
 // Count occurrences of a substring in a string
+// ── Goto elimination: state-variable transform ─────────────
+
+// Check if a function body (or any subtree) contains a goto statement.
+fn ci_has_goto(session: i64, cursor: i32) -> bool:
+    let kind = with_ci_cursor_kind(session, cursor)
+    if kind == CXK_GOTO_STMT:
+        return true
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        if ci_has_goto(session, with_ci_child(session, cursor, i)):
+            return true
+        i = i + 1
+    false
+
+// Collect all labels in a function body, assign state IDs.
+// Returns pipe-delimited map: "|label1=1|label2=2|..."
+// State 0 is the entry block (not a label).
+fn ci_collect_labels(session: i64, cursor: i32) -> str:
+    var result = ""
+    var next_state = 1
+    ci_collect_labels_rec(session, cursor, &mut result, &mut next_state)
+    result
+
+fn ci_collect_labels_rec(session: i64, cursor: i32, result: &mut str, next_state: &mut i32):
+    let kind = with_ci_cursor_kind(session, cursor)
+    if kind == CXK_LABEL_STMT:
+        let name = with_ci_cursor_spelling(session, cursor)
+        *result = *result ++ "|" ++ name ++ "=" ++ i64_to_string(*next_state as i64) ++ "|"
+        *next_state = *next_state + 1
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        ci_collect_labels_rec(session, with_ci_child(session, cursor, i), result, next_state)
+        i = i + 1
+
+// Look up a label name in the label map, return its state ID.
+fn ci_label_state(label_map: str, label_name: str) -> i32:
+    let needle = "|" ++ label_name ++ "="
+    let pos = ci_find_substr(label_map, needle)
+    if pos < 0:
+        return -1
+    // Extract the number after "="
+    let start = pos + needle.len() as i32
+    var end = start
+    let map_len = label_map.len() as i32
+    while end < map_len and label_map.byte_at(end as i64) != 124:  // '|'
+        end = end + 1
+    if end > start:
+        let num_str = label_map.slice(start as i64, end as i64)
+        // Simple string-to-int
+        var val = 0
+        var di = 0
+        while di < num_str.len() as i32:
+            let c = num_str.byte_at(di as i64)
+            if c >= 48 and c <= 57:
+                val = val * 10 + (c - 48)
+            di = di + 1
+        return val
+    -1
+
+fn ci_find_substr(haystack: str, needle: str) -> i32:
+    let hlen = haystack.len() as i32
+    let nlen = needle.len() as i32
+    if nlen > hlen: return -1
+    var i = 0
+    while i <= hlen - nlen:
+        if haystack.slice(i as i64, (i + nlen) as i64) == needle:
+            return i
+        i = i + 1
+    -1
+
+// Collect all variable declarations in a function body (for hoisting).
+// Returns parallel pipe-delimited lists of names and types.
+fn ci_collect_var_decls(session: i64, cursor: i32, names: &mut str, types: &mut str):
+    let kind = with_ci_cursor_kind(session, cursor)
+    if kind == CXK_DECL_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        var i = 0
+        while i < nc:
+            let child = with_ci_child(session, cursor, i)
+            if with_ci_cursor_kind(session, child) == 9:  // CXK_VAR_DECL
+                let vname = ci_escape_reserved(with_ci_cursor_spelling(session, child))
+                let vty = with_ci_cursor_type(session, child)
+                let vty_str = with_ci_type_translated(session, vty)
+                if not ci_str_contains(*names, "|" ++ vname ++ "|"):
+                    *names = *names ++ "|" ++ vname ++ "|"
+                    *types = *types ++ "|" ++ vty_str ++ "|"
+            i = i + 1
+    // Recurse into children
+    let nc = with_ci_num_children(session, cursor)
+    var ci = 0
+    while ci < nc:
+        ci_collect_var_decls(session, with_ci_child(session, cursor, ci), names, types)
+        ci = ci + 1
+
+// Translate a goto-containing function body as a state machine.
+// Emits: hoisted vars, var __pc = 0, while true: match __pc: arms
+fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -> str:
+    let label_map = ci_collect_labels(session, body_cursor)
+
+    // Collect and hoist variable declarations
+    var var_names = ""
+    var var_types = ""
+    ci_collect_var_decls(session, body_cursor, &mut var_names, &mut var_types)
+
+    var output = ""
+
+    // Emit hoisted variable declarations
+    var vi = 1  // skip leading |
+    while vi < var_names.len() as i32:
+        // Extract name
+        var name_end = vi
+        while name_end < var_names.len() as i32 and var_names.byte_at(name_end as i64) != 124:
+            name_end = name_end + 1
+        let vname = var_names.slice(vi as i64, name_end as i64)
+        // Extract type at same position in var_types
+        var ti = 1
+        var type_idx = 0
+        var target_idx = 0
+        // Count which var index this is
+        var count_vi = 1
+        var var_index = 0
+        while count_vi < vi:
+            if var_names.byte_at(count_vi as i64) == 124:
+                var_index = var_index + 1
+            count_vi = count_vi + 1
+        // Walk to the same index in var_types
+        var cur_type_idx = 0
+        while ti < var_types.len() as i32:
+            if cur_type_idx == var_index:
+                break
+            if var_types.byte_at(ti as i64) == 124:
+                cur_type_idx = cur_type_idx + 1
+                ti = ti + 1
+                continue
+            ti = ti + 1
+        var type_end = ti
+        while type_end < var_types.len() as i32 and var_types.byte_at(type_end as i64) != 124:
+            type_end = type_end + 1
+        let vtype = var_types.slice(ti as i64, type_end as i64)
+        let default_val = ci_default_for_type(vtype)
+        if default_val.len() > 0:
+            output = output ++ ci_indent_str(indent) ++ "var " ++ vname ++ ": " ++ vtype ++ " = " ++ default_val ++ "\n"
+
+        vi = name_end + 1
+        if vi < var_names.len() as i32 and var_names.byte_at(vi as i64) == 124:
+            vi = vi + 1  // skip separator
+
+    // Emit state machine dispatch loop
+    output = output ++ ci_indent_str(indent) ++ "var __pc: i32 = 0\n"
+    output = output ++ ci_indent_str(indent) ++ "while true:\n"
+    output = output ++ ci_indent_str(indent + 1) ++ "match __pc:\n"
+
+    // Walk body children, assigning each label's block to its state
+    let nc = with_ci_num_children(session, body_cursor)
+    var current_state = 0
+    var arm_has_content = false
+    // Emit entry state arm
+    output = output ++ ci_indent_str(indent + 2) ++ "0 ->\n"
+
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, body_cursor, i)
+        let kind = with_ci_cursor_kind(session, child)
+
+        if kind == CXK_LABEL_STMT:
+            // Close current arm with fallthrough to next state
+            let label_name = with_ci_cursor_spelling(session, child)
+            let target_state = ci_label_state(label_map, label_name)
+            if target_state >= 0:
+                if not arm_has_content:
+                    output = output ++ ci_indent_str(indent + 3) ++ "// empty\n"
+                output = output ++ ci_indent_str(indent + 3) ++ "__pc = " ++ i64_to_string(target_state as i64) ++ "; continue\n"
+                // Start new arm for this label
+                current_state = target_state
+                output = output ++ ci_indent_str(indent + 2) ++ i64_to_string(target_state as i64) ++ " ->  // " ++ label_name ++ "\n"
+                arm_has_content = false
+            // Translate the label's body child (child[0] of LabelStmt)
+            let lnc = with_ci_num_children(session, child)
+            if lnc > 0:
+                let label_body = with_ci_child(session, child, 0)
+                let lbk = with_ci_cursor_kind(session, label_body)
+                if lbk != CXK_LABEL_STMT:  // avoid double-processing nested labels
+                    let s = ci_trans_stmt_goto(session, label_body, indent + 3, scope, label_map)
+                    if s.len() > 0:
+                        output = output ++ ci_indent_str(indent + 3) ++ s ++ "\n"
+                        arm_has_content = true
+
+        else if kind == CXK_GOTO_STMT:
+            // LLVM 22: goto target label is in child[0] (CXCursor_LabelRef)
+            var target_label = ""
+            let gnc = with_ci_num_children(session, child)
+            if gnc > 0:
+                target_label = with_ci_cursor_spelling(session, with_ci_child(session, child, 0))
+            if target_label.len() == 0:
+                target_label = with_ci_cursor_spelling(session, child)
+            let target_state = ci_label_state(label_map, target_label)
+            if target_state >= 0:
+                output = output ++ ci_indent_str(indent + 3) ++ "__pc = " ++ i64_to_string(target_state as i64) ++ "; continue\n"
+                arm_has_content = true
+
+        else if kind == CXK_DECL_STMT:
+            // Variable declarations: emit only the initializer assignment (var was hoisted)
+            let dnc = with_ci_num_children(session, child)
+            var di = 0
+            while di < dnc:
+                let dchild = with_ci_child(session, child, di)
+                if with_ci_cursor_kind(session, dchild) == 9:  // VarDecl
+                    let vname = ci_escape_reserved(with_ci_cursor_spelling(session, dchild))
+                    let init_nc = with_ci_num_children(session, dchild)
+                    if init_nc > 0:
+                        let init_expr = ci_trans_expr(session, with_ci_child(session, dchild, 0), scope)
+                        if init_expr.len() > 0:
+                            output = output ++ ci_indent_str(indent + 3) ++ vname ++ " = " ++ init_expr ++ "\n"
+                            arm_has_content = true
+                di = di + 1
+
+        else:
+            let s = ci_trans_stmt_goto(session, child, indent + 3, scope, label_map)
+            if s.len() > 0:
+                output = output ++ ci_indent_str(indent + 3) ++ s ++ "\n"
+                arm_has_content = true
+
+        i = i + 1
+
+    // Close the last arm
+    if not arm_has_content:
+        output = output ++ ci_indent_str(indent + 3) ++ "// empty\n"
+
+    // Default arm
+    output = output ++ ci_indent_str(indent + 2) ++ "_ -> break\n"
+    output
+
+// Translate a statement inside a goto-containing function.
+// Same as ci_trans_stmt but replaces goto with __pc = N; continue
+// and labels with state transitions.
+fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_map: str) -> str:
+    let kind = with_ci_cursor_kind(session, cursor)
+
+    // Goto → state transition
+    // In LLVM 22, the goto target label is in the goto's child (CXCursor_LabelRef, kind 48)
+    if kind == CXK_GOTO_STMT:
+        var target_label = ""
+        let gnc = with_ci_num_children(session, cursor)
+        if gnc > 0:
+            target_label = with_ci_cursor_spelling(session, with_ci_child(session, cursor, 0))
+        if target_label.len() == 0:
+            target_label = with_ci_cursor_spelling(session, cursor)
+        let target_state = ci_label_state(label_map, target_label)
+        if target_state >= 0:
+            return "__pc = " ++ i64_to_string(target_state as i64) ++ "; continue"
+        return "comptime_error(\"unknown goto target: " ++ target_label ++ "\")"
+
+    // Label → just translate the body
+    if kind == CXK_LABEL_STMT:
+        let lnc = with_ci_num_children(session, cursor)
+        if lnc > 0:
+            return ci_trans_stmt_goto(session, with_ci_child(session, cursor, 0), indent, scope, label_map)
+        return ""
+
+    // Compound statement — recurse into children with goto awareness
+    if kind == CXK_COMPOUND_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        var body = ""
+        var i = 0
+        while i < nc:
+            let child = with_ci_child(session, cursor, i)
+            let s = ci_trans_stmt_goto(session, child, indent, scope, label_map)
+            if s.len() > 0:
+                body = body ++ ci_indent_str(indent) ++ s ++ "\n"
+            i = i + 1
+        return body
+
+    // If statement — recurse into then/else with goto awareness
+    if kind == CXK_IF_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 2:
+            let cond = ci_trans_bool_expr(session, with_ci_child(session, cursor, 0), scope)
+            if cond.len() > 0:
+                let then_body = ci_trans_stmt_goto(session, with_ci_child(session, cursor, 1), indent + 1, scope, label_map)
+                if then_body.len() > 0:
+                    var result = "if " ++ cond ++ ":\n" ++ then_body
+                    if nc > 2:
+                        let else_body = ci_trans_stmt_goto(session, with_ci_child(session, cursor, 2), indent + 1, scope, label_map)
+                        if else_body.len() > 0:
+                            result = result ++ ci_indent_str(indent) ++ "else:\n" ++ else_body
+                    return result
+        return ""
+
+    // While — recurse with goto awareness
+    if kind == CXK_WHILE_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 2:
+            let cond = ci_trans_bool_expr(session, with_ci_child(session, cursor, 0), scope)
+            if cond.len() > 0:
+                let body = ci_trans_stmt_goto(session, with_ci_child(session, cursor, 1), indent + 1, scope, label_map)
+                if body.len() > 0:
+                    return "while " ++ cond ++ ":\n" ++ body
+        return ""
+
+    // Everything else: use the normal translator (break, continue, return, etc.)
+    ci_trans_stmt(session, cursor, indent, scope)
+
 fn ci_count_substring(haystack: str, needle: str) -> i32:
     if needle.len() == 0:
         return 0
