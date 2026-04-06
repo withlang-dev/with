@@ -113,20 +113,22 @@ let CK_STATIC_ASSERT: i32 = 602
 // CX_StorageClass constants
 let CX_SC_STATIC: i32 = 3
 
-// CXCursorKind constants (new API — cursor-level)
+// CXCursorKind constants (new API — cursor-level, LLVM 22 values)
+let CXK_LABEL_STMT: i32 = 201
 let CXK_COMPOUND_STMT: i32 = 202
-let CXK_RETURN_STMT: i32 = 214
-let CXK_DECL_STMT: i32 = 231
-let CXK_IF_STMT: i32 = 206
-let CXK_WHILE_STMT: i32 = 213
+let CXK_CASE_STMT: i32 = 203
+let CXK_DEFAULT_STMT: i32 = 204
+let CXK_IF_STMT: i32 = 205
+let CXK_SWITCH_STMT: i32 = 206
+let CXK_WHILE_STMT: i32 = 207
+let CXK_DO_STMT: i32 = 208
 let CXK_FOR_STMT: i32 = 209
-let CXK_DO_STMT: i32 = 204
-let CXK_BREAK_STMT: i32 = 203
-let CXK_CONTINUE_STMT: i32 = 222
+let CXK_GOTO_STMT: i32 = 210
+let CXK_CONTINUE_STMT: i32 = 212
+let CXK_BREAK_STMT: i32 = 213
+let CXK_RETURN_STMT: i32 = 214
 let CXK_NULL_STMT: i32 = 230
-let CXK_SWITCH_STMT: i32 = 207
-let CXK_CASE_STMT: i32 = 208
-let CXK_DEFAULT_STMT: i32 = 210
+let CXK_DECL_STMT: i32 = 231
 let CXK_INT_LITERAL: i32 = 106
 let CXK_FLOAT_LITERAL: i32 = 107
 let CXK_STRING_LITERAL: i32 = 109
@@ -3904,7 +3906,7 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     if kind == CXK_NULL_STMT:
         return "pass"
 
-    // Switch statement — translate to if/else chain
+    // Switch statement — translate to match expression
     if kind == CXK_SWITCH_STMT:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
@@ -3916,19 +3918,19 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
         return ""
 
     // Static assert — untranslatable
-    if kind == 234:  // CXCursor_StaticAssert
+    if kind == 602:  // CXCursor_StaticAssert
         return "comptime_error(\"static_assert\")"
 
     // GCC asm statement — untranslatable
-    if kind == 228:  // CXCursor_GCCAsmStmt
+    if kind == 215:  // CXCursor_GCCAsmStmt
         return "comptime_error(\"inline asm\")"
 
     // Goto — untranslatable, emit comptime_error
-    if kind == 232:  // CXCursor_GotoStmt
+    if kind == CXK_GOTO_STMT:
         return "comptime_error(\"goto not supported\")"
 
     // Label — emit as comment
-    if kind == 233:  // CXCursor_LabelStmt
+    if kind == CXK_LABEL_STMT:
         let lbl = with_ci_cursor_spelling(session, cursor)
         let nc = with_ci_num_children(session, cursor)
         var body = ""
@@ -4054,44 +4056,119 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32, 
                     let case_val = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
                     let case_body = ci_trans_stmt_strip_break(session, with_ci_child(session, child, 1), indent + 2, scope)
                     if case_val.len() > 0 and case_body.len() > 0:
-                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " =>\n" ++ case_body
+                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " ->\n" ++ case_body
             else if ck == CXK_DEFAULT_STMT:
                 let case_nc = with_ci_num_children(session, child)
                 if case_nc >= 1:
                     let case_body = ci_trans_stmt_strip_break(session, with_ci_child(session, child, 0), indent + 2, scope)
                     if case_body.len() > 0:
-                        result = result ++ ci_indent_str(indent + 1) ++ "_ =>\n" ++ case_body
+                        result = result ++ ci_indent_str(indent + 1) ++ "_ ->\n" ++ case_body
             i = i + 1
         return result
 
-    // Fallback: if/else chain for fallthrough cases
-    var result = ""
-    var first_arm = true
+    // Fallthrough handling: Zig-style statement duplication.
+    // For each case, walk forward through the remaining switch body,
+    // collecting all statements until break/return. This means a case
+    // that falls through includes the next case's statements too.
+    var result = "match " ++ cond ++ ":\n"
+    var has_default = false
     i = 0
     while i < nc:
         let child = with_ci_child(session, body_cursor, i)
         let ck = with_ci_cursor_kind(session, child)
         if ck == CXK_CASE_STMT:
-            let case_nc = with_ci_num_children(session, child)
-            if case_nc >= 2:
-                let case_val = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
-                let case_body = ci_trans_stmt(session, with_ci_child(session, child, 1), indent + 1, scope)
-                if case_val.len() > 0 and case_body.len() > 0:
-                    let prefix = if first_arm: "if " else: ci_indent_str(indent) ++ "else if "
-                    result = result ++ prefix ++ cond ++ " == " ++ case_val ++ ":\n" ++ case_body
-                    first_arm = false
-        else if ck == CXK_DEFAULT_STMT:
+            // Collect case value(s) — chase nested case/default chains
             let case_nc = with_ci_num_children(session, child)
             if case_nc >= 1:
-                let case_body = ci_trans_stmt(session, with_ci_child(session, child, 0), indent + 1, scope)
-                if case_body.len() > 0:
-                    if first_arm:
-                        result = result ++ "// default\n" ++ case_body
+                let case_val = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
+                if case_val.len() > 0:
+                    // Walk forward from this case's body through remaining switch body
+                    let prong_body = ci_trans_switch_prong_forward(session, body_cursor, i, nc, indent + 2, scope)
+                    if prong_body.len() > 0:
+                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " ->\n" ++ prong_body
                     else:
-                        result = result ++ ci_indent_str(indent) ++ "else:\n" ++ case_body
-                    first_arm = false
+                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " -> pass\n"
+        else if ck == CXK_DEFAULT_STMT:
+            has_default = true
+            let prong_body = ci_trans_switch_prong_forward(session, body_cursor, i, nc, indent + 2, scope)
+            if prong_body.len() > 0:
+                result = result ++ ci_indent_str(indent + 1) ++ "_ ->\n" ++ prong_body
+            else:
+                result = result ++ ci_indent_str(indent + 1) ++ "_ -> pass\n"
         i = i + 1
+    if not has_default:
+        result = result ++ ci_indent_str(indent + 1) ++ "_ -> pass\n"
     result
+
+// Walk forward from case at position `start_idx` through the switch body,
+// translating all statements until break/return (Zig-style duplication).
+// In libclang's AST, case bodies and break statements are siblings in the
+// switch's compound body. A CaseStmt's child[1] is just its first
+// statement — subsequent statements (including break) are siblings.
+fn ci_trans_switch_prong_forward(session: i64, body_cursor: i32, start_idx: i32, total: i32, indent: i32, scope: str) -> str:
+    var output = ""
+
+    // First: translate the case/default's own body child
+    let start_child = with_ci_child(session, body_cursor, start_idx)
+    let start_kind = with_ci_cursor_kind(session, start_child)
+    if start_kind == CXK_CASE_STMT:
+        let cnc = with_ci_num_children(session, start_child)
+        if cnc >= 2:
+            let body_child = with_ci_child(session, start_child, 1)
+            let bk = with_ci_cursor_kind(session, body_child)
+            if bk == CXK_BREAK_STMT:
+                return output
+            if bk == CXK_RETURN_STMT:
+                let s = ci_trans_stmt(session, body_child, indent, scope)
+                if s.len() > 0:
+                    output = output ++ ci_indent_str(indent) ++ s ++ "\n"
+                return output
+            // Chase nested case/default: skip (handled separately)
+            if bk != CXK_CASE_STMT and bk != CXK_DEFAULT_STMT:
+                let s = ci_trans_stmt(session, body_child, indent, scope)
+                if s.len() > 0:
+                    output = output ++ ci_indent_str(indent) ++ s ++ "\n"
+    else if start_kind == CXK_DEFAULT_STMT:
+        let cnc = with_ci_num_children(session, start_child)
+        if cnc >= 1:
+            let body_child = with_ci_child(session, start_child, 0)
+            let bk = with_ci_cursor_kind(session, body_child)
+            if bk == CXK_BREAK_STMT:
+                return output
+            if bk == CXK_RETURN_STMT:
+                let s = ci_trans_stmt(session, body_child, indent, scope)
+                if s.len() > 0:
+                    output = output ++ ci_indent_str(indent) ++ s ++ "\n"
+                return output
+            if bk != CXK_CASE_STMT and bk != CXK_DEFAULT_STMT:
+                let s = ci_trans_stmt(session, body_child, indent, scope)
+                if s.len() > 0:
+                    output = output ++ ci_indent_str(indent) ++ s ++ "\n"
+
+    // Now walk forward through siblings in the switch body
+    var j = start_idx + 1
+    while j < total:
+        let next_child = with_ci_child(session, body_cursor, j)
+        let next_kind = with_ci_cursor_kind(session, next_child)
+        // Break ends this prong
+        if next_kind == CXK_BREAK_STMT:
+            return output
+        // Return ends this prong
+        if next_kind == CXK_RETURN_STMT:
+            let s = ci_trans_stmt(session, next_child, indent, scope)
+            if s.len() > 0:
+                output = output ++ ci_indent_str(indent) ++ s ++ "\n"
+            return output
+        // Next case/default: recurse for duplication (fallthrough)
+        if next_kind == CXK_CASE_STMT or next_kind == CXK_DEFAULT_STMT:
+            output = output ++ ci_trans_switch_prong_forward(session, body_cursor, j, total, indent, scope)
+            return output
+        // Regular statement
+        let s = ci_trans_stmt(session, next_child, indent, scope)
+        if s.len() > 0:
+            output = output ++ ci_indent_str(indent) ++ s ++ "\n"
+        j = j + 1
+    output
 
 fn ci_trans_stmt_strip_break(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     // Translate stmt, then remove trailing "break\n" line
