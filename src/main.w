@@ -316,8 +316,7 @@ fn run_cli(argc: i32) -> i32:
     if cli_command(argc) == "lsp":
         return run_lsp()
     if cli_command(argc) == "migrate":
-        with_eprint("error: migrate not yet available in self-hosted compiler")
-        return 1
+        return run_migrate_command(argc)
     if cli_command(argc) == "repl":
         with_eprint("error: REPL not yet available in self-hosted compiler")
         return 1
@@ -926,6 +925,42 @@ fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, 
             return 1
         return 0
     run_bench_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, filter)
+
+fn run_migrate_command(argc: i32) -> i32:
+    if argc < 3:
+        with_eprint("usage: with migrate <file.c> [-o output.w]")
+        return 1
+
+    // Parse source path (first non-flag argument after "migrate")
+    var source_path = ""
+    var output_path = ""
+    var ai = 2
+    while ai < argc:
+        let arg = with_arg_at(ai)
+        if arg == "-o" and ai + 1 < argc:
+            output_path = with_arg_at(ai + 1)
+            ai = ai + 2
+            continue
+        if arg == "-I" and ai + 1 < argc:
+            with_cimport_add_include_path(with_arg_at(ai + 1))
+            ai = ai + 2
+            continue
+        if arg.len() > 0 and arg.byte_at(0) != 45:  // not a flag
+            source_path = arg
+        ai = ai + 1
+
+    if source_path.len() == 0:
+        with_eprint("error: no source file specified")
+        return 1
+
+    // Default output: replace .c with .w
+    if output_path.len() == 0:
+        if source_path.len() > 2 and source_path.slice(source_path.len() - 2, source_path.len()) == ".c":
+            output_path = source_path.slice(0, source_path.len() - 2) ++ ".w"
+        else:
+            output_path = source_path ++ ".w"
+
+    migrate_c_file(source_path, output_path)
 
 fn run_fmt_command(argc: i32) -> i32:
     let write_mode = cli_has_flag(argc, "-w")
