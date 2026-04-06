@@ -303,8 +303,7 @@ $(COMPAT_RUNTIME_SRC): rt/compat_runtime.w $(EMBEDDED_STDLIB_RUNTIME_SRC) | $(OU
 
 $(RUNTIME_C_ALLOWLIST_STAMP): scripts/check_runtime_c_allowlist.sh $(wildcard runtime/*.c) | $(OUT_GEN_DIR)
 	@bash "$(ROOT_DIR)/scripts/check_runtime_c_allowlist.sh" \
-		runtime/clang_bridge.c \
-		runtime/llvm_bridge.c
+		runtime/clang_bridge.c
 	@touch "$@"
 
 $(CIMPORT_STUBS_OBJ): rt/cimport_stubs.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
@@ -361,9 +360,9 @@ $(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(CIMPORT_STUBS_OBJ) $
 $(EMBEDDED_OBJECTS_OBJ): $(EMBEDDED_OBJECTS_ASM) | $(OUT_LIB_DIR)
 	$(call HOST_COMPILE,)
 
-$(LLVM_BRIDGE_OBJ): runtime/llvm_bridge.c | $(OUT_LIB_DIR)
-	@if [ ! -x "$(LLVM_CONFIG_BIN)" ]; then echo "error: missing llvm-config at $(LLVM_CONFIG_BIN)" >&2; exit 1; fi
-	$(call LLVM_COMPILE,)
+$(LLVM_BRIDGE_OBJ): rt/llvm_bridge.w | $(OUT_LIB_DIR)
+	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
 
 $(CLANG_BRIDGE_OBJ): runtime/clang_bridge.c | $(OUT_LIB_DIR)
 	@if [ ! -f "$(LLVM_PREFIX)/include/clang-c/Index.h" ]; then echo "error: missing clang-c/Index.h under $(LLVM_PREFIX)/include" >&2; exit 1; fi
