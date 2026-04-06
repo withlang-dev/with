@@ -139,6 +139,8 @@ extern fn wl_get_next_function(v: i64) -> i64
 extern fn wl_is_declaration(v: i64) -> i32
 extern fn wl_add_fn_attr(ctx: i64, f: i64, attr_name: str) -> void
 extern fn wl_add_param_attr(ctx: i64, f: i64, param_idx: i32, attr_name: str) -> void
+extern fn wl_add_param_byval_attr(ctx: i64, f: i64, param_idx: i32, ty: i64) -> void
+extern fn wl_add_sret_attr(ctx: i64, f: i64, param_idx: i32, ty: i64) -> void
 
 // Basic blocks
 extern fn wl_append_bb(ctx: i64, f: i64, name: str) -> i64
@@ -419,6 +421,15 @@ type Codegen {
     // Declared functions: sym → value/type
     fn_values: HashMap[i32, i64],
     fn_fn_types: HashMap[i32, i64],
+    // Extern fn ABI: fns with large struct params/returns transformed for C ABI.
+    // Maps fn sym → 1 if the fn has an sret return (first param is hidden sret ptr).
+    extern_fn_has_sret: HashMap[i32, i32],
+    // Maps fn sym → bitmask of param indices that are byval (after sret shift).
+    extern_fn_byval_params: HashMap[i32, i64],
+    // Maps fn sym → original struct types for byval params (parallel arrays).
+    extern_fn_byval_types: HashMap[i32, Vec[i64]],
+    // Maps fn sym → original return struct type (for sret).
+    extern_fn_sret_type: HashMap[i32, i64],
 
     // Struct types: sym → index into struct_type_* arrays
     struct_type_map: HashMap[i32, i32],
@@ -773,6 +784,10 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         local_sema_types: HashMap.new(),
         fn_values: HashMap.new(),
         fn_fn_types: HashMap.new(),
+        extern_fn_has_sret: HashMap.new(),
+        extern_fn_byval_params: HashMap.new(),
+        extern_fn_byval_types: HashMap.new(),
+        extern_fn_sret_type: HashMap.new(),
         struct_type_map: HashMap.new(),
         struct_llvm_types: Vec.new(),
         struct_index_syms: Vec.new(),
@@ -3314,12 +3329,49 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
 
     let ret_ty = self.resolve_type(ret_type_node)
 
-    let param_types: Vec[i64] = Vec.new()
+    // Resolve original param types
+    let orig_param_types: Vec[i64] = Vec.new()
     for pi in 0..param_count:
         let p_type_node = self.pool.fn_param_type(param_start, pi)
-        param_types.push(self.resolve_type(p_type_node))
+        orig_param_types.push(self.resolve_type(p_type_node))
 
-    let fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, is_variadic)
+    // ABI transformation for C interop on aarch64:
+    // - Struct params > 16 bytes → ptr (caller passes pointer to copy)
+    // - Struct returns > 16 bytes → void return + hidden sret ptr first param
+    let ptr_ty = wl_ptr_type(self.context)
+    var has_sret = 0
+    var sret_ty: i64 = 0
+    var byval_mask: i64 = 0
+    let byval_types: Vec[i64] = Vec.new()
+
+    // Check return type: struct > 16 bytes → sret
+    var actual_ret_ty = ret_ty
+    if ret_ty != 0 and wl_get_type_kind(ret_ty) == wl_struct_type_kind():
+        let ret_size = self.abi_size_of(ret_ty)
+        if ret_size > 16:
+            has_sret = 1
+            sret_ty = ret_ty
+            actual_ret_ty = wl_void_type(self.context)
+
+    // Build final param list with ABI transformations
+    let param_types: Vec[i64] = Vec.new()
+    if has_sret != 0:
+        param_types.push(ptr_ty)  // hidden sret param at index 0
+
+    for pi in 0..param_count:
+        let orig_ty = orig_param_types.get(pi as i64)
+        if wl_get_type_kind(orig_ty) == wl_struct_type_kind():
+            let p_size = self.abi_size_of(orig_ty)
+            if p_size > 16:
+                param_types.push(ptr_ty)
+                byval_mask = byval_mask | (1 << (pi as i64))
+                byval_types.push(orig_ty)
+                continue
+        param_types.push(orig_ty)
+        byval_types.push(0)
+
+    let actual_param_count = param_types.len() as i32
+    let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&param_types), actual_param_count, is_variadic)
 
     let name_str = self.intern.resolve(name_sym)
     let link_name = self.canonical_extern_name(name_str)
@@ -3329,6 +3381,22 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
     var function = existing
     if existing == 0:
         function = wl_add_function(self.llmod, link_name, fn_type)
+
+    // Add sret attribute to first param if needed
+    if has_sret != 0:
+        wl_add_sret_attr(self.context, function, 0, sret_ty)
+
+    // No byval attribute needed — clang on aarch64 uses plain ptr for indirect
+    // struct params. The caller copies the struct to an alloca and passes a pointer.
+
+    // Record ABI transformations for call sites
+    if has_sret != 0 or byval_mask != 0:
+        self.extern_fn_has_sret.insert(name_sym, has_sret)
+        self.extern_fn_byval_params.insert(name_sym, byval_mask)
+        self.extern_fn_byval_types.insert(name_sym, byval_types)
+        if has_sret != 0:
+            self.extern_fn_sret_type.insert(name_sym, sret_ty)
+
     self.apply_noalias_param_attrs(function, param_start, param_count)
 
     // Apply calling convention or c_export if specified

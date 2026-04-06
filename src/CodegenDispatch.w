@@ -5534,15 +5534,51 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 if sym_text.len() > 0:
                     callee_fn_sym = self.intern.intern(sym_text)
 
+    // Check for extern fn ABI transformations (sret/byval for large structs)
+    var abi_has_sret = 0
+    var abi_byval_mask: i64 = 0
+    var abi_sret_ty: i64 = 0
+    var abi_sret_buf: i64 = 0
+    if callee_fn_sym != 0:
+        let sret_opt = self.extern_fn_has_sret.get(callee_fn_sym)
+        if sret_opt.is_some():
+            abi_has_sret = sret_opt.unwrap()
+        let bv_opt = self.extern_fn_byval_params.get(callee_fn_sym)
+        if bv_opt.is_some():
+            abi_byval_mask = bv_opt.unwrap() as i64
+        let srt_opt = self.extern_fn_sret_type.get(callee_fn_sym)
+        if srt_opt.is_some():
+            abi_sret_ty = srt_opt.unwrap() as i64
+
     let args: Vec[i64] = Vec.new()
     if is_indirect:
         args.push(ctx_ptr_val)
+
+    // If sret, allocate return buffer and prepend as first arg
+    if abi_has_sret != 0 and abi_sret_ty != 0:
+        abi_sret_buf = self.create_entry_alloca(abi_sret_ty)
+        args.push(abi_sret_buf)
+
     for ai in 0..arg_count:
         let operand_id = body.call_arg_operands.get((arg_start + ai) as i64)
         var expected_ty: i64 = 0
         let param_offset = if is_indirect: ai + 1 else: ai
-        if param_offset < param_count:
-            expected_ty = param_types.get(param_offset as i64)
+        // Account for sret param shift when looking up expected types
+        let abi_param_offset = param_offset + (if abi_has_sret != 0: 1 else: 0)
+        if abi_param_offset < param_count:
+            expected_ty = param_types.get(abi_param_offset as i64)
+
+        // Byval: large struct param → alloca + store + pass pointer
+        if (abi_byval_mask & (1 << (ai as i64))) != 0:
+            let val = self.mir_eval_operand(body, operand_id, 0)
+            let val_ty = wl_type_of(val)
+            if wl_get_type_kind(val_ty) == wl_pointer_type_kind():
+                args.push(val)
+            else:
+                let tmp = self.create_entry_alloca(val_ty)
+                wl_build_store(self.builder, val, tmp)
+                args.push(tmp)
+            continue
 
         // Ref param check: pass pointer to place instead of loading value.
         // This handles struct self params where the ABI uses pointer-passing.
@@ -5590,7 +5626,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         args.push(arg_val)
 
     let actual_callee = if is_indirect: fn_ptr_val else: callee
-    let actual_arg_count = if is_indirect: arg_count + 1 else: arg_count
+    let actual_arg_count = args.len() as i32
     if self.debug_mir_codegen_enabled():
         with_eprint(f"[mir-call] building call arg_count={actual_arg_count} ft_params={wl_count_param_types(call_ft)}")
         for di in 0..args.len() as i32:
@@ -5612,6 +5648,18 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     // Mark mutual tail calls so LLVM can optimize them
     if self.mir_emit_mutual_tail_call != 0 and call_val != 0:
         wl_set_tail_call(call_val)
+
+    // Handle sret: load result from the sret buffer instead of using call_val
+    if abi_has_sret != 0 and abi_sret_buf != 0 and abi_sret_ty != 0:
+        if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+            let dst_local = body.place_locals.get(dest_place as i64)
+            self.mir_local_ptrs.insert(dst_local, abi_sret_buf)
+            self.mir_local_types.insert(dst_local, abi_sret_ty)
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            let nv = self.mir_bb_values.get(next_bb as i64)
+            wl_build_br(self.builder, nv)
+        return true
+
     let ret_ty = wl_get_return_type(call_ft)
     if ret_ty != wl_void_type(self.context):
         if dest_place < 0 or dest_place >= body.place_locals.len() as i32:

@@ -165,6 +165,7 @@ extern fn LLVMGetNextFunction(v: *mut u8) -> *mut u8
 extern fn LLVMIsDeclaration(v: *mut u8) -> i32
 extern fn LLVMGetEnumAttributeKindForName(name: *const u8, len: u64) -> u32
 extern fn LLVMCreateEnumAttribute(c: *mut u8, kind: u32, val: u64) -> *mut u8
+extern fn LLVMCreateTypeAttribute(c: *mut u8, kind: u32, ty: *mut u8) -> *mut u8
 extern fn LLVMAddAttributeAtIndex(v: *mut u8, idx: u32, attr: *mut u8)
 
 // Basic blocks
@@ -651,6 +652,22 @@ pub fn add_param_attr(ctx: i64, fn_val: i64, param_idx: i32, attr_name: str):
     let kind = LLVMGetEnumAttributeKindForName(name, c_strlen(name) as u64)
     if kind != 0:
         let attr = LLVMCreateEnumAttribute(ctx as *mut u8, kind, 0)
+        LLVMAddAttributeAtIndex(fn_val as *mut u8, (param_idx + 1) as u32, attr)
+
+@[c_export("wl_add_param_byval_attr")]
+pub fn add_param_byval_attr(ctx: i64, fn_val: i64, param_idx: i32, ty: i64):
+    let name = "byval" as *const u8
+    let kind = LLVMGetEnumAttributeKindForName(name, 5 as u64)
+    if kind != 0:
+        let attr = LLVMCreateTypeAttribute(ctx as *mut u8, kind, ty as *mut u8)
+        LLVMAddAttributeAtIndex(fn_val as *mut u8, (param_idx + 1) as u32, attr)
+
+@[c_export("wl_add_sret_attr")]
+pub fn add_sret_attr(ctx: i64, fn_val: i64, param_idx: i32, ty: i64):
+    let name = "sret" as *const u8
+    let kind = LLVMGetEnumAttributeKindForName(name, 4 as u64)
+    if kind != 0:
+        let attr = LLVMCreateTypeAttribute(ctx as *mut u8, kind, ty as *mut u8)
         LLVMAddAttributeAtIndex(fn_val as *mut u8, (param_idx + 1) as u32, attr)
 
 // ── Basic blocks ────────────────────────────────────────────────
