@@ -4881,6 +4881,69 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
     eprint(f"migrate: {input_path} -> {output_path} ({goto_count} gotos, {unsafe_count} unsafe)")
     0
 
+// Translate a directory of .c files to .w files.
+pub fn migrate_c_directory(input_dir: str, output_dir: str) -> i32:
+    // Create output directory
+    with_fs_mkdir_p(output_dir)
+
+    // Find all .c files using shell
+    let find_cmd = "find '" ++ input_dir ++ "' -name '*.c' -not -name '.*' -type f 2>/dev/null"
+    let find_result = with_fs_read_file_cmd(find_cmd)
+    if find_result.len() == 0:
+        eprint("migrate: no .c files found in " ++ input_dir)
+        return 1
+
+    // Parse the file list (newline-separated)
+    var files_scanned = 0
+    var files_migrated = 0
+    var total_gotos = 0
+    var total_unsafe = 0
+    var pos = 0
+    let flen = find_result.len() as i32
+    while pos < flen:
+        // Find end of line
+        var line_end = pos
+        while line_end < flen and find_result.byte_at(line_end as i64) != 10:
+            line_end = line_end + 1
+        if line_end > pos:
+            let file_path = find_result.slice(pos as i64, line_end as i64)
+            if file_path.len() > 2:
+                files_scanned = files_scanned + 1
+                // Compute output path: replace input_dir prefix with output_dir, .c → .w
+                var out_path = ""
+                if ci_starts_with(file_path, input_dir):
+                    let relative = file_path.slice(input_dir.len(), file_path.len())
+                    if relative.len() > 2 and relative.slice(relative.len() - 2, relative.len()) == ".c":
+                        out_path = output_dir ++ relative.slice(0, relative.len() - 2) ++ ".w"
+                    else:
+                        out_path = output_dir ++ relative ++ ".w"
+                else:
+                    out_path = output_dir ++ "/" ++ file_path ++ ".w"
+
+                // Create subdirectories if needed
+                var dir_end = out_path.len() as i32 - 1
+                while dir_end > 0 and out_path.byte_at(dir_end as i64) != 47:
+                    dir_end = dir_end - 1
+                if dir_end > 0:
+                    with_fs_mkdir_p(out_path.slice(0, dir_end as i64))
+
+                let rc = migrate_c_file(file_path, out_path)
+                if rc == 0:
+                    files_migrated = files_migrated + 1
+        pos = line_end + 1
+
+    eprint(f"migrate: {files_migrated}/{files_scanned} files migrated from {input_dir} -> {output_dir}")
+    if files_migrated == 0: 1 else: 0
+
+// Run a shell command and capture stdout (for find, ls, etc.)
+fn with_fs_read_file_cmd(cmd: str) -> str:
+    // Write command output to temp file, read it back
+    let tmp = ".with_migrate_cmd_output"
+    with_system(cmd ++ " > " ++ tmp)
+    let result = with_fs_read_file(tmp)
+    with_system("rm -f " ++ tmp)
+    result
+
 // Translate a function with body — key difference from ci_translate_function:
 // 1. Translates ALL functions, not just static inline
 // 2. Non-static functions get @[c_export]
