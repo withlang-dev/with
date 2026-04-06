@@ -167,6 +167,25 @@ old_string doesn't match due to stale context.
 time make selfcheck
 ```
 
+### Intermittent self-host failures
+
+- If the compiler needed to build the fix is the one crashing,
+  retry `make stage2` **serially** until the patched binary is
+  produced. A flaky seed/stage1 run while building the fix does
+  not mean the fix failed.
+
+- Verify intermittent crash fixes statistically. Run the patched
+  compiler 20-30 times on the exact repro (`out/gen/main.w` if
+  applicable) and require **0 failures**. One clean run is not
+  evidence.
+
+- Be suspicious of eager type lowering in generic contexts.
+  Trait signatures, blanket impl methods, and methods on generic
+  owners may mention unbound type params. Defer resolution until
+  bindings exist, and make diagnostics/error helpers tolerate
+  invalid symbols or empty strings so bugs become errors instead
+  of segfaults.
+
 ### LLDB (preferred)
 ```
 lldb -- ./out/bin/with-stage2 check src/main.w
@@ -259,3 +278,36 @@ make test       # no regressions
 ```
 
 If any step fails, continue debugging until it passes.
+
+## Bootstrap Rules
+
+### The seed compiler is frozen
+The installed compiler at ~/.local/bin/with has its own Link.w, its own
+embedded runtime objects, and its own codegen logic baked into the binary.
+You cannot change its behavior by editing source files. If the seed's
+Link.w expects helpers.o, no amount of editing Link.w on disk changes that.
+The seed will always look for helpers.o until you install a new seed.
+
+### Never run `make install` with uncommitted changes
+`make install` updates the seed. A broken seed breaks all future builds.
+Only run `make install` after `make fixpoint` passes on committed code.
+
+### Never change Link.w and runtime files in the same commit
+Commit 1: Add new exports to rt_core.w (old link path still works)
+Commit 2: Change Link.w + strip helpers.c (new link path activates)
+Each commit must independently pass `make fixpoint`.
+
+### Bootstrap order for runtime migration
+1. git checkout all runtime/link files to last green state
+2. make build && make fixpoint (verify green baseline)
+3. Apply rt_core.w changes ONLY (new exports, ABI fixes)
+4. make build && make fixpoint (old link path, new symbols available)
+5. Apply Link.w + helpers.c + compat_runtime.w changes
+6. Build stage1 with old seed (old link path)
+7. Stage1 has new Link.w — it builds stage2 with new link path
+8. make fixpoint (stage2 == stage3, new link path converges)
+9. make install (seed is now updated)
+
+### If bootstrap is broken, don't guess
+Run `make doctor` to see what state the seed, stage binaries, and
+runtime objects are in.

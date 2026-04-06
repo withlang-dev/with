@@ -1073,7 +1073,7 @@ fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
         return "0"
     if ck == ConstKind.CK_FLOAT:
         if cd != 0:
-            let lit = cc_intern_resolve(self.intern, cd)
+            let lit = if cd >= 0 and cd < self.ast.strings.len() as i32: self.ast.get_string(cd) else: ""
             if lit.len() > 0:
                 return lit
         return "0.0"
@@ -1186,7 +1186,18 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
     if rk == RvalueKind.RK_ADDR_OF:
         return "(&" ++ self.place_text(body, d0) ++ ")"
     if rk == RvalueKind.RK_CAST:
-        return "((" ++ self.c_type(d1, 0) ++ ")(" ++ self.operand_text(body, d0) ++ "))"
+        let dst_c = self.c_type(d1, 0)
+        let src = self.operand_text(body, d0)
+        let src_tid = self.sema.resolve_alias(self.operand_tid(body, d0))
+        let dst_tid = self.sema.resolve_alias(d1)
+        let src_tk = self.sema.get_type_kind(src_tid)
+        let dst_tk = self.sema.get_type_kind(dst_tid)
+        if dst_tk == TypeKind.TY_PTR or dst_tk == TypeKind.TY_REF:
+            if src_tk == TypeKind.TY_STR:
+                return "((" ++ dst_c ++ ")(" ++ src ++ ".ptr))"
+            if src_tk == TypeKind.TY_STRUCT:
+                return "((" ++ dst_c ++ ")(&(" ++ src ++ ")))"
+        return "((" ++ dst_c ++ ")(" ++ src ++ "))"
     if rk == RvalueKind.RK_DISCRIMINANT:
         return "(" ++ self.place_text(body, d0) ++ ").tag"
     if rk == RvalueKind.RK_LEN:
@@ -1213,6 +1224,52 @@ fn CCodegen.call_arg_count(self: CCodegen, body: MirBody, args_id: i32) -> i32:
     if args_id < 0 or args_id >= body.call_arg_counts.len() as i32:
         return 0
     body.call_arg_counts.get(args_id as i64)
+
+fn CCodegen.aggregate_compound_literal(self: CCodegen, body: MirBody, rval_id: i32, dst_tid: i32) -> str:
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        return ""
+    if body.rval_kinds.get(rval_id as i64) != RvalueKind.RK_AGGREGATE:
+        return ""
+    // Only plain aggregates here. Tagged variants need dedicated lowering.
+    if body.rval_d0.get(rval_id as i64) != 0:
+        return ""
+    let fields_id = body.rval_d1.get(rval_id as i64)
+    if fields_id < 0 or fields_id >= body.agg_field_starts.len() as i32:
+        return ""
+    let start = body.agg_field_starts.get(fields_id as i64)
+    let count = body.agg_field_counts.get(fields_id as i64)
+    let dst_resolved = self.sema.resolve_alias(dst_tid)
+    let dst_tk = self.sema.get_type_kind(dst_resolved)
+    let dst_c = self.c_type(dst_tid, 0)
+    var out = "(" ++ dst_c ++ ")" ++ cc_lbrace()
+    if count <= 0:
+        out = out ++ "0"
+    else:
+        for i in 0..count:
+            if i > 0:
+                out = out ++ ", "
+            let name_sym = if (start + i) >= 0 and (start + i) < body.agg_field_name_syms.len() as i32:
+                body.agg_field_name_syms.get((start + i) as i64)
+            else:
+                0
+            if dst_tk == TypeKind.TY_STRUCT and name_sym != 0:
+                let field_name = cc_intern_resolve(self.intern, name_sym)
+                if field_name.len() > 0:
+                    out = out ++ "." ++ field_name ++ " = "
+            out = out ++ self.operand_text(body, body.agg_field_operands.get((start + i) as i64))
+    out = out ++ cc_rbrace()
+    out
+
+fn CCodegen.map_recv_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+    let recv_operand = self.call_arg_operand(body, args_id, 0)
+    let recv = self.operand_text(body, recv_operand)
+    let recv_tid = self.sema.resolve_alias(self.operand_tid(body, recv_operand))
+    let recv_tk = self.sema.get_type_kind(recv_tid)
+    if recv_tk == TypeKind.TY_PTR or recv_tk == TypeKind.TY_REF:
+        let inner = self.sema.resolve_alias(self.sema.get_type_d0(recv_tid))
+        if inner != 0 and self.c_type(inner, 0) == "int64_t":
+            return "(*(" ++ recv ++ "))"
+    recv
 
 fn CCodegen.call_arg_operand(self: CCodegen, body: MirBody, args_id: i32, idx: i32) -> i32:
     if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
@@ -2582,6 +2639,28 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
         return self.sema.ty_i64 as i32
     if kind == cc_builtin_vec_len():
         return self.sema.ty_i64 as i32
+    if kind == cc_builtin_vec_iter():
+        let hinted = self.call_dest_expected_tid(body, dest_place)
+        if hinted != 0 and self.is_void_tid(hinted) == 0:
+            return hinted
+        let dst = self.place_local_tid(body, dest_place)
+        if dst != 0 and self.is_void_tid(dst) == 0:
+            return dst
+        return cc_pseudo_tid_vec()
+    if kind == cc_builtin_veciter_next():
+        let hinted = self.call_dest_expected_tid(body, dest_place)
+        if hinted != 0 and self.is_void_tid(hinted) == 0:
+            return hinted
+        let dst = self.place_local_tid(body, dest_place)
+        if dst != 0 and self.is_void_tid(dst) == 0:
+            return dst
+        return self.sema.ty_i64 as i32
+    if kind == cc_builtin_vec_contains():
+        return self.sema.ty_bool as i32
+    if kind == cc_builtin_vec_join():
+        return self.sema.ty_str as i32
+    if kind == cc_builtin_vec_with_capacity():
+        return cc_pseudo_tid_vec()
     if kind == cc_builtin_map_new():
         return self.sema.ty_i64 as i32
     if kind == cc_builtin_map_insert():
@@ -2602,6 +2681,8 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
         return self.sema.ty_bool as i32
     if kind == cc_builtin_opt_is_some():
         return self.sema.ty_bool as i32
+    if kind == cc_builtin_opt_is_none():
+        return self.sema.ty_bool as i32
     if kind == cc_builtin_opt_unwrap():
         let hinted = self.call_dest_expected_tid(body, dest_place)
         if hinted != 0 and self.is_void_tid(hinted) == 0:
@@ -2610,6 +2691,59 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
         if dst != 0 and self.is_void_tid(dst) == 0:
             return dst
         return self.sema.ty_i64 as i32
+    if kind == cc_builtin_str_len():
+        return self.sema.ty_i64 as i32
+    if kind == cc_builtin_str_byte_at():
+        return self.sema.ty_i32 as i32
+    if kind == cc_builtin_str_slice():
+        return self.sema.ty_str as i32
+    if kind == cc_builtin_str_contains() or kind == cc_builtin_str_starts_with() or kind == cc_builtin_str_ends_with():
+        return self.sema.ty_bool as i32
+    if kind == cc_builtin_str_find() or kind == cc_builtin_str_index_of():
+        return self.sema.ty_i64 as i32
+    if kind == cc_builtin_str_split():
+        let hinted = self.call_dest_expected_tid(body, dest_place)
+        if hinted != 0 and self.is_void_tid(hinted) == 0:
+            return hinted
+        let dst = self.place_local_tid(body, dest_place)
+        if dst != 0 and self.is_void_tid(dst) == 0:
+            return dst
+        return cc_pseudo_tid_vec()
+    if kind == cc_builtin_str_trim() or kind == cc_builtin_str_to_upper() or kind == cc_builtin_str_to_lower() or kind == cc_builtin_str_replace() or kind == cc_builtin_str_repeat():
+        return self.sema.ty_str as i32
+    if kind == cc_builtin_arr_len():
+        return self.sema.ty_i64 as i32
+    if kind == cc_builtin_rotate_left() or kind == cc_builtin_rotate_right() or kind == cc_builtin_int_swap_bytes() or kind == cc_builtin_popcount() or kind == cc_builtin_clz() or kind == cc_builtin_ctz() or kind == cc_builtin_bitreverse():
+        let hinted = self.call_dest_expected_tid(body, dest_place)
+        if hinted != 0 and self.is_void_tid(hinted) == 0:
+            return hinted
+        let dst = self.place_local_tid(body, dest_place)
+        if dst != 0 and self.is_void_tid(dst) == 0:
+            return dst
+        return self.sema.ty_i32 as i32
+    if kind == cc_builtin_min() or kind == cc_builtin_max() or kind == cc_builtin_abs():
+        let hinted = self.call_dest_expected_tid(body, dest_place)
+        if hinted != 0 and self.is_void_tid(hinted) == 0:
+            return hinted
+        let dst = self.place_local_tid(body, dest_place)
+        if dst != 0 and self.is_void_tid(dst) == 0:
+            return dst
+        let operand_tid = self.operand_tid(body, self.call_arg_operand(body, args_id, 0))
+        if operand_tid != 0 and self.is_void_tid(operand_tid) == 0:
+            return operand_tid
+        return self.sema.ty_i64 as i32
+    if kind == cc_builtin_fma():
+        let hinted = self.call_dest_expected_tid(body, dest_place)
+        if hinted != 0 and self.is_void_tid(hinted) == 0:
+            return hinted
+        let dst = self.place_local_tid(body, dest_place)
+        if dst != 0 and self.is_void_tid(dst) == 0:
+            return dst
+        return self.sema.ty_f64 as i32
+    if kind == cc_builtin_fmt_to_str() or kind == cc_builtin_fmt_debug_str() or kind == cc_builtin_fmt_debug() or kind == cc_builtin_fmt_spec():
+        return self.sema.ty_str as i32
+    if kind == cc_builtin_dyn_vtable_cmp():
+        return self.sema.ty_bool as i32
     0
 
 fn CCodegen.resolve_call_named_callee(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> str:
@@ -3188,7 +3322,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         if argc < 3:
             self.fail("map.insert expects three arguments")
             return "    abort();"
-        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let recv = self.map_recv_text(body, args_id)
         let key_operand = self.call_arg_operand(body, args_id, 1)
         let val_operand = self.call_arg_operand(body, args_id, 2)
         let key_text = self.operand_text(body, key_operand)
@@ -3212,7 +3346,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         if argc < 2:
             self.fail("map.contains expects two arguments")
             return "    abort();"
-        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let recv = self.map_recv_text(body, args_id)
         let key_operand = self.call_arg_operand(body, args_id, 1)
         let key_text = self.operand_text(body, key_operand)
         var key_tid = self.operand_tid(body, key_operand)
@@ -3231,7 +3365,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         if argc < 1:
             self.fail("map.len expects one argument")
             return "    abort();"
-        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let recv = self.map_recv_text(body, args_id)
         var out = ""
         if has_ret != 0:
             out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (((" ++ recv ++ ") != 0) ? with_hashmap_len((void*)(intptr_t)(" ++ recv ++ ")) : 0);\n"
@@ -3244,7 +3378,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         if argc < 2:
             self.fail("map.remove expects two arguments")
             return "    abort();"
-        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let recv = self.map_recv_text(body, args_id)
         let key_operand = self.call_arg_operand(body, args_id, 1)
         let key_text = self.operand_text(body, key_operand)
         var key_tid = self.operand_tid(body, key_operand)
@@ -3263,7 +3397,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         if argc < 2:
             self.fail("map.get expects two arguments")
             return "    abort();"
-        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let recv = self.map_recv_text(body, args_id)
         let key_operand = self.call_arg_operand(body, args_id, 1)
         let key_text = self.operand_text(body, key_operand)
         var key_tid = self.operand_tid(body, key_operand)
@@ -3504,7 +3638,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         if argc < 1:
             self.fail("map.clear expects one argument")
             return "    abort();"
-        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let recv = self.map_recv_text(body, args_id)
         var out = "    if ((" ++ recv ++ ") != 0) with_hashmap_clear((void*)(intptr_t)(" ++ recv ++ "));\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
@@ -3513,7 +3647,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         if argc < 2:
             self.fail("map.increment expects two arguments")
             return "    abort();"
-        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let recv = self.map_recv_text(body, args_id)
         let key_operand = self.call_arg_operand(body, args_id, 1)
         let key_text = self.operand_text(body, key_operand)
         var key_tid = self.operand_tid(body, key_operand)
@@ -4358,6 +4492,9 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
                 return "    memcpy(" ++ dst_place ++ ", " ++ rval ++ ", sizeof(" ++ dst_place ++ "));"
             // Scalar to array: write scalar bytes into array via temp
             return "    " ++ cc_lbrace() ++ " __typeof__(" ++ rval ++ ") __tmp = " ++ rval ++ "; memcpy(" ++ dst_place ++ ", &__tmp, sizeof(" ++ dst_place ++ ") < sizeof(__tmp) ? sizeof(" ++ dst_place ++ ") : sizeof(__tmp)); " ++ cc_rbrace()
+        let agg_literal = self.aggregate_compound_literal(body, d1, dst_tid)
+        if agg_literal.len() > 0:
+            return "    " ++ dst_place ++ " = " ++ agg_literal ++ ";"
         // Vec zero-init: c_type returns "with_vec" for TY_GENERIC_INST(Vec)
         if (rval == "0" or rval == "0LL") and self.c_type(dst_tid, 0) == "with_vec":
             return "    " ++ dst_place ++ " = (with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";"
@@ -4679,6 +4816,7 @@ fn CCodegen.local_receives_arith(self: CCodegen, body: MirBody, local_id: i32) -
             let dst_place = body.stmt_d0.get(stmt_id as i64)
             if self.place_is_direct_local(body, dst_place, local_id) == 0:
                 continue
+            let rval_id = body.stmt_d1.get(stmt_id as i64)
             if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
                 continue
             let rk = body.rval_kinds.get(rval_id as i64)
@@ -4866,9 +5004,12 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out = out ++ "#include \"with_runtime.h\"\n\n"
     // Extra declarations for functions used by emitted C but not in with_runtime.h
     out = out ++ "/* Extra runtime declarations */\n"
-    out = out ++ "extern int64_t fmt_buf_new(void);\n"
-    out = out ++ "extern void fmt_buf_write_str(int64_t, with_str);\n"
-    out = out ++ "extern with_str fmt_buf_finish(int64_t);\n"
+    out = out ++ "#define fmt_buf_new with_fmt_buf_new\n"
+    out = out ++ "#define fmt_buf_write_str with_fmt_buf_write_str\n"
+    out = out ++ "#define fmt_buf_finish with_fmt_buf_finish\n"
+    out = out ++ "extern int64_t with_fmt_buf_new(void);\n"
+    out = out ++ "extern void with_fmt_buf_write_str(int64_t, with_str);\n"
+    out = out ++ "extern with_str with_fmt_buf_finish(int64_t);\n"
     out = out ++ "extern void* with_alloc(int64_t);\n"
     out = out ++ "extern void with_free(void*);\n"
     out = out ++ "extern void with_memcpy(void*, const void*, int64_t);\n"
