@@ -3,14 +3,13 @@
 // This module owns the remaining scheduler/stack/panic core. It uses manual
 // ABI declarations instead of c_import so the runtime stays self-contained.
 
-extern fn malloc(size: u64) -> *mut u8
-extern fn free(ptr: *mut u8) -> void
-extern fn memcpy(dst: *mut u8, src: *const u8, n: u64) -> *mut u8
-extern fn memset(dst: *mut u8, c: i32, n: u64) -> *mut u8
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8) -> void
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
+extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> void
 extern fn mmap(addr: *mut u8, len: u64, prot: i32, flags: i32, fd: i32, offset: i64) -> *mut u8
 extern fn mprotect(addr: *mut u8, len: u64, prot: i32) -> i32
 extern fn munmap(addr: *mut u8, len: u64) -> i32
-extern fn sysconf(name: i32) -> i64
 extern fn sigaltstack(ss: *const u8, old_ss: *mut u8) -> i32
 extern fn sigaction(sig: i32, act: *const u8, old_act: *mut u8) -> i32
 extern fn raise(sig: i32) -> i32
@@ -54,7 +53,7 @@ let PROT_NONE: i32 = 0
 let PROT_READ_WRITE: i32 = 3
 let MAP_PRIVATE_ANON: i32 = 0x1002
 let MAP_FAILED: i64 = -1
-let SC_PAGESIZE_DARWIN: i32 = 29
+// SC_PAGESIZE_DARWIN removed — page size hardcoded to 16384 (aarch64 Darwin)
 
 let SIGBUS: i32 = 10
 let SIGSEGV: i32 = 11
@@ -349,8 +348,9 @@ fn dequeue_any() -> i64:
 fn guard_page_size() -> i64:
     if fiber_page_size != 0:
         return fiber_page_size
-    let ps = sysconf(SC_PAGESIZE_DARWIN)
-    fiber_page_size = if ps > 0: ps else: 4096
+    // Darwin aarch64 always uses 16K pages; x86_64 uses 4K.
+    // Hardcoded to avoid sysconf libc dependency.
+    fiber_page_size = 16384
     fiber_page_size
 
 fn allocate_stack_region(size: i64) -> *mut u8:
@@ -368,7 +368,7 @@ fn acquire_fiber() -> i64:
         free_pool_head = fiber_next(f)
         let stack = fiber_stack(f)
         let stack_size = fiber_stack_size(f)
-        let _ = memset(f as *mut u8, 0, FIBER_SIZE as u64)
+        with_memset(f as *mut u8, 0, FIBER_SIZE)
         fiber_set_stack(f, stack)
         fiber_set_stack_size(f, stack_size)
         fiber_set_state(f, FIBER_STATE_READY)
@@ -376,15 +376,15 @@ fn acquire_fiber() -> i64:
         fiber_pool_reuse_count = fiber_pool_reuse_count + 1
         return f
 
-    let f = malloc(FIBER_SIZE as u64) as i64
+    let f = with_alloc(FIBER_SIZE) as i64
     if f == 0:
         return 0
-    let _ = memset(f as *mut u8, 0, FIBER_SIZE as u64)
+    with_memset(f as *mut u8, 0, FIBER_SIZE)
     fiber_set_stack_size(f, FIBER_STACK_SIZE)
     fiber_set_slot(f, -1)
     let stack = allocate_stack_region(FIBER_STACK_SIZE)
     if stack as i64 == 0:
-        free(f as *mut u8)
+        with_free(f as *mut u8)
         return 0
     fiber_set_stack(f, stack)
     fiber_pool_alloc_count = fiber_pool_alloc_count + 1
@@ -408,8 +408,8 @@ fn recycle_fiber(f: i64):
     let stack_size = fiber_stack_size(f)
     let panic_msg = fiber_panic_msg(f)
     if panic_msg as i64 != 0:
-        free(panic_msg as *mut u8)
-    let _ = memset(f as *mut u8, 0, FIBER_SIZE as u64)
+        with_free(panic_msg as *mut u8)
+    with_memset(f as *mut u8, 0, FIBER_SIZE)
     fiber_set_stack(f, stack)
     fiber_set_stack_size(f, stack_size)
     fiber_set_state(f, FIBER_STATE_DONE)
@@ -422,7 +422,7 @@ fn free_fiber_pool():
         let f = free_pool_head
         free_pool_head = fiber_next(f)
         free_fiber_stack(f)
-        free(f as *mut u8)
+        with_free(f as *mut u8)
 
 fn fiber_write_i32(fd: i32, n: i32):
     var value = n
@@ -461,14 +461,14 @@ pub fn fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8
 
     var sa: [16]u8 = [0 as u8; 16]
     let sa_base = (&mut sa) as *mut [16]u8 as i64
-    let _ = memset(sa_base as *mut u8, 0, SIGACTION_SIZE as u64)
+    with_memset(sa_base as *mut u8, 0, SIGACTION_SIZE)
     let _ = sigaction(sig, sa_base as *const u8, 0 as *mut u8)
     let _ = raise(sig)
 
 fn fiber_install_signal_handlers():
     var ss: [24]u8 = [0 as u8; 24]
     let ss_base = (&mut ss) as *mut [24]u8 as i64
-    let _ = memset(ss_base as *mut u8, 0, STACK_T_SIZE as u64)
+    with_memset(ss_base as *mut u8, 0, STACK_T_SIZE)
     store_i64(ss_base, STACK_T_OFF_SP, alt_stack_ptr() as i64)
     store_i64(ss_base, STACK_T_OFF_SIZE, FIBER_ALT_STACK_SIZE)
     store_i32(ss_base, STACK_T_OFF_FLAGS, 0)
@@ -476,7 +476,7 @@ fn fiber_install_signal_handlers():
 
     var sa: [16]u8 = [0 as u8; 16]
     let sa_base = (&mut sa) as *mut [16]u8 as i64
-    let _ = memset(sa_base as *mut u8, 0, SIGACTION_SIZE as u64)
+    with_memset(sa_base as *mut u8, 0, SIGACTION_SIZE)
     store_i64(sa_base, SIGACTION_OFF_HANDLER, fiber_stack_overflow_handler as i64)
     store_i32(sa_base, SIGACTION_OFF_FLAGS, SA_SIGINFO | SA_ONSTACK)
     let _ = sigaction(SIGSEGV, sa_base as *const u8, 0 as *mut u8)
@@ -574,11 +574,11 @@ pub fn fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, resul
         let stack = allocate_stack_region(wanted_stack_size)
         if stack as i64 == 0:
             release_fiber_slot(slot)
-            free(f as *mut u8)
+            with_free(f as *mut u8)
             return -1
         fiber_set_stack(f, stack)
 
-    let _ = memset(f as *mut u8, 0, FIBER_CTX_SIZE as u64)
+    with_memset(f as *mut u8, 0, FIBER_CTX_SIZE)
     fiber_set_entry_ptr(f, entry_fn as i64)
     fiber_set_arg_ptr(f, arg as i64)
     fiber_set_result_buf(f, result_buf)
@@ -701,9 +701,9 @@ pub fn fiber_panic_capture(msg: *const u8, msg_len: i32):
     fiber_set_has_panic(current_fiber, 1)
     var buf: *mut u8 = 0 as *mut u8
     if msg_len >= 0:
-        buf = malloc((msg_len + 1) as u64)
+        buf = with_alloc(msg_len + 1)
         if buf as i64 != 0 and msg as i64 != 0 and msg_len > 0:
-            let _ = memcpy(buf, msg, msg_len as u64)
+            with_memcpy(buf, msg, msg_len)
             unsafe:
                 *((buf as i64 + msg_len as i64) as *mut u8) = 0 as u8
     fiber_set_panic_msg(current_fiber, buf as *const u8)
