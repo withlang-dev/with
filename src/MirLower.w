@@ -1568,13 +1568,48 @@ fn MirBuilder.lower_field_base_place(self: MirBuilder, base_expr: i32) -> i32:
     base
 
 fn MirBuilder.lower_index(self: MirBuilder, base_expr: i32, index_expr: i32) -> i32:
-    let base = self.lower_expr_place(base_expr)
+    var base = self.lower_expr_place(base_expr)
+    // Indexing through `&Vec[T]` / `&mut Vec[T]` should index the container,
+    // not treat the reference itself like a raw pointer.
+    var base_ty = self.expr_type(base_expr)
+    while base_ty > 0:
+        let resolved = self.sema.resolve_alias(base_ty)
+        if self.sema.get_type_kind(resolved) != TypeKind.TY_REF:
+            break
+        base = self.body.new_deref_place(base)
+        base_ty = self.sema.get_type_d0(resolved)
     let idx_op = self.lower_expr(index_expr)
     let idx_ty = self.expr_type(index_expr)
     let idx_local = self.new_temp(idx_ty)
     let idx_place = self.place_for_local(idx_local)
     self.assign_operand_to_place(idx_place, idx_op, self.ast.get_start(index_expr))
     self.body.new_index_place(base, idx_local, 0)
+
+fn MirBuilder.lower_call_place(self: MirBuilder, node: i32) -> i32:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_CALL:
+        return -1
+    let callee = self.ast.get_data0(node)
+    if self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS:
+        return -1
+    let recv_expr = self.ast.get_data0(callee)
+    let method_sym = self.ast.get_data1(callee)
+    var recv_type = self.expr_type(recv_expr)
+    if recv_type == 0 or recv_type == self.sema.ty_void:
+        recv_type = self.type_receiver_type(recv_expr)
+    if recv_type == 0 or recv_type == self.sema.ty_void:
+        return -1
+    let method_name = self.pool.resolve_symbol(method_sym)
+    let intrinsic = self.classify_intrinsic(recv_type, method_name)
+    // Preserve lvalue identity for vec element projections used as a place
+    // (for example `items.get(0).tags.push(...)`).
+    if intrinsic != MirIntrinsic.MIR_INTRINSIC_VEC_GET:
+        return -1
+    let arg_count = self.ast.get_data2(node)
+    if arg_count != 1:
+        return -1
+    let arg_start = self.ast.get_data1(node)
+    let index_expr = self.ast.get_extra(arg_start)
+    self.lower_index(recv_expr, index_expr)
 
 fn MirBuilder.lower_vec_literal_push(self: MirBuilder, vec_place: i32, elem_node: i32, elem_ty: i32):
     if elem_node == 0:
@@ -1723,6 +1758,11 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
         self.terminate(TermKind.TK_CALL, self.unit_operand(), mi_args_id, mi_result_place, mi_next_bb)
         self.switch_to(mi_next_bb)
         return mi_result_place
+
+    if kind == NodeKind.NK_CALL:
+        let call_place = self.lower_call_place(node)
+        if call_place >= 0:
+            return call_place
 
     if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_DEREF:
         return self.lower_deref(self.ast.get_data1(node))
