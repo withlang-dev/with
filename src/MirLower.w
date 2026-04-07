@@ -37,6 +37,11 @@ type MirBuilder {
     bind_syms: Vec[i32],
     bind_local_ids: Vec[i32],
     bind_scope_starts: Vec[i32],
+    // Non-owning lexical aliases (sym -> place), scoped.
+    alias_syms: Vec[i32],
+    alias_places: Vec[i32],
+    alias_types: Vec[i32],
+    alias_scope_starts: Vec[i32],
 
     // Defer/errdefer stacks (body AST nodes).
     defer_nodes: Vec[i32],
@@ -70,6 +75,10 @@ fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> M
         bind_syms: Vec.new(),
         bind_local_ids: Vec.new(),
         bind_scope_starts: Vec.new(),
+        alias_syms: Vec.new(),
+        alias_places: Vec.new(),
+        alias_types: Vec.new(),
+        alias_scope_starts: Vec.new(),
         defer_nodes: Vec.new(),
         defer_scope_starts: Vec.new(),
         errdefer_nodes: Vec.new(),
@@ -101,6 +110,7 @@ fn MirBuilder.terminate_with_span(self: MirBuilder, kind: i32, d0: i32, d1: i32,
 fn MirBuilder.push_scope(self: MirBuilder):
     self.drop_scope_starts.push(self.drop_local_ids.len() as i32)
     self.bind_scope_starts.push(self.bind_syms.len() as i32)
+    self.alias_scope_starts.push(self.alias_syms.len() as i32)
 
 fn MirBuilder.schedule_drop(self: MirBuilder, local_id: i32, drop_kind: i32):
     self.drop_local_ids.push(local_id)
@@ -136,6 +146,13 @@ fn MirBuilder.pop_scope_with_goto(self: MirBuilder, target_bb: i32):
         self.bind_local_ids.pop()
     self.bind_scope_starts.pop()
 
+    let alias_start = self.alias_scope_starts.get(scope_idx as i64)
+    while self.alias_syms.len() as i32 > alias_start:
+        self.alias_syms.pop()
+        self.alias_places.pop()
+        self.alias_types.pop()
+    self.alias_scope_starts.pop()
+
     self.terminate(TermKind.TK_GOTO, target_bb, 0, 0, 0)
 
 fn MirBuilder.pop_scope_inline(self: MirBuilder):
@@ -159,6 +176,13 @@ fn MirBuilder.pop_scope_inline(self: MirBuilder):
         self.bind_syms.pop()
         self.bind_local_ids.pop()
     self.bind_scope_starts.pop()
+
+    let alias_start = self.alias_scope_starts.get(scope_idx as i64)
+    while self.alias_syms.len() as i32 > alias_start:
+        self.alias_syms.pop()
+        self.alias_places.pop()
+        self.alias_types.pop()
+    self.alias_scope_starts.pop()
 
 fn MirBuilder.emit_drops_for_break(self: MirBuilder, loop_info: LoopInfo):
     var i = self.drop_local_ids.len() as i32 - 1
@@ -239,6 +263,11 @@ fn MirBuilder.bind_local(self: MirBuilder, sym: i32, local_id: i32):
     self.bind_syms.push(sym)
     self.bind_local_ids.push(local_id)
 
+fn MirBuilder.bind_alias_place(self: MirBuilder, sym: i32, place: i32, ty: i32):
+    self.alias_syms.push(sym)
+    self.alias_places.push(place)
+    self.alias_types.push(ty)
+
 fn MirBuilder.lookup_local(self: MirBuilder, sym: i32) -> i32:
     var i = self.bind_syms.len() as i32 - 1
     while i >= 0:
@@ -246,6 +275,22 @@ fn MirBuilder.lookup_local(self: MirBuilder, sym: i32) -> i32:
             return self.bind_local_ids.get(i as i64)
         i = i - 1
     0 - 1
+
+fn MirBuilder.lookup_alias_place(self: MirBuilder, sym: i32) -> i32:
+    var i = self.alias_syms.len() as i32 - 1
+    while i >= 0:
+        if self.alias_syms.get(i as i64) == sym:
+            return self.alias_places.get(i as i64)
+        i = i - 1
+    0 - 1
+
+fn MirBuilder.lookup_alias_type(self: MirBuilder, sym: i32) -> i32:
+    var i = self.alias_syms.len() as i32 - 1
+    while i >= 0:
+        if self.alias_syms.get(i as i64) == sym:
+            return self.alias_types.get(i as i64)
+        i = i - 1
+    0
 
 fn MirBuilder.expr_type(self: MirBuilder, node: i32) -> i32:
     if node == 0:
@@ -283,6 +328,9 @@ fn MirBuilder.ident_type(self: MirBuilder, sym: i32) -> i32:
     let local = self.lookup_local(sym)
     if local >= 0:
         return self.local_type(local)
+    let alias_ty = self.lookup_alias_type(sym)
+    if alias_ty != 0:
+        return alias_ty
     let sig_idx = self.sema.get_sig(sym)
     if sig_idx >= 0:
         return self.sema.sig_type_ids.get(sig_idx as i64) as i32
@@ -1329,6 +1377,9 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
         if self.sema.is_copy(type_id) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, place)
         return self.body.new_operand(OperandKind.OK_MOVE, place)
+    let alias_place = self.lookup_alias_place(sym)
+    if alias_place >= 0:
+        return self.body.new_operand(OperandKind.OK_COPY, alias_place)
 
     let sig_idx = self.sema.get_sig(sym)
     if sig_idx >= 0:
@@ -1611,6 +1662,32 @@ fn MirBuilder.lower_call_place(self: MirBuilder, node: i32) -> i32:
     let index_expr = self.ast.get_extra(arg_start)
     self.lower_index(recv_expr, index_expr)
 
+fn MirBuilder.lower_binding_alias_place(self: MirBuilder, node: i32) -> i32:
+    if node == 0:
+        return -1
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED:
+        return self.lower_binding_alias_place(self.ast.get_data0(node))
+    if kind == NodeKind.NK_CALL:
+        return self.lower_call_place(node)
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        let base_expr = self.ast.get_data0(node)
+        let base_place = self.lower_binding_alias_place(base_expr)
+        if base_place < 0:
+            return -1
+        let field_sym = self.ast.get_data1(node)
+        var field_base = base_place
+        var base_ty = self.expr_type(base_expr)
+        while base_ty > 0:
+            let resolved = self.sema.resolve_alias(base_ty)
+            let tk = self.sema.get_type_kind(resolved)
+            if tk != TypeKind.TY_PTR and tk != TypeKind.TY_REF:
+                break
+            field_base = self.body.new_deref_place(field_base)
+            base_ty = self.sema.get_type_d0(resolved)
+        return self.body.new_field_place(field_base, field_sym, self.expr_type(node))
+    -1
+
 fn MirBuilder.lower_vec_literal_push(self: MirBuilder, vec_place: i32, elem_node: i32, elem_ty: i32):
     if elem_node == 0:
         return
@@ -1704,6 +1781,9 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
         let local = self.lookup_local(sym)
         if local >= 0:
             return self.place_for_local(local)
+        let alias_place = self.lookup_alias_place(sym)
+        if alias_place >= 0:
+            return alias_place
         // Try module-level mutable variable
         let gv_local = self.ensure_global_local(sym)
         if gv_local >= 0:
@@ -1785,6 +1865,11 @@ fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
     let mutable = flags % 2
 
     let bind_ty = self.binding_type(node)
+    if mutable == 0:
+        let alias_place = self.lower_binding_alias_place(rhs_expr)
+        if alias_place >= 0:
+            self.bind_alias_place(name_sym, alias_place, bind_ty)
+            return
     let local_id = self.body.new_local(bind_ty, mutable, name_sym, 1)
     self.bind_local(name_sym, local_id)
 
