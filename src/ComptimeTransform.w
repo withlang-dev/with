@@ -500,9 +500,14 @@ fn ct_struct_lit_field_value(pool: &mut AstPool, node: i32, field: i32) -> i32:
             return pool.get_extra(base + 1)
     0
 
+fn ct_sync_sema_ast(sema: &mut Sema, pool: &mut AstPool):
+    let live_ast = unsafe: *pool
+    sema.ast = live_ast
+
 fn ct_try_fold_type_call(pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, diags: &mut DiagnosticList, node: i32) -> i32:
     if node == 0 or pool.kind(node) != NodeKind.NK_CALL:
         return node
+    ct_sync_sema_ast(sema, pool)
     let callee = pool.get_data0(node)
     if callee == 0 or pool.kind(callee) != NodeKind.NK_FIELD_ACCESS:
         return node
@@ -881,6 +886,7 @@ fn ct_rewrite_comptime(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema,
 fn ct_transform_expr(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, diags: &mut DiagnosticList, node: i32) -> i32:
     if node == 0:
         return 0
+    ct_sync_sema_ast(sema, pool)
     let kind = pool.kind(node)
 
     if kind == NodeKind.NK_COMPTIME:

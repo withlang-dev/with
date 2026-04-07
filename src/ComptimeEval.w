@@ -141,7 +141,8 @@ fn comptime_eval_result_invalid() -> ComptimeEvalResult:
     }
 
 fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
-    let sema = unsafe: *sema_ptr
+    var sema = unsafe: *sema_ptr
+    sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 0)
     let value = evaluator.eval_root(diags, node)
     ComptimeEvalResult {
@@ -151,7 +152,8 @@ fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticList
     }
 
 fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
-    let sema = unsafe: *sema_ptr
+    var sema = unsafe: *sema_ptr
+    sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     let value = evaluator.eval_root(diags, node)
     ComptimeEvalResult {
