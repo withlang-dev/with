@@ -1,7 +1,5 @@
 //! expect-check-fail: string concatenation uses '++', not '+'
 
-fn double[T](x: T) -> T:
-    x + x
-
 fn main:
-    let s = double("hi")
+    let s = "a" + "b"
+    print(s)

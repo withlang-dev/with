@@ -8,11 +8,13 @@ source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 SELFHOST_BIN="./out/bin/with-stage2"
 CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
-echo "rebuilding self-host compiler for issue61 noop-local regression..."
-make stage2 >/dev/null
+if [[ ! -x "$SELFHOST_BIN" ]]; then
+  echo "rebuilding self-host compiler for issue61 noop-local regression..."
+  make stage2 >/dev/null
+fi
 
 if [[ ! -x "$SELFHOST_BIN" ]]; then
-  echo "error: missing self-host compiler: $SELFHOST_BIN" >&2
+  echo "error: missing self-host compiler after rebuild: $SELFHOST_BIN" >&2
   exit 1
 fi
 

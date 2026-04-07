@@ -249,11 +249,10 @@ fn Sema.check_bodies(self: Sema):
                         self.update_module_context(di)
                         self.check_fn_body(decl)
 
-fn Sema.check_fn_body(self: Sema, node: i32):
+fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     let fn_name = self.ast.get_data0(node)
     let body = self.ast.get_data1(node)
     let flags = self.ast.get_data2(node)
-    let sig_idx = self.get_sig(fn_name)
     if sig_idx < 0:
         return
 
@@ -378,6 +377,11 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     self.in_async_fn = saved_async
     self.pop_scope()
 
+fn Sema.check_fn_body(self: Sema, node: i32):
+    let fn_name = self.ast.get_data0(node)
+    let sig_idx = self.get_sig(fn_name)
+    self.check_fn_body_with_sig(node, sig_idx)
+
 // ── Concrete type-checking for monomorphized generic functions ───
 // Type-checks a generic function body with concrete type substitutions,
 // populating typed_expr_types so MirLower has type information.
@@ -419,34 +423,47 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
 
     let ret_tid = if ret_type_node != 0: self.resolve_type_expr(ret_type_node) else: self.ty_void
 
-    // Save existing sig for fn_name (if any) and register mono sig temporarily
-    let had_sig = self.sig_lookup.contains(fn_name)
-    var saved_sig_idx = 0 - 1
-    if had_sig:
-        saved_sig_idx = self.sig_lookup.get(fn_name).unwrap()
+    var sig_idx = self.get_sig(mono_sym)
+    if sig_idx < 0:
+        self.add_sig(mono_sym, 0, ret_tid, ps, param_count, 0)
+        sig_idx = self.get_sig(mono_sym)
 
-    self.add_sig(fn_name, 0, ret_tid, ps, param_count, 0)
-    let sig_idx = self.get_sig(fn_name)
+    // Concrete generic validation must run in the callee's own lexical
+    // environment, not inside the caller's active local scopes.
+    let saved_bind_names = self.bind_names
+    let saved_bind_types = self.bind_types
+    let saved_bind_muts = self.bind_muts
+    let saved_bind_states = self.bind_states
+    let saved_bind_is_task = self.bind_is_task
+    let saved_bind_is_scoped_task = self.bind_is_scoped_task
+    let saved_bind_is_ephemeral_task = self.bind_is_ephemeral_task
+    let saved_scope_starts = self.scope_starts
+    let saved_scope_name_map = self.scope_name_map
+    self.bind_names = Vec.new()
+    self.bind_types = Vec.new()
+    self.bind_muts = Vec.new()
+    self.bind_states = Vec.new()
+    self.bind_is_task = Vec.new()
+    self.bind_is_scoped_task = Vec.new()
+    self.bind_is_ephemeral_task = Vec.new()
+    self.scope_starts = Vec.new()
+    self.scope_starts.push(0)
+    self.scope_name_map = HashMap.new()
 
-    // Also register under mono_sym for later lookup
-    self.sig_lookup.insert(mono_sym, sig_idx)
+    // Type-check body with concrete substitutions installed. Generic bodies
+    // may still become invalid after instantiation (for example `T + T`
+    // specialized with `str`), so these diagnostics must stay visible.
+    self.check_fn_body_with_sig(fn_node, sig_idx)
 
-    // Suppress errors — generic bodies were validated at definition time
-    let saved_suppress = self.suppress_errors
-    self.suppress_errors = 1
-
-    // Type-check body
-    self.check_fn_body(fn_node)
-
-    self.suppress_errors = saved_suppress
-
-    // Restore sig_lookup for fn_name
-    if had_sig:
-        self.sig_lookup.insert(fn_name, saved_sig_idx)
-    else:
-        // Remove fn_name from sig_lookup — we keep it under mono_sym
-        // Can't remove from HashMap, so insert a sentinel
-        self.sig_lookup.insert(fn_name, sig_idx)
+    self.bind_names = saved_bind_names
+    self.bind_types = saved_bind_types
+    self.bind_muts = saved_bind_muts
+    self.bind_states = saved_bind_states
+    self.bind_is_task = saved_bind_is_task
+    self.bind_is_scoped_task = saved_bind_is_scoped_task
+    self.bind_is_ephemeral_task = saved_bind_is_ephemeral_task
+    self.scope_starts = saved_scope_starts
+    self.scope_name_map = saved_scope_name_map
 
     // Restore named_types
     for ti in 0..tp_count:
@@ -1031,15 +1048,14 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
         return tid
 
     // Check function names
+    if self.generic_fn_nodes.contains(sym) and self.is_ci_visible(sym) != 0:
+        return 0
+
     let sig_idx = self.get_sig(sym)
     if sig_idx >= 0 and self.is_ci_visible(sym) != 0:
         let fn_tid = self.sig_type_ids.get(sig_idx as i64)
         self.typed_expr_types.insert(node, fn_tid)
         return fn_tid
-
-    // Check generic functions
-    if self.generic_fn_nodes.contains(sym) and self.is_ci_visible(sym) != 0:
-        return 0
 
     // Check type names
     let prim = self.primitive_type_by_sym(sym)
@@ -1260,7 +1276,8 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
 
     if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL or op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD:
         if op == BinaryOp.OP_ADD and lhs == self.ty_str and rhs == self.ty_str:
-            return self.ty_str as i32
+            self.emit_error("string concatenation uses '++', not '+'", node)
+            return 0
         // Pointer arithmetic: ptr + int → ptr, ptr - int → ptr
         let lhs_k = self.get_type_kind(self.resolve_alias(lhs))
         let rhs_k = self.get_type_kind(self.resolve_alias(rhs))
@@ -3046,7 +3063,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 self.emit_error("named arguments are not supported for closures or function pointers", node)
 
     let param_offset = if self.in_pipeline_rhs != 0: 1 else: 0
-    let sig_idx_raw = self.get_sig(fn_sym)
+    let sig_idx_raw = if self.generic_fn_nodes.contains(fn_sym): 0 - 1 else: self.get_sig(fn_sym)
     let sig_idx = if sig_idx_raw >= 0 and self.is_ci_visible(fn_sym) == 0: 0 - 1 else: sig_idx_raw
     let variant_expected_ty = if self.variant_lookup.contains(fn_sym) and self.is_ci_visible(fn_sym) != 0: self.expected_variant_constructor_type(fn_sym) else: 0
     let variant_payload_tys = if variant_expected_ty != 0: self.enum_variant_payload_types(variant_expected_ty, fn_sym) else: Vec.new()
@@ -3637,6 +3654,21 @@ fn Sema.check_generic_call(self: Sema, fn_sym: i32, fn_node: i32, arg_types: Vec
         let cached = self.generic_specialization_cache.get(spec_key).unwrap()
         self.typed_expr_types.insert(call_node, cached)
         return cached
+
+    let before_errors = self.diags.count_by_severity(DiagSeverity.Error)
+    let tp_syms: Vec[i32] = Vec.new()
+    let tp_sema_tys: Vec[i32] = Vec.new()
+    var tp_pos = tp_start
+    for ti in 0..tp_count:
+        let tp_sym = self.ast.get_extra(tp_pos)
+        let bound_count = self.ast.get_extra(tp_pos + 1)
+        tp_syms.push(tp_sym)
+        tp_sema_tys.push(self.lookup_generic_subst(tp_sym))
+        tp_pos = tp_pos + 2 + bound_count
+    let mono_sym = self.pool_intern(f"{self.pool_resolve(fn_sym)}__sema__{spec_key}")
+    let _ = self.check_fn_body_concrete(fn_node, tp_syms, tp_sema_tys, mono_sym)
+    if self.diags.count_by_severity(DiagSeverity.Error) != before_errors:
+        return 0
 
     let resolved_ret = self.resolve_generic_return_type_node(ret_node, tp_start, tp_count)
     self.generic_specialization_cache.insert(sema_owned_text(spec_key), resolved_ret)
