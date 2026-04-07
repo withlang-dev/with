@@ -3190,6 +3190,10 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         if arg_node == 0:
             arg_types.push(0)
             continue
+        if arg_node < 0:
+            let bind_sym = 0 - arg_node
+            arg_types.push(self.scope_lookup(bind_sym))
+            continue
         let is_closure_arg = self.ast.kind(arg_node) == NodeKind.NK_CLOSURE
         if is_closure_arg:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
@@ -3201,7 +3205,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     // Mark non-Copy args as moved
     for ai in 0..resolved_arg_count:
         let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
-        if arg_node != 0:
+        if arg_node > 0:
             self.mark_moved_if_consumed(arg_node)
 
     if self.check_comptime_call_restriction(fn_sym, node) != 0:
@@ -3252,9 +3256,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                         if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
                             let err_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                             if not (self.ci_syms.contains(fn_sym) and self.try_ci_coercion(arg_ty, expected_ty) != 0):
-                                self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, param_i, expected_ty, arg_ty, err_arg_node)
+                                self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, param_i, expected_ty, arg_ty, if err_arg_node > 0: err_arg_node else: node)
             let eph_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
-            if self.expr_is_ephemeral_task(eph_arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
+            if eph_arg_node > 0 and self.expr_is_ephemeral_task(eph_arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
                 self.emit_warning("ephemeral Task passed by value may escape", eph_arg_node)
 
         self.check_dyn_trait_call_compat(fn_sym, resolved_extra_start, arg_types, resolved_arg_count, param_offset)
