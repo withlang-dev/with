@@ -1748,11 +1748,13 @@ pub fn hashmap_contains(map: *mut u8, key: *const u8, is_str_key: i64) -> i32:
     hashmap_get(map, key, 0 as *mut u8, is_str_key)
 
 @[c_export("with_hashmap_remove")]
-pub fn hashmap_remove(map: *mut u8, key: *const u8, is_str_key: i64) -> i32:
+pub fn hashmap_remove(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key: i64) -> i32:
+    let _ = is_str_key  // key type already stored in struct
     let m = map as i64
     if hm_len(m) == 0: return 0
     let cap = hm_cap(m)
     let ksz = hm_key_size(m)
+    let vsz = hm_val_size(m)
 
     var h = (hm_hash_key(m, key) % (cap as u64)) as i64
     var probes: i64 = 0
@@ -1760,6 +1762,8 @@ pub fn hashmap_remove(map: *mut u8, key: *const u8, is_str_key: i64) -> i32:
         if hm_occ(m)[h] == 0:
             return 0
         if hm_keys_eq(m, (hm_keys(m) as i64 + h * ksz) as *const u8, key) != 0:
+            if val_out as i64 != 0:
+                rt_memcpy(val_out, (hm_vals(m) as i64 + h * vsz) as *const u8, vsz)
             *((hm_occ(m) as i64 + h) as *mut u8) = 0
             hm_set_len(m, hm_len(m) - 1)
             // Rehash following entries
@@ -1767,13 +1771,12 @@ pub fn hashmap_remove(map: *mut u8, key: *const u8, is_str_key: i64) -> i32:
             while hm_occ(m)[next] != 0:
                 // Save key+val, clear slot, re-insert
                 let tmpk = rt_alloc(ksz)
-                let vsz = hm_val_size(m)
                 let tmpv = rt_alloc(vsz)
                 rt_memcpy(tmpk, (hm_keys(m) as i64 + next * ksz) as *const u8, ksz)
                 rt_memcpy(tmpv, (hm_vals(m) as i64 + next * vsz) as *const u8, vsz)
                 *((hm_occ(m) as i64 + next) as *mut u8) = 0
                 hm_set_len(m, hm_len(m) - 1)
-                hashmap_insert(map, tmpk as *const u8, tmpv as *const u8, is_str_key)
+                hashmap_insert(map, tmpk as *const u8, tmpv as *const u8, hm_is_str_key(m) as i64)
                 rt_free_sized(tmpk, ksz)
                 rt_free_sized(tmpv, vsz)
                 next = ((next + 1) as u64 % (cap as u64)) as i64

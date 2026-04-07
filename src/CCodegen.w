@@ -1871,6 +1871,9 @@ fn CCodegen.type_owner_text(self: CCodegen, tid: i32) -> str:
         return cc_intern_resolve(self.intern, owner_sym)
     ""
 
+fn CCodegen.call_first_arg_owner_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+    self.type_owner_text(self.call_first_arg_resolved_tid(body, args_id))
+
 fn CCodegen.owner_named_body_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32) -> i32:
     let raw = cc_intern_resolve(self.intern, fn_sym)
     if raw.len() == 0:
@@ -2678,6 +2681,15 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
     if kind == cc_builtin_map_len():
         return self.sema.ty_i64 as i32
     if kind == cc_builtin_map_remove():
+        let owner = self.call_first_arg_owner_text(body, args_id)
+        if cc_str_contains(owner, "HashMap") != 0:
+            let hinted = self.call_dest_expected_tid(body, dest_place)
+            if hinted != 0 and self.is_void_tid(hinted) == 0:
+                return hinted
+            let dst = self.place_local_tid(body, dest_place)
+            if dst != 0 and self.is_void_tid(dst) == 0:
+                return dst
+            return self.sema.ty_i64 as i32
         return self.sema.ty_bool as i32
     if kind == cc_builtin_opt_is_some():
         return self.sema.ty_bool as i32
@@ -3379,6 +3391,8 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             self.fail("map.remove expects two arguments")
             return "    abort();"
         let recv = self.map_recv_text(body, args_id)
+        let owner = self.call_first_arg_owner_text(body, args_id)
+        let recv_is_hashmap = if cc_str_contains(owner, "HashMap") != 0: 1 else: 0
         let key_operand = self.call_arg_operand(body, args_id, 1)
         let key_text = self.operand_text(body, key_operand)
         var key_tid = self.operand_tid(body, key_operand)
@@ -3386,10 +3400,18 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             key_tid = self.sema.ty_i64 as i32
         let key_ty = self.c_type(key_tid, 0)
         let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
-        var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; "
-        if has_ret != 0:
-            out = out ++ self.place_text(body, dest_place) ++ " = "
-        out = out ++ "(((" ++ recv ++ ") != 0) && (with_hashmap_remove((void*)(intptr_t)(" ++ recv ++ "), &__with_k, " ++ is_str_key ++ ") != 0)); " ++ cc_rbrace() ++ "\n"
+        var out = f"    {cc_lbrace()} {key_ty} __with_k = {key_text}; "
+        if recv_is_hashmap != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "int64_t __with_v = 0;"
+            out = out ++ " int64_t __with_r = 0;"
+            out = out ++ " if ((" ++ recv ++ ") != 0 && with_hashmap_remove((void*)(intptr_t)(" ++ recv ++ "), &__with_k, &__with_v, " ++ is_str_key ++ ") != 0) "
+            out = out ++ cc_lbrace() ++ " __with_r = (__with_v + 1); " ++ cc_rbrace()
+            out = out ++ " memcpy(&(" ++ dst ++ "), &__with_r, sizeof(__with_r) < sizeof(" ++ dst ++ ") ? sizeof(__with_r) : sizeof(" ++ dst ++ ")); " ++ cc_rbrace() ++ "\n"
+        else:
+            if has_ret != 0:
+                out = out ++ self.place_text(body, dest_place) ++ " = "
+            out = out ++ "(((" ++ recv ++ ") != 0) && (with_hashmap_remove((void*)(intptr_t)(" ++ recv ++ "), &__with_k, (void*)0, " ++ is_str_key ++ ") != 0)); " ++ cc_rbrace() ++ "\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
 
