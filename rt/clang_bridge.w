@@ -298,6 +298,16 @@ type EnumConstInfo:
     name: *mut u8
     value: i64
 
+type FieldCollector:
+    fields: *mut FieldInfo
+    count: i32
+    cap: i32
+
+type EnumConstCollector:
+    consts: *mut EnumConstInfo
+    count: i32
+    cap: i32
+
 type DeclCache:
     fields: *mut FieldInfo
     field_count: i32
@@ -333,6 +343,12 @@ type CImportSession:
     child_indices_count: i32
     child_indices_cap: i32
     children_cache_cap: i32
+
+type ChildCollector:
+    session: *mut CImportSession
+    indices: *mut i32
+    count: i32
+    cap: i32
 
 type MacroSession:
     names: *mut *mut u8
@@ -815,33 +831,29 @@ fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
 
 @[callconv("c")]
 fn collect_field(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
-    // data points to: [*mut FieldInfo, i32 count, i32 cap]
-    let fc = data
+    let fc = data as *mut FieldCollector
     if clang_getCursorKind(cursor) != CXCursor_FieldDecl:
         return CXChildVisit_Continue
-    let count_ptr = (fc as i64 + 8) as *mut i32
-    let cap_ptr = (fc as i64 + 12) as *mut i32
-    let fields_ptr = fc as *mut *mut FieldInfo
-    if *count_ptr >= *cap_ptr:
-        *cap_ptr = if *cap_ptr > 0: *cap_ptr * 2 else: 16
-        let new_buf = with_alloc((*cap_ptr) as i64 * 40)  // sizeof(FieldInfo) = 8+8+4+pad+24 ≈ 40 (use 40)
+    if (*fc).count >= (*fc).cap:
+        (*fc).cap = if (*fc).cap > 0: (*fc).cap * 2 else: 16
+        let new_buf = with_alloc((*fc).cap as i64 * 48)  // sizeof(FieldInfo) = 8+8+4+pad+24 = 48
         if new_buf as i64 != 0:
-            with_memset(new_buf, 0, (*cap_ptr) as i64 * 40)
-            if *fields_ptr as i64 != 0 and *count_ptr > 0:
-                with_memcpy(new_buf, *fields_ptr as *const u8, (*count_ptr) as i64 * 40)
-            if *fields_ptr as i64 != 0:
-                with_free(*fields_ptr as *mut u8)
-        *fields_ptr = new_buf as *mut FieldInfo
+            with_memset(new_buf, 0, (*fc).cap as i64 * 48)
+            if (*fc).fields as i64 != 0 and (*fc).count > 0:
+                with_memcpy(new_buf, (*fc).fields as *const u8, (*fc).count as i64 * 48)
+            if (*fc).fields as i64 != 0:
+                with_free((*fc).fields as *mut u8)
+        (*fc).fields = new_buf as *mut FieldInfo
     let name = clang_getCursorSpelling(cursor)
     let ty = clang_getCursorType(cursor)
     let canonical = clang_getCanonicalType(ty)
     let type_str = clang_getTypeSpelling(canonical)
-    let fi = ((*fields_ptr) as i64 + (*count_ptr) as i64 * 40) as *mut FieldInfo
+    let fi = ((*fc).fields as i64 + (*fc).count as i64 * 48) as *mut FieldInfo
     (*fi).name = c_strdup(clang_getCString(name))
     (*fi).type_spelling = c_strdup(clang_getCString(type_str))
     (*fi).clang_type = ty
     (*fi).is_bitfield = if clang_Cursor_isBitField(cursor) != 0: 1 else: 0
-    *count_ptr = *count_ptr + 1
+    (*fc).count = (*fc).count + 1
     clang_disposeString(name)
     clang_disposeString(type_str)
     CXChildVisit_Continue
@@ -855,39 +867,32 @@ fn ensure_fields_cached(s: *mut CImportSession, idx: i32):
     let cache = ((*s).caches as i64 + idx as i64 * 48) as *mut DeclCache
     if (*cache).fields_cached != 0: return
     (*cache).fields_cached = 1
-    // FieldCollector: { *mut FieldInfo, i32 count, i32 cap }
-    var fc_fields: *mut FieldInfo = 0 as *mut FieldInfo
-    var fc_count: i32 = 0
-    var fc_cap: i32 = 0
-    let fc_data = &mut fc_fields as *mut *mut FieldInfo as *mut u8
+    var fc = FieldCollector { fields: 0 as *mut FieldInfo, count: 0, cap: 0 }
     let decl = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
-    let _ = clang_visitChildren(decl, collect_field as *const u8, fc_data)
-    (*cache).fields = fc_fields
-    (*cache).field_count = fc_count
+    let _ = clang_visitChildren(decl, collect_field as *const u8, &mut fc as *mut FieldCollector as *mut u8)
+    (*cache).fields = fc.fields
+    (*cache).field_count = fc.count
 
 @[callconv("c")]
 fn collect_enum_const(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
-    let ec = data
+    let ec = data as *mut EnumConstCollector
     if clang_getCursorKind(cursor) != CXCursor_EnumConstantDecl:
         return CXChildVisit_Continue
-    let count_ptr = (ec as i64 + 8) as *mut i32
-    let cap_ptr = (ec as i64 + 12) as *mut i32
-    let consts_ptr = ec as *mut *mut EnumConstInfo
-    if *count_ptr >= *cap_ptr:
-        *cap_ptr = if *cap_ptr > 0: *cap_ptr * 2 else: 16
-        let new_buf = with_alloc((*cap_ptr) as i64 * 16)  // sizeof(EnumConstInfo) = 16
+    if (*ec).count >= (*ec).cap:
+        (*ec).cap = if (*ec).cap > 0: (*ec).cap * 2 else: 16
+        let new_buf = with_alloc((*ec).cap as i64 * 16)  // sizeof(EnumConstInfo) = 16
         if new_buf as i64 != 0:
-            with_memset(new_buf, 0, (*cap_ptr) as i64 * 16)
-            if *consts_ptr as i64 != 0 and *count_ptr > 0:
-                with_memcpy(new_buf, *consts_ptr as *const u8, (*count_ptr) as i64 * 16)
-            if *consts_ptr as i64 != 0:
-                with_free(*consts_ptr as *mut u8)
-        *consts_ptr = new_buf as *mut EnumConstInfo
+            with_memset(new_buf, 0, (*ec).cap as i64 * 16)
+            if (*ec).consts as i64 != 0 and (*ec).count > 0:
+                with_memcpy(new_buf, (*ec).consts as *const u8, (*ec).count as i64 * 16)
+            if (*ec).consts as i64 != 0:
+                with_free((*ec).consts as *mut u8)
+        (*ec).consts = new_buf as *mut EnumConstInfo
     let name = clang_getCursorSpelling(cursor)
-    let ci = ((*consts_ptr) as i64 + (*count_ptr) as i64 * 16) as *mut EnumConstInfo
+    let ci = ((*ec).consts as i64 + (*ec).count as i64 * 16) as *mut EnumConstInfo
     (*ci).name = c_strdup(clang_getCString(name))
     (*ci).value = clang_getEnumConstantDeclValue(cursor)
-    *count_ptr = *count_ptr + 1
+    (*ec).count = (*ec).count + 1
     clang_disposeString(name)
     CXChildVisit_Continue
 
@@ -900,14 +905,11 @@ fn ensure_enum_consts_cached(s: *mut CImportSession, idx: i32):
     let cache = ((*s).caches as i64 + idx as i64 * 48) as *mut DeclCache
     if (*cache).enum_consts_cached != 0: return
     (*cache).enum_consts_cached = 1
-    var ec_consts: *mut EnumConstInfo = 0 as *mut EnumConstInfo
-    var ec_count: i32 = 0
-    var ec_cap: i32 = 0
-    let ec_data = &mut ec_consts as *mut *mut EnumConstInfo as *mut u8
+    var ec = EnumConstCollector { consts: 0 as *mut EnumConstInfo, count: 0, cap: 0 }
     let decl = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
-    let _ = clang_visitChildren(decl, collect_enum_const as *const u8, ec_data)
-    (*cache).enum_consts = ec_consts
-    (*cache).enum_const_count = ec_count
+    let _ = clang_visitChildren(decl, collect_enum_const as *const u8, &mut ec as *mut EnumConstCollector as *mut u8)
+    (*cache).enum_consts = ec.consts
+    (*cache).enum_const_count = ec.count
 
 // ═══════════════════════════════════════════════════════════
 // Public API
@@ -1061,7 +1063,7 @@ pub fn cimport_dispose(session: i64):
             let cache = ((*s).caches as i64 + i as i64 * 48) as *mut DeclCache
             var j: i32 = 0
             while j < (*cache).field_count:
-                let fi = ((*cache).fields as i64 + j as i64 * 40) as *mut FieldInfo
+                let fi = ((*cache).fields as i64 + j as i64 * 48) as *mut FieldInfo
                 with_free((*fi).name)
                 with_free((*fi).type_spelling)
                 j = j + 1
@@ -1293,7 +1295,7 @@ pub fn cimport_struct_field_name(session: i64, idx: i32, field: i32) -> str:
     if (*s).caches as i64 == 0: return ""
     let cache = ((*s).caches as i64 + idx as i64 * 48) as *const DeclCache
     if field < 0 or field >= (*cache).field_count: return ""
-    let fi = ((*cache).fields as i64 + field as i64 * 40) as *const FieldInfo
+    let fi = ((*cache).fields as i64 + field as i64 * 48) as *const FieldInfo
     make_str((*fi).name as *const u8)
 
 @[c_export("with_cimport_struct_field_type")]
@@ -1304,7 +1306,7 @@ pub fn cimport_struct_field_type(session: i64, idx: i32, field: i32) -> str:
     if (*s).caches as i64 == 0: return ""
     let cache = ((*s).caches as i64 + idx as i64 * 48) as *const DeclCache
     if field < 0 or field >= (*cache).field_count: return ""
-    let fi = ((*cache).fields as i64 + field as i64 * 40) as *const FieldInfo
+    let fi = ((*cache).fields as i64 + field as i64 * 48) as *const FieldInfo
     make_str((*fi).type_spelling as *const u8)
 
 @[c_export("with_cimport_struct_field_is_bitfield")]
@@ -1315,7 +1317,7 @@ pub fn cimport_struct_field_is_bitfield(session: i64, idx: i32, field: i32) -> i
     if (*s).caches as i64 == 0: return 0
     let cache = ((*s).caches as i64 + idx as i64 * 48) as *const DeclCache
     if field < 0 or field >= (*cache).field_count: return 0
-    let fi = ((*cache).fields as i64 + field as i64 * 40) as *const FieldInfo
+    let fi = ((*cache).fields as i64 + field as i64 * 48) as *const FieldInfo
     (*fi).is_bitfield
 
 @[c_export("with_cimport_struct_field_offset")]
@@ -1328,7 +1330,7 @@ pub fn cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i64:
     if field < 0 or field >= (*cache).field_count: return -1
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
     let ty = clang_getCursorType(cursor)
-    let fi = ((*cache).fields as i64 + field as i64 * 40) as *const FieldInfo
+    let fi = ((*cache).fields as i64 + field as i64 * 48) as *const FieldInfo
     let offset_bits = clang_Type_getOffsetOf(ty, (*fi).name as *const u8)
     if offset_bits < 0: return -1
     offset_bits / 8
@@ -1349,7 +1351,7 @@ pub fn cimport_struct_field_size(session: i64, idx: i32, field: i32) -> i64:
     if (*s).caches as i64 == 0: return -1
     let cache = ((*s).caches as i64 + idx as i64 * 48) as *const DeclCache
     if field < 0 or field >= (*cache).field_count: return -1
-    let fi = ((*cache).fields as i64 + field as i64 * 40) as *const FieldInfo
+    let fi = ((*cache).fields as i64 + field as i64 * 48) as *const FieldInfo
     clang_Type_getSizeOf((*fi).clang_type)
 
 @[c_export("with_cimport_struct_is_opaque")]
@@ -1386,7 +1388,7 @@ pub fn cimport_struct_field_type_translated(session: i64, idx: i32, field: i32) 
     if (*s).caches as i64 == 0: return ""
     let cache = ((*s).caches as i64 + idx as i64 * 48) as *const DeclCache
     if field < 0 or field >= (*cache).field_count: return ""
-    let fi = ((*cache).fields as i64 + field as i64 * 40) as *const FieldInfo
+    let fi = ((*cache).fields as i64 + field as i64 * 48) as *const FieldInfo
     let is_last = if field == (*cache).field_count - 1: 1 else: 0
     let result = translate_type_recursive(s, (*fi).clang_type, 0, is_last)
     if result as i64 == 0: return ""
@@ -1400,7 +1402,7 @@ pub fn cimport_struct_field_align(session: i64, idx: i32, field: i32) -> i64:
     if (*s).caches as i64 == 0: return -1
     let cache = ((*s).caches as i64 + idx as i64 * 48) as *const DeclCache
     if field < 0 or field >= (*cache).field_count: return -1
-    let fi = ((*cache).fields as i64 + field as i64 * 40) as *const FieldInfo
+    let fi = ((*cache).fields as i64 + field as i64 * 48) as *const FieldInfo
     clang_Type_getAlignOf((*fi).clang_type)
 
 // ── Enum queries ────────────────────────────────────────────
@@ -1558,10 +1560,13 @@ pub fn cimport_parse_macros(header_code: str) -> i64:
         return ms as i64
 
     var line: [4096]u8 = [0 as u8; 4096]
-    while fgets(&mut line as *mut [4096]u8 as *mut u8, 4096, p) as i64 != 0:
-        if c_strncmp(&line as *const [4096]u8 as *const u8, "#define \0" as *const u8, 8) != 0:
+    while true:
+        let line_ptr = fgets(&mut line as *mut [4096]u8 as *mut u8, 4096, p)
+        if line_ptr as i64 == 0:
+            break
+        if c_strncmp(line_ptr as *const u8, "#define \0" as *const u8, 8) != 0:
             continue
-        let name_start = ((&line) as i64 + 8) as *const u8
+        let name_start = (line_ptr as i64 + 8) as *const u8
         // Skip builtins
         if *name_start == 95 and *((name_start as i64 + 1) as *const u8) == 95:
             continue
@@ -1752,7 +1757,7 @@ pub fn cimport_struct_field_is_anonymous_record(session: i64, idx: i32, field: i
     if (*s).caches as i64 == 0: return 0
     let cache = ((*s).caches as i64 + idx as i64 * 48) as *const DeclCache
     if field < 0 or field >= (*cache).field_count: return 0
-    let fi = ((*cache).fields as i64 + field as i64 * 40) as *const FieldInfo
+    let fi = ((*cache).fields as i64 + field as i64 * 48) as *const FieldInfo
     let canonical = clang_getCanonicalType((*fi).clang_type)
     if canonical.kind != CXType_Record: return 0
     let decl = clang_getTypeDeclaration(canonical)
@@ -1822,22 +1827,17 @@ fn store_type(s: *mut CImportSession, ty: CXType) -> i32:
 
 @[callconv("c")]
 fn collect_child_cursor(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
-    // data = ChildCollector: { *mut CImportSession, *mut i32 indices, i32 count, i32 cap }
-    let cc = data
-    let session = *((cc as i64) as *const *mut CImportSession)
-    let count_ptr = (cc as i64 + 16) as *mut i32
-    let cap_ptr = (cc as i64 + 20) as *mut i32
-    let indices_ptr = (cc as i64 + 8) as *mut *mut i32
-    if *count_ptr >= *cap_ptr:
-        *cap_ptr = if *cap_ptr > 0: *cap_ptr * 2 else: 64
-        let new_buf = with_alloc((*cap_ptr) as i64 * 4)
-        if *indices_ptr as i64 != 0 and *count_ptr > 0:
-            with_memcpy(new_buf, *indices_ptr as *const u8, (*count_ptr) as i64 * 4)
-        if *indices_ptr as i64 != 0: with_free(*indices_ptr as *mut u8)
-        *indices_ptr = new_buf as *mut i32
-    let stored_idx = store_cursor(session, cursor)
-    *((*indices_ptr as i64 + (*count_ptr) as i64 * 4) as *mut i32) = stored_idx
-    *count_ptr = *count_ptr + 1
+    let cc = data as *mut ChildCollector
+    if (*cc).count >= (*cc).cap:
+        (*cc).cap = if (*cc).cap > 0: (*cc).cap * 2 else: 64
+        let new_buf = with_alloc((*cc).cap as i64 * 4)
+        if (*cc).indices as i64 != 0 and (*cc).count > 0:
+            with_memcpy(new_buf, (*cc).indices as *const u8, (*cc).count as i64 * 4)
+        if (*cc).indices as i64 != 0: with_free((*cc).indices as *mut u8)
+        (*cc).indices = new_buf as *mut i32
+    let stored_idx = store_cursor((*cc).session, cursor)
+    *(((*cc).indices as i64 + (*cc).count as i64 * 4) as *mut i32) = stored_idx
+    (*cc).count = (*cc).count + 1
     CXChildVisit_Continue
 
 fn ensure_children_cached(s: *mut CImportSession, cursor_idx: i32):
@@ -1863,18 +1863,13 @@ fn ensure_children_cached(s: *mut CImportSession, cursor_idx: i32):
     if start_val != -1: return  // already cached
     // Collect children
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
-    // ChildCollector: { session_ptr, indices, count, cap }
-    var cc_session: *mut CImportSession = s
-    var cc_indices: *mut i32 = 0 as *mut i32
-    var cc_count: i32 = 0
-    var cc_cap: i32 = 0
-    let cc_data = &mut cc_session as *mut *mut CImportSession as *mut u8
-    let _ = clang_visitChildren(cursor, collect_child_cursor as *const u8, cc_data)
+    var cc = ChildCollector { session: s, indices: 0 as *mut i32, count: 0, cap: 0 }
+    let _ = clang_visitChildren(cursor, collect_child_cursor as *const u8, &mut cc as *mut ChildCollector as *mut u8)
     // Store results
     let flat_start = (*s).child_indices_count
-    if cc_count > 0:
+    if cc.count > 0:
         // Grow child_indices
-        while (*s).child_indices_count + cc_count > (*s).child_indices_cap:
+        while (*s).child_indices_count + cc.count > (*s).child_indices_cap:
             (*s).child_indices_cap = if (*s).child_indices_cap > 0: (*s).child_indices_cap * 2 else: 256
         let new_ci = with_alloc((*s).child_indices_cap as i64 * 4)
         if (*s).child_indices as i64 != 0 and (*s).child_indices_count > 0:
@@ -1882,11 +1877,11 @@ fn ensure_children_cached(s: *mut CImportSession, cursor_idx: i32):
         if (*s).child_indices as i64 != 0: with_free((*s).child_indices as *mut u8)
         (*s).child_indices = new_ci as *mut i32
         // Copy indices
-        with_memcpy(((*s).child_indices as i64 + flat_start as i64 * 4) as *mut u8, cc_indices as *const u8, cc_count as i64 * 4)
-        (*s).child_indices_count = (*s).child_indices_count + cc_count
-    if cc_indices as i64 != 0: with_free(cc_indices as *mut u8)
+        with_memcpy(((*s).child_indices as i64 + flat_start as i64 * 4) as *mut u8, cc.indices as *const u8, cc.count as i64 * 4)
+        (*s).child_indices_count = (*s).child_indices_count + cc.count
+    if cc.indices as i64 != 0: with_free(cc.indices as *mut u8)
     *(((*s).child_starts as i64 + cursor_idx as i64 * 4) as *mut i32) = flat_start
-    *(((*s).child_counts as i64 + cursor_idx as i64 * 4) as *mut i32) = cc_count
+    *(((*s).child_counts as i64 + cursor_idx as i64 * 4) as *mut i32) = cc.count
 
 @[c_export("with_ci_root_cursor")]
 pub fn ci_root_cursor(session: i64) -> i32:
