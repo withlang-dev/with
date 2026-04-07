@@ -2744,7 +2744,7 @@ fn Codegen.mir_hashmap_key_type(self: Codegen, body: MirBody, recv_op_id: i32) -
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
             let arg_count = self.mir_input.mir_get_type_d2(resolved)
-            if base_sym == self.sym_hashmap and arg_count > 0:
+            if (base_sym == self.sym_hashmap or base_sym == self.sym_hashset) and arg_count > 0:
                 let te_start = self.mir_input.mir_get_type_d1(resolved)
                 let key_tid = self.mir_input.mir_get_type_extra(te_start)
                 if key_tid > 0:
@@ -2866,6 +2866,14 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "increment": return MirIntrinsic.MIR_INTRINSIC_MAP_INCREMENT
         if method_name == "keys": return MirIntrinsic.MIR_INTRINSIC_MAP_KEYS
         return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "HashSet":
+        if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_MAP_NEW
+        if method_name == "insert": return MirIntrinsic.MIR_INTRINSIC_MAP_INSERT
+        if method_name == "contains": return MirIntrinsic.MIR_INTRINSIC_MAP_CONTAINS
+        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_MAP_LEN
+        if method_name == "remove": return MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE
+        if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR
+        return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "Option":
         if method_name == "unwrap": return MirIntrinsic.MIR_INTRINSIC_OPT_UNWRAP
         if method_name == "is_some": return MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME
@@ -2899,6 +2907,7 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
     MirIntrinsic.MIR_INTRINSIC_NONE
 
 fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    let byte_ty = wl_i8_type(self.context)
     let i64_ty = wl_i64_type(self.context)
     let i32_ty = wl_i32_type(self.context)
     let ptr_ty = wl_ptr_type(self.context)
@@ -3074,13 +3083,15 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         var hm_key_size: i64 = 8
         var hm_val_size: i64 = 8
         var hm_ty: i64 = 0
+        var hm_base_sym = 0
         let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
         if dest_sema > 0:
             let resolved = self.mir_input.mir_resolve_alias(dest_sema)
             let tk = self.mir_input.mir_get_type_kind(resolved)
             if tk == TypeKind.TY_GENERIC_INST:
+                hm_base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
                 let gi_arg_count = self.mir_input.mir_get_type_d2(resolved)
-                if gi_arg_count == 2:
+                if hm_base_sym == self.sym_hashmap and gi_arg_count == 2:
                     let args_start = self.mir_input.mir_get_type_d1(resolved)
                     let key_sema = self.mir_input.mir_get_type_extra(args_start)
                     let val_sema = self.mir_input.mir_get_type_extra(args_start + 1)
@@ -3089,7 +3100,15 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
                     if key_llvm != 0 and val_llvm != 0:
                         hm_key_size = self.abi_size_of(key_llvm)
                         hm_val_size = self.abi_size_of(val_llvm)
-                        hm_ty = self.get_or_create_hashmap_type(0, key_llvm, val_llvm)
+                        hm_ty = self.get_or_create_hashmap_type(dest_sema, key_llvm, val_llvm)
+                else if hm_base_sym == self.sym_hashset and gi_arg_count > 0:
+                    let args_start = self.mir_input.mir_get_type_d1(resolved)
+                    let elem_sema = self.mir_input.mir_get_type_extra(args_start)
+                    let elem_llvm = self.sema_type_to_llvm(elem_sema)
+                    if elem_llvm != 0:
+                        hm_key_size = self.abi_size_of(elem_llvm)
+                        hm_val_size = 1
+                        hm_ty = self.get_or_create_hashset_type(dest_sema, elem_llvm)
         let new_fn = self.ensure_hashmap_new_declared()
         let fn_ty = self.get_hashmap_new_fn_type()
         let new_args: Vec[i64] = Vec.new()
@@ -3098,23 +3117,35 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let handle = wl_build_call(self.builder, fn_ty, new_fn, vec_data_i64(&new_args), 2)
         // Wrap handle in HashMap struct { ptr }.
         if hm_ty == 0:
-            hm_ty = self.get_or_create_hashmap_type(0, i64_ty, i64_ty)
+            if hm_base_sym == self.sym_hashset:
+                hm_ty = self.get_or_create_hashset_type(0, i64_ty)
+            else:
+                hm_ty = self.get_or_create_hashmap_type(0, i64_ty, i64_ty)
         let empty = self.build_default_value(hm_ty)
         result = wl_build_insert_value(self.builder, empty, handle, 0)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_INSERT:
         let recv_op = body.call_arg_operands.get(arg_start as i64)
+        let recv_base_sym = self.mir_map_recv_base_sym(body, recv_op)
         let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
-        let val_raw = self.mir_intrinsic_arg(body, args_id, 2)
         let key_ty = self.mir_hashmap_key_type(body, recv_op)
-        let val_ty = self.mir_hashmap_value_type(body, recv_op)
         let key = if key_ty != 0 and wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
-        let val = if val_ty != 0 and wl_type_of(val_raw) != val_ty: self.coerce_value_to_type(val_raw, val_ty) else: val_raw
         let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
-        let val_alloca = wl_build_alloca(self.builder, wl_type_of(val))
         wl_build_store(self.builder, key, key_alloca)
-        wl_build_store(self.builder, val, val_alloca)
+        let val_alloca =
+            if recv_base_sym == self.sym_hashset:
+                let set_present = wl_const_int(byte_ty, 1, 0)
+                let set_val_alloca = wl_build_alloca(self.builder, byte_ty)
+                wl_build_store(self.builder, set_present, set_val_alloca)
+                set_val_alloca
+            else:
+                let val_raw = self.mir_intrinsic_arg(body, args_id, 2)
+                let val_ty = self.mir_hashmap_value_type(body, recv_op)
+                let val = if val_ty != 0 and wl_type_of(val_raw) != val_ty: self.coerce_value_to_type(val_raw, val_ty) else: val_raw
+                let map_val_alloca = wl_build_alloca(self.builder, wl_type_of(val))
+                wl_build_store(self.builder, val, map_val_alloca)
+                map_val_alloca
         let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
         let fn_val = self.ensure_hm_fn("with_hashmap_insert", void_ty)
         let params: Vec[i64] = Vec.new()
