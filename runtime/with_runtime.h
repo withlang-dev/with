@@ -101,7 +101,7 @@ void with_hashmap_new_at(void *base, int64_t offset, int64_t key_size, int64_t v
 void with_hashmap_insert(void *handle, const void *key, const void *val, int64_t is_str_key);
 int64_t with_hashmap_get(void *handle, const void *key, void *out_val, int64_t is_str_key);
 int64_t with_hashmap_contains(void *handle, const void *key, int64_t is_str_key);
-int64_t with_hashmap_remove(void *handle, const void *key, int64_t is_str_key);
+int64_t with_hashmap_remove(void *handle, const void *key, void *out_val, int64_t is_str_key);
 int64_t with_hashmap_len(void *handle);
 void with_hashmap_clear(void *handle);
 void with_hashmap_keys_out(with_vec *out, void *handle, int64_t key_size);

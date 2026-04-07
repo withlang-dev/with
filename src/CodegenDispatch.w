@@ -2766,6 +2766,14 @@ fn Codegen.mir_hashmap_value_type(self: Codegen, body: MirBody, recv_op_id: i32)
                     return self.mir_sema_type_to_llvm(value_tid)
     0
 
+fn Codegen.mir_map_recv_base_sym(self: Codegen, body: MirBody, recv_op_id: i32) -> i32:
+    let sema_ty = self.mir_operand_sema_type(body, recv_op_id)
+    if sema_ty > 0:
+        let resolved = self.mir_unwrap_ref_like_sema_type(sema_ty)
+        if self.mir_input.mir_get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+            return self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
+    0
+
 fn Codegen.ast_static_type_expr(self: Codegen, node: i32) -> i32:
     if node == 0:
         return 0
@@ -3193,22 +3201,47 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE:
+        let recv_op = body.call_arg_operands.get(arg_start as i64)
         let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
-        let key = self.mir_intrinsic_arg(body, args_id, 1)
+        let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
+        let key_ty = self.mir_hashmap_key_type(body, recv_op)
+        let key = if key_ty != 0 and wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
         let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
         wl_build_store(self.builder, key, key_alloca)
-        let is_str_val = wl_const_int(i64_ty, 0, 0)
+        let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
+        let recv_base_sym = self.mir_map_recv_base_sym(body, recv_op)
         let fn_val = self.ensure_hm_fn("with_hashmap_remove", i64_ty)
         let params: Vec[i64] = Vec.new()
         params.push(ptr_ty)
         params.push(ptr_ty)
+        params.push(ptr_ty)
         params.push(i64_ty)
-        let fn_ty = wl_function_type(i64_ty, vec_data_i64(&params), 3, 0)
+        let fn_ty = wl_function_type(i64_ty, vec_data_i64(&params), 4, 0)
         let args: Vec[i64] = Vec.new()
         args.push(map_ptr)
         args.push(key_alloca)
-        args.push(is_str_val)
-        result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 3)
+        if recv_base_sym == self.sym_hashmap:
+            var val_ty = self.mir_hashmap_value_type(body, recv_op)
+            if val_ty == 0:
+                val_ty = i64_ty
+            let out_alloca = wl_build_alloca(self.builder, val_ty)
+            args.push(out_alloca)
+            args.push(is_str_val)
+            let found = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
+            let val = wl_build_load(self.builder, val_ty, out_alloca)
+            var dest_llvm = self.get_or_create_option_type(0, val_ty)
+            if dest_llvm != 0:
+                let is_found = wl_build_icmp(self.builder, wl_int_ne(), found, wl_const_int(i64_ty, 0, 0))
+                let some_val = self.build_option_some(val, dest_llvm)
+                let none_val = self.build_option_none(dest_llvm)
+                result = wl_build_select(self.builder, is_found, some_val, none_val)
+            else:
+                result = val
+        else:
+            args.push(wl_const_null(ptr_ty))
+            args.push(is_str_val)
+            let raw = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
+            result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i64_ty, 0, 0))
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR:
         let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
