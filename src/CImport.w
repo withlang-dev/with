@@ -535,6 +535,9 @@ fn ci_is_directly_demoted(session: i64, idx: i32) -> bool:
     while fi < field_count:
         if with_cimport_struct_field_is_bitfield(session, idx, fi) != 0:
             return true
+        let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, fi)
+        if anon_kind != 0 and with_cimport_struct_field_anon_field_count(session, idx, fi) <= 0:
+            return true
         fi = fi + 1
     // Unsupported or opaque field type
     fi = 0
