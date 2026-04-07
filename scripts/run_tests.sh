@@ -17,7 +17,7 @@ set -euo pipefail
 #
 # Environment:
 #   WITH_TEST_JOBS=N     — number of parallel jobs (default: CPU count)
-#   WITH_TEST_TIMING=1   — show per-test timing and slowest-tests summary
+#   WITH_TEST_TIMING=1   — show per-test timing, slowest-tests summary, and >5s/>10s buckets
 #   WITH_TEST_TIMEOUT=N  — per-test timeout in seconds (default: 30)
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -341,14 +341,38 @@ fi
 if [[ "$SHOW_TIMING" == "1" ]]; then
   echo ""
   echo "--- slowest tests ---"
-  printf "$timing_data" | sort -t'	' -k1 -rn | head -20 | while IFS='	' read -r tms tname; do
+  printf "%b" "$timing_data" | sort -t'	' -k1 -rn | head -20 | while IFS='	' read -r tms tname; do
     [[ -z "$tms" ]] && continue
-    if [[ "$tms" -ge 1000 ]]; then
-      printf "  %6d ms  %s\n" "$tms" "$tname"
-    else
-      printf "  %6d ms  %s\n" "$tms" "$tname"
-    fi
+    printf "  %6d ms  %s\n" "$tms" "$tname"
   done
+
+  print_threshold_summary() {
+    local threshold_ms="$1"
+    local label="$2"
+    local count
+    count="$(
+      printf "%b" "$timing_data" |
+        awk -F'	' -v min_ms="$threshold_ms" 'NF >= 2 && ($1 + 0) > min_ms { c += 1 } END { print c + 0 }'
+    )"
+
+    echo ""
+    echo "--- tests over ${label} (${count}) ---"
+    if [[ "$count" -eq 0 ]]; then
+      return
+    fi
+
+    printf "%b" "$timing_data" |
+      awk -F'	' -v min_ms="$threshold_ms" 'NF >= 2 && ($1 + 0) > min_ms { print }' |
+      sort -t'	' -k1 -rn |
+      head -20 |
+      while IFS='	' read -r tms tname; do
+        [[ -z "$tms" ]] && continue
+        printf "  %6d ms  %s\n" "$tms" "$tname"
+      done
+  }
+
+  print_threshold_summary 5000 "5s"
+  print_threshold_summary 10000 "10s"
 fi
 
 if [[ "$failed" -gt 0 ]]; then
