@@ -20,15 +20,64 @@ extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_str_hash(s: str) -> i64
 extern fn with_eprint(s: str) -> void
+extern fn with_arg_at(idx: i32) -> str
 extern fn with_getenv_str(name: str) -> str
 extern fn with_clock_nanos() -> i64
 extern fn with_str_clone(s: str) -> str
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
+var frontend_cimport_compiler_fingerprint_ready: i32 = 0
+var frontend_cimport_compiler_fingerprint: str = ""
+
 fn frontend_owned_text(text: str) -> str:
     if text.len() == 0:
         return ""
     with_str_clone(text)
+
+fn frontend_str_contains_byte(text: str, target: i32) -> bool:
+    for i in 0..text.len():
+        if text.byte_at(i as i64) == target:
+            return true
+    false
+
+fn frontend_resolve_executable_path(argv0: str) -> str:
+    if argv0.len() == 0:
+        return ""
+    if with_fs_read_file(argv0).len() > 0:
+        return argv0
+    if frontend_str_contains_byte(argv0, 47):
+        return ""
+
+    let search_path = with_getenv_str("PATH")
+    if search_path.len() == 0:
+        return ""
+
+    var segment_start = 0
+    var i = 0
+    while i <= search_path.len() as i32:
+        let at_end = i == search_path.len() as i32
+        let ch = if at_end: 58 else: search_path.byte_at(i as i64)
+        if ch == 58:
+            let dir = search_path.slice(segment_start as i64, i as i64)
+            let candidate = if dir.len() == 0: "./" ++ argv0 else: dir ++ "/" ++ argv0
+            if with_fs_read_file(candidate).len() > 0:
+                return candidate
+            segment_start = i + 1
+        i = i + 1
+    ""
+
+fn frontend_cimport_compiler_fingerprint_line() -> str:
+    if frontend_cimport_compiler_fingerprint_ready != 0:
+        return frontend_cimport_compiler_fingerprint
+    frontend_cimport_compiler_fingerprint_ready = 1
+    let compiler_path = frontend_resolve_executable_path(with_arg_at(0))
+    if compiler_path.len() == 0:
+        return ""
+    let compiler_image = with_fs_read_file(compiler_path)
+    if compiler_image.len() == 0:
+        return ""
+    frontend_cimport_compiler_fingerprint = frontend_owned_text(f"\n#compiler-hash:{with_str_hash(compiler_image)}")
+    frontend_cimport_compiler_fingerprint
 
 fn count_non_use_decls_frontend(pool: AstPool) -> i32:
     var count = 0
@@ -257,12 +306,13 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     out
 
 fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_spec: str) -> str:
-    var key = header_spec ++ "\n#format:cimport-v2\n#links:"
+    var key = header_spec ++ "\n#format:cimport-v3\n#links:"
     let link_start = pool.get_data1(decl)
     let link_count = pool.get_data2(decl)
     for li in 0..link_count:
         let lib_sym = pool.get_extra(link_start + li)
         key = key ++ "|" ++ self.pool.resolve(lib_sym)
+    key = key ++ frontend_cimport_compiler_fingerprint_line()
     let epoch = with_getenv_str("WITH_CIMPORT_CACHE_EPOCH")
     if epoch.len() > 0:
         key = key ++ "\n#epoch:" ++ epoch
