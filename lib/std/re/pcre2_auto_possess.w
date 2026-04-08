@@ -682,7 +682,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
     var c: u8 = 0 // init: untranslatable
     var end: *const u8 = null // init: untranslatable
     var repeat_opcode: *mut u8 = null // init: untranslatable
-    var list: [8]c_uint
+    var list: *mut c_uint = with_alloc(32) as *mut c_uint  // [8]c_uint
     var rec_limit: c_int = 1000
     var utf: c_int = 0 // init: untranslatable
     var ucp: c_int = 0 // init: untranslatable
@@ -695,7 +695,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
             c = c - (get_repeat_base(c) - OP_STAR)
             (end = (if ((if c <= OP_MINUPTO: 1 else: 0)) != 0: get_chr_property_list(code, utf, ucp, cb.fcc, list) else: null))
             (list[1] = (if (if (if (if c == OP_STAR: 1 else: 0) != 0 or (if c == OP_PLUS: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == OP_QUERY: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == OP_UPTO: 1 else: 0) != 0: 1 else: 0))
-            if (if (if end != null: 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, list, end, &rec_limit) != 0: 1 else: 0) != 0:
+            if (if (if end != null: 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, list, end, &rec_limit as *mut c_int) != 0: 1 else: 0) != 0:
                 match c
                     OP_STAR =>
                         unsafe: *code = unsafe: *code + (OP_POSSTAR - OP_STAR)
@@ -724,7 +724,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                 if (if (if c >= OP_CRSTAR: 1 else: 0) != 0 and (if c <= OP_CRMINRANGE: 1 else: 0) != 0: 1 else: 0) != 0:
                     (end = get_chr_property_list(code, utf, ucp, cb.fcc, list))
                     (list[1] = (if ((c & 1)) == 0: 1 else: 0))
-                    if (if (if end != null: 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, list, end, &rec_limit) != 0: 1 else: 0) != 0:
+                    if (if (if end != null: 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, list, end, &rec_limit as *mut c_int) != 0: 1 else: 0) != 0:
                         match c
                             OP_CRSTAR => 0
                             OP_CRPLUS => 0
