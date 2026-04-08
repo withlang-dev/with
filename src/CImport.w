@@ -4714,6 +4714,21 @@ fn ci_concat_strings(s: str) -> str:
 //
 // Reference: Zig translate-c (.reference/translate-c/src/Translator.zig)
 
+// Module-level defines to prepend to migrated C source.
+// Set via migrate_add_define() before calling migrate_c_file().
+var g_migrate_defines: str = ""
+
+pub fn migrate_add_define(define: str):
+    // define is "NAME=VALUE" or just "NAME"
+    if ci_str_contains(define, "="):
+        let eq_pos = ci_find_substr(define, "=")
+        if eq_pos > 0:
+            let name = define.slice(0, eq_pos as i64)
+            let value = define.slice((eq_pos + 1) as i64, define.len())
+            g_migrate_defines = g_migrate_defines ++ "#define " ++ name ++ " " ++ value ++ "\n"
+    else:
+        g_migrate_defines = g_migrate_defines ++ "#define " ++ define ++ "\n"
+
 pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
     if with_cimport_available() == 0:
         eprint("migrate: libclang not available")
@@ -4729,12 +4744,14 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
     // Reset name tracking state for fresh migration
     with_cimport_reset_names()
 
-    // Pass the C source content directly to cimport_parse.
-    // cimport_parse writes it to a temp file and parses via libclang.
-    let source = with_fs_read_file(input_path)
-    if source.len() == 0:
+    // Read source and prepend defines
+    let raw_source = with_fs_read_file(input_path)
+    if raw_source.len() == 0:
         eprint("migrate: cannot read " ++ input_path)
         return 1
+    let source = if g_migrate_defines.len() > 0: g_migrate_defines ++ raw_source else: raw_source
+
+    // Pass to libclang via cimport_parse
     let session = with_cimport_parse(source)
     if session == 0:
         eprint("migrate: failed to parse " ++ input_path)

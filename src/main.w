@@ -946,7 +946,8 @@ fn run_migrate_command(argc: i32) -> i32:
             ai = ai + 2
             continue
         if arg == "-D" and ai + 1 < argc:
-            ai = ai + 2  // TODO: pass defines to libclang
+            migrate_add_define(with_arg_at(ai + 1))
+            ai = ai + 2
             continue
         if arg == "--check" or arg == "--diff" or arg == "--stats":
             ai = ai + 1
