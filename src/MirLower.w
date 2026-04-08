@@ -2697,6 +2697,20 @@ fn MirBuilder.lower_enum_discriminant(self: MirBuilder, place: i32) -> i32:
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, disc_place, rv, 0)
     self.body.new_operand(OperandKind.OK_COPY, disc_place)
 
+fn MirBuilder.lower_pattern_eq_operand(self: MirBuilder, scrutinee_place: i32, value_op: i32, pat_node: i32, arm_bb: i32, fail_bb: i32):
+    let scrutinee_op = self.body.new_operand(OperandKind.OK_COPY, scrutinee_place)
+    let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_EQ, scrutinee_op, value_op)
+    let cmp_tmp = self.new_temp(self.sema.ty_bool)
+    let cmp_place = self.place_for_local(cmp_tmp)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(pat_node))
+    let cmp_op = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(arm_bb)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, cmp_op, table, fail_bb, 0)
+
 fn MirBuilder.pattern_payload_node(self: MirBuilder, owner_pat: i32, payload_entry: i32) -> i32:
     if payload_entry <= 0 or payload_entry >= self.ast.node_count():
         return 0
@@ -2747,6 +2761,15 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         return
 
     if pk == NodeKind.NK_PAT_VARIANT or pk == NodeKind.NK_PAT_ENUM_SHORTHAND:
+        if self.sema.pattern_value_syms.contains(pat_node):
+            let value_sym = self.sema.pattern_value_syms.get(pat_node).unwrap()
+            let scrutinee_ty = self.place_local_type(scrutinee_place)
+            let saved_expected = self.expected_type
+            self.expected_type = scrutinee_ty
+            let value_op = self.lower_var(value_sym, scrutinee_ty)
+            self.expected_type = saved_expected
+            self.lower_pattern_eq_operand(scrutinee_place, value_op, pat_node, arm_bb, fail_bb)
+            return
         let variant_sym = self.resolve_variant_sym(pat_node)
         let payload_start = self.ast.get_data1(pat_node)
         let payload_count = self.ast.get_data2(pat_node)
@@ -2804,17 +2827,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             self.lower_bool_lit(self.ast.get_data0(pat_node))
         else:
             self.lower_str_lit(self.ast.get_data0(pat_node))
-        let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_EQ, scrutinee_op, lit)
-        let cmp_tmp = self.new_temp(self.sema.ty_bool)
-        let cmp_place = self.place_for_local(cmp_tmp)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(pat_node))
-        let cmp_op = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
-        let vals: Vec[i32] = Vec.new()
-        vals.push(1)
-        let targets: Vec[i32] = Vec.new()
-        targets.push(arm_bb)
-        let table = self.body.new_switch_table(vals, targets)
-        self.terminate(TermKind.TK_SWITCH_INT, cmp_op, table, fail_bb, 0)
+        self.lower_pattern_eq_operand(scrutinee_place, lit, pat_node, arm_bb, fail_bb)
         return
 
     if pk == NodeKind.NK_PAT_RANGE:
@@ -2972,6 +2985,8 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         return out
 
     if pk == NodeKind.NK_PAT_VARIANT or pk == NodeKind.NK_PAT_ENUM_SHORTHAND:
+        if self.sema.pattern_value_syms.contains(pat_node):
+            return out
         let variant_sym = self.ast.get_data0(pat_node)
         let bind_start = self.ast.get_data1(pat_node)
         let bind_count = self.ast.get_data2(pat_node)
