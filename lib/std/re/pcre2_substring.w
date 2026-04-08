@@ -79,7 +79,7 @@ fn pcre2_substring_copy_byname_8(match_data: *mut pcre2_real_match_data_8, strin
     var entry: *const u8 = null // init: untranslatable
     var failrc: c_int = 0
     var entrysize: c_int = 0
-    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, &first, &last))
+    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, &first as *mut *const u8, &last as *mut *const u8))
     if (if entrysize < 0: 1 else: 0) != 0:
         return entrysize
 
@@ -94,7 +94,7 @@ fn pcre2_substring_copy_byname_8(match_data: *mut pcre2_real_match_data_8, strin
 fn pcre2_substring_copy_bynumber_8(match_data: *mut pcre2_real_match_data_8, stringnumber: c_uint, buffer: *mut u8, sizeptr: *mut c_ulong) -> c_int:
     var rc: c_int = 0
     var size: c_ulong = 0 // init: untranslatable
-    (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, &size))
+    (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, &size as *mut c_ulong))
     if (if rc < 0: 1 else: 0) != 0:
         return rc
 
@@ -116,7 +116,7 @@ fn pcre2_substring_get_byname_8(match_data: *mut pcre2_real_match_data_8, string
     var entry: *const u8 = null // init: untranslatable
     var failrc: c_int = 0
     var entrysize: c_int = 0
-    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, &first, &last))
+    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, &first as *mut *const u8, &last as *mut *const u8))
     if (if entrysize < 0: 1 else: 0) != 0:
         return entrysize
 
@@ -132,7 +132,7 @@ fn pcre2_substring_get_bynumber_8(match_data: *mut pcre2_real_match_data_8, stri
     var rc: c_int = 0
     var size: c_ulong = 0 // init: untranslatable
     var yield_: *mut u8 = null // init: untranslatable
-    (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, &size))
+    (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, &size as *mut c_ulong))
     if (if rc < 0: 1 else: 0) != 0:
         return rc
 
@@ -148,7 +148,7 @@ fn pcre2_substring_length_byname_8(match_data: *mut pcre2_real_match_data_8, str
     var entry: *const u8 = null // init: untranslatable
     var failrc: c_int = 0
     var entrysize: c_int = 0
-    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, &first, &last))
+    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, &first as *mut *const u8, &last as *mut *const u8))
     if (if entrysize < 0: 1 else: 0) != 0:
         return entrysize
 
@@ -186,7 +186,8 @@ fn pcre2_substring_nametable_scan_8(code: *const pcre2_real_code_8, stringname: 
             var last: *const u8 = null // init: untranslatable
             var lastentry: *const u8 = null // init: untranslatable
             (lastentry = (nametable + ((entrysize * ((code.name_count - 1))) as isize as usize)))
-            (first = (last = entry))
+            last = entry
+            first = entry
             while (if first > nametable: 1 else: 0) != 0:
                 if (if _pcre2_strcmp_8(stringname, (((first - (entrysize as isize as usize)) + (2 as isize as usize)))) != 0: 1 else: 0) != 0:
                     break
@@ -239,7 +240,7 @@ fn pcre2_substring_list_get_8(match_data: *mut pcre2_real_match_data_8, listptr:
         (count = match_data.oveccount)
 
     (count2 = (2 * count))
-    (ovector = match_data.ovector)
+    (ovector = &match_data.ovector as *mut c_ulong)
     (size = (sizeof[pcre2_memctl]() +% sizeof[u8]()))
     if (if lengthsptr != null: 1 else: 0) != 0:
         size = size + (sizeof[c_ulong]() *% count)
