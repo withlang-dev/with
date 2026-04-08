@@ -19,6 +19,7 @@ set -euo pipefail
 #   WITH_TEST_JOBS=N     — number of parallel jobs (default: CPU count)
 #   WITH_TEST_TIMING=1   — show per-test timing, slowest-tests summary, and >5s/>10s buckets
 #   WITH_TEST_TIMEOUT=N  — per-test timeout in seconds (default: 30)
+#   WITH_TEST_DEBUG=1    — keep debug info for ephemeral test binaries (default: 0, pass -g0)
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -28,6 +29,7 @@ COMPILER="${WITH:-./out/bin/with-stage2}"
 RUN_TIMEOUT_SECS="${WITH_TEST_TIMEOUT:-30}"
 JOBS="${WITH_TEST_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)}"
 SHOW_TIMING="${WITH_TEST_TIMING:-0}"
+KEEP_TEST_DEBUG="${WITH_TEST_DEBUG:-0}"
 
 # Portable millisecond clock. Uses perl for sub-second precision
 # (bash SECONDS is integer-only, and date %N is not available on macOS).
@@ -84,6 +86,10 @@ run_single_test() {
   local extra_args=""
   local name
   name="$(basename "$file" .w)"
+  local debug_args=""
+  if [[ "$KEEP_TEST_DEBUG" != "1" ]]; then
+    debug_args="-g0"
+  fi
 
   local t_start
   t_start="$(_epoch_ms)"
@@ -165,7 +171,7 @@ run_single_test() {
   # Case 2: expect build to fail with message
   if [[ -n "$expect_build_fail" ]]; then
     local rc=0
-    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" build $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
+    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" build $debug_args $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
       _emit_result "FAIL $name (expected build failure)"
     elif grep -Fq "$expect_build_fail" "$my_tmp/err"; then
@@ -211,7 +217,7 @@ run_single_test() {
 
   # Case 4: build+run
   local rc=0
-  timeout "$RUN_TIMEOUT_SECS" "$COMPILER" run $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
+  timeout "$RUN_TIMEOUT_SECS" "$COMPILER" run $debug_args $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
 
   # Clean up artifacts
   local stem="${file%.w}"
