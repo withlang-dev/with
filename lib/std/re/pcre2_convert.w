@@ -48,7 +48,7 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
     var plength = __param_plength
     var ccontext = __param_ccontext
     var rc: c_int = 0
-    var null_str = 0 // init: untranslatable ([1]u8)
+    var null_str: *const u8 = "" as *const u8  // empty string
     var dummy_buffer = 0 // init: untranslatable ([100]u8)
     var use_buffer: *mut u8 = null // init: untranslatable
     var use_length: c_ulong = 0 // init: untranslatable

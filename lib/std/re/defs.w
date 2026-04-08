@@ -1,4 +1,4 @@
-// std.re.defs — shared type aliases for migrated PCRE2
+// std.re.defs
 
 fn is_alpha(c: i32) -> bool: (c >= 65 and c <= 90) or (c >= 97 and c <= 122)
 fn is_digit(c: i32) -> bool: c >= 48 and c <= 57

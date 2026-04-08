@@ -1,6 +1,15 @@
+diff -ruN a/defs.w b/defs.w
+--- a/defs.w	2026-04-08 15:58:20
++++ b/defs.w	2026-04-08 15:58:19
+@@ -1,4 +1,4 @@
+-// std.re.defs
++// std.re.defs — shared type aliases for migrated PCRE2
+ 
+ fn is_alpha(c: i32) -> bool: (c >= 65 and c <= 90) or (c >= 97 and c <= 122)
+ fn is_digit(c: i32) -> bool: c >= 48 and c <= 57
 diff -ruN a/pcre2_auto_possess.w b/pcre2_auto_possess.w
---- a/pcre2_auto_possess.w	2026-04-08 15:49:57
-+++ b/pcre2_auto_possess.w	2026-04-08 15:49:57
+--- a/pcre2_auto_possess.w	2026-04-08 15:58:20
++++ b/pcre2_auto_possess.w	2026-04-08 15:58:19
 @@ -670,13 +670,19 @@
  type struct_match_block_8 = match_block_8
  type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, start_subject: *const u8 = null, end_subject: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, tables: *const u8 = null, start_offset: c_ulong = 0, heap_limit: c_uint = 0, heap_used: c_ulong = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, allowemptypartial: c_int = 0, nl: [4]u8, bsr_convention: c_ushort = 0, cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null, recursive: *mut dfa_recursion_info = null }
@@ -18,13 +27,31 @@ diff -ruN a/pcre2_auto_possess.w b/pcre2_auto_possess.w
      var end: *const u8 = null // init: untranslatable
      var repeat_opcode: *mut u8 = null // init: untranslatable
 -    var list = 0 // init: untranslatable ([8]c_uint)
-+    var list: [8]c_uint
++    var list: *mut c_uint = with_alloc(32) as *mut c_uint  // [8]c_uint
      var rec_limit: c_int = 1000
      var utf: c_int = 0 // init: untranslatable
      var ucp: c_int = 0 // init: untranslatable
+@@ -689,7 +695,7 @@
+             c = c - (get_repeat_base(c) - OP_STAR)
+             (end = (if ((if c <= OP_MINUPTO: 1 else: 0)) != 0: get_chr_property_list(code, utf, ucp, cb.fcc, list) else: null))
+             (list[1] = (if (if (if (if c == OP_STAR: 1 else: 0) != 0 or (if c == OP_PLUS: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == OP_QUERY: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == OP_UPTO: 1 else: 0) != 0: 1 else: 0))
+-            if (if (if end != null: 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, list, end, &rec_limit) != 0: 1 else: 0) != 0:
++            if (if (if end != null: 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, list, end, &rec_limit as *mut c_int) != 0: 1 else: 0) != 0:
+                 match c
+                     OP_STAR =>
+                         unsafe: *code = unsafe: *code + (OP_POSSTAR - OP_STAR)
+@@ -718,7 +724,7 @@
+                 if (if (if c >= OP_CRSTAR: 1 else: 0) != 0 and (if c <= OP_CRMINRANGE: 1 else: 0) != 0: 1 else: 0) != 0:
+                     (end = get_chr_property_list(code, utf, ucp, cb.fcc, list))
+                     (list[1] = (if ((c & 1)) == 0: 1 else: 0))
+-                    if (if (if end != null: 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, list, end, &rec_limit) != 0: 1 else: 0) != 0:
++                    if (if (if end != null: 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, list, end, &rec_limit as *mut c_int) != 0: 1 else: 0) != 0:
+                         match c
+                             OP_CRSTAR => 0
+                             OP_CRPLUS => 0
 diff -ruN a/pcre2_compile_cgroup.w b/pcre2_compile_cgroup.w
---- a/pcre2_compile_cgroup.w	2026-04-08 15:49:57
-+++ b/pcre2_compile_cgroup.w	2026-04-08 15:49:57
+--- a/pcre2_compile_cgroup.w	2026-04-08 15:58:20
++++ b/pcre2_compile_cgroup.w	2026-04-08 15:58:19
 @@ -865,7 +865,8 @@
  
      tablecount = tablecount + duplicate_count
@@ -36,8 +63,8 @@ diff -ruN a/pcre2_compile_cgroup.w b/pcre2_compile_cgroup.w
  
          while 1 != 0:
 diff -ruN a/pcre2_config.w b/pcre2_config.w
---- a/pcre2_config.w	2026-04-08 15:49:57
-+++ b/pcre2_config.w	2026-04-08 15:49:57
+--- a/pcre2_config.w	2026-04-08 15:58:20
++++ b/pcre2_config.w	2026-04-08 15:58:19
 @@ -48,7 +48,7 @@
  
          9 => 0
@@ -48,8 +75,8 @@ diff -ruN a/pcre2_config.w b/pcre2_config.w
  
      return 0
 diff -ruN a/pcre2_context.w b/pcre2_context.w
---- a/pcre2_context.w	2026-04-08 15:49:57
-+++ b/pcre2_context.w	2026-04-08 15:49:57
+--- a/pcre2_context.w	2026-04-08 15:58:20
++++ b/pcre2_context.w	2026-04-08 15:58:19
 @@ -19,6 +19,13 @@
  type pcre2_substitute_callout_block_8 { version: c_uint = 0, input: *const u8 = null, output: *const u8 = null, output_offsets: [2]c_ulong, ovector: *mut c_ulong = null, oveccount: c_uint = 0, subscount: c_uint = 0 }
  type struct_pcre2_substitute_callout_block_8 = pcre2_substitute_callout_block_8
@@ -65,9 +92,9 @@ diff -ruN a/pcre2_context.w b/pcre2_context.w
  fn pcre2_general_context_copy_8(gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_general_context_8:
      var newcontext: *mut pcre2_real_general_context_8 = null // init: untranslatable
 diff -ruN a/pcre2_convert.w b/pcre2_convert.w
---- a/pcre2_convert.w	2026-04-08 15:49:57
-+++ b/pcre2_convert.w	2026-04-08 15:49:57
-@@ -40,6 +40,8 @@
+--- a/pcre2_convert.w	2026-04-08 15:58:20
++++ b/pcre2_convert.w	2026-04-08 15:58:19
+@@ -40,13 +40,15 @@
  extern fn pcre2_convert_context_free_8(p0: *mut pcre2_real_convert_context_8) -> void
  extern fn pcre2_set_glob_escape_8(p0: *mut pcre2_real_convert_context_8, p1: c_uint) -> c_int
  extern fn pcre2_set_glob_separator_8(p0: *mut pcre2_real_convert_context_8, p1: c_uint) -> c_int
@@ -76,9 +103,17 @@ diff -ruN a/pcre2_convert.w b/pcre2_convert.w
  @[c_export("pcre2_pattern_convert_8")]
  fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong, options: c_uint, buffptr: *mut *mut u8, bufflenptr: *mut c_ulong, __param_ccontext: *mut pcre2_real_convert_context_8) -> c_int:
      var pattern = __param_pattern
+     var plength = __param_plength
+     var ccontext = __param_ccontext
+     var rc: c_int = 0
+-    var null_str = 0 // init: untranslatable ([1]u8)
++    var null_str: *const u8 = "" as *const u8  // empty string
+     var dummy_buffer = 0 // init: untranslatable ([100]u8)
+     var use_buffer: *mut u8 = null // init: untranslatable
+     var use_length: c_ulong = 0 // init: untranslatable
 diff -ruN a/pcre2_error.w b/pcre2_error.w
---- a/pcre2_error.w	2026-04-08 15:49:57
-+++ b/pcre2_error.w	2026-04-08 15:49:57
+--- a/pcre2_error.w	2026-04-08 15:58:20
++++ b/pcre2_error.w	2026-04-08 15:58:19
 @@ -94,6 +94,10 @@
  extern fn pcre2_jit_stack_create_8(p0: c_ulong, p1: c_ulong, p2: *mut pcre2_real_general_context_8) -> *mut pcre2_real_jit_stack_8
  extern fn pcre2_jit_stack_assign_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, p2: *mut c_void) -> void
@@ -91,8 +126,8 @@ diff -ruN a/pcre2_error.w b/pcre2_error.w
  fn pcre2_get_error_message_8(enumber: c_int, buffer: *mut u8, size: c_ulong) -> c_int:
      var message: *const u8 = null
 diff -ruN a/pcre2_match.w b/pcre2_match.w
---- a/pcre2_match.w	2026-04-08 15:49:57
-+++ b/pcre2_match.w	2026-04-08 15:49:57
+--- a/pcre2_match.w	2026-04-08 15:58:20
++++ b/pcre2_match.w	2026-04-08 15:58:19
 @@ -64,6 +64,12 @@
  extern fn pcre2_match_data_create_from_pattern_8(p0: *const pcre2_real_code_8, p1: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8
  extern fn pcre2_match_data_free_8(p0: *mut pcre2_real_match_data_8) -> void
@@ -204,8 +239,8 @@ diff -ruN a/pcre2_match.w b/pcre2_match.w
                                          if (if p == null: 1 else: 0) != 0:
                                              (p = memchr(pp, req_cu2, ((end_subject as usize -% pp as usize) / sizeof[u8]())))
 diff -ruN a/pcre2_match_data.w b/pcre2_match_data.w
---- a/pcre2_match_data.w	2026-04-08 15:49:57
-+++ b/pcre2_match_data.w	2026-04-08 15:49:57
+--- a/pcre2_match_data.w	2026-04-08 15:58:20
++++ b/pcre2_match_data.w	2026-04-08 15:58:19
 @@ -118,7 +118,7 @@
  
  @[c_export("pcre2_get_ovector_pointer_8")]
@@ -216,8 +251,8 @@ diff -ruN a/pcre2_match_data.w b/pcre2_match_data.w
  @[c_export("pcre2_get_startchar_8")]
  fn pcre2_get_startchar_8(match_data: *mut pcre2_real_match_data_8) -> c_ulong:
 diff -ruN a/pcre2_match_next.w b/pcre2_match_next.w
---- a/pcre2_match_next.w	2026-04-08 15:49:57
-+++ b/pcre2_match_next.w	2026-04-08 15:49:57
+--- a/pcre2_match_next.w	2026-04-08 15:58:20
++++ b/pcre2_match_next.w	2026-04-08 15:58:19
 @@ -71,6 +71,8 @@
  extern fn pcre2_get_ovector_count_8(p0: *mut pcre2_real_match_data_8) -> c_uint
  extern fn pcre2_get_ovector_pointer_8(p0: *mut pcre2_real_match_data_8) -> *mut c_ulong
@@ -228,8 +263,8 @@ diff -ruN a/pcre2_match_next.w b/pcre2_match_next.w
  fn pcre2_next_match_8(match_data: *mut pcre2_real_match_data_8, pstart_offset: *mut c_ulong, poptions: *mut c_uint) -> c_int:
      var rc: c_int = match_data.rc
 diff -ruN a/pcre2_pattern_info.w b/pcre2_pattern_info.w
---- a/pcre2_pattern_info.w	2026-04-08 15:49:57
-+++ b/pcre2_pattern_info.w	2026-04-08 15:49:57
+--- a/pcre2_pattern_info.w	2026-04-08 15:58:20
++++ b/pcre2_pattern_info.w	2026-04-08 15:58:19
 @@ -58,6 +58,8 @@
  extern fn pcre2_code_free_8(p0: *mut pcre2_real_code_8) -> void
  extern fn pcre2_code_copy_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8
@@ -240,8 +275,8 @@ diff -ruN a/pcre2_pattern_info.w b/pcre2_pattern_info.w
  fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *mut c_void) -> c_int:
      var re: *const pcre2_real_code_8 = null // init: untranslatable
 diff -ruN a/pcre2_serialize.w b/pcre2_serialize.w
---- a/pcre2_serialize.w	2026-04-08 15:49:57
-+++ b/pcre2_serialize.w	2026-04-08 15:49:57
+--- a/pcre2_serialize.w	2026-04-08 15:58:20
++++ b/pcre2_serialize.w	2026-04-08 15:58:19
 @@ -147,7 +147,6 @@
                  with_memcpy(tables as *i8, src_bytes as *i8, 1088 as i64)
                  (i = 0)
@@ -251,8 +286,8 @@ diff -ruN a/pcre2_serialize.w b/pcre2_serialize.w
                      if (if blocksize <= sizeof[pcre2_real_code_8](): 1 else: 0) != 0:
                          comptime_error("goto not supported")
 diff -ruN a/pcre2_string_utils.w b/pcre2_string_utils.w
---- a/pcre2_string_utils.w	2026-04-08 15:49:57
-+++ b/pcre2_string_utils.w	2026-04-08 15:49:57
+--- a/pcre2_string_utils.w	2026-04-08 15:58:20
++++ b/pcre2_string_utils.w	2026-04-08 15:58:19
 @@ -718,7 +718,9 @@
      var str2 = __param_str2
      var t: *mut u8 = null // init: untranslatable
@@ -265,8 +300,8 @@ diff -ruN a/pcre2_string_utils.w b/pcre2_string_utils.w
      return ((t as usize -% str1 as usize) / sizeof[u8]())
  
 diff -ruN a/pcre2_study.w b/pcre2_study.w
---- a/pcre2_study.w	2026-04-08 15:49:57
-+++ b/pcre2_study.w	2026-04-08 15:49:57
+--- a/pcre2_study.w	2026-04-08 15:58:20
++++ b/pcre2_study.w	2026-04-08 15:58:19
 @@ -3,7 +3,11 @@
  
  type BOOL = c_int
@@ -280,8 +315,8 @@ diff -ruN a/pcre2_study.w b/pcre2_study.w
  type pcre2_compile_context_8 = pcre2_real_compile_context_8
  type pcre2_match_context_8 = pcre2_real_match_context_8
 diff -ruN a/pcre2_xclass.w b/pcre2_xclass.w
---- a/pcre2_xclass.w	2026-04-08 15:49:57
-+++ b/pcre2_xclass.w	2026-04-08 15:49:57
+--- a/pcre2_xclass.w	2026-04-08 15:58:20
++++ b/pcre2_xclass.w	2026-04-08 15:58:19
 @@ -699,6 +699,7 @@
      var utf = __param_utf
      var t: u8 = 0 // init: untranslatable
@@ -299,8 +334,8 @@ diff -ruN a/pcre2_xclass.w b/pcre2_xclass.w
                  (stack_depth = stack_depth + 1)
                  break
 diff -ruN a/pcre2posix.w b/pcre2posix.w
---- a/pcre2posix.w	2026-04-08 15:49:57
-+++ b/pcre2posix.w	2026-04-08 15:49:57
+--- a/pcre2posix.w	2026-04-08 15:58:20
++++ b/pcre2posix.w	2026-04-08 15:58:19
 @@ -158,7 +158,7 @@
          errorcode = errorcode - 100
          (i = 0)
