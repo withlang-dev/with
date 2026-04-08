@@ -663,10 +663,10 @@ Specified separately in `docs/regex-spec.md`.
 
 Language-level regex literals (`/pattern/flags`), `=~`/`!~`
 match operators with capture bindings, regex in `match` arms.
-Go RE2-derived engine ported to pure With. Three execution
-strategies (one-pass DFA, backtracking with memoization, NFA
-simulation). Linear-time guarantee. Full Unicode support.
-~2500-3000 lines.
+PCRE2 engine auto-migrated from C via `with migrate` (72K lines).
+Full Perl-compatible syntax: backreferences, lookahead,
+lookbehind, atomic groups, recursive patterns, Unicode
+properties. ~300 lines of With wrapper API over migrated PCRE2.
 
 #### 3.5 `std.encoding.csv` — CSV reader/writer
 
