@@ -55,11 +55,11 @@ fn pcre2_pattern_convert_8(__p0: *const u8, __p1: c_ulong, __p2: c_uint, __p3: *
     var use_length: c_ulong = 0 // init: untranslatable
     var utf: c_int = 0 // init: untranslatable
     var pattype: c_uint = 0 // init: untranslatable
-    if (if (if pattern == ((0 as *mut c_void)): 1 else: 0) and (if plength == 0: 1 else: 0): 1 else: 0) != 0:
+    if (if (if pattern == null: 1 else: 0) != 0 and (if plength == 0: 1 else: 0) != 0: 1 else: 0) != 0:
         (pattern = null_str)
 
-    if (if (if pattern == ((0 as *mut c_void)): 1 else: 0) or (if bufflenptr == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
-        if (if bufflenptr != ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if (if pattern == null: 1 else: 0) != 0 or (if bufflenptr == null: 1 else: 0) != 0: 1 else: 0) != 0:
+        if (if bufflenptr != null: 1 else: 0) != 0:
             (unsafe: *bufflenptr = 0)
 
 
@@ -67,7 +67,7 @@ fn pcre2_pattern_convert_8(__p0: *const u8, __p1: c_ulong, __p2: c_uint, __p3: *
         (unsafe: *bufflenptr = 0)
         return 132
 
-    if (if (if buffptr != ((0 as *mut c_void)): 1 else: 0) and (if unsafe: *buffptr != ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
+    if (if (if buffptr != null: 1 else: 0) != 0 and (if unsafe: *buffptr != null: 1 else: 0) != 0: 1 else: 0) != 0:
         (use_buffer = unsafe: *buffptr)
         (use_length = unsafe: *bufflenptr)
 
@@ -82,7 +82,7 @@ fn pcre2_pattern_convert_8(__p0: *const u8, __p1: c_ulong, __p2: c_uint, __p3: *
             _ =>
                 (unsafe: *bufflenptr = 0)
 
-        if (if allocated == ((0 as *mut c_void)): 1 else: 0) != 0:
+        if (if allocated == null: 1 else: 0) != 0:
             (unsafe: *bufflenptr = 0)
 
         (use_buffer = unsafe: *buffptr)
@@ -94,7 +94,7 @@ fn pcre2_pattern_convert_8(__p0: *const u8, __p1: c_ulong, __p2: c_uint, __p3: *
 @[c_export("pcre2_converted_pattern_free_8")]
 fn pcre2_converted_pattern_free_8(__p0: *mut u8):
     var converted = __p0
-    if (if converted != ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if converted != null: 1 else: 0) != 0:
         var memctl: *mut pcre2_memctl = null // init: untranslatable
         memctl.free(memctl, memctl.memory_data)
 

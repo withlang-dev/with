@@ -22,7 +22,7 @@ type struct_pcre2_substitute_callout_block_8 = pcre2_substitute_callout_block_8
 fn pcre2_config_8(__p0: c_uint, __p1: *mut c_void) -> c_int:
     var what = __p0
     var where_ = __p1
-    if (if where_ == ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if where_ == null: 1 else: 0) != 0:
         match what
             _ => 0
             0 => 0

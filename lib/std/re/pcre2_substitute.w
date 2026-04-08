@@ -166,23 +166,23 @@ fn pcre2_substitute_8(__p0: *const pcre2_real_code_8, __p1: *const u8, __p2: c_u
     while true:
         match __pc
             0 =>
-                substitute_case_callout_data = ((0 as *mut c_void))
+                substitute_case_callout_data = null
                 (buff_offset = 0)
                 (lengthleft = (buff_length = unsafe: *blength))
-                if (if mcontext != ((0 as *mut c_void)): 1 else: 0) != 0:
+                if (if mcontext != null: 1 else: 0) != 0:
                     (substitute_case_callout = mcontext.substitute_case_callout)
                     (substitute_case_callout_data = mcontext.substitute_case_callout_data)
 
-                if (if replacement == ((0 as *mut c_void)): 1 else: 0) != 0:
+                if (if replacement == null: 1 else: 0) != 0:
                     (replacement = null_str)
 
                 (repend = (replacement + rlength))
-                if (if subject == ((0 as *mut c_void)): 1 else: 0) != 0:
+                if (if subject == null: 1 else: 0) != 0:
                     (subject = null_str)
 
                 (use_existing_match = ((if ((options & 65536)) != 0: 1 else: 0)))
                 (replacement_only = ((if ((options & 131072)) != 0: 1 else: 0)))
-                if (if match_data == ((0 as *mut c_void)): 1 else: 0) != 0:
+                if (if match_data == null: 1 else: 0) != 0:
                     var gcontext = 0 // init failed: pcre2_real_general_context_8
                     (match_data = (internal_match_data = pcre2_match_data_create_from_pattern_8(code, &gcontext)))
                 else:
@@ -191,12 +191,12 @@ if use_existing_match != 0:
                         var gcontext = 0 // init failed: pcre2_real_general_context_8
                         (pairs = (if ((if (code.top_bracket + 1) < match_data.oveccount: 1 else: 0)) != 0: (code.top_bracket + 1) else: match_data.oveccount))
                         (internal_match_data = pcre2_match_data_create_8(match_data.oveccount, &gcontext))
-                        (internal_match_data.heapframes = ((0 as *mut c_void)))
+                        (internal_match_data.heapframes = null)
                         (internal_match_data.heapframes_size = 0)
                         internal_match_data.flags = internal_match_data.flags & (0 - 1 - 1)
                         (match_data = internal_match_data)
 
-                if (if internal_match_data != ((0 as *mut c_void)): 1 else: 0) != 0:
+                if (if internal_match_data != null: 1 else: 0) != 0:
 options = options & (0 - 16384 - 1)
                 (ovector = pcre2_get_ovector_pointer_8(match_data))
                 (ovector_count = pcre2_get_ovector_count_8(match_data))
@@ -205,7 +205,8 @@ options = options & (0 - 16384 - 1)
                 (scb.ovector = ovector)
                 if (if start_offset > length: 1 else: 0) != 0:
                     (match_data.leftchar = 0)
-                    __pc = 6; continue
+                    __pc = 6
+            continue
 
                 if (not replacement_only) != 0:
 while true:
@@ -232,10 +233,10 @@ while true:
                     if (if rc < 0: 1 else: 0) != 0:
                         comptime_error("goto not supported")
 
-                    if (if (if ovector[1] < ovector[0]: 1 else: 0) or (if ovector[0] < start_offset: 1 else: 0): 1 else: 0) != 0:
+                    if (if (if ovector[1] < ovector[0]: 1 else: 0) != 0 or (if ovector[0] < start_offset: 1 else: 0) != 0: 1 else: 0) != 0:
                         comptime_error("goto not supported")
 
-                    if (if (if subs > 0: 1 else: 0) and (not ((if (if ovector[1] > ovecsave[1]: 1 else: 0) or ((if (if (if ovector[1] == ovector[0]: 1 else: 0) and (if ovecsave[1] > ovecsave[0]: 1 else: 0): 1 else: 0) and (if ovector[1] == ovecsave[1]: 1 else: 0): 1 else: 0)): 1 else: 0))): 1 else: 0) != 0:
+                    if (if (if subs > 0: 1 else: 0) != 0 and (not ((if (if ovector[1] > ovecsave[1]: 1 else: 0) != 0 or ((if (if (if ovector[1] == ovector[0]: 1 else: 0) != 0 and (if ovecsave[1] > ovecsave[0]: 1 else: 0) != 0: 1 else: 0) != 0 and (if ovector[1] == ovecsave[1]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0))) != 0: 1 else: 0) != 0:
                         comptime_error("goto not supported")
 
                     (ovecsave[0] = ovector[0])
@@ -291,7 +292,7 @@ while true:
                                 continue
 
                             if escaped_literal != 0:
-                                if (if (if (if ptr[0] == 92: 1 else: 0) and (if ptr < (repend - (1 as isize as usize)): 1 else: 0): 1 else: 0) and (if ptr[1] == 69: 1 else: 0): 1 else: 0) != 0:
+                                if (if (if (if ptr[0] == 92: 1 else: 0) != 0 and (if ptr < (repend - (1 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 69: 1 else: 0) != 0: 1 else: 0) != 0:
                                     (escaped_literal = 0)
                                     ptr = ptr + 2
                                     continue
@@ -313,22 +314,22 @@ while true:
                                     comptime_error("goto not supported")
 
                                 (special = 0)
-                                (text1_start = ((0 as *mut c_void)))
-                                (text1_end = ((0 as *mut c_void)))
-                                (text2_start = ((0 as *mut c_void)))
-                                (text2_end = ((0 as *mut c_void)))
+                                (text1_start = null)
+                                (text1_end = null)
+                                (text2_start = null)
+                                (text2_end = null)
                                 (group = (0 - 1))
                                 (inparens = 0)
                                 (inangle = 0)
                                 (star = 0)
-                                (subptr = ((0 as *mut c_void)))
-                                (subptrend = ((0 as *mut c_void)))
+                                (subptr = null)
+                                (subptrend = null)
                                 if (if next == 38: 1 else: 0) != 0:
                                     (ptr = ptr + 1)
                                     (group = 0)
                                     comptime_error("goto not supported")
 
-                                if (if (if next == 96: 1 else: 0) or (if next == 39: 1 else: 0): 1 else: 0) != 0:
+                                if (if (if next == 96: 1 else: 0) != 0 or (if next == 39: 1 else: 0) != 0: 1 else: 0) != 0:
                                     (ptr = ptr + 1)
                                     (rc = pcre2_substring_length_bynumber_8(match_data, 0, &sublength))
                                     if (if rc < 0: 1 else: 0) != 0:
@@ -355,7 +356,7 @@ while true:
                                     (subptrend = (subject + length))
                                     comptime_error("goto not supported")
 
-                                if (if (if next == 43: 1 else: 0) and (not ((if (if (ptr + (1 as isize as usize)) < repend: 1 else: 0) and (if ptr[1] == 123: 1 else: 0): 1 else: 0))): 1 else: 0) != 0:
+                                if (if (if next == 43: 1 else: 0) != 0 and (not ((if (if (ptr + (1 as isize as usize)) < repend: 1 else: 0) != 0 and (if ptr[1] == 123: 1 else: 0) != 0: 1 else: 0))) != 0: 1 else: 0) != 0:
                                     (ptr = ptr + 1)
                                     if (if code.top_bracket == 0: 1 else: 0) != 0:
                                         if (if ((suboptions & 2048)) == 0: 1 else: 0) != 0:
@@ -390,24 +391,24 @@ while true:
                                         (inangle = 1)
 
 
-                                if (if (not inangle) and (if next == 42: 1 else: 0): 1 else: 0) != 0:
+                                if (if (not inangle) != 0 and (if next == 42: 1 else: 0) != 0: 1 else: 0) != 0:
                                     if (if (ptr = ptr + 1) >= repend: 1 else: 0) != 0:
                                         comptime_error("goto not supported")
 
                                     (next = unsafe: *ptr)
                                     (star = 1)
 
-                                if (if (if (if (not star) and (not inangle): 1 else: 0) and (if next >= 48: 1 else: 0): 1 else: 0) and (if next <= 57: 1 else: 0): 1 else: 0) != 0:
+                                if (if (if (if (not star) != 0 and (not inangle) != 0: 1 else: 0) != 0 and (if next >= 48: 1 else: 0) != 0: 1 else: 0) != 0 and (if next <= 57: 1 else: 0) != 0: 1 else: 0) != 0:
                                     (group = (next - 48))
                                     while (if (ptr = ptr + 1) < repend: 1 else: 0) != 0:
                                         (next = unsafe: *ptr)
-                                        if (if (if next < 48: 1 else: 0) or (if next > 57: 1 else: 0): 1 else: 0) != 0:
+                                        if (if (if next < 48: 1 else: 0) != 0 or (if next > 57: 1 else: 0) != 0: 1 else: 0) != 0:
                                             break
 
                                         (group = ((group * 10) + ((next - 48))))
                                         if (if group > code.top_bracket: 1 else: 0) != 0:
                                             if (if ((suboptions & 2048)) != 0: 1 else: 0) != 0:
-                                                while (if (if (if (ptr = ptr + 1) < repend: 1 else: 0) and (if unsafe: *ptr >= 48: 1 else: 0): 1 else: 0) and (if unsafe: *ptr <= 57: 1 else: 0): 1 else: 0) != 0:
+                                                while (if (if (if (ptr = ptr + 1) < repend: 1 else: 0) != 0 and (if unsafe: *ptr >= 48: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *ptr <= 57: 1 else: 0) != 0: 1 else: 0) != 0:
 // (empty)
                                                 break
                                             else:
@@ -424,9 +425,9 @@ while true:
                                 (next = 0)
                                 next
                                 if inparens != 0:
-                                    if (if (if (if (if ((suboptions & 512)) != 0: 1 else: 0) and (not star): 1 else: 0) and (if ptr < (repend - (2 as isize as usize)): 1 else: 0): 1 else: 0) and (if unsafe: *ptr == 58: 1 else: 0): 1 else: 0) != 0:
+                                    if (if (if (if (if ((suboptions & 512)) != 0: 1 else: 0) != 0 and (not star) != 0: 1 else: 0) != 0 and (if ptr < (repend - (2 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *ptr == 58: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (special = unsafe: *((ptr = ptr + 1)))
-                                        if (if (if special != 43: 1 else: 0) and (if special != 45: 1 else: 0): 1 else: 0) != 0:
+                                        if (if (if special != 43: 1 else: 0) != 0 and (if special != 45: 1 else: 0) != 0: 1 else: 0) != 0:
                                             comptime_error("goto not supported")
 
                                         (text1_start = (ptr = ptr + 1))
@@ -435,7 +436,7 @@ while true:
                                             comptime_error("goto not supported")
 
                                         (text1_end = ptr)
-                                        if (if (if special == 43: 1 else: 0) and (if unsafe: *ptr == 58: 1 else: 0): 1 else: 0) != 0:
+                                        if (if (if special == 43: 1 else: 0) != 0 and (if unsafe: *ptr == 58: 1 else: 0) != 0: 1 else: 0) != 0:
                                             (text2_start = (ptr = ptr + 1))
                                             (rc = find_text_end(code, &ptr, repend, 1))
                                             if (if rc != 0: 1 else: 0) != 0:
@@ -444,14 +445,14 @@ while true:
                                             (text2_end = ptr)
 
                                     else:
-                                        if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 125: 1 else: 0): 1 else: 0) != 0:
+                                        if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 125: 1 else: 0) != 0: 1 else: 0) != 0:
                                             comptime_error("goto not supported")
 
 
                                     (ptr = ptr + 1)
 
                                 if inangle != 0:
-                                    if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 62: 1 else: 0): 1 else: 0) != 0:
+                                    if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                         comptime_error("goto not supported")
 
                                     (ptr = ptr + 1)
@@ -459,9 +460,9 @@ while true:
                                 if star != 0:
                                     if (if _pcre2_strcmp_c8_8(name, STRING_MARK) == 0: 1 else: 0) != 0:
                                         var mark: *const u8 = null // init: untranslatable
-                                        if (if mark != ((0 as *mut c_void)): 1 else: 0) != 0:
+                                        if (if mark != null: 1 else: 0) != 0:
                                             (fraglength = mark[(0 - 1)])
-                                            if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
+                                            if (if (if forcecase.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout == null: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     var chkcc_length: c_ulong = 0 // init: untranslatable
                                                     var chkcc_rc: c_ulong = 0 // init: untranslatable
@@ -530,7 +531,7 @@ if (if group < 0: 1 else: 0) != 0:
 (subptr = (subject + ovector[(group * 2)]))
                                     (subptrend = (subject + ovector[((group * 2) + 1)]))
                                     // label: SUBPTR_SUBSTITUTE
-if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
+if (if (if forcecase.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout == null: 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
                                             var chkcc_length: c_ulong = 0 // init: untranslatable
                                             var chkcc_rc: c_ulong = 0 // init: untranslatable
@@ -554,7 +555,7 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
 
                             else:
-                                if (if (if ((suboptions & 512)) != 0: 1 else: 0) and (if unsafe: *ptr == 92: 1 else: 0): 1 else: 0) != 0:
+                                if (if (if ((suboptions & 512)) != 0: 1 else: 0) != 0 and (if unsafe: *ptr == 92: 1 else: 0) != 0: 1 else: 0) != 0:
                                     var errorcode: c_int = 0
                                     var new_forcecase = 0 // init: untranslatable (case_state)
                                     if (if ptr < (repend - (1 as isize as usize)): 1 else: 0) != 0:
@@ -567,7 +568,7 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
                                                 (new_forcecase.to_case = 1)
                                                 (new_forcecase.single_char = 1)
                                                 ptr = ptr + 2
-                                                if (if (if (if (ptr + (2 as isize as usize)) < repend: 1 else: 0) and (if ptr[0] == 92: 1 else: 0): 1 else: 0) and (if ptr[1] == 85: 1 else: 0): 1 else: 0) != 0:
+                                                if (if (if (if (ptr + (2 as isize as usize)) < repend: 1 else: 0) != 0 and (if ptr[0] == 92: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 85: 1 else: 0) != 0: 1 else: 0) != 0:
                                                     (new_forcecase.to_case = 4)
                                                     (new_forcecase.single_char = 0)
                                                     ptr = ptr + 2
@@ -580,7 +581,7 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
                                                 (new_forcecase.to_case = 3)
                                                 (new_forcecase.single_char = 1)
                                                 ptr = ptr + 2
-                                                if (if (if (if (ptr + (2 as isize as usize)) < repend: 1 else: 0) and (if ptr[0] == 92: 1 else: 0): 1 else: 0) and (if ptr[1] == 76: 1 else: 0): 1 else: 0) != 0:
+                                                if (if (if (if (ptr + (2 as isize as usize)) < repend: 1 else: 0) != 0 and (if ptr[0] == 92: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 76: 1 else: 0) != 0: 1 else: 0) != 0:
                                                     (new_forcecase.to_case = 3)
                                                     (new_forcecase.single_char = 0)
                                                     ptr = ptr + 2
@@ -590,7 +591,7 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
                                     if (if new_forcecase.to_case != 0: 1 else: 0) != 0:
                                         // label: SETFORCECASE
-if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if forcecase.to_case != 0: 1 else: 0): 1 else: 0) != 0:
+if (if (if substitute_case_callout != null: 1 else: 0) != 0 and (if forcecase.to_case != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                             while true:
                                                 var chars_outstanding: c_ulong = 0 // init: untranslatable
                                                 if not (0 != 0):
@@ -603,7 +604,7 @@ if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if f
                                         continue
 
                                     (ptr = ptr + 1)
-                                    (rc = _pcre2_check_escape_8(&ptr, repend, &ch, &errorcode, code.overall_options, code.extra_options, code.top_bracket, 0, ((0 as *mut c_void))))
+                                    (rc = _pcre2_check_escape_8(&ptr, repend, &ch, &errorcode, code.overall_options, code.extra_options, code.top_bracket, 0, null))
                                     if (if errorcode != 0: 1 else: 0) != 0:
                                         comptime_error("goto not supported")
 
@@ -618,7 +619,7 @@ if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if f
                                                                                         (temp[0] = ch)
                                             (chlen = 1)
 
-                                            if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
+                                            if (if (if forcecase.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout == null: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     var chkcc_length: c_ulong = 0 // init: untranslatable
                                                     var chkcc_rc: c_ulong = 0 // init: untranslatable
@@ -643,13 +644,13 @@ if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if f
                                             continue
                                                                                         var name_len: c_ulong = 0 // init: untranslatable
                                             var name_start: *const u8 = null // init: untranslatable
-                                            if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 60: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 comptime_error("goto not supported")
 
                                             (ptr = ptr + 1)
                                             (name_start = ptr)
                                             (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
-                                            if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 62: 1 else: 0): 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 comptime_error("goto not supported")
 
                                             (ptr = ptr + 1)
@@ -673,7 +674,7 @@ if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if f
                                                                                         (temp[0] = ch)
                                             (chlen = 1)
 
-                                            if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
+                                            if (if (if forcecase.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout == null: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     var chkcc_length: c_ulong = 0 // init: untranslatable
                                                     var chkcc_rc: c_ulong = 0 // init: untranslatable
@@ -698,13 +699,13 @@ if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if f
                                             continue
                                                                                         var name_len: c_ulong = 0 // init: untranslatable
                                             var name_start: *const u8 = null // init: untranslatable
-                                            if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 60: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 comptime_error("goto not supported")
 
                                             (ptr = ptr + 1)
                                             (name_start = ptr)
                                             (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
-                                            if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 62: 1 else: 0): 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 comptime_error("goto not supported")
 
                                             (ptr = ptr + 1)
@@ -726,7 +727,7 @@ if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if f
                                                                                         (temp[0] = ch)
                                             (chlen = 1)
 
-                                            if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
+                                            if (if (if forcecase.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout == null: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     var chkcc_length: c_ulong = 0 // init: untranslatable
                                                     var chkcc_rc: c_ulong = 0 // init: untranslatable
@@ -751,13 +752,13 @@ if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if f
                                             continue
                                                                                         var name_len: c_ulong = 0 // init: untranslatable
                                             var name_start: *const u8 = null // init: untranslatable
-                                            if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 60: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 comptime_error("goto not supported")
 
                                             (ptr = ptr + 1)
                                             (name_start = ptr)
                                             (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
-                                            if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 62: 1 else: 0): 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 comptime_error("goto not supported")
 
                                             (ptr = ptr + 1)
@@ -775,13 +776,13 @@ if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if f
                                         ESC_g =>
                                                                                         var name_len: c_ulong = 0 // init: untranslatable
                                             var name_start: *const u8 = null // init: untranslatable
-                                            if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 60: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 comptime_error("goto not supported")
 
                                             (ptr = ptr + 1)
                                             (name_start = ptr)
                                             (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
-                                            if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 62: 1 else: 0): 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 comptime_error("goto not supported")
 
                                             (ptr = ptr + 1)
@@ -810,7 +811,7 @@ if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if f
 (ch_start = ptr)
                                     // (empty)
                                     ch
-                                    if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
+                                    if (if (if forcecase.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout == null: 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
                                             var chkcc_length: c_ulong = 0 // init: untranslatable
                                             var chkcc_rc: c_ulong = 0 // init: untranslatable
@@ -836,14 +837,14 @@ if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if f
 
 
 
-                    if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if forcecase.to_case != 0: 1 else: 0): 1 else: 0) != 0:
+                    if (if (if substitute_case_callout != null: 1 else: 0) != 0 and (if forcecase.to_case != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                         while true:
                             var chars_outstanding: c_ulong = 0 // init: untranslatable
                             if not (0 != 0):
                                 break
 
 
-                    if (if (if mcontext != ((0 as *mut c_void)): 1 else: 0) and (if mcontext.substitute_callout != ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
+                    if (if (if mcontext != null: 1 else: 0) != 0 and (if mcontext.substitute_callout != null: 1 else: 0) != 0: 1 else: 0) != 0:
                         if (not overflowed) != 0:
                             (scb.subscount = subs)
                             (scb.output_offsets[1] = buff_offset)
@@ -878,7 +879,7 @@ if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if f
 
 
 
-                    if (if (if ((suboptions & 256)) == 0: 1 else: 0) or (not pcre2_next_match_8(match_data, &start_offset, &goptions)): 1 else: 0) != 0:
+                    if (if (if ((suboptions & 256)) == 0: 1 else: 0) != 0 or (not pcre2_next_match_8(match_data, &start_offset, &goptions)) != 0: 1 else: 0) != 0:
                         (start_offset = ovector[1])
                         break
 
@@ -909,30 +910,42 @@ if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if f
                     (rc = subs)
                     (unsafe: *blength = (buff_offset -% 1))
 
-                __pc = 6; continue
+                __pc = 6
+                continue
             6 =>  // EXIT
-                if (if internal_match_data != ((0 as *mut c_void)): 1 else: 0) != 0:
+                if (if internal_match_data != null: 1 else: 0) != 0:
 pcre2_match_data_free_8(internal_match_data)                else:
 (match_data.rc = rc)
                 return rc
-                __pc = 7; continue
+                __pc = 7
+                continue
             7 =>  // NOROOM
-                __pc = 6; continue
-                __pc = 8; continue
+                __pc = 6
+                continue
+                __pc = 8
+                continue
             8 =>  // CASEERROR
-                __pc = 6; continue
-                __pc = 9; continue
+                __pc = 6
+                continue
+                __pc = 9
+                continue
             9 =>  // TOOLARGEREPLACE
-                __pc = 6; continue
-                __pc = 10; continue
+                __pc = 6
+                continue
+                __pc = 10
+                continue
             10 =>  // BAD
-                __pc = 12; continue
-                __pc = 11; continue
+                __pc = 12
+                continue
+                __pc = 11
+                continue
             11 =>  // BADESCAPE
                 // empty
-                __pc = 12; continue
+                __pc = 12
+                continue
             12 =>  // PTREXIT
-                __pc = 6; continue
+                __pc = 6
+                continue
             _ => break
 
 extern fn pcre2_jit_compile_8(__p0: *mut pcre2_real_code_8, __p1: c_uint) -> c_int

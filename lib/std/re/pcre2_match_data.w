@@ -71,12 +71,12 @@ fn pcre2_match_data_create_8(__p0: c_uint, __p1: *mut pcre2_real_general_context
     if (if oveccount > 65535: 1 else: 0) != 0:
         (oveccount = 65535)
 
-    if (if yield_ == ((0 as *mut c_void)): 1 else: 0) != 0:
-        return ((0 as *mut c_void))
+    if (if yield_ == null: 1 else: 0) != 0:
+        return null
 
     (yield_.oveccount = oveccount)
     (yield_.flags = 0)
-    (yield_.heapframes = ((0 as *mut c_void)))
+    (yield_.heapframes = null)
     (yield_.heapframes_size = 0)
     return yield_
 
@@ -84,15 +84,15 @@ fn pcre2_match_data_create_8(__p0: c_uint, __p1: *mut pcre2_real_general_context
 fn pcre2_match_data_create_from_pattern_8(__p0: *const pcre2_real_code_8, __p1: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8:
     var code = __p0
     var gcontext = __p1
-    if (if code == ((0 as *mut c_void)): 1 else: 0) != 0:
-        return ((0 as *mut c_void))
+    if (if code == null: 1 else: 0) != 0:
+        return null
 
 
 @[c_export("pcre2_match_data_free_8")]
 fn pcre2_match_data_free_8(__p0: *mut pcre2_real_match_data_8):
     var match_data = __p0
-    if (if match_data != ((0 as *mut c_void)): 1 else: 0) != 0:
-        if (if match_data.heapframes != ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if match_data != null: 1 else: 0) != 0:
+        if (if match_data.heapframes != null: 1 else: 0) != 0:
             match_data.memctl.free(match_data.heapframes, match_data.memctl.memory_data)
 
         if (if ((match_data.flags & 1)) != 0: 1 else: 0) != 0:

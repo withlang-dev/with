@@ -23,8 +23,8 @@ extern fn pcre2_config_8(__p0: c_uint, __p1: *mut c_void) -> c_int
 fn pcre2_general_context_copy_8(__p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_general_context_8:
     var gcontext = __p0
     var newcontext: *mut pcre2_real_general_context_8 = null // init: untranslatable
-    if (if newcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-        return ((0 as *mut c_void))
+    if (if newcontext == null: 1 else: 0) != 0:
+        return null
 
     mem_copy(newcontext, gcontext, sizeof[pcre2_real_general_context_8]())
     return newcontext
@@ -35,15 +35,15 @@ fn pcre2_general_context_create_8(__p0: *const fn(c_ulong, *mut c_void) -> *mut 
     var private_free = __p1
     var memory_data = __p2
     var gcontext: *mut pcre2_real_general_context_8 = null // init: untranslatable
-    if (if private_malloc == ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if private_malloc == null: 1 else: 0) != 0:
         (private_malloc = default_malloc)
 
-    if (if private_free == ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if private_free == null: 1 else: 0) != 0:
         (private_free = default_free)
 
     (gcontext = private_malloc(sizeof[pcre2_real_general_context_8](), memory_data))
-    if (if gcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-        return ((0 as *mut c_void))
+    if (if gcontext == null: 1 else: 0) != 0:
+        return null
 
     (gcontext.memctl.malloc = private_malloc)
     (gcontext.memctl.free = private_free)
@@ -53,7 +53,7 @@ fn pcre2_general_context_create_8(__p0: *const fn(c_ulong, *mut c_void) -> *mut 
 @[c_export("pcre2_general_context_free_8")]
 fn pcre2_general_context_free_8(__p0: *mut pcre2_real_general_context_8):
     var gcontext = __p0
-    if (if gcontext != ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if gcontext != null: 1 else: 0) != 0:
         gcontext.memctl.free(gcontext, gcontext.memctl.memory_data)
 
 
@@ -61,8 +61,8 @@ fn pcre2_general_context_free_8(__p0: *mut pcre2_real_general_context_8):
 fn pcre2_compile_context_copy_8(__p0: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_compile_context_8:
     var ccontext = __p0
     var newcontext: *mut pcre2_real_compile_context_8 = null // init: untranslatable
-    if (if newcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-        return ((0 as *mut c_void))
+    if (if newcontext == null: 1 else: 0) != 0:
+        return null
 
     mem_copy(newcontext, ccontext, sizeof[pcre2_real_compile_context_8]())
     return newcontext
@@ -71,8 +71,8 @@ fn pcre2_compile_context_copy_8(__p0: *mut pcre2_real_compile_context_8) -> *mut
 fn pcre2_compile_context_create_8(__p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_compile_context_8:
     var gcontext = __p0
     var ccontext: *mut pcre2_real_compile_context_8 = null // init: untranslatable
-    if (if ccontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-        return ((0 as *mut c_void))
+    if (if ccontext == null: 1 else: 0) != 0:
+        return null
 
     (unsafe: *ccontext = _pcre2_default_compile_context_8)
     return ccontext
@@ -80,7 +80,7 @@ fn pcre2_compile_context_create_8(__p0: *mut pcre2_real_general_context_8) -> *m
 @[c_export("pcre2_compile_context_free_8")]
 fn pcre2_compile_context_free_8(__p0: *mut pcre2_real_compile_context_8):
     var ccontext = __p0
-    if (if ccontext != ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if ccontext != null: 1 else: 0) != 0:
         ccontext.memctl.free(ccontext, ccontext.memctl.memory_data)
 
 
@@ -165,7 +165,7 @@ fn pcre2_set_optimize_8(__p0: *mut pcre2_real_compile_context_8, __p1: c_uint) -
         1 =>
             (ccontext.optimization_flags = 7)
         _ =>
-            if (if (if directive >= 64: 1 else: 0) and (if directive <= 69: 1 else: 0): 1 else: 0) != 0:
+            if (if (if directive >= 64: 1 else: 0) != 0 and (if directive <= 69: 1 else: 0) != 0: 1 else: 0) != 0:
                 if (if ((directive & 1)) != 0: 1 else: 0) != 0:
                     ccontext.optimization_flags = ccontext.optimization_flags & (0 - ((1 << ((((directive >> 1)) -% 32)))) - 1)
                 else:
@@ -180,8 +180,8 @@ fn pcre2_set_optimize_8(__p0: *mut pcre2_real_compile_context_8, __p1: c_uint) -
 fn pcre2_convert_context_copy_8(__p0: *mut pcre2_real_convert_context_8) -> *mut pcre2_real_convert_context_8:
     var ccontext = __p0
     var newcontext: *mut pcre2_real_convert_context_8 = null // init: untranslatable
-    if (if newcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-        return ((0 as *mut c_void))
+    if (if newcontext == null: 1 else: 0) != 0:
+        return null
 
     mem_copy(newcontext, ccontext, sizeof[pcre2_real_convert_context_8]())
     return newcontext
@@ -190,8 +190,8 @@ fn pcre2_convert_context_copy_8(__p0: *mut pcre2_real_convert_context_8) -> *mut
 fn pcre2_convert_context_create_8(__p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_convert_context_8:
     var gcontext = __p0
     var ccontext: *mut pcre2_real_convert_context_8 = null // init: untranslatable
-    if (if ccontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-        return ((0 as *mut c_void))
+    if (if ccontext == null: 1 else: 0) != 0:
+        return null
 
     (unsafe: *ccontext = _pcre2_default_convert_context_8)
     return ccontext
@@ -199,7 +199,7 @@ fn pcre2_convert_context_create_8(__p0: *mut pcre2_real_general_context_8) -> *m
 @[c_export("pcre2_convert_context_free_8")]
 fn pcre2_convert_context_free_8(__p0: *mut pcre2_real_convert_context_8):
     var ccontext = __p0
-    if (if ccontext != ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if ccontext != null: 1 else: 0) != 0:
         ccontext.memctl.free(ccontext, ccontext.memctl.memory_data)
 
 
@@ -223,8 +223,8 @@ extern fn pcre2_converted_pattern_free_8(__p0: *mut u8) -> void
 fn pcre2_match_context_copy_8(__p0: *mut pcre2_real_match_context_8) -> *mut pcre2_real_match_context_8:
     var mcontext = __p0
     var newcontext: *mut pcre2_real_match_context_8 = null // init: untranslatable
-    if (if newcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-        return ((0 as *mut c_void))
+    if (if newcontext == null: 1 else: 0) != 0:
+        return null
 
     mem_copy(newcontext, mcontext, sizeof[pcre2_real_match_context_8]())
     return newcontext
@@ -233,8 +233,8 @@ fn pcre2_match_context_copy_8(__p0: *mut pcre2_real_match_context_8) -> *mut pcr
 fn pcre2_match_context_create_8(__p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_context_8:
     var gcontext = __p0
     var mcontext: *mut pcre2_real_match_context_8 = null // init: untranslatable
-    if (if mcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-        return ((0 as *mut c_void))
+    if (if mcontext == null: 1 else: 0) != 0:
+        return null
 
     (unsafe: *mcontext = _pcre2_default_match_context_8)
     return mcontext
@@ -242,7 +242,7 @@ fn pcre2_match_context_create_8(__p0: *mut pcre2_real_general_context_8) -> *mut
 @[c_export("pcre2_match_context_free_8")]
 fn pcre2_match_context_free_8(__p0: *mut pcre2_real_match_context_8):
     var mcontext = __p0
-    if (if mcontext != ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if mcontext != null: 1 else: 0) != 0:
         mcontext.memctl.free(mcontext, mcontext.memctl.memory_data)
 
 

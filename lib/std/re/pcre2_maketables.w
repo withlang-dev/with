@@ -101,8 +101,8 @@ fn pcre2_maketables_8(__p0: *mut pcre2_real_general_context_8) -> *const u8:
     var yield_: *mut u8 = null // init: untranslatable
     var i: c_int = 0
     var p: *mut u8 = null // init: untranslatable
-    if (if yield_ == ((0 as *mut c_void)): 1 else: 0) != 0:
-        return ((0 as *mut c_void))
+    if (if yield_ == null: 1 else: 0) != 0:
+        return null
 
     (p = yield_)
     (i = 0)
@@ -171,7 +171,7 @@ fn pcre2_maketables_8(__p0: *mut pcre2_real_general_context_8) -> *const u8:
         if is_digit((i)) != 0:
             x = x + 8
 
-        if (if is_alnum((i)) or (if i == 95: 1 else: 0): 1 else: 0) != 0:
+        if (if is_alnum((i)) != 0 or (if i == 95: 1 else: 0) != 0: 1 else: 0) != 0:
             x = x + 16
 
         (unsafe: *(p = p + 1) = x)
@@ -183,10 +183,10 @@ fn pcre2_maketables_8(__p0: *mut pcre2_real_general_context_8) -> *const u8:
 fn pcre2_maketables_free_8(__p0: *mut pcre2_real_general_context_8, __p1: *const u8):
     var gcontext = __p0
     var tables = __p1
-    if (if gcontext != ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if gcontext != null: 1 else: 0) != 0:
         gcontext.memctl.free((tables as *mut c_void), gcontext.memctl.memory_data)
     else:
-        free_mem((tables as *mut c_void) as *i8)
+        with_free((tables as *mut c_void) as *i8)
 
 
 let ucp_C: c_uint = 0

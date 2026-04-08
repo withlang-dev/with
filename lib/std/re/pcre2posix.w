@@ -128,8 +128,8 @@ fn pcre2_regcomp(__p0: *mut regex_t, __p1: *const i8, __p2: c_int) -> c_int:
     var errorcode: c_int = 0
     var options: c_int = 0
     var re_nsub: c_int = 0
-    (preg.re_match_data = ((0 as *mut c_void)))
-    (preg.re_pcre2_code = ((0 as *mut c_void)))
+    (preg.re_match_data = null)
+    (preg.re_pcre2_code = null)
     if (if ((cflags & 1)) != 0: 1 else: 0) != 0:
         options = options | 8
 
@@ -153,7 +153,7 @@ fn pcre2_regcomp(__p0: *mut regex_t, __p1: *const i8, __p2: c_int) -> c_int:
 
     (preg.re_cflags = cflags)
     (preg.re_erroffset = erroffset)
-    if (if preg.re_pcre2_code == ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if preg.re_pcre2_code == null: 1 else: 0) != 0:
         var i: c_uint = 0
         if (if errorcode < 100: 1 else: 0) != 0:
             return REG_BADPAT
@@ -167,10 +167,10 @@ if (if errorcode == eint2[i]: 1 else: 0) != 0:
 
         return REG_BADPAT
 
-    (preg.re_match_data = pcre2_match_data_create_8((re_nsub + 1), ((0 as *mut c_void))))
-    if (if preg.re_match_data == ((0 as *mut c_void)): 1 else: 0) != 0:
+    (preg.re_match_data = pcre2_match_data_create_8((re_nsub + 1), null))
+    if (if preg.re_match_data == null: 1 else: 0) != 0:
         pcre2_code_free_8(preg.re_pcre2_code)
-        (preg.re_pcre2_code = ((0 as *mut c_void)))
+        (preg.re_pcre2_code = null)
         return REG_ESPACE
 
     return 0
@@ -187,7 +187,7 @@ fn pcre2_regexec(__p0: *const regex_t, __p1: *const i8, __p2: c_ulong, __p3: *mu
     var eo: c_int = 0
     var options: c_int = 0
     var md: *mut pcre2_real_match_data_8 = null // init: untranslatable
-    if (if string == ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if string == null: 1 else: 0) != 0:
         return REG_INVARG
 
     if (if ((eflags & 4)) != 0: 1 else: 0) != 0:
@@ -199,11 +199,11 @@ fn pcre2_regexec(__p0: *const regex_t, __p1: *const i8, __p2: c_ulong, __p3: *mu
     if (if ((eflags & 256)) != 0: 1 else: 0) != 0:
         options = options | 4
 
-    if (if (if ((preg.re_cflags & 32)) != 0: 1 else: 0) or (if pmatch == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
+    if (if (if ((preg.re_cflags & 32)) != 0: 1 else: 0) != 0 or (if pmatch == null: 1 else: 0) != 0: 1 else: 0) != 0:
         (nmatch = 0)
 
     if (if ((eflags & 128)) != 0: 1 else: 0) != 0:
-        if (if pmatch == ((0 as *mut c_void)): 1 else: 0) != 0:
+        if (if pmatch == null: 1 else: 0) != 0:
             return REG_INVARG
 
         (so = pmatch[0].rm_so)

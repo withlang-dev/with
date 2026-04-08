@@ -3502,13 +3502,18 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                     return "(" ++ lhs ++ " - " ++ rhs ++ ")"
 
                 let is_unsigned = with_ci_type_is_unsigned(session, cursor)
+                // C logical ops (&&, ||) need bool operands in With
+                if op == BO_LAND or op == BO_LOR:
+                    let bool_lhs = ci_trans_bool_expr(session, lhs_cursor, scope)
+                    let bool_rhs = ci_trans_bool_expr(session, rhs_cursor, scope)
+                    let log_op = if op == BO_LAND: "and" else: "or"
+                    return "(if " ++ bool_lhs ++ " " ++ log_op ++ " " ++ bool_rhs ++ ": 1 else: 0)"
+
                 let op_str = ci_bo_to_str_typed(op, is_unsigned)
                 if op_str.len() > 0:
-                    // C comparisons and logical ops return int, not bool.
+                    // C comparisons return int, not bool.
                     // Wrap in (if cond: 1 else: 0) to match C semantics.
                     if op == BO_EQ or op == BO_NE or op == BO_LT or op == BO_GT or op == BO_LE or op == BO_GE:
-                        return "(if " ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ": 1 else: 0)"
-                    if op == BO_LAND or op == BO_LOR:
                         return "(if " ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ": 1 else: 0)"
                     return "(" ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ")"
         return ""
@@ -4865,7 +4870,7 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
         with_cimport_mark_name_emitted("c_ulonglong")
         with_cimport_mark_name_emitted("c_longdouble")
 
-    // Emit builtin wrappers
+    // Emit builtin and runtime wrappers
     if with_cimport_is_name_emitted("with_clz") == 0:
         output = output ++ "extern fn with_clz(x: i32) -> i32\n"
         output = output ++ "extern fn with_ctz(x: i32) -> i32\n"
@@ -4878,6 +4883,13 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
         output = output ++ "extern fn with_ctzl(x: i64) -> i32\n"
         output = output ++ "extern fn with_ctzll(x: i64) -> i32\n"
         output = output ++ "extern fn with_abs(x: i32) -> i32\n"
+        // Memory operations (accept any pointer via implicit *i8 coercion)
+        output = output ++ "extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> void\n"
+        output = output ++ "extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> void\n"
+        output = output ++ "extern fn with_memset(ptr: *i8, c: i32, n: i64) -> void\n"
+        output = output ++ "extern fn with_memcmp(a: *i8, b: *i8, n: i64) -> i32\n"
+        output = output ++ "extern fn with_alloc(size: i64) -> *i8\n"
+        output = output ++ "extern fn with_free(ptr: *i8) -> void\n"
         with_cimport_mark_name_emitted("with_clz")
 
     output = output ++ "\n"
@@ -5301,7 +5313,7 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
             if target_state >= 0:
                 if not arm_has_content:
                     output = output ++ ci_indent_str(indent + 3) ++ "// empty\n"
-                output = output ++ ci_indent_str(indent + 3) ++ "__pc = " ++ i64_to_string(target_state as i64) ++ "; continue\n"
+                output = output ++ ci_indent_str(indent + 3) ++ "__pc = " ++ i64_to_string(target_state as i64) ++ "\n" ++ ci_indent_str(indent + 3) ++ "continue\n"
                 // Start new arm for this label
                 current_state = target_state
                 output = output ++ ci_indent_str(indent + 2) ++ i64_to_string(target_state as i64) ++ " =>  // " ++ label_name ++ "\n"
@@ -5327,7 +5339,7 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
                 target_label = with_ci_cursor_spelling(session, child)
             let target_state = ci_label_state(label_map, target_label)
             if target_state >= 0:
-                output = output ++ ci_indent_str(indent + 3) ++ "__pc = " ++ i64_to_string(target_state as i64) ++ "; continue\n"
+                output = output ++ ci_indent_str(indent + 3) ++ "__pc = " ++ i64_to_string(target_state as i64) ++ "\n" ++ ci_indent_str(indent + 3) ++ "continue\n"
                 arm_has_content = true
 
         else if kind == CXK_DECL_STMT:
@@ -5379,7 +5391,7 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
             target_label = with_ci_cursor_spelling(session, cursor)
         let target_state = ci_label_state(label_map, target_label)
         if target_state >= 0:
-            return "__pc = " ++ i64_to_string(target_state as i64) ++ "; continue"
+            return "__pc = " ++ i64_to_string(target_state as i64) ++ "\n            continue"
         return "comptime_error(\"unknown goto target: " ++ target_label ++ "\")"
 
     // Label → just translate the body
@@ -5568,25 +5580,25 @@ fn ci_is_mapped_libc_fn(name: str) -> bool:
 // Map C standard library function calls to With equivalents.
 // This enables migrated code to be pure With (no c_import needed).
 fn ci_map_libc_call(callee: str, args: str) -> str:
-    // Memory allocation
+    // Memory allocation — use runtime externs directly
     if callee == "malloc":
-        return "alloc(" ++ args ++ " as i32)"
+        return "with_alloc(" ++ args ++ " as i64)"
     if callee == "free":
-        return "free_mem(" ++ args ++ " as *i8)"
+        return "with_free(" ++ args ++ " as *i8)"
     if callee == "calloc":
         return "alloc_zeroed(" ++ args ++ ")"
     if callee == "realloc":
         return "realloc_mem(" ++ args ++ ")"
 
-    // Memory operations
+    // Memory operations — use runtime externs directly (accept any pointer via *i8)
     if callee == "memcpy":
-        return "mem_copy(" ++ args ++ ")"
+        return "with_memcpy(" ++ args ++ ")"
     if callee == "memmove":
-        return "mem_move(" ++ args ++ ")"
+        return "with_memmove(" ++ args ++ ")"
     if callee == "memset":
-        return "mem_set(" ++ args ++ ")"
+        return "with_memset(" ++ args ++ ")"
     if callee == "memcmp":
-        return "mem_cmp(" ++ args ++ ")"
+        return "with_memcmp(" ++ args ++ ")"
 
     // String operations
     if callee == "strlen":
