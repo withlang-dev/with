@@ -4315,38 +4315,28 @@ fn ci_indent_str(level: i32) -> str:
 // Returns "" on failure (caller falls back to comptime_error stub).
 
 fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
-    // Use the new cursor-based API to find the function body
+    // Use the new cursor-based API to find the function body.
+    // Match by NAME first (reliable), fall back to index matching.
     let root = with_ci_root_cursor(session)
     let n = with_ci_num_children(session, root)
-    // Find the matching function declaration cursor by index
-    // The decl_idx corresponds to our old-API index — we need to find the same
-    // declaration in the new cursor tree. They're in the same order.
+    let target_name = with_cimport_decl_name(session, decl_idx)
+
+    // Name-based search (most reliable — handles system header functions correctly)
     var found_cursor = -1
-    var fn_count = 0
     var i = 0
     while i < n:
         let child = with_ci_child(session, root, i)
         let ck = with_ci_cursor_kind(session, child)
         if ck == CK_FUNCTION:
-            if fn_count == decl_idx:
-                found_cursor = child
-                break
-            fn_count = fn_count + 1
-        i = i + 1
-
-    // Try to find by matching name instead
-    if found_cursor < 0:
-        let target_name = with_cimport_decl_name(session, decl_idx)
-        i = 0
-        while i < n:
-            let child = with_ci_child(session, root, i)
-            let ck = with_ci_cursor_kind(session, child)
-            if ck == CK_FUNCTION:
-                let cname = with_ci_cursor_spelling(session, child)
-                if cname == target_name:
+            let cname = with_ci_cursor_spelling(session, child)
+            if cname == target_name:
+                // Prefer definitions over declarations
+                if with_ci_cursor_is_definition(session, child) != 0:
                     found_cursor = child
                     break
-            i = i + 1
+                if found_cursor < 0:
+                    found_cursor = child
+        i = i + 1
 
     if found_cursor < 0:
         return ""
@@ -5019,9 +5009,12 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
         let ret_suffix = if ret == "void": "" else: " -> " ++ ret
         return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body ++ "\n"
 
-    // Body translation failed — emit with comptime_error body
-    let ret_suffix = if ret == "void": "" else: " -> " ++ ret
-    export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n    comptime_error(\"body translation failed\")\n\n"
+    // Body translation failed — emit as extern fn (system header function
+    // or function with untranslatable body). This is the graceful demotion
+    // pattern from Zig's translate-c.
+    let cc = with_cimport_fn_calling_conv(session, idx)
+    let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
+    cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
 
 // Count occurrences of a substring in a string
 // ── Goto elimination: state-variable transform ─────────────
