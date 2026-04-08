@@ -82,7 +82,7 @@ fn pcre2_next_match_8(__p0: *mut pcre2_real_match_data_8, __p1: *mut c_ulong, __
     if (if rc < 0: 1 else: 0) != 0:
         return 0
 
-    if (if (if ovector[0] != start_offset: 1 else: 0) and (if ovector[1] == start_offset: 1 else: 0): 1 else: 0) != 0:
+    if (if (if ovector[0] != start_offset: 1 else: 0) != 0 and (if ovector[1] == start_offset: 1 else: 0) != 0: 1 else: 0) != 0:
         if (if start_offset >= match_data.subject_length: 1 else: 0) != 0:
             return 0
 

@@ -99,10 +99,10 @@ fn pcre2_serialize_encode_8(__p0: *mut *const pcre2_real_code_8, __p1: c_int, __
     var data: *mut pcre2_serialized_data = null // init: untranslatable
     var memctl: *const pcre2_memctl = null // init: untranslatable
     (total_size = (sizeof[pcre2_serialized_data]() +% 1088))
-    (tables = ((0 as *mut c_void)))
+    (tables = null)
     (i = 0)
     while (if i < number_of_codes: 1 else: 0) != 0:
-        if (if tables == ((0 as *mut c_void)): 1 else: 0) != 0:
+        if (if tables == null: 1 else: 0) != 0:
             (tables = re.tables)
 
         total_size = total_size + re.blocksize
@@ -159,30 +159,31 @@ fn pcre2_serialize_decode_8(__p0: *mut *mut pcre2_real_code_8, __p1: c_int, __p2
                     if (if blocksize <= sizeof[pcre2_real_code_8](): 1 else: 0) != 0:
                         comptime_error("goto not supported")
 
-                    if (if dst_re == ((0 as *mut c_void)): 1 else: 0) != 0:
+                    if (if dst_re == null: 1 else: 0) != 0:
                         comptime_error("goto not supported")
 
-                    if (if (if (if dst_re.magic_number != 1346589253: 1 else: 0) or (if dst_re.name_entry_size > ((128 + 2) + 1): 1 else: 0): 1 else: 0) or (if dst_re.name_count > 10000: 1 else: 0): 1 else: 0) != 0:
+                    if (if (if (if dst_re.magic_number != 1346589253: 1 else: 0) != 0 or (if dst_re.name_entry_size > ((128 + 2) + 1): 1 else: 0) != 0: 1 else: 0) != 0 or (if dst_re.name_count > 10000: 1 else: 0) != 0: 1 else: 0) != 0:
                         comptime_error("goto not supported")
 
                     (dst_re.tables = tables)
-                    (dst_re.executable_jit = ((0 as *mut c_void)))
+                    (dst_re.executable_jit = null)
                     dst_re.flags = dst_re.flags | 262144
                     (codes[i] = dst_re)
-                    (dst_re = ((0 as *mut c_void)))
+                    (dst_re = null)
                     src_bytes = src_bytes + blocksize
                     (i = i + 1)
 
                 return number_of_codes
-                __pc = 1; continue
+                __pc = 1
+                continue
             1 =>  // cleanup
-                if (if dst_re != ((0 as *mut c_void)): 1 else: 0) != 0:
+                if (if dst_re != null: 1 else: 0) != 0:
 memctl.free(dst_re, memctl.memory_data)
                 memctl.free(tables, memctl.memory_data)
                 (j = 0)
                 while (if j < i: 1 else: 0) != 0:
                     memctl.free(codes[j], memctl.memory_data)
-                    (codes[j] = ((0 as *mut c_void)))
+                    (codes[j] = null)
                     (j = j + 1)
 
                 return error_
@@ -197,7 +198,7 @@ fn pcre2_serialize_get_number_of_codes_8(__p0: *const u8) -> c_int:
 @[c_export("pcre2_serialize_free_8")]
 fn pcre2_serialize_free_8(__p0: *mut u8):
     var bytes = __p0
-    if (if bytes != ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if bytes != null: 1 else: 0) != 0:
         var memctl: *mut pcre2_memctl = null // init: untranslatable
         memctl.free(memctl, memctl.memory_data)
 

@@ -111,41 +111,48 @@ fn pcre2_dfa_match_8(__p0: *const pcre2_real_code_8, __p1: *const u8, __p2: c_ul
     while true:
         match __pc
             0 =>
-                (rws.next = ((0 as *mut c_void)))
+                (rws.next = null)
                 (rws.size = 7680)
                 (rws.free = 7676)
-                if (if (if subject == ((0 as *mut c_void)): 1 else: 0) and (if length == 0: 1 else: 0): 1 else: 0) != 0:
+                if (if (if subject == null: 1 else: 0) != 0 and (if length == 0: 1 else: 0) != 0: 1 else: 0) != 0:
 (subject = null_str)
-                if (if (if (if re == ((0 as *mut c_void)): 1 else: 0) or (if subject == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) or (if workspace == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
-                    __pc = 2; continue
+                if (if (if (if re == null: 1 else: 0) != 0 or (if subject == null: 1 else: 0) != 0: 1 else: 0) != 0 or (if workspace == null: 1 else: 0) != 0: 1 else: 0) != 0:
+                    __pc = 2
+            continue
 
                 if (if wscount < 20: 1 else: 0) != 0:
-                    __pc = 2; continue
+                    __pc = 2
+            continue
 
                 if (if start_offset > length: 1 else: 0) != 0:
-                    __pc = 2; continue
+                    __pc = 2
+            continue
 
-                if (if (if ((options & ((32 | 16)))) != 0: 1 else: 0) and (if ((((re.overall_options | options)) & 536870912)) != 0: 1 else: 0): 1 else: 0) != 0:
-                    __pc = 2; continue
+                if (if (if ((options & ((32 | 16)))) != 0: 1 else: 0) != 0 and (if ((((re.overall_options | options)) & 536870912)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    __pc = 2
+            continue
 
                 if (if ((re.overall_options & 67108864)) != 0: 1 else: 0) != 0:
-                    __pc = 2; continue
+                    __pc = 2
+            continue
 
                 if (if re.magic_number != 1346589253: 1 else: 0) != 0:
-                    __pc = 2; continue
+                    __pc = 2
+            continue
 
                 if (if ((options & 64)) != 0: 1 else: 0) != 0:
-                    if (if (if (if ((workspace[0] & ((0 - 2)))) != 0: 1 else: 0) or (if workspace[1] < 1: 1 else: 0): 1 else: 0) or (if workspace[1] > (((((wscount -% 2)) / 3)) as c_int): 1 else: 0): 1 else: 0) != 0:
-                        __pc = 2; continue
+                    if (if (if (if ((workspace[0] & ((0 - 2)))) != 0: 1 else: 0) != 0 or (if workspace[1] < 1: 1 else: 0) != 0: 1 else: 0) != 0 or (if workspace[1] > (((((wscount -% 2)) / 3)) as c_int): 1 else: 0) != 0: 1 else: 0) != 0:
+                        __pc = 2
+            continue
 
 
                 (utf = (if ((re.overall_options & 524288)) != 0: 1 else: 0))
                 (start_match = (subject + start_offset))
                 (end_subject = (subject + length))
                 (req_cu_ptr = (start_match - (1 as isize as usize)))
-                (anchored = (if (if ((options & ((2147483648 | 64)))) != 0: 1 else: 0) or (if ((re.overall_options & 2147483648)) != 0: 1 else: 0): 1 else: 0))
+                (anchored = (if (if ((options & ((2147483648 | 64)))) != 0: 1 else: 0) != 0 or (if ((re.overall_options & 2147483648)) != 0: 1 else: 0) != 0: 1 else: 0))
                 (startline = (if ((re.flags & 512)) != 0: 1 else: 0))
-                (firstline = (if (not anchored) and (if ((re.overall_options & 256)) != 0: 1 else: 0): 1 else: 0))
+                (firstline = (if (not anchored) != 0 and (if ((re.overall_options & 256)) != 0: 1 else: 0) != 0: 1 else: 0))
                 (bumpalong_limit = end_subject)
                 (mb.cb = &cb)
                 (cb.version = 2)
@@ -153,9 +160,9 @@ fn pcre2_dfa_match_8(__p0: *const pcre2_real_code_8, __p1: *const u8, __p2: c_ul
                 (cb.callout_flags = 0)
                 (cb.capture_top = 1)
                 (cb.capture_last = 0)
-                (cb.mark = ((0 as *mut c_void)))
-                if (if mcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-                    (mb.callout = ((0 as *mut c_void)))
+                (cb.mark = null)
+                if (if mcontext == null: 1 else: 0) != 0:
+                    (mb.callout = null)
                     (mb.memctl = re.memctl)
                     (mb.match_limit = _pcre2_default_match_context_8.match_limit)
                     (mb.match_limit_depth = _pcre2_default_match_context_8.depth_limit)
@@ -178,7 +185,7 @@ fn pcre2_dfa_match_8(__p0: *const pcre2_real_code_8, __p1: *const u8, __p2: c_ul
                 (mb.start_subject = subject)
                 (mb.end_subject = end_subject)
                 (mb.start_offset = start_offset)
-                (mb.allowemptypartial = (if ((if re.max_lookbehind > 0: 1 else: 0)) or (if ((re.flags & 8192)) != 0: 1 else: 0): 1 else: 0))
+                (mb.allowemptypartial = (if ((if re.max_lookbehind > 0: 1 else: 0)) != 0 or (if ((re.flags & 8192)) != 0: 1 else: 0) != 0: 1 else: 0))
                 (mb.moptions = options)
                 (mb.poptions = re.overall_options)
                 (mb.match_call_count = 0)
@@ -212,7 +219,7 @@ fn pcre2_dfa_match_8(__p0: *const pcre2_real_code_8, __p1: *const u8, __p2: c_ul
                         (first_cu2 = (((mb.tables + (256 as isize as usize)))[first_cu]))
 
                 else:
-if (if (not startline) and (if ((re.flags & 64)) != 0: 1 else: 0): 1 else: 0) != 0:
+if (if (not startline) != 0 and (if ((re.flags & 64)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
 (start_bits = re.start_bitmap)
                 if (if ((re.flags & 128)) != 0: 1 else: 0) != 0:
                     (has_req_cu = 1)
@@ -225,23 +232,23 @@ if (if (not startline) and (if ((re.flags & 64)) != 0: 1 else: 0): 1 else: 0) !=
                     match_data.flags = match_data.flags & (0 - 1 - 1)
 
                 (match_data.code = re)
-                (match_data.subject = ((0 as *mut c_void)))
-                (match_data.mark = ((0 as *mut c_void)))
+                (match_data.subject = null)
+                (match_data.mark = null)
                 (match_data.matchedby = 1)
                 (match_data.options = original_options)
                 while true:
-                    if (if (if ((re.optimization_flags & 4)) != 0: 1 else: 0) and (if ((options & 64)) == 0: 1 else: 0): 1 else: 0) != 0:
+                    if (if (if ((re.optimization_flags & 4)) != 0: 1 else: 0) != 0 and (if ((options & 64)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                         if firstline != 0:
                             var t: *const u8 = null // init: untranslatable
                             (end_subject = t)
 
                         if anchored != 0:
-                            if (if has_first_cu or (if start_bits != ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
+                            if (if has_first_cu != 0 or (if start_bits != null: 1 else: 0) != 0: 1 else: 0) != 0:
                                 var ok: c_int = 0 // init: untranslatable
                                 if ok != 0:
                                     var c: u8 = 0 // init: untranslatable
-                                    (ok = (if has_first_cu and ((if (if c == first_cu: 1 else: 0) or (if c == first_cu2: 1 else: 0): 1 else: 0)): 1 else: 0))
-                                    if (if (not ok) and (if start_bits != ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
+                                    (ok = (if has_first_cu != 0 and ((if (if c == first_cu: 1 else: 0) != 0 or (if c == first_cu2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0))
+                                    if (if (not ok) != 0 and (if start_bits != null: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (ok = (if ((start_bits[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0))
 
 
@@ -255,41 +262,41 @@ if (if (not startline) and (if ((re.flags & 64)) != 0: 1 else: 0): 1 else: 0) !=
                                     var pp1: *const u8 = null // init: untranslatable
                                     var pp2: *const u8 = null // init: untranslatable
                                     var searchlength: c_ulong = 0 // init: untranslatable
-                                    if (if (if memchr_found_first_cu == ((0 as *mut c_void)): 1 else: 0) or (if start_match > memchr_found_first_cu: 1 else: 0): 1 else: 0) != 0:
+                                    if (if (if memchr_found_first_cu == null: 1 else: 0) != 0 or (if start_match > memchr_found_first_cu: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (pp1 = memchr(start_match, first_cu, searchlength))
-                                        (memchr_found_first_cu = (if ((if pp1 == ((0 as *mut c_void)): 1 else: 0)) != 0: end_subject else: pp1))
+                                        (memchr_found_first_cu = (if ((if pp1 == null: 1 else: 0)) != 0: end_subject else: pp1))
                                     else:
-                                        (pp1 = (if ((if memchr_found_first_cu == end_subject: 1 else: 0)) != 0: ((0 as *mut c_void)) else: memchr_found_first_cu))
+                                        (pp1 = (if ((if memchr_found_first_cu == end_subject: 1 else: 0)) != 0: null else: memchr_found_first_cu))
 
-                                    if (if (if memchr_found_first_cu2 == ((0 as *mut c_void)): 1 else: 0) or (if start_match > memchr_found_first_cu2: 1 else: 0): 1 else: 0) != 0:
+                                    if (if (if memchr_found_first_cu2 == null: 1 else: 0) != 0 or (if start_match > memchr_found_first_cu2: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (pp2 = memchr(start_match, first_cu2, searchlength))
-                                        (memchr_found_first_cu2 = (if ((if pp2 == ((0 as *mut c_void)): 1 else: 0)) != 0: end_subject else: pp2))
+                                        (memchr_found_first_cu2 = (if ((if pp2 == null: 1 else: 0)) != 0: end_subject else: pp2))
                                     else:
-                                        (pp2 = (if ((if memchr_found_first_cu2 == end_subject: 1 else: 0)) != 0: ((0 as *mut c_void)) else: memchr_found_first_cu2))
+                                        (pp2 = (if ((if memchr_found_first_cu2 == end_subject: 1 else: 0)) != 0: null else: memchr_found_first_cu2))
 
-                                    if (if pp1 == ((0 as *mut c_void)): 1 else: 0) != 0:
-                                        (start_match = (if ((if pp2 == ((0 as *mut c_void)): 1 else: 0)) != 0: end_subject else: pp2))
+                                    if (if pp1 == null: 1 else: 0) != 0:
+                                        (start_match = (if ((if pp2 == null: 1 else: 0)) != 0: end_subject else: pp2))
                                     else:
-                                        (start_match = (if ((if (if pp2 == ((0 as *mut c_void)): 1 else: 0) or (if pp1 < pp2: 1 else: 0): 1 else: 0)) != 0: pp1 else: pp2))
+                                        (start_match = (if ((if (if pp2 == null: 1 else: 0) != 0 or (if pp1 < pp2: 1 else: 0) != 0: 1 else: 0)) != 0: pp1 else: pp2))
 
                                 else:
                                     (start_match = memchr(start_match, first_cu, ((end_subject as usize -% start_match as usize) / sizeof[u8]())))
-                                    if (if start_match == ((0 as *mut c_void)): 1 else: 0) != 0:
+                                    if (if start_match == null: 1 else: 0) != 0:
                                         (start_match = end_subject)
 
 
-                                if (if (if ((mb.moptions & ((32 | 16)))) == 0: 1 else: 0) and (if start_match >= mb.end_subject: 1 else: 0): 1 else: 0) != 0:
+                                if (if (if ((mb.moptions & ((32 | 16)))) == 0: 1 else: 0) != 0 and (if start_match >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0:
                                     break
 
                             else:
                                 if startline != 0:
                                     if (if start_match > (mb.start_subject + start_offset): 1 else: 0) != 0:
-                                        if (if (if (if (if start_match[(0 - 1)] == 13: 1 else: 0) and ((if (if mb.nltype == 1: 1 else: 0) or (if mb.nltype == 2: 1 else: 0): 1 else: 0)): 1 else: 0) and (if start_match < end_subject: 1 else: 0): 1 else: 0) and (if unsafe: *start_match == 10: 1 else: 0): 1 else: 0) != 0:
+                                        if (if (if (if (if start_match[(0 - 1)] == 13: 1 else: 0) != 0 and ((if (if mb.nltype == 1: 1 else: 0) != 0 or (if mb.nltype == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and (if start_match < end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *start_match == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                             (start_match = start_match + 1)
 
 
                                 else:
-                                    if (if start_bits != ((0 as *mut c_void)): 1 else: 0) != 0:
+                                    if (if start_bits != null: 1 else: 0) != 0:
                                         while (if start_match < end_subject: 1 else: 0) != 0:
                                             var c: c_uint = 0 // init: untranslatable
                                             if (if ((start_bits[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0) != 0:
@@ -297,7 +304,7 @@ if (if (not startline) and (if ((re.flags & 64)) != 0: 1 else: 0): 1 else: 0) !=
 
                                             (start_match = start_match + 1)
 
-                                        if (if (if ((mb.moptions & ((32 | 16)))) == 0: 1 else: 0) and (if start_match >= mb.end_subject: 1 else: 0): 1 else: 0) != 0:
+                                        if (if (if ((mb.moptions & ((32 | 16)))) == 0: 1 else: 0) != 0 and (if start_match >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0:
                                             break
 
 
@@ -311,21 +318,21 @@ if (if (not startline) and (if ((re.flags & 64)) != 0: 1 else: 0): 1 else: 0) !=
                                 comptime_error("goto not supported")
 
                             (p = (start_match + (((if has_first_cu != 0: 1 else: 0)) as isize as usize)))
-                            if (if has_req_cu and (if p > req_cu_ptr: 1 else: 0): 1 else: 0) != 0:
+                            if (if has_req_cu != 0 and (if p > req_cu_ptr: 1 else: 0) != 0: 1 else: 0) != 0:
                                 var check_length: c_ulong = 0 // init: untranslatable
-                                if (if (if check_length < 5000: 1 else: 0) or ((if (not anchored) and (if check_length < 5000000: 1 else: 0): 1 else: 0)): 1 else: 0) != 0:
+                                if (if (if check_length < 5000: 1 else: 0) != 0 or ((if (not anchored) != 0 and (if check_length < 5000000: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                                     if (if req_cu != req_cu2: 1 else: 0) != 0:
                                         var pp: *const u8 = null // init: untranslatable
                                         (p = memchr(pp, req_cu, ((end_subject as usize -% pp as usize) / sizeof[u8]())))
-                                        if (if p == ((0 as *mut c_void)): 1 else: 0) != 0:
+                                        if (if p == null: 1 else: 0) != 0:
                                             (p = memchr(pp, req_cu2, ((end_subject as usize -% pp as usize) / sizeof[u8]())))
-                                            if (if p == ((0 as *mut c_void)): 1 else: 0) != 0:
+                                            if (if p == null: 1 else: 0) != 0:
                                                 (p = end_subject)
 
 
                                     else:
                                         (p = memchr(p, req_cu, ((end_subject as usize -% p as usize) / sizeof[u8]())))
-                                        if (if p == ((0 as *mut c_void)): 1 else: 0) != 0:
+                                        if (if p == null: 1 else: 0) != 0:
                                             (p = end_subject)
 
 
@@ -342,23 +349,25 @@ if (if (not startline) and (if ((re.flags & 64)) != 0: 1 else: 0): 1 else: 0) !=
 
                     (mb.start_used_ptr = start_match)
                     (mb.last_used_ptr = start_match)
-                    (mb.recursive = ((0 as *mut c_void)))
+                    (mb.recursive = null)
                     (start_match = start_match + 1)
                     if (if start_match > end_subject: 1 else: 0) != 0:
                         break
 
-                    if (if (if (if (if (if start_match[(0 - 1)] == 13: 1 else: 0) and (if start_match < end_subject: 1 else: 0): 1 else: 0) and (if unsafe: *start_match == 10: 1 else: 0): 1 else: 0) and (if ((re.flags & 2048)) == 0: 1 else: 0): 1 else: 0) and ((if (if (if mb.nltype == 1: 1 else: 0) or (if mb.nltype == 2: 1 else: 0): 1 else: 0) or (if mb.nllen == 2: 1 else: 0): 1 else: 0)): 1 else: 0) != 0:
+                    if (if (if (if (if (if start_match[(0 - 1)] == 13: 1 else: 0) != 0 and (if start_match < end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *start_match == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((re.flags & 2048)) == 0: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (if mb.nltype == 1: 1 else: 0) != 0 or (if mb.nltype == 2: 1 else: 0) != 0: 1 else: 0) != 0 or (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                         (start_match = start_match + 1)
 
 
-                __pc = 1; continue
+                __pc = 1
+                continue
             1 =>  // NOMATCH_EXIT
                 (match_data.subject = original_subject)
                 (match_data.subject_length = length)
                 (match_data.start_offset = start_offset)
-                __pc = 2; continue
+                __pc = 2
+                continue
             2 =>  // EXIT
-                while (if rws.next != ((0 as *mut c_void)): 1 else: 0) != 0:
+                while (if rws.next != null: 1 else: 0) != 0:
                     var next: *mut RWS_anchor = null // init failed
                     (rws.next = next.next)
                     mb.memctl.free(next, mb.memctl.memory_data)
