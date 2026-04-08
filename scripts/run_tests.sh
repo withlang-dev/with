@@ -19,6 +19,7 @@ set -euo pipefail
 #   WITH_TEST_JOBS=N     — number of parallel jobs (default: CPU count)
 #   WITH_TEST_TIMING=1   — show per-test timing, under-load summaries, suite throughput, and isolated reruns
 #   WITH_TEST_TIMING_ISOLATED_TOP=N — with timing enabled, rerun top N slow under-load tests serially (default: 10, 0 disables)
+#   WITH_TEST_TIMING_PHASES_TOP=N — with timing enabled, profile top N isolated reruns and print compiler phase breakdowns (default: 5, 0 disables)
 #   WITH_TEST_TIMEOUT=N  — per-test timeout in seconds (default: 30)
 #   WITH_TEST_DEBUG=1    — keep debug info for ephemeral test binaries (default: 0, pass -g0)
 
@@ -31,6 +32,7 @@ RUN_TIMEOUT_SECS="${WITH_TEST_TIMEOUT:-30}"
 JOBS="${WITH_TEST_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)}"
 SHOW_TIMING="${WITH_TEST_TIMING:-0}"
 ISOLATED_TIMING_TOP="${WITH_TEST_TIMING_ISOLATED_TOP:-10}"
+PHASE_TIMING_TOP="${WITH_TEST_TIMING_PHASES_TOP:-5}"
 KEEP_TEST_DEBUG="${WITH_TEST_DEBUG:-0}"
 
 # Portable millisecond clock. Uses perl for sub-second precision
@@ -75,17 +77,113 @@ echo ""
 # Export variables needed by the worker
 export COMPILER RUN_TIMEOUT_SECS
 
+parse_test_directives() {
+  local file="$1"
+  TEST_EXPECT_STDOUT=""
+  TEST_EXPECT_CHECK_FAIL=""
+  TEST_EXPECT_BUILD_FAIL=""
+  TEST_EXPECT_CHECK_STDOUT=""
+  TEST_EXPECT_EXIT=""
+  TEST_EXPECT_STDERR=""
+  TEST_CHECK_ONLY=0
+  TEST_EXTRA_ARGS=""
+  TEST_SKIP=0
+
+  while IFS= read -r line; do
+    case "$line" in
+      "//! skip"*)
+        TEST_SKIP=1
+        return
+        ;;
+      "//! expect-stdout: "*)
+        TEST_EXPECT_STDOUT="${line#//! expect-stdout: }"
+        ;;
+      "//! expect-check-fail: "*)
+        TEST_EXPECT_CHECK_FAIL="${line#//! expect-check-fail: }"
+        ;;
+      "//! expect-error: "*)
+        TEST_EXPECT_CHECK_FAIL="${line#//! expect-error: }"
+        ;;
+      "//! expect-build-fail: "*)
+        TEST_EXPECT_BUILD_FAIL="${line#//! expect-build-fail: }"
+        ;;
+      "//! check-only"*)
+        TEST_CHECK_ONLY=1
+        ;;
+      "//! expect-check-stdout: "*)
+        TEST_EXPECT_CHECK_STDOUT="${line#//! expect-check-stdout: }"
+        ;;
+      "//! args: "*)
+        TEST_EXTRA_ARGS="${line#//! args: }"
+        ;;
+      "//! expect-exit: "*)
+        TEST_EXPECT_EXIT="${line#//! expect-exit: }"
+        ;;
+      "//! expect-stderr: "*)
+        TEST_EXPECT_STDERR="${line#//! expect-stderr: }"
+        ;;
+      "//!"*)
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done < "$file"
+}
+
+profile_test_phases() {
+  local file="$1"
+  local debug_args=""
+  if [[ "$KEEP_TEST_DEBUG" != "1" ]]; then
+    debug_args="-g0"
+  fi
+
+  parse_test_directives "$file"
+  if [[ "$TEST_SKIP" -eq 1 ]]; then
+    return
+  fi
+
+  local my_tmp
+  my_tmp="$(mktemp -d)"
+  local rc=0
+
+  if [[ -n "$TEST_EXPECT_CHECK_FAIL" ]]; then
+    WITH_PROFILE=1 timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
+  elif [[ -n "$TEST_EXPECT_BUILD_FAIL" ]]; then
+    WITH_PROFILE=1 timeout "$RUN_TIMEOUT_SECS" "$COMPILER" build $debug_args $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
+    local stem="${file%.w}"
+    rm -f "$stem" "${stem}.o" 2>/dev/null || true
+  elif [[ -n "$TEST_EXPECT_CHECK_STDOUT" || "$TEST_CHECK_ONLY" -eq 1 ]]; then
+    WITH_PROFILE=1 timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
+  else
+    WITH_PROFILE=1 timeout "$RUN_TIMEOUT_SECS" "$COMPILER" run $debug_args $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
+    local stem="${file%.w}"
+    rm -f "$stem" "${stem}.o" 2>/dev/null || true
+  fi
+
+  if [[ "$rc" -ne 0 && -z "$TEST_EXPECT_EXIT" && -z "$TEST_EXPECT_CHECK_FAIL" && -z "$TEST_EXPECT_BUILD_FAIL" ]]; then
+    rm -rf "$my_tmp"
+    return 1
+  fi
+  if [[ -n "$TEST_EXPECT_EXIT" && "$rc" -ne "$TEST_EXPECT_EXIT" ]]; then
+    rm -rf "$my_tmp"
+    return 1
+  fi
+
+  grep '^\[profile\]' "$my_tmp/err" | awk '
+    {
+      phase = $2
+      ms = $3 + 0
+      printf "%s\t%.3f\n", phase, ms
+    }
+  '
+
+  rm -rf "$my_tmp"
+}
+
 run_single_test() {
   local file="$1"
   local result_file="$2"
-  local expect_stdout=""
-  local expect_check_fail=""
-  local expect_build_fail=""
-  local expect_check_stdout=""
-  local expect_exit=""
-  local expect_stderr=""
-  local check_only=0
-  local extra_args=""
   local name
   name="$(basename "$file" .w)"
   local debug_args=""
@@ -109,77 +207,41 @@ run_single_test() {
   local my_tmp
   my_tmp="$(mktemp -d)"
 
-  # Parse directives from file header
-  while IFS= read -r line; do
-    case "$line" in
-      "//! skip"*)
-        _emit_result "PASS $name (skipped)"
-        rm -rf "$my_tmp"
-        return
-        ;;
-      "//! expect-stdout: "*)
-        expect_stdout="${line#//! expect-stdout: }"
-        ;;
-      "//! expect-check-fail: "*)
-        expect_check_fail="${line#//! expect-check-fail: }"
-        ;;
-      "//! expect-error: "*)
-        expect_check_fail="${line#//! expect-error: }"
-        ;;
-      "//! expect-build-fail: "*)
-        expect_build_fail="${line#//! expect-build-fail: }"
-        ;;
-      "//! check-only"*)
-        check_only=1
-        ;;
-      "//! expect-check-stdout: "*)
-        expect_check_stdout="${line#//! expect-check-stdout: }"
-        ;;
-      "//! args: "*)
-        extra_args="${line#//! args: }"
-        ;;
-      "//! expect-exit: "*)
-        expect_exit="${line#//! expect-exit: }"
-        ;;
-      "//! expect-stderr: "*)
-        expect_stderr="${line#//! expect-stderr: }"
-        ;;
-      "//!"*)
-        ;;
-      *)
-        break
-        ;;
-    esac
-  done < "$file"
+  parse_test_directives "$file"
 
   # Case 1: expect check to fail with message
-  if [[ -n "$expect_check_fail" ]]; then
+  if [[ "$TEST_SKIP" -eq 1 ]]; then
+    _emit_result "PASS $name (skipped)"
+    rm -rf "$my_tmp"
+    return
+  fi
+  if [[ -n "$TEST_EXPECT_CHECK_FAIL" ]]; then
     local rc=0
-    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
+    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
       _emit_result "FAIL $name (expected check failure)"
       rm -rf "$my_tmp"
       return
     fi
-    if grep -Fq "$expect_check_fail" "$my_tmp/err"; then
+    if grep -Fq "$TEST_EXPECT_CHECK_FAIL" "$my_tmp/err"; then
       _emit_result "PASS $name"
     else
-      _emit_result "FAIL $name (missing error: $expect_check_fail)"
+      _emit_result "FAIL $name (missing error: $TEST_EXPECT_CHECK_FAIL)"
     fi
     rm -rf "$my_tmp"
     return
   fi
 
   # Case 2: expect build to fail with message
-  if [[ -n "$expect_build_fail" ]]; then
+  if [[ -n "$TEST_EXPECT_BUILD_FAIL" ]]; then
     local rc=0
-    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" build $debug_args $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
+    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" build $debug_args $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
       _emit_result "FAIL $name (expected build failure)"
-    elif grep -Fq "$expect_build_fail" "$my_tmp/err"; then
+    elif grep -Fq "$TEST_EXPECT_BUILD_FAIL" "$my_tmp/err"; then
       _emit_result "PASS $name"
     else
-      _emit_result "FAIL $name (missing error: $expect_build_fail)"
+      _emit_result "FAIL $name (missing error: $TEST_EXPECT_BUILD_FAIL)"
     fi
     local stem="${file%.w}"
     rm -f "$stem" "${stem}.o" 2>/dev/null || true
@@ -188,26 +250,26 @@ run_single_test() {
   fi
 
   # Case 2b: check with expected stdout (for dump tests)
-  if [[ -n "$expect_check_stdout" ]]; then
+  if [[ -n "$TEST_EXPECT_CHECK_STDOUT" ]]; then
     local rc=0
-    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
+    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
     if [[ "$rc" -ne 0 ]]; then
       _emit_result "FAIL $name (check failed with rc=$rc)"
-    elif grep -Fq "$expect_check_stdout" "$my_tmp/out"; then
+    elif grep -Fq "$TEST_EXPECT_CHECK_STDOUT" "$my_tmp/out"; then
       _emit_result "PASS $name"
     else
       local got
       got="$(head -5 "$my_tmp/out")"
-      _emit_result "FAIL $name (missing output: $expect_check_stdout, got: $got)"
+      _emit_result "FAIL $name (missing output: $TEST_EXPECT_CHECK_STDOUT, got: $got)"
     fi
     rm -rf "$my_tmp"
     return
   fi
 
   # Case 3: check-only (no build/run)
-  if [[ "$check_only" -eq 1 ]]; then
+  if [[ "$TEST_CHECK_ONLY" -eq 1 ]]; then
     local rc=0
-    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
+    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
       _emit_result "PASS $name"
     else
@@ -219,7 +281,7 @@ run_single_test() {
 
   # Case 4: build+run
   local rc=0
-  timeout "$RUN_TIMEOUT_SECS" "$COMPILER" run $debug_args $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
+  timeout "$RUN_TIMEOUT_SECS" "$COMPILER" run $debug_args $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
 
   # Clean up artifacts
   local stem="${file%.w}"
@@ -231,24 +293,24 @@ run_single_test() {
     return
   fi
 
-  if [[ -n "$expect_exit" ]]; then
+  if [[ -n "$TEST_EXPECT_EXIT" ]]; then
     # Expected non-zero exit code (e.g. panic tests, stack overflow)
-    if [[ "$rc" -ne "$expect_exit" ]]; then
-      _emit_result "FAIL $name (exit code $rc, expected $expect_exit)"
+    if [[ "$rc" -ne "$TEST_EXPECT_EXIT" ]]; then
+      _emit_result "FAIL $name (exit code $rc, expected $TEST_EXPECT_EXIT)"
       rm -rf "$my_tmp"
       return
     fi
-    if [[ -n "$expect_stdout" ]] && ! grep -Fq "$expect_stdout" "$my_tmp/out"; then
+    if [[ -n "$TEST_EXPECT_STDOUT" ]] && ! grep -Fq "$TEST_EXPECT_STDOUT" "$my_tmp/out"; then
       local got
       got="$(head -1 "$my_tmp/out" 2>/dev/null || echo "(empty)")"
-      _emit_result "FAIL $name (stdout mismatch, expected: $expect_stdout, got: $got)"
+      _emit_result "FAIL $name (stdout mismatch, expected: $TEST_EXPECT_STDOUT, got: $got)"
       rm -rf "$my_tmp"
       return
     fi
-    if [[ -n "$expect_stderr" ]] && ! grep -Fq "$expect_stderr" "$my_tmp/err"; then
+    if [[ -n "$TEST_EXPECT_STDERR" ]] && ! grep -Fq "$TEST_EXPECT_STDERR" "$my_tmp/err"; then
       local got_err
       got_err="$(head -1 "$my_tmp/err" 2>/dev/null || echo "(empty)")"
-      _emit_result "FAIL $name (stderr mismatch, expected: $expect_stderr, got: $got_err)"
+      _emit_result "FAIL $name (stderr mismatch, expected: $TEST_EXPECT_STDERR, got: $got_err)"
       rm -rf "$my_tmp"
       return
     fi
@@ -266,23 +328,23 @@ run_single_test() {
   fi
 
   # If no expect-stdout directive, pass on exit 0
-  if [[ -z "$expect_stdout" ]]; then
+  if [[ -z "$TEST_EXPECT_STDOUT" ]]; then
     _emit_result "PASS $name"
     rm -rf "$my_tmp"
     return
   fi
 
-  if grep -Fq "$expect_stdout" "$my_tmp/out"; then
+  if grep -Fq "$TEST_EXPECT_STDOUT" "$my_tmp/out"; then
     _emit_result "PASS $name"
   else
     local got
     got="$(head -1 "$my_tmp/out" 2>/dev/null || echo "(empty)")"
-    _emit_result "FAIL $name (stdout mismatch, expected: $expect_stdout, got: $got)"
+    _emit_result "FAIL $name (stdout mismatch, expected: $TEST_EXPECT_STDOUT, got: $got)"
   fi
   rm -rf "$my_tmp"
 }
 
-export -f run_single_test _epoch_ms
+export -f parse_test_directives profile_test_phases run_single_test _epoch_ms
 export results_dir
 
 suite_start_ms="$(_epoch_ms)"
@@ -429,6 +491,56 @@ if [[ "$SHOW_TIMING" == "1" ]]; then
     done < "$top_under_load_file"
 
     rm -rf "$isolated_tmp"
+  fi
+
+  if [[ "$failed" -eq 0 && "$PHASE_TIMING_TOP" -gt 0 ]]; then
+    phase_tmp="$(mktemp -d)"
+    top_phase_file="$phase_tmp/top_phase.tsv"
+
+    printf "%b" "$timing_data" |
+      awk -F'	' 'NF >= 3 && $3 != "" { print }' |
+      sort -t'	' -k1 -rn |
+      head -"$PHASE_TIMING_TOP" > "$top_phase_file"
+
+    echo ""
+    echo "--- compiler phase breakdown for top ${PHASE_TIMING_TOP} under-load tests ---"
+    echo "  phase totals come from WITH_PROFILE; residual = isolated wall minus summed compiler phases"
+
+    while IFS='	' read -r under_ms under_msg under_file; do
+      [[ -z "$under_file" ]] && continue
+      isolated_result="$phase_tmp/result.tsv"
+      run_single_test "$under_file" "$isolated_result"
+      isolated_raw="$(cat "$isolated_result")"
+      isolated_msg="${isolated_raw%%	*}"
+      isolated_rest="${isolated_raw#*	}"
+      isolated_ms="${isolated_rest%%	*}"
+
+      if [[ "$isolated_msg" != PASS* ]]; then
+        printf "  %s\n" "$isolated_msg"
+        continue
+      fi
+
+      phase_data="$(profile_test_phases "$under_file" || true)"
+      profile_sum="$(printf "%s\n" "$phase_data" | awk -F'	' 'NF >= 2 { sum += $2 } END { printf "%.3f", sum + 0.0 }')"
+      residual_ms="$(awk -v total="$isolated_ms" -v prof="$profile_sum" 'BEGIN { printf "%.3f", total - prof }')"
+
+      printf "  %s\n" "$isolated_msg"
+      printf "      isolated wall: %s ms\n" "$isolated_ms"
+      printf "      compiler sum: %s ms\n" "$profile_sum"
+      printf "      residual:     %s ms\n" "$residual_ms"
+
+      if [[ -n "$phase_data" ]]; then
+        printf "%s\n" "$phase_data" |
+          sort -t'	' -k2,2nr |
+          head -5 |
+          while IFS='	' read -r phase_name phase_ms; do
+            [[ -z "$phase_name" ]] && continue
+            printf "      %16s  %8s ms\n" "$phase_name" "$phase_ms"
+          done
+      fi
+    done < "$top_phase_file"
+
+    rm -rf "$phase_tmp"
   fi
 fi
 
