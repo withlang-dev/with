@@ -865,7 +865,8 @@ if (if ng_it.name == name: 1 else: 0) != 0:
 
     tablecount = tablecount + duplicate_count
     while 1 != 0:
-        if (if (duplicate_count = duplicate_count - 1) == 0: 1 else: 0) != 0:
+        duplicate_count = duplicate_count - 1
+        if duplicate_count == 0:
             break
 
         while 1 != 0:
