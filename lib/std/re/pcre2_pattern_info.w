@@ -123,14 +123,16 @@ fn pcre2_callout_enumerate_8(p0: *const pcre2_real_code_8, p1: *const fn(*mut pc
                 (cb.callout_string = ((0 as *mut c_void)))
                 (rc = callback(&cb, callout_data))
                 if (if rc != 0: 1 else: 0) != 0:
-return rc
+                    return rc
+
                 cc = cc + _pcre2_OP_lengths_8[unsafe: *cc]
             OP_CALLOUT_STR =>
                 (cb.callout_number = 0)
                 (cb.callout_string = ((cc + (((1 + (4 * 2))) as isize as usize)) + (1 as isize as usize)))
                 (rc = callback(&cb, callout_data))
                 if (if rc != 0: 1 else: 0) != 0:
-return rc
+                    return rc
+
             _ =>
                 cc = cc + _pcre2_OP_lengths_8[unsafe: *cc]
 

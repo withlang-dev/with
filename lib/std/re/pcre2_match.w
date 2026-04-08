@@ -187,7 +187,7 @@ fn pcre2_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c
 
                     (match_data.heapframes_size = heapframes_size)
 
-                __builtin___memset_chk((((match_data.heapframes) as *mut i8) + 120), 255, (frame_size -% 120), __builtin_object_size((((match_data.heapframes) as *mut i8) + 120), 0))
+                mem_set((((match_data.heapframes) as *mut i8) + 120), 255, (frame_size -% 120), __builtin_object_size((((match_data.heapframes) as *mut i8) + 120), 0))
                 (mb.lcc = (re.tables + (0 as isize as usize)))
                 (mb.fcc = (re.tables + (256 as isize as usize)))
                 if (if ((re.flags & 16)) != 0: 1 else: 0) != 0:
@@ -233,40 +233,49 @@ if (if (not startline) and (if ((re.flags & 64)) != 0: 1 else: 0): 1 else: 0) !=
                                         (pp1 = memchr(start_match, first_cu, searchlength))
                                         (memchr_found_first_cu = (if ((if pp1 == ((0 as *mut c_void)): 1 else: 0)) != 0: end_subject else: pp1))
                                     else:
-(pp1 = (if ((if memchr_found_first_cu == end_subject: 1 else: 0)) != 0: ((0 as *mut c_void)) else: memchr_found_first_cu))
+                                        (pp1 = (if ((if memchr_found_first_cu == end_subject: 1 else: 0)) != 0: ((0 as *mut c_void)) else: memchr_found_first_cu))
+
                                     if (if (if memchr_found_first_cu2 == ((0 as *mut c_void)): 1 else: 0) or (if start_match > memchr_found_first_cu2: 1 else: 0): 1 else: 0) != 0:
                                         (pp2 = memchr(start_match, first_cu2, searchlength))
                                         (memchr_found_first_cu2 = (if ((if pp2 == ((0 as *mut c_void)): 1 else: 0)) != 0: end_subject else: pp2))
                                     else:
-(pp2 = (if ((if memchr_found_first_cu2 == end_subject: 1 else: 0)) != 0: ((0 as *mut c_void)) else: memchr_found_first_cu2))
+                                        (pp2 = (if ((if memchr_found_first_cu2 == end_subject: 1 else: 0)) != 0: ((0 as *mut c_void)) else: memchr_found_first_cu2))
+
                                     if (if pp1 == ((0 as *mut c_void)): 1 else: 0) != 0:
-(start_match = (if ((if pp2 == ((0 as *mut c_void)): 1 else: 0)) != 0: end_subject else: pp2))                                    else:
-(start_match = (if ((if (if pp2 == ((0 as *mut c_void)): 1 else: 0) or (if pp1 < pp2: 1 else: 0): 1 else: 0)) != 0: pp1 else: pp2))
+                                        (start_match = (if ((if pp2 == ((0 as *mut c_void)): 1 else: 0)) != 0: end_subject else: pp2))
+                                    else:
+                                        (start_match = (if ((if (if pp2 == ((0 as *mut c_void)): 1 else: 0) or (if pp1 < pp2: 1 else: 0): 1 else: 0)) != 0: pp1 else: pp2))
+
                                 else:
                                     (start_match = memchr(start_match, first_cu, ((end_subject as usize -% start_match as usize) / sizeof[u8]())))
                                     if (if start_match == ((0 as *mut c_void)): 1 else: 0) != 0:
-(start_match = end_subject)
+                                        (start_match = end_subject)
+
 
                                 if (if (if mb.partial == 0: 1 else: 0) and (if start_match >= mb.end_subject: 1 else: 0): 1 else: 0) != 0:
                                     (rc = 0)
                                     break
 
                             else:
-if startline != 0:
+                                if startline != 0:
                                     if (if start_match > (mb.start_subject + start_offset): 1 else: 0) != 0:
                                         if (if (if (if (if start_match[(0 - 1)] == 13: 1 else: 0) and ((if (if mb.nltype == 1: 1 else: 0) or (if mb.nltype == 2: 1 else: 0): 1 else: 0)): 1 else: 0) and (if start_match < end_subject: 1 else: 0): 1 else: 0) and (if unsafe: *start_match == 10: 1 else: 0): 1 else: 0) != 0:
-{ let __tmp = start_match; start_match = start_match + 1; __tmp }
+                                            { let __tmp = start_match; start_match = start_match + 1; __tmp }
+
 
                                 else:
-if (if start_bits != ((0 as *mut c_void)): 1 else: 0) != 0:
+                                    if (if start_bits != ((0 as *mut c_void)): 1 else: 0) != 0:
                                         while (if start_match < end_subject: 1 else: 0) != 0:
                                             if (if ((start_bits[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0) != 0:
-break
+                                                break
+
                                             { let __tmp = start_match; start_match = start_match + 1; __tmp }
 
                                         if (if (if mb.partial == 0: 1 else: 0) and (if start_match >= mb.end_subject: 1 else: 0): 1 else: 0) != 0:
                                             (rc = 0)
                                             break
+
+
 
 
 
@@ -284,12 +293,14 @@ break
                                         if (if p == ((0 as *mut c_void)): 1 else: 0) != 0:
                                             (p = memchr(pp, req_cu2, ((end_subject as usize -% pp as usize) / sizeof[u8]())))
                                             if (if p == ((0 as *mut c_void)): 1 else: 0) != 0:
-(p = end_subject)
+                                                (p = end_subject)
+
 
                                     else:
                                         (p = memchr(p, req_cu, ((end_subject as usize -% p as usize) / sizeof[u8]())))
                                         if (if p == ((0 as *mut c_void)): 1 else: 0) != 0:
-(p = end_subject)
+                                            (p = end_subject)
+
 
                                     if (if p >= end_subject: 1 else: 0) != 0:
                                         (rc = 0)
@@ -325,9 +336,11 @@ break
                     (rc = 0)
                     (start_match = new_start_match)
                     if (if anchored or (if start_match > end_subject: 1 else: 0): 1 else: 0) != 0:
-break
+                        break
+
                     if (if (if (if (if (if (if start_match > (subject + start_offset): 1 else: 0) and (if start_match[(0 - 1)] == 13: 1 else: 0): 1 else: 0) and (if start_match < end_subject: 1 else: 0): 1 else: 0) and (if unsafe: *start_match == 10: 1 else: 0): 1 else: 0) and (if ((re.flags & 2048)) == 0: 1 else: 0): 1 else: 0) and ((if (if (if mb.nltype == 1: 1 else: 0) or (if mb.nltype == 2: 1 else: 0): 1 else: 0) or (if mb.nllen == 2: 1 else: 0): 1 else: 0)): 1 else: 0) != 0:
-{ let __tmp = start_match; start_match = start_match + 1; __tmp }
+                        { let __tmp = start_match; start_match = start_match + 1; __tmp }
+
                     (mb.mark = ((0 as *mut c_void)))
 
                 __pc = 1; continue

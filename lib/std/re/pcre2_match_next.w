@@ -75,17 +75,20 @@ extern fn pcre2_get_startchar_8(p0: *mut pcre2_real_match_data_8) -> c_ulong
 fn pcre2_next_match_8(p0: *mut pcre2_real_match_data_8, p1: *mut c_ulong, p2: *mut c_uint) -> c_int:
     var rc: c_int = match_data.rc
     if (if rc < 0: 1 else: 0) != 0:
-return 0
+        return 0
+
     if (if (if ovector[0] != start_offset: 1 else: 0) and (if ovector[1] == start_offset: 1 else: 0): 1 else: 0) != 0:
         if (if start_offset >= match_data.subject_length: 1 else: 0) != 0:
-return 0
+            return 0
+
         (unsafe: *pstart_offset = do_bumpalong(match_data, ovector[1]))
         (unsafe: *poptions = 0)
         return 1
 
     if (if ovector[0] == ovector[1]: 1 else: 0) != 0:
         if (if ovector[0] >= match_data.subject_length: 1 else: 0) != 0:
-return 0
+            return 0
+
         (unsafe: *pstart_offset = ovector[1])
         (unsafe: *poptions = 8)
         return 1

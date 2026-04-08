@@ -78,7 +78,8 @@ fn pcre2_substring_copy_byname_8(p0: *mut pcre2_real_match_data_8, p1: *const u8
     var entrysize: c_int = 0
     (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, &first, &last))
     if (if entrysize < 0: 1 else: 0) != 0:
-return entrysize
+        return entrysize
+
     return failrc
 
 @[c_export("pcre2_substring_copy_bynumber_8")]
@@ -86,7 +87,8 @@ fn pcre2_substring_copy_bynumber_8(p0: *mut pcre2_real_match_data_8, p1: c_uint,
     var rc: c_int = 0
     (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, &size))
     if (if rc < 0: 1 else: 0) != 0:
-return rc
+        return rc
+
     (buffer[size] = 0)
     (unsafe: *sizeptr = size)
     return 0
@@ -103,7 +105,8 @@ fn pcre2_substring_get_byname_8(p0: *mut pcre2_real_match_data_8, p1: *const u8,
     var entrysize: c_int = 0
     (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, &first, &last))
     if (if entrysize < 0: 1 else: 0) != 0:
-return entrysize
+        return entrysize
+
     return failrc
 
 @[c_export("pcre2_substring_get_bynumber_8")]
@@ -111,7 +114,8 @@ fn pcre2_substring_get_bynumber_8(p0: *mut pcre2_real_match_data_8, p1: c_uint, 
     var rc: c_int = 0
     (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, &size))
     if (if rc < 0: 1 else: 0) != 0:
-return rc
+        return rc
+
     (yield_[size] = 0)
     (unsafe: *stringptr = yield_)
     (unsafe: *sizeptr = size)
@@ -123,7 +127,8 @@ fn pcre2_substring_length_byname_8(p0: *mut pcre2_real_match_data_8, p1: *const 
     var entrysize: c_int = 0
     (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, &first, &last))
     if (if entrysize < 0: 1 else: 0) != 0:
-return entrysize
+        return entrysize
+
     return failrc
 
 @[c_export("pcre2_substring_length_bynumber_8")]
@@ -132,7 +137,8 @@ fn pcre2_substring_length_bynumber_8(p0: *mut pcre2_real_match_data_8, p1: c_uin
     (left = match_data.ovector[(stringnumber *% 2)])
     (right = match_data.ovector[((stringnumber *% 2) +% 1)])
     if (if sizeptr != ((0 as *mut c_void)): 1 else: 0) != 0:
-(unsafe: *sizeptr = (if ((if left > right: 1 else: 0)) != 0: 0 else: (right -% left)))
+        (unsafe: *sizeptr = (if ((if left > right: 1 else: 0)) != 0: 0 else: (right -% left)))
+
     return 0
 
 @[c_export("pcre2_substring_nametable_scan_8")]
@@ -144,12 +150,14 @@ fn pcre2_substring_nametable_scan_8(p0: *const pcre2_real_code_8, p1: *const u8,
             (first = (last = entry))
             while (if first > nametable: 1 else: 0) != 0:
                 if (if _pcre2_strcmp_8(stringname, (((first - (entrysize as isize as usize)) + (2 as isize as usize)))) != 0: 1 else: 0) != 0:
-break
+                    break
+
                 first = first - entrysize
 
             while (if last < lastentry: 1 else: 0) != 0:
                 if (if _pcre2_strcmp_8(stringname, (((last + (entrysize as isize as usize)) + (2 as isize as usize)))) != 0: 1 else: 0) != 0:
-break
+                    break
+
                 last = last + entrysize
 
             (unsafe: *firstptr = first)
@@ -157,8 +165,10 @@ break
             return entrysize
 
         if (if c > 0: 1 else: 0) != 0:
-(bot = (mid + 1))        else:
-(top = mid)
+            (bot = (mid + 1))
+        else:
+            (top = mid)
+
 
 
 @[c_export("pcre2_substring_number_from_name_8")]
@@ -177,14 +187,17 @@ fn pcre2_substring_list_get_8(p0: *mut pcre2_real_match_data_8, p1: *mut *mut *m
     var count: c_int = 0
     var count2: c_int = 0
     if (if ((count = match_data.rc)) < 0: 1 else: 0) != 0:
-return count
+        return count
+
     if (if count == 0: 1 else: 0) != 0:
-(count = match_data.oveccount)
+        (count = match_data.oveccount)
+
     (count2 = (2 * count))
     (ovector = match_data.ovector)
     (size = (sizeof[pcre2_memctl]() +% sizeof[u8]()))
     if (if lengthsptr != ((0 as *mut c_void)): 1 else: 0) != 0:
-size = size + (sizeof[c_ulong]() *% count)
+        size = size + (sizeof[c_ulong]() *% count)
+
     (i = 0)
     while (if i < count2: 1 else: 0) != 0:
         size = size + (sizeof[u8]() +% 1)
@@ -200,7 +213,8 @@ size = size + (sizeof[c_ulong]() *% count)
         (size = (if ((if ovector[(i + 1)] > ovector[i]: 1 else: 0)) != 0: ((ovector[(i + 1)] -% ovector[i])) else: 0))
         (unsafe: *{ let __tmp = listp; listp = listp + 1; __tmp } = sp)
         if (if lensp != ((0 as *mut c_void)): 1 else: 0) != 0:
-(unsafe: *{ let __tmp = lensp; lensp = lensp + 1; __tmp } = size)
+            (unsafe: *{ let __tmp = lensp; lensp = lensp + 1; __tmp } = size)
+
         sp = sp + size
         (unsafe: *{ let __tmp = sp; sp = sp + 1; __tmp } = 0)
         i = i + 2

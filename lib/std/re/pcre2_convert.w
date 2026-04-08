@@ -44,10 +44,12 @@ extern fn pcre2_set_glob_separator_8(p0: *mut pcre2_real_convert_context_8, p1: 
 fn pcre2_pattern_convert_8(p0: *const u8, p1: c_ulong, p2: c_uint, p3: *mut *mut u8, p4: *mut c_ulong, p5: *mut pcre2_real_convert_context_8) -> c_int:
     var rc: c_int = 0
     if (if (if pattern == ((0 as *mut c_void)): 1 else: 0) and (if plength == 0: 1 else: 0): 1 else: 0) != 0:
-(pattern = null_str)
+        (pattern = null_str)
+
     if (if (if pattern == ((0 as *mut c_void)): 1 else: 0) or (if bufflenptr == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
         if (if bufflenptr != ((0 as *mut c_void)): 1 else: 0) != 0:
-(unsafe: *bufflenptr = 0)
+            (unsafe: *bufflenptr = 0)
+
 
     if utf != 0:
         (unsafe: *bufflenptr = 0)

@@ -208,9 +208,11 @@ while true:
                         (rc = match_data.rc)
                         (use_existing_match = 0)
                     else:
-(rc = pcre2_match_8(code, subject, length, start_offset, (options | goptions), match_data, mcontext))
+                        (rc = pcre2_match_8(code, subject, length, start_offset, (options | goptions), match_data, mcontext))
+
                     if (if rc < 0: 1 else: 0) != 0:
-comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+
                     if (if (if ovector[1] < ovector[0]: 1 else: 0) or (if ovector[0] < start_offset: 1 else: 0): 1 else: 0) != 0:
                         comptime_error("goto not supported")
 
@@ -224,15 +226,17 @@ comptime_error("goto not supported")
 
                     { let __tmp = subs; subs = subs + 1; __tmp }
                     if (if rc == 0: 1 else: 0) != 0:
-(rc = ovector_count)
+                        (rc = ovector_count)
+
                     (fraglength = (ovector[0] -% start_offset))
                     if (not replacement_only) != 0:
-while true:
+                        while true:
                             if overflowed != 0:
                                 extra_needed = extra_needed + chkmc_length
 
                             if not (0 != 0):
                                 break
+
 
                     (scb.output_offsets[0] = buff_offset)
                     (scb.oveccount = rc)
@@ -247,12 +251,13 @@ while true:
                                 break
 
                     else:
-while true:
+                        while true:
                             var chlen: c_uint = 0
                             var group: c_int = 0
                             if (if ptr >= repend: 1 else: 0) != 0:
                                 if (if ptrstackptr == 0: 1 else: 0) != 0:
-break
+                                    break
+
                                 (repend = ptrstack[{ ptrstackptr = ptrstackptr - 1; ptrstackptr }])
                                 (ptr = ptrstack[{ ptrstackptr = ptrstackptr - 1; ptrstackptr }])
                                 continue
@@ -267,9 +272,11 @@ break
 
                             if (if unsafe: *ptr == 36: 1 else: 0) != 0:
                                 if (if { ptr = ptr + 1; ptr } >= repend: 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                    comptime_error("goto not supported")
+
                                 if (if ((next = unsafe: *ptr)) == 36: 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                    comptime_error("goto not supported")
+
                                 (special = 0)
                                 (text1_start = ((0 as *mut c_void)))
                                 (text1_end = ((0 as *mut c_void)))
@@ -327,26 +334,31 @@ comptime_error("goto not supported")
 
                                     if (if group == 0: 1 else: 0) != 0:
                                         if (if ((suboptions & 1024)) != 0: 1 else: 0) != 0:
-continue
+                                            continue
+
                                         comptime_error("goto not supported")
 
                                     comptime_error("goto not supported")
 
                                 if (if next == 123: 1 else: 0) != 0:
                                     if (if { ptr = ptr + 1; ptr } >= repend: 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                        comptime_error("goto not supported")
+
                                     (next = unsafe: *ptr)
                                     (inparens = 1)
                                 else:
-if (if next == 60: 1 else: 0) != 0:
+                                    if (if next == 60: 1 else: 0) != 0:
                                         if (if { ptr = ptr + 1; ptr } >= repend: 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                            comptime_error("goto not supported")
+
                                         (next = unsafe: *ptr)
                                         (inangle = 1)
 
+
                                 if (if (not inangle) and (if next == 42: 1 else: 0): 1 else: 0) != 0:
                                     if (if { ptr = ptr + 1; ptr } >= repend: 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                        comptime_error("goto not supported")
+
                                     (next = unsafe: *ptr)
                                     (star = 1)
 
@@ -355,7 +367,8 @@ comptime_error("goto not supported")
                                     while (if { ptr = ptr + 1; ptr } < repend: 1 else: 0) != 0:
                                         (next = unsafe: *ptr)
                                         if (if (if next < 48: 1 else: 0) or (if next > 57: 1 else: 0): 1 else: 0) != 0:
-break
+                                            break
+
                                         (group = ((group * 10) + ((next - 48))))
                                         if (if group > code.top_bracket: 1 else: 0) != 0:
                                             if (if ((suboptions & 2048)) != 0: 1 else: 0) != 0:
@@ -382,13 +395,15 @@ break
                                         (text1_start = { ptr = ptr + 1; ptr })
                                         (rc = find_text_end(code, &ptr, repend, (if special == 45: 1 else: 0)))
                                         if (if rc != 0: 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                            comptime_error("goto not supported")
+
                                         (text1_end = ptr)
                                         if (if (if special == 43: 1 else: 0) and (if unsafe: *ptr == 58: 1 else: 0): 1 else: 0) != 0:
                                             (text2_start = { ptr = ptr + 1; ptr })
                                             (rc = find_text_end(code, &ptr, repend, 1))
                                             if (if rc != 0: 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                                comptime_error("goto not supported")
+
                                             (text2_end = ptr)
 
                                     else:
@@ -400,7 +415,8 @@ comptime_error("goto not supported")
 
                                 if inangle != 0:
                                     if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 62: 1 else: 0): 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                        comptime_error("goto not supported")
+
                                     { let __tmp = ptr; ptr = ptr + 1; __tmp }
 
                                 if star != 0:
@@ -408,7 +424,7 @@ comptime_error("goto not supported")
                                         if (if mark != ((0 as *mut c_void)): 1 else: 0) != 0:
                                             (fraglength = mark[(0 - 1)])
                                             if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
-while true:
+                                                while true:
                                                                                                         if overflowed != 0:
                                                         extra_needed = extra_needed + chkcc_rc
                                                         break
@@ -416,8 +432,9 @@ while true:
 
                                                     if not (0 != 0):
                                                         break
+
                                             else:
-while true:
+                                                while true:
                                                     if overflowed != 0:
                                                         extra_needed = extra_needed + chkmc_length
 
@@ -425,8 +442,10 @@ while true:
                                                         break
 
 
+
                                     else:
-comptime_error("goto not supported")
+                                        comptime_error("goto not supported")
+
                                 else:
                                     // label: GROUP_SUBSTITUTE
 if (if group < 0: 1 else: 0) != 0:
@@ -436,19 +455,22 @@ if (if group < 0: 1 else: 0) != 0:
                                     if (if rc < 0: 1 else: 0) != 0:
                                         if (if special == 0: 1 else: 0) != 0:
                                             if (if ((suboptions & 1024)) != 0: 1 else: 0) != 0:
-continue
+                                                continue
+
                                             comptime_error("goto not supported")
 
 
                                     if (if special != 0: 1 else: 0) != 0:
                                         if (if special == 45: 1 else: 0) != 0:
                                             if (if rc == 0: 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                                comptime_error("goto not supported")
+
                                             (text2_start = text1_start)
                                             (text2_end = text1_end)
 
                                         if (if ptrstackptr >= 20: 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                            comptime_error("goto not supported")
+
                                         (ptrstack[{ let __tmp = ptrstackptr; ptrstackptr = ptrstackptr + 1; __tmp }] = ptr)
                                         (ptrstack[{ let __tmp = ptrstackptr; ptrstackptr = ptrstackptr + 1; __tmp }] = repend)
                                         if (if rc == 0: 1 else: 0) != 0:
@@ -465,7 +487,7 @@ comptime_error("goto not supported")
                                     (subptrend = (subject + ovector[((group * 2) + 1)]))
                                     // label: SUBPTR_SUBSTITUTE
 if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
-while true:
+                                        while true:
                                                                                         if overflowed != 0:
                                                 extra_needed = extra_needed + chkcc_rc
                                                 break
@@ -473,8 +495,9 @@ while true:
 
                                             if not (0 != 0):
                                                 break
+
                                     else:
-while true:
+                                        while true:
                                             if overflowed != 0:
                                                 extra_needed = extra_needed + chkmc_length
 
@@ -482,11 +505,12 @@ while true:
                                                 break
 
 
+
                             else:
-if (if (if ((suboptions & 512)) != 0: 1 else: 0) and (if unsafe: *ptr == 92: 1 else: 0): 1 else: 0) != 0:
+                                if (if (if ((suboptions & 512)) != 0: 1 else: 0) and (if unsafe: *ptr == 92: 1 else: 0): 1 else: 0) != 0:
                                     var errorcode: c_int = 0
                                     if (if ptr < (repend - (1 as isize as usize)): 1 else: 0) != 0:
-match ptr[1]
+                                        match ptr[1]
                                             76 =>
                                                 (new_forcecase.to_case = 1)
                                                 (new_forcecase.single_char = 0)
@@ -515,6 +539,7 @@ match ptr[1]
 
                                             _ => 0
 
+
                                     if (if new_forcecase.to_case != 0: 1 else: 0) != 0:
                                         // label: SETFORCECASE
 
@@ -526,19 +551,21 @@ match ptr[1]
                                     { let __tmp = ptr; ptr = ptr + 1; __tmp }
                                     (rc = _pcre2_check_escape_8(&ptr, repend, &ch, &errorcode, code.overall_options, code.extra_options, code.top_bracket, 0, ((0 as *mut c_void))))
                                     if (if errorcode != 0: 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                        comptime_error("goto not supported")
+
                                     match rc
                                         ESC_E =>
                                             comptime_error("goto not supported")
                                             (escaped_literal = 1)
                                             continue
                                             if (if rc == ESC_v: 1 else: 0) != 0:
-(ch = 11)
+                                                (ch = 11)
+
                                                                                         (temp[0] = ch)
                                             (chlen = 1)
 
                                             if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
-while true:
+                                                while true:
                                                                                                         if overflowed != 0:
                                                         extra_needed = extra_needed + chkcc_rc
                                                         break
@@ -546,22 +573,26 @@ while true:
 
                                                     if not (0 != 0):
                                                         break
+
                                             else:
-while true:
+                                                while true:
                                                     if overflowed != 0:
                                                         extra_needed = extra_needed + chkmc_length
 
                                                     if not (0 != 0):
                                                         break
 
+
                                             continue
                                                                                         if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                                comptime_error("goto not supported")
+
                                             { ptr = ptr + 1; ptr }
                                             (name_start = ptr)
                                             (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
                                             if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 62: 1 else: 0): 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                                comptime_error("goto not supported")
+
                                             { ptr = ptr + 1; ptr }
                                             (special = 0)
                                             (group = (0 - 1))
@@ -578,12 +609,13 @@ comptime_error("goto not supported")
                                             (escaped_literal = 1)
                                             continue
                                             if (if rc == ESC_v: 1 else: 0) != 0:
-(ch = 11)
+                                                (ch = 11)
+
                                                                                         (temp[0] = ch)
                                             (chlen = 1)
 
                                             if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
-while true:
+                                                while true:
                                                                                                         if overflowed != 0:
                                                         extra_needed = extra_needed + chkcc_rc
                                                         break
@@ -591,22 +623,26 @@ while true:
 
                                                     if not (0 != 0):
                                                         break
+
                                             else:
-while true:
+                                                while true:
                                                     if overflowed != 0:
                                                         extra_needed = extra_needed + chkmc_length
 
                                                     if not (0 != 0):
                                                         break
 
+
                                             continue
                                                                                         if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                                comptime_error("goto not supported")
+
                                             { ptr = ptr + 1; ptr }
                                             (name_start = ptr)
                                             (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
                                             if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 62: 1 else: 0): 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                                comptime_error("goto not supported")
+
                                             { ptr = ptr + 1; ptr }
                                             (special = 0)
                                             (group = (0 - 1))
@@ -621,12 +657,13 @@ comptime_error("goto not supported")
                                             comptime_error("goto not supported")
                                         0 =>
                                             if (if rc == ESC_v: 1 else: 0) != 0:
-(ch = 11)
+                                                (ch = 11)
+
                                                                                         (temp[0] = ch)
                                             (chlen = 1)
 
                                             if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
-while true:
+                                                while true:
                                                                                                         if overflowed != 0:
                                                         extra_needed = extra_needed + chkcc_rc
                                                         break
@@ -634,22 +671,26 @@ while true:
 
                                                     if not (0 != 0):
                                                         break
+
                                             else:
-while true:
+                                                while true:
                                                     if overflowed != 0:
                                                         extra_needed = extra_needed + chkmc_length
 
                                                     if not (0 != 0):
                                                         break
 
+
                                             continue
                                                                                         if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                                comptime_error("goto not supported")
+
                                             { ptr = ptr + 1; ptr }
                                             (name_start = ptr)
                                             (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
                                             if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 62: 1 else: 0): 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                                comptime_error("goto not supported")
+
                                             { ptr = ptr + 1; ptr }
                                             (special = 0)
                                             (group = (0 - 1))
@@ -664,12 +705,14 @@ comptime_error("goto not supported")
                                             comptime_error("goto not supported")
                                         ESC_g =>
                                                                                         if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                                comptime_error("goto not supported")
+
                                             { ptr = ptr + 1; ptr }
                                             (name_start = ptr)
                                             (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
                                             if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 62: 1 else: 0): 1 else: 0) != 0:
-comptime_error("goto not supported")
+                                                comptime_error("goto not supported")
+
                                             { ptr = ptr + 1; ptr }
                                             (special = 0)
                                             (group = (0 - 1))
@@ -696,7 +739,7 @@ comptime_error("goto not supported")
                                     // (empty)
                                     ch
                                     if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
-while true:
+                                        while true:
                                                                                         if overflowed != 0:
                                                 extra_needed = extra_needed + chkcc_rc
                                                 break
@@ -704,13 +747,17 @@ while true:
 
                                             if not (0 != 0):
                                                 break
+
                                     else:
-while true:
+                                        while true:
                                             if overflowed != 0:
                                                 extra_needed = extra_needed + chkmc_length
 
                                             if not (0 != 0):
                                                 break
+
+
+
 
 
 
@@ -723,15 +770,17 @@ while true:
                                 buff_offset = buff_offset - newlength
                                 lengthleft = lengthleft + newlength
                                 if (not replacement_only) != 0:
-while true:
+                                    while true:
                                         if overflowed != 0:
                                             extra_needed = extra_needed + chkmc_length
 
                                         if not (0 != 0):
                                             break
 
+
                                 if (if rc < 0: 1 else: 0) != 0:
-suboptions = suboptions & ((0 - 256 - 1))
+                                    suboptions = suboptions & ((0 - 256 - 1))
+
 
                         else:
                             if (if oldlength > newlength: 1 else: 0) != 0:
