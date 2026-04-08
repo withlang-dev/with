@@ -64,6 +64,7 @@ extern fn pcre2_callout_enumerate_8(__p0: *const pcre2_real_code_8, __p1: *const
 fn pcre2_match_data_create_8(__p0: c_uint, __p1: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8:
     var oveccount = __p0
     var gcontext = __p1
+    var yield_: *mut pcre2_real_match_data_8 = null // init: untranslatable
     if (if oveccount < 1: 1 else: 0) != 0:
         (oveccount = 1)
 

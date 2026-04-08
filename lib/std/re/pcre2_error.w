@@ -100,6 +100,7 @@ fn pcre2_get_error_message_8(__p0: c_int, __p1: *mut u8, __p2: c_ulong) -> c_int
     var buffer = __p1
     var size = __p2
     var message: *const u8 = null
+    var i: c_ulong = 0 // init: untranslatable
     var n: c_int = 0
     var rc: c_int = 0
     if (if enumber >= 100: 1 else: 0) != 0:

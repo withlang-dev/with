@@ -209,6 +209,7 @@ options = options & (0 - 16384 - 1)
 
                 if (not replacement_only) != 0:
 while true:
+                        var chkmc_length: c_ulong = 0 // init: untranslatable
                         if overflowed != 0:
                             extra_needed = extra_needed + chkmc_length
 
@@ -217,6 +218,11 @@ while true:
 
                 (subs = 0)
                 while true:
+                    var ptrstack = 0 // init: untranslatable ([20]*const u8)
+                    var ptrstackptr: c_uint = 0 // init: untranslatable
+                    var forcecase = 0 // init: untranslatable (case_state)
+                    var casestart_offset: c_ulong = 0 // init: untranslatable
+                    var casestart_extra_needed: c_ulong = 0 // init: untranslatable
                     if use_existing_match != 0:
                         (rc = match_data.rc)
                         (use_existing_match = 0)
@@ -244,6 +250,7 @@ while true:
                     (fraglength = (ovector[0] -% start_offset))
                     if (not replacement_only) != 0:
                         while true:
+                            var chkmc_length: c_ulong = 0 // init: untranslatable
                             if overflowed != 0:
                                 extra_needed = extra_needed + chkmc_length
 
@@ -257,6 +264,7 @@ while true:
                     (ptr = replacement)
                     if (if ((suboptions & 32768)) != 0: 1 else: 0) != 0:
                         while true:
+                            var chkmc_length: c_ulong = 0 // init: untranslatable
                             if overflowed != 0:
                                 extra_needed = extra_needed + chkmc_length
 
@@ -265,8 +273,15 @@ while true:
 
                     else:
                         while true:
+                            var ch: c_uint = 0 // init: untranslatable
                             var chlen: c_uint = 0
                             var group: c_int = 0
+                            var special: c_uint = 0 // init: untranslatable
+                            var text1_start: *const u8 = null // init: untranslatable
+                            var text1_end: *const u8 = null // init: untranslatable
+                            var text2_start: *const u8 = null // init: untranslatable
+                            var text2_end: *const u8 = null // init: untranslatable
+                            var name = 0 // init: untranslatable ([129]u8)
                             if (if ptr >= repend: 1 else: 0) != 0:
                                 if (if ptrstackptr == 0: 1 else: 0) != 0:
                                     break
@@ -284,6 +299,13 @@ while true:
                                 comptime_error("goto not supported")
 
                             if (if unsafe: *ptr == 36: 1 else: 0) != 0:
+                                var inparens: c_int = 0 // init: untranslatable
+                                var inangle: c_int = 0 // init: untranslatable
+                                var star: c_int = 0 // init: untranslatable
+                                var sublength: c_ulong = 0 // init: untranslatable
+                                var next: u8 = 0 // init: untranslatable
+                                var subptr: *const u8 = null // init: untranslatable
+                                var subptrend: *const u8 = null // init: untranslatable
                                 if (if (ptr = ptr + 1) >= repend: 1 else: 0) != 0:
                                     comptime_error("goto not supported")
 
@@ -394,6 +416,8 @@ while true:
 
 
                                 else:
+                                    var name_len: c_ulong = 0 // init: untranslatable
+                                    var name_start: *const u8 = null // init: untranslatable
                                     (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
                                     (name[name_len] = 0)
 
@@ -434,10 +458,13 @@ while true:
 
                                 if star != 0:
                                     if (if _pcre2_strcmp_c8_8(name, STRING_MARK) == 0: 1 else: 0) != 0:
+                                        var mark: *const u8 = null // init: untranslatable
                                         if (if mark != ((0 as *mut c_void)): 1 else: 0) != 0:
                                             (fraglength = mark[(0 - 1)])
                                             if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
                                                 while true:
+                                                    var chkcc_length: c_ulong = 0 // init: untranslatable
+                                                    var chkcc_rc: c_ulong = 0 // init: untranslatable
                                                                                                         if overflowed != 0:
                                                         extra_needed = extra_needed + chkcc_rc
                                                         break
@@ -448,6 +475,7 @@ while true:
 
                                             else:
                                                 while true:
+                                                    var chkmc_length: c_ulong = 0 // init: untranslatable
                                                     if overflowed != 0:
                                                         extra_needed = extra_needed + chkmc_length
 
@@ -462,6 +490,9 @@ while true:
                                 else:
                                     // label: GROUP_SUBSTITUTE
 if (if group < 0: 1 else: 0) != 0:
+                                        var first: *const u8 = null // init: untranslatable
+                                        var last: *const u8 = null // init: untranslatable
+                                        var entry: *const u8 = null // init: untranslatable
                                         (rc = pcre2_substring_nametable_scan_8(code, name, &first, &last))
 
                                     (rc = pcre2_substring_length_bynumber_8(match_data, group, &sublength))
@@ -501,6 +532,8 @@ if (if group < 0: 1 else: 0) != 0:
                                     // label: SUBPTR_SUBSTITUTE
 if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
                                         while true:
+                                            var chkcc_length: c_ulong = 0 // init: untranslatable
+                                            var chkcc_rc: c_ulong = 0 // init: untranslatable
                                                                                         if overflowed != 0:
                                                 extra_needed = extra_needed + chkcc_rc
                                                 break
@@ -511,6 +544,7 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
                                     else:
                                         while true:
+                                            var chkmc_length: c_ulong = 0 // init: untranslatable
                                             if overflowed != 0:
                                                 extra_needed = extra_needed + chkmc_length
 
@@ -522,6 +556,7 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
                             else:
                                 if (if (if ((suboptions & 512)) != 0: 1 else: 0) and (if unsafe: *ptr == 92: 1 else: 0): 1 else: 0) != 0:
                                     var errorcode: c_int = 0
+                                    var new_forcecase = 0 // init: untranslatable (case_state)
                                     if (if ptr < (repend - (1 as isize as usize)): 1 else: 0) != 0:
                                         match ptr[1]
                                             76 =>
@@ -555,6 +590,12 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
                                     if (if new_forcecase.to_case != 0: 1 else: 0) != 0:
                                         // label: SETFORCECASE
+if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if forcecase.to_case != 0: 1 else: 0): 1 else: 0) != 0:
+                                            while true:
+                                                var chars_outstanding: c_ulong = 0 // init: untranslatable
+                                                if not (0 != 0):
+                                                    break
+
 
                                         (forcecase = new_forcecase)
                                         (casestart_offset = buff_offset)
@@ -579,6 +620,8 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
                                             if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
                                                 while true:
+                                                    var chkcc_length: c_ulong = 0 // init: untranslatable
+                                                    var chkcc_rc: c_ulong = 0 // init: untranslatable
                                                                                                         if overflowed != 0:
                                                         extra_needed = extra_needed + chkcc_rc
                                                         break
@@ -589,6 +632,7 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
                                             else:
                                                 while true:
+                                                    var chkmc_length: c_ulong = 0 // init: untranslatable
                                                     if overflowed != 0:
                                                         extra_needed = extra_needed + chkmc_length
 
@@ -597,7 +641,9 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
 
                                             continue
-                                                                                        if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
+                                                                                        var name_len: c_ulong = 0 // init: untranslatable
+                                            var name_start: *const u8 = null // init: untranslatable
+                                            if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
                                                 comptime_error("goto not supported")
 
                                             (ptr = ptr + 1)
@@ -629,6 +675,8 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
                                             if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
                                                 while true:
+                                                    var chkcc_length: c_ulong = 0 // init: untranslatable
+                                                    var chkcc_rc: c_ulong = 0 // init: untranslatable
                                                                                                         if overflowed != 0:
                                                         extra_needed = extra_needed + chkcc_rc
                                                         break
@@ -639,6 +687,7 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
                                             else:
                                                 while true:
+                                                    var chkmc_length: c_ulong = 0 // init: untranslatable
                                                     if overflowed != 0:
                                                         extra_needed = extra_needed + chkmc_length
 
@@ -647,7 +696,9 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
 
                                             continue
-                                                                                        if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
+                                                                                        var name_len: c_ulong = 0 // init: untranslatable
+                                            var name_start: *const u8 = null // init: untranslatable
+                                            if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
                                                 comptime_error("goto not supported")
 
                                             (ptr = ptr + 1)
@@ -677,6 +728,8 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
                                             if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
                                                 while true:
+                                                    var chkcc_length: c_ulong = 0 // init: untranslatable
+                                                    var chkcc_rc: c_ulong = 0 // init: untranslatable
                                                                                                         if overflowed != 0:
                                                         extra_needed = extra_needed + chkcc_rc
                                                         break
@@ -687,6 +740,7 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
                                             else:
                                                 while true:
+                                                    var chkmc_length: c_ulong = 0 // init: untranslatable
                                                     if overflowed != 0:
                                                         extra_needed = extra_needed + chkmc_length
 
@@ -695,7 +749,9 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
 
                                             continue
-                                                                                        if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
+                                                                                        var name_len: c_ulong = 0 // init: untranslatable
+                                            var name_start: *const u8 = null // init: untranslatable
+                                            if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
                                                 comptime_error("goto not supported")
 
                                             (ptr = ptr + 1)
@@ -717,7 +773,9 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
                                             comptime_error("goto not supported")
                                         ESC_g =>
-                                                                                        if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
+                                                                                        var name_len: c_ulong = 0 // init: untranslatable
+                                            var name_start: *const u8 = null // init: untranslatable
+                                            if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
                                                 comptime_error("goto not supported")
 
                                             (ptr = ptr + 1)
@@ -747,12 +805,15 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
                                             comptime_error("goto not supported")
 
                                 else:
+                                    var ch_start: *const u8 = null // init: untranslatable
                                     // label: LOADLITERAL
 (ch_start = ptr)
                                     // (empty)
                                     ch
                                     if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
                                         while true:
+                                            var chkcc_length: c_ulong = 0 // init: untranslatable
+                                            var chkcc_rc: c_ulong = 0 // init: untranslatable
                                                                                         if overflowed != 0:
                                                 extra_needed = extra_needed + chkcc_rc
                                                 break
@@ -763,6 +824,7 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
                                     else:
                                         while true:
+                                            var chkmc_length: c_ulong = 0 // init: untranslatable
                                             if overflowed != 0:
                                                 extra_needed = extra_needed + chkmc_length
 
@@ -774,16 +836,26 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
 
 
+                    if (if (if substitute_case_callout != ((0 as *mut c_void)): 1 else: 0) and (if forcecase.to_case != 0: 1 else: 0): 1 else: 0) != 0:
+                        while true:
+                            var chars_outstanding: c_ulong = 0 // init: untranslatable
+                            if not (0 != 0):
+                                break
+
+
                     if (if (if mcontext != ((0 as *mut c_void)): 1 else: 0) and (if mcontext.substitute_callout != ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
                         if (not overflowed) != 0:
                             (scb.subscount = subs)
                             (scb.output_offsets[1] = buff_offset)
                             (rc = mcontext.substitute_callout(&scb, mcontext.substitute_callout_data))
                             if (if rc != 0: 1 else: 0) != 0:
+                                var newlength: c_ulong = 0 // init: untranslatable
+                                var oldlength: c_ulong = 0 // init: untranslatable
                                 buff_offset = buff_offset - newlength
                                 lengthleft = lengthleft + newlength
                                 if (not replacement_only) != 0:
                                     while true:
+                                        var chkmc_length: c_ulong = 0 // init: untranslatable
                                         if overflowed != 0:
                                             extra_needed = extra_needed + chkmc_length
 
@@ -796,7 +868,12 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
 
                         else:
+                            var newlength_buf: c_ulong = 0 // init: untranslatable
+                            var newlength_extra: c_ulong = 0 // init: untranslatable
+                            var newlength: c_ulong = 0 // init: untranslatable
+                            var oldlength: c_ulong = 0 // init: untranslatable
                             if (if oldlength > newlength: 1 else: 0) != 0:
+                                var additional: c_ulong = 0 // init: untranslatable
                                 extra_needed = extra_needed + additional
 
 
@@ -809,6 +886,7 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
                 if (not replacement_only) != 0:
                     (fraglength = (length -% start_offset))
                     while true:
+                        var chkmc_length: c_ulong = 0 // init: untranslatable
                         if overflowed != 0:
                             extra_needed = extra_needed + chkmc_length
 
@@ -818,6 +896,7 @@ if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout ==
 
                 (temp[0] = 0)
                 while true:
+                    var chkmc_length: c_ulong = 0 // init: untranslatable
                     if overflowed != 0:
                         extra_needed = extra_needed + chkmc_length
 

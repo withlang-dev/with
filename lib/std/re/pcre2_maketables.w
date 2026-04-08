@@ -98,7 +98,9 @@ extern fn pcre2_get_error_message_8(__p0: c_int, __p1: *mut u8, __p2: c_ulong) -
 @[c_export("pcre2_maketables_8")]
 fn pcre2_maketables_8(__p0: *mut pcre2_real_general_context_8) -> *const u8:
     var gcontext = __p0
+    var yield_: *mut u8 = null // init: untranslatable
     var i: c_int = 0
+    var p: *mut u8 = null // init: untranslatable
     if (if yield_ == ((0 as *mut c_void)): 1 else: 0) != 0:
         return ((0 as *mut c_void))
 

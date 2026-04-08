@@ -63,6 +63,7 @@ fn pcre2_pattern_info_8(__p0: *const pcre2_real_code_8, __p1: c_uint, __p2: *mut
     var code = __p0
     var what = __p1
     var where_ = __p2
+    var re: *const pcre2_real_code_8 = null // init: untranslatable
     if (if where_ == ((0 as *mut c_void)): 1 else: 0) != 0:
         match what
             0 =>
@@ -113,6 +114,9 @@ fn pcre2_callout_enumerate_8(__p0: *const pcre2_real_code_8, __p1: *const fn(*mu
     var code = __p0
     var callback = __p1
     var callout_data = __p2
+    var re: *const pcre2_real_code_8 = null // init: untranslatable
+    var cb = 0 // init: untranslatable (pcre2_callout_enumerate_block_8)
+    var cc: *const u8 = null // init: untranslatable
     (cb.version = 0)
     while 1 != 0:
         var rc: c_int = 0

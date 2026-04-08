@@ -194,7 +194,10 @@ optim_flags = optim_flags & (0 - 4 - 1)
                     while (if (if (if (patlen -% skipatstart) >= 2: 1 else: 0) and (if ptr[skipatstart] == 40: 1 else: 0): 1 else: 0) and (if ptr[(skipatstart +% 1)] == 42: 1 else: 0): 1 else: 0) != 0:
                         (i = 0)
                         while (if i < (sizeof[[23]pso]() / sizeof[pso]()): 1 else: 0) != 0:
+                            var p: *const pso = null // init: untranslatable
                             if (if (if ((patlen -% skipatstart) -% 2) >= p.length: 1 else: 0) and (if _pcre2_strncmp_c8_8(((ptr + skipatstart) + (2 as isize as usize)), p.name, p.length) == 0: 1 else: 0): 1 else: 0) != 0:
+                                var c: c_uint = 0 // init: untranslatable
+                                var pp: c_uint = 0 // init: untranslatable
                                 skipatstart = skipatstart + (p.length + 2)
                                 match p.type_
                                     PSO_OPT =>
@@ -438,6 +441,7 @@ re.flags = re.flags | 8192
                         if (if groupnumber == 0: 1 else: 0) != 0:
                             (rgroup = codestart)
                         else:
+                            var search_from: *const u8 = null // init: untranslatable
                             (rgroup = ((0 as *mut c_void)))
                             while (if i < ccount: 1 else: 0) != 0:
                                 if (if groupnumber == rc[p].groupnumber: 1 else: 0) != 0:
@@ -555,6 +559,7 @@ ccontext.memctl.free((cb.groupinfo as *mut c_void), ccontext.memctl.memory_data)
                 if (if cb.first_data != ((0 as *mut c_void)): 1 else: 0) != 0:
                     var current_data: *mut compile_data = null // init failed
                     while true:
+                        var next_data: *mut compile_data = null // init: untranslatable
                         cb.cx.memctl.free(current_data, cb.cx.memctl.memory_data)
                         (current_data = next_data)
                         if not ((if current_data != ((0 as *mut c_void)): 1 else: 0) != 0):
@@ -567,6 +572,7 @@ ccontext.memctl.free((cb.groupinfo as *mut c_void), ccontext.memctl.memory_data)
 @[c_export("pcre2_code_free_8")]
 fn pcre2_code_free_8(__p0: *mut pcre2_real_code_8):
     var code = __p0
+    var ref_count: *mut c_ulong = null // init: untranslatable
     if (if code != ((0 as *mut c_void)): 1 else: 0) != 0:
         if (if ((code.flags & 262144)) != 0: 1 else: 0) != 0:
             if (if unsafe: *ref_count > 0: 1 else: 0) != 0:
@@ -582,6 +588,8 @@ fn pcre2_code_free_8(__p0: *mut pcre2_real_code_8):
 @[c_export("pcre2_code_copy_8")]
 fn pcre2_code_copy_8(__p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8:
     var code = __p0
+    var ref_count: *mut c_ulong = null // init: untranslatable
+    var newcode: *mut pcre2_real_code_8 = null // init: untranslatable
     if (if code == ((0 as *mut c_void)): 1 else: 0) != 0:
         return ((0 as *mut c_void))
 
@@ -599,6 +607,9 @@ fn pcre2_code_copy_8(__p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8:
 @[c_export("pcre2_code_copy_with_tables_8")]
 fn pcre2_code_copy_with_tables_8(__p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8:
     var code = __p0
+    var ref_count: *mut c_ulong = null // init: untranslatable
+    var newcode: *mut pcre2_real_code_8 = null // init: untranslatable
+    var newtables: *mut u8 = null // init: untranslatable
     if (if code == ((0 as *mut c_void)): 1 else: 0) != 0:
         return ((0 as *mut c_void))
 

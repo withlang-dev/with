@@ -49,6 +49,12 @@ fn pcre2_pattern_convert_8(__p0: *const u8, __p1: c_ulong, __p2: c_uint, __p3: *
     var bufflenptr = __p4
     var ccontext = __p5
     var rc: c_int = 0
+    var null_str = 0 // init: untranslatable ([1]u8)
+    var dummy_buffer = 0 // init: untranslatable ([100]u8)
+    var use_buffer: *mut u8 = null // init: untranslatable
+    var use_length: c_ulong = 0 // init: untranslatable
+    var utf: c_int = 0 // init: untranslatable
+    var pattype: c_uint = 0 // init: untranslatable
     if (if (if pattern == ((0 as *mut c_void)): 1 else: 0) and (if plength == 0: 1 else: 0): 1 else: 0) != 0:
         (pattern = null_str)
 
@@ -67,6 +73,8 @@ fn pcre2_pattern_convert_8(__p0: *const u8, __p1: c_ulong, __p2: c_uint, __p3: *
 
     var i: c_int = 0
     while (if i < 2: 1 else: 0) != 0:
+        var allocated: *mut u8 = null // init: untranslatable
+        var dummyrun: c_int = 0 // init: untranslatable
         match pattype
             16 =>
                 (rc = convert_glob((options & (0 - 16 - 1)), pattern, plength, utf, use_buffer, use_length, bufflenptr, dummyrun, ccontext))
@@ -87,6 +95,7 @@ fn pcre2_pattern_convert_8(__p0: *const u8, __p1: c_ulong, __p2: c_uint, __p3: *
 fn pcre2_converted_pattern_free_8(__p0: *mut u8):
     var converted = __p0
     if (if converted != ((0 as *mut c_void)): 1 else: 0) != 0:
+        var memctl: *mut pcre2_memctl = null // init: untranslatable
         memctl.free(memctl, memctl.memory_data)
 
 

@@ -123,6 +123,8 @@ fn pcre2_regcomp(__p0: *mut regex_t, __p1: *const i8, __p2: c_int) -> c_int:
     var preg = __p0
     var pattern = __p1
     var cflags = __p2
+    var erroffset: c_ulong = 0 // init: untranslatable
+    var patlen: c_ulong = 0 // init: untranslatable
     var errorcode: c_int = 0
     var options: c_int = 0
     var re_nsub: c_int = 0
@@ -184,6 +186,7 @@ fn pcre2_regexec(__p0: *const regex_t, __p1: *const i8, __p2: c_ulong, __p3: *mu
     var so: c_int = 0
     var eo: c_int = 0
     var options: c_int = 0
+    var md: *mut pcre2_real_match_data_8 = null // init: untranslatable
     if (if string == ((0 as *mut c_void)): 1 else: 0) != 0:
         return REG_INVARG
 
@@ -210,6 +213,8 @@ fn pcre2_regexec(__p0: *const regex_t, __p1: *const i8, __p2: c_ulong, __p3: *mu
         (eo = (string_len(string) as c_int))
 
     if (if rc >= 0: 1 else: 0) != 0:
+        var i: c_ulong = 0 // init: untranslatable
+        var ovector: *mut c_ulong = null // init: untranslatable
         while (if i < nmatch: 1 else: 0) != 0:
 (pmatch[i].rm_so = (pmatch[i].rm_eo = (0 - 1)))            (i = i + 1)
 
@@ -230,6 +235,7 @@ fn pcre2_regerror(__p0: c_int, __p1: *const regex_t, __p2: *mut i8, __p3: c_ulon
     var offset_buf: [23]c_char = (11 + 12)
     var snprintf_rc: c_int = 0
     var have_offset: c_int = 0
+    var i: c_ulong = 0 // init: untranslatable
     (i = 0)
     while (if unsafe: *message != 0: 1 else: 0) != 0:
 if (if (i +% 1) < errbuf_size: 1 else: 0) != 0:

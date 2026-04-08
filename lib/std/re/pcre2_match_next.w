@@ -77,6 +77,8 @@ fn pcre2_next_match_8(__p0: *mut pcre2_real_match_data_8, __p1: *mut c_ulong, __
     var pstart_offset = __p1
     var poptions = __p2
     var rc: c_int = match_data.rc
+    var start_offset: c_ulong = 0 // init: untranslatable
+    var ovector: *mut c_ulong = null // init: untranslatable
     if (if rc < 0: 1 else: 0) != 0:
         return 0
 
