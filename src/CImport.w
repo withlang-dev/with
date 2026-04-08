@@ -4958,20 +4958,7 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
         else if kind == CK_ENUM:
             output = output ++ ci_translate_enum(session, i)
         else if kind == CK_VAR:
-            // For migrate: try to translate static vars with their initializers
-            let mvar_name = with_cimport_decl_name(session, i)
-            let mvar_init = ci_try_eval_var_init(session, i)
-            let mvar_type = with_cimport_var_type_translated(session, i)
-            if mvar_init.len() > 0 and not ci_starts_with(mvar_type, "__UNSUPPORTED"):
-                if with_cimport_is_name_emitted(mvar_name) == 0:
-                    with_cimport_mark_name_emitted(mvar_name)
-                    let mvar_safe = ci_escape_reserved(mvar_name)
-                    if with_cimport_var_is_const(session, i) != 0:
-                        output = output ++ "let " ++ mvar_safe ++ ": " ++ mvar_type ++ " = " ++ mvar_init ++ "\n"
-                    else:
-                        output = output ++ "var " ++ mvar_safe ++ ": " ++ mvar_type ++ " = " ++ mvar_init ++ "\n"
-            else:
-                output = output ++ ci_translate_var(session, i, translated_structs)
+            output = output ++ ci_translate_var(session, i, translated_structs)
         else if kind == CK_TYPEDEF:
             let td_result = ci_translate_typedef(session, i, translated_structs)
             output = output ++ td_result
