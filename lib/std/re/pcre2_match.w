@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_match.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int
@@ -106,8 +106,8 @@ fn pcre2_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c
     var pp: *const u8 = null
     var __pc: i32 = 0
     while true:
-        match __pc:
-            0 ->
+        match __pc
+            0 =>
                 if (if (if subject == ((0 as *mut c_void)): 1 else: 0) and (if length == 0: 1 else: 0): 1 else: 0) != 0:
 (subject = null_str)
                 (start_match = (subject + start_offset))
@@ -149,25 +149,25 @@ fn pcre2_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c
                 (mb.name_entry_size = re.name_entry_size)
                 (mb.bsr_convention = re.bsr_convention)
                 (mb.nltype = 0)
-                match re.newline_convention:
-                    1 ->
+                match re.newline_convention
+                    1 =>
                         (mb.nllen = 1)
                         (mb.nl[0] = 13)
-                    2 ->
+                    2 =>
                         (mb.nllen = 1)
                         (mb.nl[0] = 10)
-                    6 ->
+                    6 =>
                         (mb.nllen = 1)
                         (mb.nl[0] = 0)
-                    3 ->
+                    3 =>
                         (mb.nllen = 2)
                         (mb.nl[0] = 13)
                         (mb.nl[1] = 10)
-                    4 ->
+                    4 =>
                         (mb.nltype = 1)
-                    5 ->
+                    5 =>
                         (mb.nltype = 2)
-                    _ -> pass
+                    _ => 0
 
                 (frame_size = (((((120 +% ((re.top_bracket * 2) *% sizeof[c_ulong]())) +% 8) -% 1)) & (0 - ((8 -% 1)) - 1)))
                 (mb.heap_limit = ((if ((if mcontext.heap_limit < re.limit_heap: 1 else: 0)) != 0: mcontext.heap_limit else: re.limit_heap)))
@@ -316,10 +316,10 @@ break
                         (start_partial = mb.start_used_ptr)
                         (match_partial = start_match)
 
-                    match rc:
-                        0 ->
+                    match rc
+                        0 =>
                             (new_start_match = (start_match + (1 as isize as usize)))
-                        _ ->
+                        _ =>
                             comptime_error("goto not supported")
 
                     (rc = 0)
@@ -331,7 +331,7 @@ break
                     (mb.mark = ((0 as *mut c_void)))
 
                 __pc = 1; continue
-            1 ->  // ENDLOOP
+            1 =>  // ENDLOOP
                 (match_data.code = re)
                 (match_data.mark = mb.mark)
                 (match_data.matchedby = 0)
@@ -351,7 +351,7 @@ break
 
                 (match_data.mark = mb.nomatch_mark)
                 return match_data.rc
-            _ -> break
+            _ => break
 
 extern fn pcre2_get_mark_8(p0: *mut pcre2_real_match_data_8) -> *const u8
 extern fn pcre2_get_match_data_size_8(p0: *mut pcre2_real_match_data_8) -> c_ulong

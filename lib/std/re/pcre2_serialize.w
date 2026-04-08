@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_serialize.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int
@@ -123,12 +123,12 @@ fn pcre2_serialize_decode_8(p0: *mut *mut pcre2_real_code_8, p1: c_int, p2: *con
     var tables: *mut u8 = null
     var i: c_int = 0
     var j: c_int = 0
-    var error: c_int = 0
+    var error_: c_int = 0
     var blocksize: c_ulong = 0
     var __pc: i32 = 0
     while true:
-        match __pc:
-            0 ->
+        match __pc
+            0 =>
                 if (if number_of_codes > data.number_of_codes: 1 else: 0) != 0:
 (number_of_codes = data.number_of_codes)
                 (src_bytes = (bytes + sizeof[pcre2_serialized_data]()))
@@ -156,7 +156,7 @@ fn pcre2_serialize_decode_8(p0: *mut *mut pcre2_real_code_8, p1: c_int, p2: *con
 
                 return number_of_codes
                 __pc = 1; continue
-            1 ->  // cleanup
+            1 =>  // cleanup
                 if (if dst_re != ((0 as *mut c_void)): 1 else: 0) != 0:
 memctl.free(dst_re, memctl.memory_data)
                 memctl.free(tables, memctl.memory_data)
@@ -166,8 +166,8 @@ memctl.free(dst_re, memctl.memory_data)
                     (codes[j] = ((0 as *mut c_void)))
                     { let __tmp = j; j = j + 1; __tmp }
 
-                return error
-            _ -> break
+                return error_
+            _ => break
 
 @[c_export("pcre2_serialize_get_number_of_codes_8")]
 fn pcre2_serialize_get_number_of_codes_8(p0: *const u8) -> c_int:

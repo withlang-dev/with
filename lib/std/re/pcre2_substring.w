@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_substring.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int
@@ -112,8 +112,8 @@ fn pcre2_substring_get_bynumber_8(p0: *mut pcre2_real_match_data_8, p1: c_uint, 
     (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, &size))
     if (if rc < 0: 1 else: 0) != 0:
 return rc
-    (yield[size] = 0)
-    (unsafe: *stringptr = yield)
+    (yield_[size] = 0)
+    (unsafe: *stringptr = yield_)
     (unsafe: *sizeptr = size)
     return 0
 

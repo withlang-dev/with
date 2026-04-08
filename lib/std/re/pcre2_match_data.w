@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_match_data.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int
@@ -66,13 +66,13 @@ fn pcre2_match_data_create_8(p0: c_uint, p1: *mut pcre2_real_general_context_8) 
 (oveccount = 1)
     if (if oveccount > 65535: 1 else: 0) != 0:
 (oveccount = 65535)
-    if (if yield == ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if yield_ == ((0 as *mut c_void)): 1 else: 0) != 0:
 return ((0 as *mut c_void))
-    (yield.oveccount = oveccount)
-    (yield.flags = 0)
-    (yield.heapframes = ((0 as *mut c_void)))
-    (yield.heapframes_size = 0)
-    return yield
+    (yield_.oveccount = oveccount)
+    (yield_.flags = 0)
+    (yield_.heapframes = ((0 as *mut c_void)))
+    (yield_.heapframes_size = 0)
+    return yield_
 
 @[c_export("pcre2_match_data_create_from_pattern_8")]
 fn pcre2_match_data_create_from_pattern_8(p0: *const pcre2_real_code_8, p1: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8:

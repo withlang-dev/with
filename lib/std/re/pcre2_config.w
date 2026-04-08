@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_config.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int
@@ -20,34 +20,34 @@ type pcre2_substitute_callout_block_8 { version: c_uint = 0, input: *const u8 = 
 type struct_pcre2_substitute_callout_block_8 = pcre2_substitute_callout_block_8
 @[c_export("pcre2_config_8")]
 fn pcre2_config_8(p0: c_uint, p1: *mut c_void) -> c_int:
-    if (if where == ((0 as *mut c_void)): 1 else: 0) != 0:
-        match what:
-            _ -> pass
-            0 -> pass
-            2 -> pass
+    if (if where_ == ((0 as *mut c_void)): 1 else: 0) != 0:
+        match what
+            _ => 0
+            0 => 0
+            2 => 0
 
 
-    match what:
-        _ -> pass
-        0 -> pass
-        14 -> pass
-        7 -> pass
-        16 -> pass
-        12 -> pass
-        1 -> pass
-        2 -> pass
-        3 -> pass
-        4 -> pass
-        5 -> pass
-        13 -> pass
-        6 -> pass
-        8 -> pass
-        15 -> pass
-        10 ->
+    match what
+        _ => 0
+        0 => 0
+        14 => 0
+        7 => 0
+        16 => 0
+        12 => 0
+        1 => 0
+        2 => 0
+        3 => 0
+        4 => 0
+        5 => 0
+        13 => 0
+        6 => 0
+        8 => 0
+        15 => 0
+        10 =>
                         var v: *const i8 = "Unicode not supported"
 
-        9 -> pass
-        11 ->
+        9 => 0
+        11 =>
                         var v: *const i8 = (if ((if 32 == 0: 1 else: 0)) != 0: XSTRING(PCRE2_MAJOR.PCRE2_MINOR PCRE2_DATE) else: XSTRING(PCRE2_MAJOR.PCRE2_MINOR) XSTRING(PCRE2_PRERELEASE PCRE2_DATE))
 
 

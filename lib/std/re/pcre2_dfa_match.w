@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_dfa_match.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int
@@ -100,8 +100,8 @@ fn pcre2_dfa_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p
     var next: *mut RWS_anchor = null
     var __pc: i32 = 0
     while true:
-        match __pc:
-            0 ->
+        match __pc
+            0 =>
                 (rws.next = ((0 as *mut c_void)))
                 (rws.size = 7680)
                 (rws.free = 7676)
@@ -176,25 +176,25 @@ fn pcre2_dfa_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p
                 (mb.heap_used = 0)
                 (mb.bsr_convention = re.bsr_convention)
                 (mb.nltype = 0)
-                match re.newline_convention:
-                    1 ->
+                match re.newline_convention
+                    1 =>
                         (mb.nllen = 1)
                         (mb.nl[0] = 13)
-                    2 ->
+                    2 =>
                         (mb.nllen = 1)
                         (mb.nl[0] = 10)
-                    6 ->
+                    6 =>
                         (mb.nllen = 1)
                         (mb.nl[0] = 0)
-                    3 ->
+                    3 =>
                         (mb.nllen = 2)
                         (mb.nl[0] = 13)
                         (mb.nl[1] = 10)
-                    4 ->
+                    4 =>
                         (mb.nltype = 1)
-                    5 ->
+                    5 =>
                         (mb.nltype = 2)
-                    _ ->
+                    _ =>
                         comptime_error("goto not supported")
 
                 if (if ((re.flags & 16)) != 0: 1 else: 0) != 0:
@@ -314,19 +314,19 @@ break
 { let __tmp = start_match; start_match = start_match + 1; __tmp }
 
                 __pc = 1; continue
-            1 ->  // NOMATCH_EXIT
+            1 =>  // NOMATCH_EXIT
                 (match_data.subject = original_subject)
                 (match_data.subject_length = length)
                 (match_data.start_offset = start_offset)
                 __pc = 2; continue
-            2 ->  // EXIT
+            2 =>  // EXIT
                 while (if rws.next != ((0 as *mut c_void)): 1 else: 0) != 0:
                     (rws.next = next.next)
                     mb.memctl.free(next, mb.memctl.memory_data)
 
                 (match_data.rc = rc)
                 return rc
-            _ -> break
+            _ => break
 
 extern fn pcre2_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8) -> c_int
 extern fn pcre2_get_mark_8(p0: *mut pcre2_real_match_data_8) -> *const u8
