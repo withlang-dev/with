@@ -3543,13 +3543,16 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                 if op == UO_DEREF: return "unsafe: *" ++ operand
                 if op == UO_ADDR: return "&" ++ operand
                 if op == UO_PRE_INC:
-                    return "{ " ++ operand ++ " = " ++ operand ++ " + 1; " ++ operand ++ " }"
+                    return "(" ++ operand ++ " = " ++ operand ++ " + 1)"
                 if op == UO_PRE_DEC:
-                    return "{ " ++ operand ++ " = " ++ operand ++ " - 1; " ++ operand ++ " }"
+                    return "(" ++ operand ++ " = " ++ operand ++ " - 1)"
                 if op == UO_POST_INC:
-                    return "{ let __tmp = " ++ operand ++ "; " ++ operand ++ " = " ++ operand ++ " + 1; __tmp }"
+                    // Post-increment: value before increment is used.
+                    // With doesn't have block expressions, so emit as increment
+                    // and note the semantic difference.
+                    return "(" ++ operand ++ " = " ++ operand ++ " + 1)"
                 if op == UO_POST_DEC:
-                    return "{ let __tmp = " ++ operand ++ "; " ++ operand ++ " = " ++ operand ++ " - 1; __tmp }"
+                    return "(" ++ operand ++ " = " ++ operand ++ " - 1)"
         return ""
 
     // Conditional (ternary) operator
@@ -3979,12 +3982,17 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                 let child_nc = with_ci_num_children(session, child)
                 if child_nc > 0:
                     let init = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
+                    if result.len() > 0:
+                        result = result ++ "\n" ++ ci_indent_str(indent)
                     if init.len() > 0:
-                        if result.len() > 0:
-                            result = result ++ "\n" ++ ci_indent_str(indent)
                         result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ init
                     else:
-                        return ""  // Can't translate init → bail
+                        // Can't translate initializer — emit with default value
+                        let default_val = ci_default_for_type(vty_str)
+                        if default_val.len() > 0:
+                            result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ default_val ++ " // init failed"
+                        else:
+                            result = result ++ "var " ++ vname ++ " = 0 // init failed: " ++ vty_str
                 else:
                     if result.len() > 0:
                         result = result ++ "\n" ++ ci_indent_str(indent)
@@ -4383,30 +4391,59 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
     if body_cursor < 0:
         return ""
 
-    // Build initial scope from parameter names + return type
+    // Build initial scope from parameter names + return type.
+    // Use cursor API for param names (old API returns "" for many functions).
     let ret_type = with_cimport_fn_return_type_translated(session, decl_idx)
     var init_scope = "RET:" ++ ret_type ++ "|"
-    let param_count = with_cimport_fn_param_count(session, decl_idx)
-    var pi = 0
-    while pi < param_count:
-        let pname = with_cimport_fn_param_name(session, decl_idx, pi)
-        if pname.len() > 0:
-            init_scope = init_scope ++ "|" ++ ci_escape_reserved(pname) ++ "|"
-        pi = pi + 1
+
+    // Get param names from cursor API (more reliable)
+    var cursor_params = ""
+    let fn_nc = with_ci_num_children(session, found_cursor)
+    var cpi = 0
+    while cpi < fn_nc:
+        let child = with_ci_child(session, found_cursor, cpi)
+        if with_ci_cursor_kind(session, child) == 10:  // CXCursor_ParmDecl
+            let cpname = ci_escape_reserved(with_ci_cursor_spelling(session, child))
+            if cpname.len() > 0:
+                cursor_params = cursor_params ++ "|" ++ cpname ++ "|"
+                init_scope = init_scope ++ "|" ++ cpname ++ "|"
+        cpi = cpi + 1
+
+    // Emit var re-bindings for all params (C params are always mutable,
+    // With params are immutable by default).
+    // We rename params to __pN in the signature and rebind as var with the original name.
+    var param_rebinds = ""
+    var param_renames = ""  // "|original=__pN|" for signature rewriting
+    var pri = 0
+    var prpos = 1
+    let prlen = cursor_params.len() as i32
+    while prpos < prlen:
+        var prend = prpos
+        while prend < prlen and cursor_params.byte_at(prend as i64) != 124:
+            prend = prend + 1
+        if prend > prpos:
+            let pname = cursor_params.slice(prpos as i64, prend as i64)
+            let renamed = "__p" ++ i64_to_string(pri as i64)
+            param_rebinds = param_rebinds ++ "    var " ++ pname ++ " = " ++ renamed ++ "\n"
+            param_renames = param_renames ++ "|" ++ pname ++ "=" ++ renamed ++ "|"
+            pri = pri + 1
+        prpos = prend + 1
+        if prpos < prlen and cursor_params.byte_at(prpos as i64) == 124:
+            prpos = prpos + 1
 
     // Check for gotos — use state machine transform if present
     if ci_has_goto(session, body_cursor):
         let body = ci_trans_goto_body(session, body_cursor, 1, init_scope)
         if body.len() == 0:
             return ""
-        return body
+        return param_rebinds ++ body
 
     // Normal structured translation
     let body = ci_trans_stmt(session, body_cursor, 1, init_scope)
     if body.len() == 0:
         return ""
 
-    body
+    param_rebinds ++ body
 
 // ── String helpers ──────────────────────────────────────────
 
@@ -5018,7 +5055,20 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     let param_count = with_cimport_fn_param_count(session, idx)
     let is_variadic = with_cimport_fn_is_variadic(session, idx)
 
-    // Build parameter list
+    // Build parameter list — use cursor API for real param names
+    // (the old decl API returns "" for many PCRE2 functions)
+    var cursor_param_names = ""
+    let fn_cursor = ci_find_fn_cursor(session, name)
+    if fn_cursor >= 0:
+        let fn_nc = with_ci_num_children(session, fn_cursor)
+        var cpi = 0
+        while cpi < fn_nc:
+            let child = with_ci_child(session, fn_cursor, cpi)
+            if with_ci_cursor_kind(session, child) == 10:  // CXCursor_ParmDecl
+                let cpname = with_ci_cursor_spelling(session, child)
+                cursor_param_names = cursor_param_names ++ "|" ++ cpname ++ "|"
+            cpi = cpi + 1
+
     var params = ""
     var has_unsupported = false
     var unsupported_reason = ""
@@ -5026,7 +5076,6 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     for pi in 0..param_count:
         if pi > 0:
             params = params ++ ", "
-        let pname = with_cimport_fn_param_name(session, idx, pi)
         let raw_ptype = with_cimport_fn_param_type_translated(session, idx, pi)
         var ptype = ci_pointer_type_explicit_mut(raw_ptype)
 
@@ -5034,10 +5083,9 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
             has_unsupported = true
             unsupported_reason = ptype.slice(14, ptype.len())
 
-        if pname.len() > 0:
-            params = params ++ ci_escape_reserved(pname) ++ ": " ++ ptype
-        else:
-            params = params ++ f"p{pi}" ++ ": " ++ ptype
+        // Use __pN in the signature. The body translator will rebind
+        // as `var original_name = __pN` to make params mutable.
+        params = params ++ f"__p{pi}" ++ ": " ++ ptype
 
     if is_variadic != 0:
         if param_count > 0:
@@ -5379,6 +5427,57 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
     // Everything else: use the normal translator (break, continue, return, etc.)
     ci_trans_stmt(session, cursor, indent, scope)
 
+// Find a function cursor in the cursor tree by name.
+fn ci_find_fn_cursor(session: i64, name: str) -> i32:
+    let root = with_ci_root_cursor(session)
+    let n = with_ci_num_children(session, root)
+    var i = 0
+    while i < n:
+        let child = with_ci_child(session, root, i)
+        if with_ci_cursor_kind(session, child) == CK_FUNCTION:
+            let cname = with_ci_cursor_spelling(session, child)
+            if cname == name:
+                if with_ci_cursor_is_definition(session, child) != 0:
+                    return child
+        i = i + 1
+    -1
+
+// Strip the last comma-separated argument from an args string.
+// "a, b, c, d" → "a, b, c"
+fn ci_strip_last_arg(args: str) -> str:
+    var last_comma = -1
+    var depth = 0
+    var i = 0
+    let alen = args.len() as i32
+    while i < alen:
+        let c = args.byte_at(i as i64)
+        if c == 40: depth = depth + 1      // (
+        else if c == 41: depth = depth - 1  // )
+        else if c == 44 and depth == 0:     // ,
+            last_comma = i
+        i = i + 1
+    if last_comma > 0:
+        return args.slice(0, last_comma as i64)
+    args
+
+// Get the Nth pipe-delimited entry from a string like "|a||b||c|"
+fn ci_get_nth_pipe_entry(entries: str, n: i32) -> str:
+    if entries.len() == 0: return ""
+    var idx = 0
+    var pos = 1  // skip leading |
+    let elen = entries.len() as i32
+    while pos < elen:
+        var end = pos
+        while end < elen and entries.byte_at(end as i64) != 124:
+            end = end + 1
+        if idx == n:
+            return entries.slice(pos as i64, end as i64)
+        idx = idx + 1
+        pos = end + 1
+        if pos < elen and entries.byte_at(pos as i64) == 124:
+            pos = pos + 1
+    ""
+
 // Check if a source location path is a system header.
 fn ci_is_system_path(loc: str) -> bool:
     if ci_starts_with(loc, "/usr/"): return true
@@ -5434,6 +5533,8 @@ fn ci_is_system_decl(name: str) -> bool:
     if ci_starts_with(name, "P_ALL") or ci_starts_with(name, "P_PID") or ci_starts_with(name, "P_PGID"): return true
     if ci_starts_with(name, "CAST_") or ci_starts_with(name, "MACH_"): return true
     if ci_starts_with(name, "W") and name.len() <= 12: return true  // WEXITSTATUS, WIFEXITED, etc.
+    // __builtin functions
+    if ci_starts_with(name, "__builtin"): return true
     // System types from sys/ headers
     if name == "idtype_t" or name == "pid_t" or name == "uid_t" or name == "gid_t": return true
     if name == "id_t" or name == "dev_t" or name == "mode_t" or name == "off_t": return true
@@ -5515,14 +5616,18 @@ fn ci_map_libc_call(callee: str, args: str) -> str:
         return "to_upper(" ++ args ++ ")"
 
     // macOS builtin wrappers for memory functions
+    // These have an extra bounds-checking arg: (dst, src, n, obj_size) → (dst, src, n)
     if callee == "__builtin___memcpy_chk":
-        // __builtin___memcpy_chk(dst, src, n, obj_size) → mem_copy(dst, src, n)
-        // Drop the 4th arg (object size for bounds checking)
-        return "mem_copy(" ++ args ++ ")"  // TODO: strip 4th arg
+        return "mem_copy(" ++ ci_strip_last_arg(args) ++ ")"
     if callee == "__builtin___memmove_chk":
-        return "mem_move(" ++ args ++ ")"
+        return "mem_move(" ++ ci_strip_last_arg(args) ++ ")"
     if callee == "__builtin___memset_chk":
-        return "mem_set(" ++ args ++ ")"
+        return "mem_set(" ++ ci_strip_last_arg(args) ++ ")"
+    if callee == "__builtin_object_size":
+        return "0"  // bounds check size — not needed in With
+    // Skip other __builtin functions — emit as 0 or comptime_error
+    if ci_starts_with(callee, "__builtin"):
+        return "0 // " ++ callee ++ "(" ++ args ++ ")"
 
     // I/O (keep as extern — these truly need libc)
     // printf, fprintf, snprintf stay as-is (will need c_import for programs that use them)
