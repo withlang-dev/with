@@ -2,6 +2,14 @@
 use std.re.defs
 
 type BOOL = c_int
+extern fn imaxabs(j: c_long) -> c_long
+type imaxdiv_t { quot: c_long = 0, rem: c_long = 0 }
+type struct_imaxdiv_t = imaxdiv_t
+extern fn imaxdiv(__numer: c_long, __denom: c_long) -> imaxdiv_t
+extern fn strtoimax(__nptr: *const i8, __endptr: *mut *mut i8, __base: c_int) -> c_long
+extern fn strtoumax(__nptr: *const i8, __endptr: *mut *mut i8, __base: c_int) -> c_ulong
+extern fn wcstoimax(__nptr: *const c_int, __endptr: *mut *mut c_int, __base: c_int) -> c_long
+extern fn wcstoumax(__nptr: *const c_int, __endptr: *mut *mut c_int, __base: c_int) -> c_ulong
 type PCRE2_UCHAR8 = u8
 type PCRE2_SPTR8 = *const u8
 type pcre2_general_context_8 = pcre2_real_general_context_8
@@ -1555,6 +1563,250 @@ extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_
 extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
 extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
 extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
+fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend: *const u8, last: c_int) -> c_int:
+    var rc: c_int = 0
+    var nestlevel: c_uint = 0
+    var literal: c_int = 0
+    var ptr: *const u8 = null
+    var erc: c_int = 0
+    var errorcode: c_int = 0
+    var ch: c_uint = 0
+    var esc_end_ptr: *const u8 = null
+    var __pc: i32 = 0
+    while true:
+        match __pc
+            0 =>
+                rc = 0
+                while (if ptr < ptrend: 1 else: 0) != 0:
+                    if literal != 0:
+                        if (if (if (if ptr[0] == 92: 1 else: 0) != 0 and (if ptr < (ptrend - (1 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 69: 1 else: 0) != 0: 1 else: 0) != 0:
+                            (literal = 0)
+                            ptr = ptr + 1
+
+                    else:
+                        if (if unsafe: *ptr == 125: 1 else: 0) != 0:
+                            if (if nestlevel == 0: 1 else: 0) != 0:
+                                comptime_error("goto not supported")
+
+                            (nestlevel = nestlevel - 1)
+                        else:
+                            if (if (if (if unsafe: *ptr == 58: 1 else: 0) != 0 and (not last) != 0: 1 else: 0) != 0 and (if nestlevel == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                comptime_error("goto not supported")
+                            else:
+                                if (if unsafe: *ptr == 36: 1 else: 0) != 0:
+                                    if (if (if ptr < (ptrend - (1 as isize as usize)): 1 else: 0) != 0 and (if ptr[1] == 123: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (nestlevel = nestlevel + 1)
+                                        ptr = ptr + 1
+
+                                else:
+                                    if (if unsafe: *ptr == 92: 1 else: 0) != 0:
+                                        var erc: c_int = 0
+                                        var errorcode: c_int = 0
+                                        var ch: c_uint = 0 // init: untranslatable
+                                        var esc_end_ptr: *const u8 = null // init: untranslatable
+                                        if (if ptr < (ptrend - (1 as isize as usize)): 1 else: 0) != 0:
+                                            match ptr[1]
+                                                76 =>
+                                                    continue
+                                                _ => 0
+
+
+                                        ptr = ptr + 1
+                                        (erc = _pcre2_check_escape_8(&ptr, ptrend, &ch, &errorcode, code.overall_options, code.extra_options, code.top_bracket, 0, null))
+                                        if (if errorcode != 0: 1 else: 0) != 0:
+                                            comptime_error("goto not supported")
+
+                                        (esc_end_ptr = ptr)
+                                        ptr = ptr - 1
+                                        match erc
+                                            0 =>
+                                                (literal = 1)
+                                            ESC_Q =>
+                                                (literal = 1)
+                                            ESC_g => 0
+                                            _ =>
+                                                if (if erc < 0: 1 else: 0) != 0:
+                                                    break
+
+                                                (ptr = esc_end_ptr)
+                                                comptime_error("goto not supported")
+
+
+
+
+
+
+                    (ptr = ptr + 1)
+
+                __pc = 1
+                continue
+            1 =>  // EXIT
+                (unsafe: *ptrptr = ptr)
+                return rc
+            _ => break
+
+fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes: *const u8) -> c_int:
+    var ptr: *const u8 = null
+    var nameptr: *const u8 = null
+    var __pc: i32 = 0
+    while true:
+        match __pc
+            0 =>
+                if (if ptr >= ptrend: 1 else: 0) != 0:
+                    __pc = 1
+            continue
+
+                utf
+                                while (if (if (if ptr < ptrend: 1 else: 0) != 0 and 1 != 0: 1 else: 0) != 0 and (if ((ctypes[unsafe: *ptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (ptr = ptr + 1)
+
+
+                if (if ((ptr as usize -% nameptr as usize) / sizeof[u8]()) > 128: 1 else: 0) != 0:
+                    __pc = 1
+            continue
+
+                if (if ptr == nameptr: 1 else: 0) != 0:
+                    __pc = 1
+            continue
+
+                (unsafe: *ptrptr = ptr)
+                return 1
+                __pc = 1
+                continue
+            1 =>  // FAILED
+                (unsafe: *ptrptr = ptr)
+                return 0
+            _ => break
+
+type case_state { to_case: c_int = 0, single_char: c_int = 0 }
+type struct_case_state = case_state
+fn pessimistic_case_inflation(len: c_ulong) -> c_ulong:
+    return (((len >> 3)) +% 10)
+
+fn default_substitute_case_callout(input: *const u8, input_len: c_ulong, output: *mut u8, output_cap: c_ulong, state: *mut case_state, code: *const pcre2_real_code_8) -> c_ulong:
+    var output = output
+    var output_cap = output_cap
+    var input_end: *const u8 = null // init: untranslatable
+    var temp = 0 // init: untranslatable ([6]u8)
+    var next_to_upper: c_int = 0 // init: untranslatable
+    var rest_to_upper: c_int = 0 // init: untranslatable
+    var single_char: c_int = 0 // init: untranslatable
+    var overflow: c_int = 0 // init: untranslatable
+    var written: c_ulong = 0 // init: untranslatable
+    if (if input_len == 0: 1 else: 0) != 0:
+        return 0
+
+    match state.to_case
+        _ =>
+            return 0
+        1 => 0
+        3 =>
+            (next_to_upper = 1)
+            (rest_to_upper = 0)
+            (state.to_case = 1)
+        4 =>
+            (next_to_upper = 0)
+            (rest_to_upper = 1)
+            (state.to_case = 2)
+
+    (single_char = state.single_char)
+    if single_char != 0:
+        (state.to_case = 0)
+
+    while (if input < input_end: 1 else: 0) != 0:
+        var ch: c_uint = 0 // init: untranslatable
+        var chlen: c_uint = 0
+        // (empty)
+        if 1 != 0:
+            if (if (((((code.tables + (512 as isize as usize)) + (((if next_to_upper != 0: 96 else: 128)) as isize as usize)))[(ch / 8)] & ((1 << ((ch % 8)))))) == 0: 1 else: 0) != 0:
+                (ch = ((code.tables + (256 as isize as usize)))[ch])
+
+
+                (temp[0] = ch)
+        (chlen = 1)
+
+        if (if (not overflow) != 0 and (if chlen <= output_cap: 1 else: 0) != 0: 1 else: 0) != 0:
+            output = output + chlen
+            output_cap = output_cap - chlen
+        else:
+            (overflow = 1)
+
+        written = written + chlen
+        (next_to_upper = rest_to_upper)
+        if single_char != 0:
+            var rest_len: c_ulong = 0 // init: untranslatable
+            written = written + rest_len
+            return written
+
+
+    return written
+
+fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, state: *mut case_state, utf: c_int, substitute_case_callout: *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong, substitute_case_callout_data: *mut c_void) -> c_ulong:
+    var input: *const u8 = null // init: untranslatable
+    var output: *mut u8 = null // init: untranslatable
+    var rc: c_ulong = 0 // init: untranslatable
+    var rc2: c_ulong = 0 // init: untranslatable
+    var ch1_to_case: c_int = 0
+    var rest_to_case: c_int = 0
+    var ch1 = 0 // init: untranslatable ([6]u8)
+    var ch1_len: c_ulong = 0 // init: untranslatable
+    var rest: *const u8 = null // init: untranslatable
+    var rest_len: c_ulong = 0 // init: untranslatable
+    var ch1_overflow: c_int = 0 // init: untranslatable
+    var rest_overflow: c_int = 0 // init: untranslatable
+    utf
+    match state.to_case
+        _ =>
+            return 0
+        1 =>
+            (ch1_to_case = state.to_case)
+            (rest_to_case = 0)
+        4 =>
+            (ch1_to_case = 1)
+            (rest_to_case = 2)
+
+        var ch_end: *const u8 = null // init: untranslatable
+    var ch: c_uint = 0 // init: untranslatable
+    // (empty)
+    ch
+    (ch1_len = ((ch_end as usize -% input as usize) / sizeof[u8]()))
+
+    (rest = (input + ch1_len))
+    (rest_len = (input_len -% ch1_len))
+        var ch1_cap: c_ulong = 0 // init: untranslatable
+    var max_ch1_cap: c_ulong = 0 // init: untranslatable
+    (ch1_cap = ch1_len)
+    (max_ch1_cap = (output_cap -% rest_len))
+    while 1 != 0:
+        (rc = substitute_case_callout(ch1, ch1_len, output, ch1_cap, ch1_to_case, substitute_case_callout_data))
+        if (if rc <= ch1_cap: 1 else: 0) != 0:
+            break
+
+        if (if rc > max_ch1_cap: 1 else: 0) != 0:
+            (ch1_overflow = 1)
+            break
+
+        (rest = (input + rc))
+        (ch1_cap = rc)
+
+
+    if (if rest_to_case == 0: 1 else: 0) != 0:
+        (rc2 = rest_len)
+        (state.to_case = 0)
+    else:
+        var dummy = 0 // init: untranslatable ([1]u8)
+        (rc2 = substitute_case_callout(rest, rest_len, (if ch1_overflow != 0: dummy else: (output + rc)), (if ch1_overflow != 0: 0 else: (output_cap -% rc)), rest_to_case, substitute_case_callout_data))
+        if (if (not ch1_overflow) != 0 and (if rc2 > (output_cap -% rc): 1 else: 0) != 0: 1 else: 0) != 0:
+            (rest_overflow = 1)
+
+        if (if ch1_overflow != 0 and (if rc2 < rest_len: 1 else: 0) != 0: 1 else: 0) != 0:
+            (rc2 = rest_len)
+
+        (state.to_case = 2)
+
+    rest_overflow
+    return (rc +% rc2)
+
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0

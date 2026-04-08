@@ -2,6 +2,14 @@
 use std.re.defs
 
 type BOOL = c_int
+extern fn imaxabs(j: c_long) -> c_long
+type imaxdiv_t { quot: c_long = 0, rem: c_long = 0 }
+type struct_imaxdiv_t = imaxdiv_t
+extern fn imaxdiv(__numer: c_long, __denom: c_long) -> imaxdiv_t
+extern fn strtoimax(__nptr: *const i8, __endptr: *mut *mut i8, __base: c_int) -> c_long
+extern fn strtoumax(__nptr: *const i8, __endptr: *mut *mut i8, __base: c_int) -> c_ulong
+extern fn wcstoimax(__nptr: *const c_int, __endptr: *mut *mut c_int, __base: c_int) -> c_long
+extern fn wcstoumax(__nptr: *const c_int, __endptr: *mut *mut c_int, __base: c_int) -> c_ulong
 type PCRE2_UCHAR8 = u8
 type PCRE2_SPTR8 = *const u8
 type pcre2_general_context_8 = pcre2_real_general_context_8
@@ -1018,6 +1026,12895 @@ extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_
 extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
 extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
 extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
+let REPTYPE_MIN: c_uint = 0
+let REPTYPE_MAX: c_uint = 1
+let REPTYPE_POS: c_uint = 2
+extern var rep_min: [11]c_uint
+extern var rep_max: [11]c_uint
+extern var rep_typ: [12]c_uint
+let RM1: c_uint = 1
+let RM2: c_uint = 2
+let RM3: c_uint = 3
+let RM4: c_uint = 4
+let RM5: c_uint = 5
+let RM6: c_uint = 6
+let RM7: c_uint = 7
+let RM8: c_uint = 8
+let RM9: c_uint = 9
+let RM10: c_uint = 10
+let RM11: c_uint = 11
+let RM12: c_uint = 12
+let RM13: c_uint = 13
+let RM14: c_uint = 14
+let RM15: c_uint = 15
+let RM16: c_uint = 16
+let RM17: c_uint = 17
+let RM18: c_uint = 18
+let RM19: c_uint = 19
+let RM20: c_uint = 20
+let RM21: c_uint = 21
+let RM22: c_uint = 22
+let RM23: c_uint = 23
+let RM24: c_uint = 24
+let RM25: c_uint = 25
+let RM26: c_uint = 26
+let RM27: c_uint = 27
+let RM28: c_uint = 28
+let RM29: c_uint = 29
+let RM30: c_uint = 30
+let RM31: c_uint = 31
+let RM32: c_uint = 32
+let RM33: c_uint = 33
+let RM34: c_uint = 34
+let RM35: c_uint = 35
+let RM36: c_uint = 36
+let RM37: c_uint = 37
+let RM38: c_uint = 38
+let RM39: c_uint = 39
+fn do_callout(F: *mut heapframe, mb: *mut match_block_8, lengthptr: *mut c_ulong) -> c_int:
+    var rc: c_int = 0
+    var save0: c_ulong = 0 // init: untranslatable
+    var save1: c_ulong = 0 // init: untranslatable
+    var callout_ovector: *mut c_ulong = null // init: untranslatable
+    var cb: *mut pcre2_callout_block_8 = null // init: untranslatable
+    if (if mb.callout == null: 1 else: 0) != 0:
+        return 0
+
+    (cb = mb.cb)
+    (cb.capture_last = F.capture_last)
+    (cb.offset_vector = callout_ovector)
+    (cb.mark = mb.nomatch_mark)
+    if (if unsafe: *F.ecode == OP_CALLOUT: 1 else: 0) != 0:
+        (cb.callout_number = F.ecode[(1 + (2 * 2))])
+        (cb.callout_string_offset = 0)
+        (cb.callout_string = null)
+        (cb.callout_string_length = 0)
+    else:
+        (cb.callout_number = 0)
+        (cb.callout_string = ((F.ecode + (((1 + (4 * 2))) as isize as usize)) + (1 as isize as usize)))
+        (cb.callout_string_length = ((unsafe: *lengthptr -% 9) -% 2))
+
+    (save0 = callout_ovector[0])
+    (save1 = callout_ovector[1])
+    (rc = mb.callout(cb, mb.callout_data))
+    (callout_ovector[0] = save0)
+    (callout_ovector[1] = save1)
+    (cb.callout_flags = 0)
+    return rc
+
+fn match_ref(offset: c_ulong, caseless: c_int, caseopts: c_int, F: *mut heapframe, mb: *mut match_block_8, lengthptr: *mut c_ulong) -> c_int:
+    var p: *const u8 = null // init: untranslatable
+    var length: c_ulong = 0 // init: untranslatable
+    var eptr: *const u8 = null // init: untranslatable
+    var eptr_start: *const u8 = null // init: untranslatable
+    caseopts
+    (eptr = (eptr_start = F.eptr))
+    (p = (mb.start_subject + F.ovector[offset]))
+    (length = (F.ovector[(offset +% 1)] -% F.ovector[offset]))
+    if caseless != 0:
+                while (if length > 0: 1 else: 0) != 0:
+            var cc: c_uint = 0 // init: untranslatable
+            var cp: c_uint = 0 // init: untranslatable
+            if (if eptr >= mb.end_subject: 1 else: 0) != 0:
+                return 1
+
+            (cc = unsafe: *eptr)
+            (cp = unsafe: *p)
+            if (if ((mb.lcc)[cp]) != ((mb.lcc)[cc]): 1 else: 0) != 0:
+                return (0 - 1)
+
+            (p = p + 1)
+            (eptr = eptr + 1)
+            (length = length - 1)
+
+
+    else:
+        if (if mb.partial != 0: 1 else: 0) != 0:
+            while (if length > 0: 1 else: 0) != 0:
+                if (if eptr >= mb.end_subject: 1 else: 0) != 0:
+                    return 1
+
+                if (if unsafe: *(p = p + 1) != unsafe: *(eptr = eptr + 1): 1 else: 0) != 0:
+                    return (0 - 1)
+
+                (length = length - 1)
+
+        else:
+            eptr = eptr + length
+
+
+    (unsafe: *lengthptr = ((eptr as usize -% eptr_start as usize) / sizeof[u8]()))
+    return 0
+
+fn recurse_update_offsets(F: *mut heapframe, P: *mut heapframe):
+    var dst: *mut c_ulong = null // init: untranslatable
+    var src: *mut c_ulong = null // init: untranslatable
+    var offset: c_ulong = 0 // init: untranslatable
+    var offset_top: c_ulong = 0 // init: untranslatable
+    var diff: c_ulong = 0 // init: untranslatable
+    var ecode: *const u8 = null // init: untranslatable
+    while true:
+        ecode = ecode + (1 + 2)
+        if (if (offset +% diff) >= offset_top: 1 else: 0) != 0:
+            while (if unsafe: *ecode == OP_CREF: 1 else: 0) != 0:
+ecode = ecode + (1 + 2)
+            break
+
+        if (if diff == 2: 1 else: 0) != 0:
+            (dst[0] = src[0])
+            (dst[1] = src[1])
+        else:
+            if (if diff >= 4: 1 else: 0) != 0:
+                with_memcpy(dst as *i8, src as *i8, (diff *% sizeof[c_ulong]()) as i64)
+
+
+        diff = diff + 2
+        offset = offset + diff
+        dst = dst + diff
+        src = src + diff
+        if not ((if unsafe: *ecode == OP_CREF: 1 else: 0) != 0):
+            break
+
+    (diff = (offset_top -% offset))
+    if (if diff == 2: 1 else: 0) != 0:
+        (dst[0] = src[0])
+        (dst[1] = src[1])
+    else:
+        if (if diff >= 4: 1 else: 0) != 0:
+            with_memcpy(dst as *i8, src as *i8, (diff *% sizeof[c_ulong]()) as i64)
+
+
+    (F.ecode = ecode)
+    (F.offset_top = (if ((if offset <= P.offset_top: 1 else: 0)) != 0: P.offset_top else: ((offset -% 2))))
+
+fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, frame_size: c_ulong, match_data: *mut pcre2_real_match_data_8, mb: *mut match_block_8) -> c_int:
+    var F: *mut heapframe = null
+    var N: *mut heapframe = null
+    var P: *mut heapframe = null
+    var frames_top: *mut heapframe = null
+    var assert_accept_frame: *mut heapframe = null
+    var frame_copy_size: c_ulong = 0
+    var branch_end: *const u8 = null
+    var branch_start: *const u8 = null
+    var bracode: *const u8 = null
+    var offset: c_ulong = 0
+    var length: c_ulong = 0
+    var rrc: c_int = 0
+    var i: c_uint = 0
+    var fc: c_uint = 0
+    var number: c_uint = 0
+    var reptype: c_uint = 0
+    var group_frame_type: c_uint = 0
+    var condition: c_int = 0
+    var cur_is_word: c_int = 0
+    var prev_is_word: c_int = 0
+    var utf: c_int = 0
+    var new: *mut heapframe = null
+    var newsize: c_ulong = 0
+    var usedsize: c_ulong = 0
+    var old_size: c_ulong = 0
+    var max_delta: c_ulong = 0
+    var over_bytes: c_int = 0
+    var ch: c_uint = 0
+    var cc: c_uint = 0
+    var count: c_int = 0
+    var slot: *const u8 = null
+    var slength: c_ulong = 0
+    var samelengths: c_int = 0
+    var next_ecode: *const u8 = null
+    var current_branch: *const u8 = null
+    var next_branch: *const u8 = null
+    var ecode: *const u8 = null
+    var diff: c_long = 0
+    var available: c_uint = 0
+    var y: c_uint = 0
+    var lastptr: *const u8 = null
+    var nextptr: *const u8 = null
+    var __pc: i32 = 0
+    while true:
+        match __pc
+            0 =>
+                (frame_copy_size = (frame_size -% 64))
+                (F = match_data.heapframes)
+                (F.rdepth = 0)
+                (F.capture_last = 0)
+                (F.current_recurse = 4294967295)
+                (F.start_match = (F.eptr = start_eptr))
+                (F.mark = null)
+                (F.offset_top = 0)
+                (group_frame_type = 0)
+                __pc = 2
+                continue
+                __pc = 1
+                continue
+            1 =>  // MATCH_RECURSE
+                with_memcpy(((N as *mut i8) + 64) as *i8, ((F as *mut i8) + 64) as *i8, frame_copy_size as i64)
+                (N.rdepth = (F.rdepth +% 1))
+                (F = N)
+                __pc = 2
+                continue
+            2 =>  // NEW_FRAME
+                (F.group_frame_type = group_frame_type)
+                (F.ecode = start_ecode)
+                (F.back_frame = frame_size)
+                if (if group_frame_type != 0: 1 else: 0) != 0:
+                    (F.last_group_offset = (((F as *mut i8) as usize -% (match_data.heapframes as *mut i8) as usize) / sizeof[c_char]()))
+                    (group_frame_type = 0)
+
+                while true:
+                    match F.op
+                        OP_CLOSE =>
+                            if (if F.current_recurse == 4294967295: 1 else: 0) != 0:
+                                (offset = F.last_group_offset)
+                                while true:
+                                    if (if N.group_frame_type == ((65536 | number)): 1 else: 0) != 0:
+                                        break
+
+                                    (offset = P.last_group_offset)
+
+                                (offset = (((number << 1)) -% 2))
+                                (F.capture_last = number)
+                                (F.ovector[offset] = ((P.eptr as usize -% mb.start_subject as usize) / sizeof[u8]()))
+                                (F.ovector[(offset +% 1)] = ((F.eptr as usize -% mb.start_subject as usize) / sizeof[u8]()))
+                                if (if offset >= F.offset_top: 1 else: 0) != 0:
+                                    (F.offset_top = (offset +% 2))
+
+
+                            F.ecode = F.ecode + _pcre2_OP_lengths_8[unsafe: *F.ecode]
+                        OP_ASSERT_ACCEPT =>
+                            if (if F.eptr > mb.last_used_ptr: 1 else: 0) != 0:
+                                (mb.last_used_ptr = F.eptr)
+
+                            (assert_accept_frame = F)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            if (if F.current_recurse != 4294967295: 1 else: 0) != 0:
+                                (offset = F.last_group_offset)
+                                while true:
+                                    (offset = P.last_group_offset)
+
+                                (P.eptr = F.eptr)
+                                (P.mark = F.mark)
+                                (P.start_match = F.start_match)
+                                (F = P)
+                                F.ecode = F.ecode + (1 + 2)
+                                continue
+
+                            if (if (if F.eptr == F.start_match: 1 else: 0) != 0 and ((if (if ((mb.moptions & 4)) != 0: 1 else: 0) != 0 or ((if (if ((mb.moptions & 8)) != 0: 1 else: 0) != 0 and (if F.start_match == (mb.start_subject + mb.start_offset): 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if ((((mb.moptions | mb.poptions)) & 536870912)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if F.op == OP_END: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                return 0
+
+                            (mb.end_match_ptr = F.eptr)
+                            (mb.end_offset_top = F.offset_top)
+                            (mb.mark = F.mark)
+                            if (if F.eptr > mb.last_used_ptr: 1 else: 0) != 0:
+                                (mb.last_used_ptr = F.eptr)
+
+                            (match_data.ovector[0] = ((F.start_match as usize -% mb.start_subject as usize) / sizeof[u8]()))
+                            (match_data.ovector[1] = ((F.eptr as usize -% mb.start_subject as usize) / sizeof[u8]()))
+                            (i = (2 * ((if ((if (top_bracket + 1) > match_data.oveccount: 1 else: 0)) != 0: match_data.oveccount else: (top_bracket + 1)))))
+                            with_memcpy((match_data.ovector + (2 as isize as usize)) as *i8, F.ovector as *i8, (((i -% 2)) *% sizeof[c_ulong]()) as i64)
+                            return 1
+                        OP_ACCEPT =>
+                            if (if F.current_recurse != 4294967295: 1 else: 0) != 0:
+                                (offset = F.last_group_offset)
+                                while true:
+                                    (offset = P.last_group_offset)
+
+                                (P.eptr = F.eptr)
+                                (P.mark = F.mark)
+                                (P.start_match = F.start_match)
+                                (F = P)
+                                F.ecode = F.ecode + (1 + 2)
+                                continue
+
+                            if (if (if F.eptr == F.start_match: 1 else: 0) != 0 and ((if (if ((mb.moptions & 4)) != 0: 1 else: 0) != 0 or ((if (if ((mb.moptions & 8)) != 0: 1 else: 0) != 0 and (if F.start_match == (mb.start_subject + mb.start_offset): 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if ((((mb.moptions | mb.poptions)) & 536870912)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if F.op == OP_END: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                return 0
+
+                            (mb.end_match_ptr = F.eptr)
+                            (mb.end_offset_top = F.offset_top)
+                            (mb.mark = F.mark)
+                            if (if F.eptr > mb.last_used_ptr: 1 else: 0) != 0:
+                                (mb.last_used_ptr = F.eptr)
+
+                            (match_data.ovector[0] = ((F.start_match as usize -% mb.start_subject as usize) / sizeof[u8]()))
+                            (match_data.ovector[1] = ((F.eptr as usize -% mb.start_subject as usize) / sizeof[u8]()))
+                            (i = (2 * ((if ((if (top_bracket + 1) > match_data.oveccount: 1 else: 0)) != 0: match_data.oveccount else: (top_bracket + 1)))))
+                            with_memcpy((match_data.ovector + (2 as isize as usize)) as *i8, F.ovector as *i8, (((i -% 2)) *% sizeof[c_ulong]()) as i64)
+                            return 1
+                        OP_END =>
+                            if (if (if F.eptr == F.start_match: 1 else: 0) != 0 and ((if (if ((mb.moptions & 4)) != 0: 1 else: 0) != 0 or ((if (if ((mb.moptions & 8)) != 0: 1 else: 0) != 0 and (if F.start_match == (mb.start_subject + mb.start_offset): 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if ((((mb.moptions | mb.poptions)) & 536870912)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if F.op == OP_END: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                return 0
+
+                            (mb.end_match_ptr = F.eptr)
+                            (mb.end_offset_top = F.offset_top)
+                            (mb.mark = F.mark)
+                            if (if F.eptr > mb.last_used_ptr: 1 else: 0) != 0:
+                                (mb.last_used_ptr = F.eptr)
+
+                            (match_data.ovector[0] = ((F.start_match as usize -% mb.start_subject as usize) / sizeof[u8]()))
+                            (match_data.ovector[1] = ((F.eptr as usize -% mb.start_subject as usize) / sizeof[u8]()))
+                            (i = (2 * ((if ((if (top_bracket + 1) > match_data.oveccount: 1 else: 0)) != 0: match_data.oveccount else: (top_bracket + 1)))))
+                            with_memcpy((match_data.ovector + (2 as isize as usize)) as *i8, F.ovector as *i8, (((i -% 2)) *% sizeof[c_ulong]()) as i64)
+                            return 1
+                        OP_ANY =>
+                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if F.eptr == (mb.end_subject - (1 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == mb.nl[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (mb.hitend = 1)
+
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.eptr = F.eptr + 1)
+                            (F.ecode = F.ecode + 1)
+                        OP_ALLANY =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.eptr = F.eptr + 1)
+                            (F.ecode = F.ecode + 1)
+                        OP_ANYBYTE =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.eptr = F.eptr + 1)
+                            (F.ecode = F.ecode + 1)
+                        OP_CHAR =>
+                                                        if (if ((mb.end_subject as usize -% F.eptr as usize) / sizeof[u8]()) < 1: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            if (if F.ecode[1] != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            F.ecode = F.ecode + 2
+
+                        OP_CHARI =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                                                        if (if ((mb.lcc)[F.ecode[1]]) != ((mb.lcc)[unsafe: *F.eptr]): 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.eptr = F.eptr + 1)
+                            F.ecode = F.ecode + 2
+
+                        OP_NOT =>
+                                                        var ch: c_uint = 0 // init: untranslatable
+                            (fc = unsafe: *(F.eptr = F.eptr + 1))
+                            if (if (if ch == fc: 1 else: 0) != 0 or ((if (if F.op == OP_NOTI: 1 else: 0) != 0 and (if ((mb.fcc)[ch]) == fc: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            F.ecode = F.ecode + 2
+
+                        OP_EXACT =>
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            (F.fields.char_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 1)
+                            (F.fields.char_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            (F.fields.char_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = rep_min[fc])
+                            (F.fields.char_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATCHAR
+(F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.op >= OP_STARI: 1 else: 0) != 0:
+                                (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    var cc: c_uint = 0 // init: untranslatable
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (cc = unsafe: *F.eptr)
+                                    if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM25
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM26
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+                            else:
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM27
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr <= F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM28
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+
+                        OP_POSUPTO =>
+                            (F.fields.char_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            (F.fields.char_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 1)
+                            (F.fields.char_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            (F.fields.char_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = rep_min[fc])
+                            (F.fields.char_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATCHAR
+(F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.op >= OP_STARI: 1 else: 0) != 0:
+                                (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    var cc: c_uint = 0 // init: untranslatable
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (cc = unsafe: *F.eptr)
+                                    if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM25
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM26
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+                            else:
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM27
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr <= F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM28
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+
+                        OP_UPTO =>
+                            (F.fields.char_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            (F.fields.char_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 1)
+                            (F.fields.char_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            (F.fields.char_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = rep_min[fc])
+                            (F.fields.char_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATCHAR
+(F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.op >= OP_STARI: 1 else: 0) != 0:
+                                (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    var cc: c_uint = 0 // init: untranslatable
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (cc = unsafe: *F.eptr)
+                                    if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM25
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM26
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+                            else:
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM27
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr <= F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM28
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+
+                        OP_MINUPTO =>
+                            (F.fields.char_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            (F.fields.char_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 1)
+                            (F.fields.char_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            (F.fields.char_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = rep_min[fc])
+                            (F.fields.char_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATCHAR
+(F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.op >= OP_STARI: 1 else: 0) != 0:
+                                (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    var cc: c_uint = 0 // init: untranslatable
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (cc = unsafe: *F.eptr)
+                                    if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM25
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM26
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+                            else:
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM27
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr <= F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM28
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+
+                        OP_POSSTAR =>
+                            (F.fields.char_repeat.min = 0)
+                            (F.fields.char_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 1)
+                            (F.fields.char_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            (F.fields.char_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = rep_min[fc])
+                            (F.fields.char_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATCHAR
+(F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.op >= OP_STARI: 1 else: 0) != 0:
+                                (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    var cc: c_uint = 0 // init: untranslatable
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (cc = unsafe: *F.eptr)
+                                    if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM25
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM26
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+                            else:
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM27
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr <= F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM28
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+
+                        OP_POSPLUS =>
+                            (F.fields.char_repeat.min = 1)
+                            (F.fields.char_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = 0)
+                            (F.fields.char_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = rep_min[fc])
+                            (F.fields.char_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATCHAR
+(F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.op >= OP_STARI: 1 else: 0) != 0:
+                                (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    var cc: c_uint = 0 // init: untranslatable
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (cc = unsafe: *F.eptr)
+                                    if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM25
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM26
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+                            else:
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM27
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr <= F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM28
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+
+                        OP_POSQUERY =>
+                            (F.fields.char_repeat.min = 0)
+                            (F.fields.char_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.char_repeat.min = rep_min[fc])
+                            (F.fields.char_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATCHAR
+(F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.op >= OP_STARI: 1 else: 0) != 0:
+                                (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    var cc: c_uint = 0 // init: untranslatable
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (cc = unsafe: *F.eptr)
+                                    if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM25
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM26
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+                            else:
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM27
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr <= F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM28
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+
+                        OP_STAR =>
+                            (F.fields.char_repeat.min = rep_min[fc])
+                            (F.fields.char_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATCHAR
+(F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.op >= OP_STARI: 1 else: 0) != 0:
+                                (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    var cc: c_uint = 0 // init: untranslatable
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (cc = unsafe: *F.eptr)
+                                    if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM25
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        var cc: c_uint = 0 // init: untranslatable
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        (cc = unsafe: *F.eptr)
+                                        if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM26
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+                            else:
+                                (i = 1)
+                                while (if i <= F.fields.char_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+                                if (if F.fields.char_repeat.min == F.fields.char_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                    while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM27
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.char_repeat.min = F.fields.char_repeat.min + 1) >= F.fields.char_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+                                else:
+                                    (F.fields.char_repeat.start_eptr = F.eptr)
+                                    (i = F.fields.char_repeat.min)
+                                    while (if i < F.fields.char_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr <= F.fields.char_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM28
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            (F.eptr = F.eptr - 1)
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+
+
+
+
+                        OP_NOTEXACT =>
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (reptype = 1)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (reptype = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            (F.fields.charnot_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 1)
+                            (F.fields.charnot_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            (F.fields.charnot_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = rep_min[fc])
+                            (F.fields.charnot_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATNOTCHAR
+
+                            // (empty)
+                            if (if F.op >= OP_NOTSTARI: 1 else: 0) != 0:
+                                (F.fields.charnot_repeat.oc = ((mb.fcc)[F.fields.charnot_repeat.c]))
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM29
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM30
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+                            else:
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM31
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM32
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+
+                        OP_NOTUPTO =>
+                            (reptype = 1)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (reptype = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            (F.fields.charnot_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 1)
+                            (F.fields.charnot_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            (F.fields.charnot_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = rep_min[fc])
+                            (F.fields.charnot_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATNOTCHAR
+
+                            // (empty)
+                            if (if F.op >= OP_NOTSTARI: 1 else: 0) != 0:
+                                (F.fields.charnot_repeat.oc = ((mb.fcc)[F.fields.charnot_repeat.c]))
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM29
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM30
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+                            else:
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM31
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM32
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+
+                        OP_NOTMINUPTO =>
+                            (reptype = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            (F.fields.charnot_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 1)
+                            (F.fields.charnot_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            (F.fields.charnot_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = rep_min[fc])
+                            (F.fields.charnot_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATNOTCHAR
+
+                            // (empty)
+                            if (if F.op >= OP_NOTSTARI: 1 else: 0) != 0:
+                                (F.fields.charnot_repeat.oc = ((mb.fcc)[F.fields.charnot_repeat.c]))
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM29
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM30
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+                            else:
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM31
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM32
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+
+                        OP_NOTPOSSTAR =>
+                            (F.fields.charnot_repeat.min = 0)
+                            (F.fields.charnot_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 1)
+                            (F.fields.charnot_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            (F.fields.charnot_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = rep_min[fc])
+                            (F.fields.charnot_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATNOTCHAR
+
+                            // (empty)
+                            if (if F.op >= OP_NOTSTARI: 1 else: 0) != 0:
+                                (F.fields.charnot_repeat.oc = ((mb.fcc)[F.fields.charnot_repeat.c]))
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM29
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM30
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+                            else:
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM31
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM32
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+
+                        OP_NOTPOSPLUS =>
+                            (F.fields.charnot_repeat.min = 1)
+                            (F.fields.charnot_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            (F.fields.charnot_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = rep_min[fc])
+                            (F.fields.charnot_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATNOTCHAR
+
+                            // (empty)
+                            if (if F.op >= OP_NOTSTARI: 1 else: 0) != 0:
+                                (F.fields.charnot_repeat.oc = ((mb.fcc)[F.fields.charnot_repeat.c]))
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM29
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM30
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+                            else:
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM31
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM32
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+
+                        OP_NOTPOSQUERY =>
+                            (F.fields.charnot_repeat.min = 0)
+                            (F.fields.charnot_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = rep_min[fc])
+                            (F.fields.charnot_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATNOTCHAR
+
+                            // (empty)
+                            if (if F.op >= OP_NOTSTARI: 1 else: 0) != 0:
+                                (F.fields.charnot_repeat.oc = ((mb.fcc)[F.fields.charnot_repeat.c]))
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM29
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM30
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+                            else:
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM31
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM32
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+
+                        OP_NOTPOSUPTO =>
+                            (F.fields.charnot_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.charnot_repeat.min = rep_min[fc])
+                            (F.fields.charnot_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATNOTCHAR
+
+                            // (empty)
+                            if (if F.op >= OP_NOTSTARI: 1 else: 0) != 0:
+                                (F.fields.charnot_repeat.oc = ((mb.fcc)[F.fields.charnot_repeat.c]))
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM29
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM30
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+                            else:
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM31
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM32
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+
+                        OP_NOTSTAR =>
+                            (F.fields.charnot_repeat.min = rep_min[fc])
+                            (F.fields.charnot_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATNOTCHAR
+
+                            // (empty)
+                            if (if F.op >= OP_NOTSTARI: 1 else: 0) != 0:
+                                (F.fields.charnot_repeat.oc = ((mb.fcc)[F.fields.charnot_repeat.c]))
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr + 1)
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM29
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        (F.eptr = F.eptr + 1)
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM30
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+                            else:
+                                                                (i = 1)
+                                while (if i <= F.fields.charnot_repeat.min: 1 else: 0) != 0:
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (i = i + 1)
+
+
+                                if (if F.fields.charnot_repeat.min == F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                    continue
+
+                                if (if reptype == 0: 1 else: 0) != 0:
+                                                                        while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM31
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if (F.fields.charnot_repeat.min = F.fields.charnot_repeat.min + 1) >= F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+
+
+                                else:
+                                    (F.fields.charnot_repeat.start_eptr = F.eptr)
+                                                                        (i = F.fields.charnot_repeat.min)
+                                    while (if i < F.fields.charnot_repeat.max: 1 else: 0) != 0:
+                                        if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                            break
+
+                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.eptr + 1)
+                                        (i = i + 1)
+
+                                    if (if reptype != 2: 1 else: 0) != 0:
+                                        while true:
+                                            if (if F.eptr == F.fields.charnot_repeat.start_eptr: 1 else: 0) != 0:
+                                                break
+
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                // label: L_RM32
+// (empty)
+                                                if not (0 != 0):
+                                                    break
+
+                                            if (if rrc != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr - 1)
+
+
+
+
+
+                        OP_NCLASS =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            // (empty)
+                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_NOT_DIGIT =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            // (empty)
+                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_DIGIT =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            // (empty)
+                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_NOT_WHITESPACE =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            // (empty)
+                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_WHITESPACE =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            // (empty)
+                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_NOT_WORDCHAR =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            // (empty)
+                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_WORDCHAR =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            // (empty)
+                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_ANYNL =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            // (empty)
+                            match fc
+                                _ =>
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+                                13 => 0
+                                10 => 0
+                                11 => 0
+
+                            (F.ecode = F.ecode + 1)
+                        OP_NOT_HSPACE =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            // (empty)
+                            match fc
+                                9 => 0
+                                _ => 0
+
+                            (F.ecode = F.ecode + 1)
+                        OP_HSPACE =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            // (empty)
+                            match fc
+                                9 =>
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+                                _ =>
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_NOT_VSPACE =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            // (empty)
+                            match fc
+                                10 => 0
+                                _ => 0
+
+                            (F.ecode = F.ecode + 1)
+                        OP_VSPACE =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            // (empty)
+                            match fc
+                                10 =>
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+                                _ =>
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_TYPEEXACT =>
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (reptype = (if ((if unsafe: *F.ecode == OP_TYPEMINUPTO: 1 else: 0)) != 0: REPTYPE_MIN else: REPTYPE_MAX))
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            (F.fields.type_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 1)
+                            (F.fields.type_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            (F.fields.type_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.type_repeat.min = rep_min[fc])
+                            (F.fields.type_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATTYPE
+(F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
+                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == mb.nl[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (mb.hitend = 1)
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 =>
+                                        if (if F.eptr > (mb.end_subject - F.fields.type_repeat.min): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        F.eptr = F.eptr + F.fields.type_repeat.min
+                                    17 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ => 0
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                10 => 0
+                                                _ => 0
+
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+
+                            if (if F.fields.type_repeat.min == F.fields.type_repeat.max: 1 else: 0) != 0:
+                                continue
+
+                            if (if reptype == 0: 1 else: 0) != 0:
+                                                                while true:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM33
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (F.fields.type_repeat.min = F.fields.type_repeat.min + 1) >= F.fields.type_repeat.max: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    match F.fields.type_repeat.ctype
+                                        12 => 0
+                                        13 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        17 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        18 =>
+                                            match fc
+                                                _ => 0
+                                                9 => 0
+
+                                        19 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                        20 =>
+                                            match fc
+                                                _ => 0
+                                                10 => 0
+
+                                        21 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                        6 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        7 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        8 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        9 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        10 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        11 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        _ => 0
+
+
+
+                            else:
+                                (F.fields.type_repeat.start_eptr = F.eptr)
+                                                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 => 0
+                                    17 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (fc = unsafe: *F.eptr)
+                                            if (if fc == 13: 1 else: 0) != 0:
+                                                if (if (F.eptr = F.eptr + 1) >= mb.end_subject: 1 else: 0) != 0:
+                                                    break
+
+                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                    (F.eptr = F.eptr + 1)
+
+                                            else:
+                                                if (if (if fc != 10: 1 else: 0) != 0 and ((if (if mb.bsr_convention == 2: 1 else: 0) != 0 or ((if (if (if fc != 11: 1 else: 0) != 0 and (if fc != 12: 1 else: 0) != 0: 1 else: 0) != 0 and (if fc != 133: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                                    break
+
+                                                (F.eptr = F.eptr + 1)
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP00
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+                                if (if reptype == 2: 1 else: 0) != 0:
+                                    continue
+
+                                while true:
+                                    if (if F.eptr == F.fields.type_repeat.start_eptr: 1 else: 0) != 0:
+                                        break
+
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM34
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr - 1)
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[(0 - 1)] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (F.eptr = F.eptr - 1)
+
+
+
+
+                        OP_TYPEUPTO =>
+                            (reptype = (if ((if unsafe: *F.ecode == OP_TYPEMINUPTO: 1 else: 0)) != 0: REPTYPE_MIN else: REPTYPE_MAX))
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            (F.fields.type_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 1)
+                            (F.fields.type_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            (F.fields.type_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.type_repeat.min = rep_min[fc])
+                            (F.fields.type_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATTYPE
+(F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
+                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == mb.nl[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (mb.hitend = 1)
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 =>
+                                        if (if F.eptr > (mb.end_subject - F.fields.type_repeat.min): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        F.eptr = F.eptr + F.fields.type_repeat.min
+                                    17 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ => 0
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                10 => 0
+                                                _ => 0
+
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+
+                            if (if F.fields.type_repeat.min == F.fields.type_repeat.max: 1 else: 0) != 0:
+                                continue
+
+                            if (if reptype == 0: 1 else: 0) != 0:
+                                                                while true:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM33
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (F.fields.type_repeat.min = F.fields.type_repeat.min + 1) >= F.fields.type_repeat.max: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    match F.fields.type_repeat.ctype
+                                        12 => 0
+                                        13 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        17 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        18 =>
+                                            match fc
+                                                _ => 0
+                                                9 => 0
+
+                                        19 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                        20 =>
+                                            match fc
+                                                _ => 0
+                                                10 => 0
+
+                                        21 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                        6 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        7 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        8 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        9 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        10 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        11 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        _ => 0
+
+
+
+                            else:
+                                (F.fields.type_repeat.start_eptr = F.eptr)
+                                                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 => 0
+                                    17 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (fc = unsafe: *F.eptr)
+                                            if (if fc == 13: 1 else: 0) != 0:
+                                                if (if (F.eptr = F.eptr + 1) >= mb.end_subject: 1 else: 0) != 0:
+                                                    break
+
+                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                    (F.eptr = F.eptr + 1)
+
+                                            else:
+                                                if (if (if fc != 10: 1 else: 0) != 0 and ((if (if mb.bsr_convention == 2: 1 else: 0) != 0 or ((if (if (if fc != 11: 1 else: 0) != 0 and (if fc != 12: 1 else: 0) != 0: 1 else: 0) != 0 and (if fc != 133: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                                    break
+
+                                                (F.eptr = F.eptr + 1)
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP00
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+                                if (if reptype == 2: 1 else: 0) != 0:
+                                    continue
+
+                                while true:
+                                    if (if F.eptr == F.fields.type_repeat.start_eptr: 1 else: 0) != 0:
+                                        break
+
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM34
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr - 1)
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[(0 - 1)] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (F.eptr = F.eptr - 1)
+
+
+
+
+                        OP_TYPEPOSSTAR =>
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            (F.fields.type_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 1)
+                            (F.fields.type_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            (F.fields.type_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.type_repeat.min = rep_min[fc])
+                            (F.fields.type_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATTYPE
+(F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
+                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == mb.nl[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (mb.hitend = 1)
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 =>
+                                        if (if F.eptr > (mb.end_subject - F.fields.type_repeat.min): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        F.eptr = F.eptr + F.fields.type_repeat.min
+                                    17 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ => 0
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                10 => 0
+                                                _ => 0
+
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+
+                            if (if F.fields.type_repeat.min == F.fields.type_repeat.max: 1 else: 0) != 0:
+                                continue
+
+                            if (if reptype == 0: 1 else: 0) != 0:
+                                                                while true:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM33
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (F.fields.type_repeat.min = F.fields.type_repeat.min + 1) >= F.fields.type_repeat.max: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    match F.fields.type_repeat.ctype
+                                        12 => 0
+                                        13 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        17 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        18 =>
+                                            match fc
+                                                _ => 0
+                                                9 => 0
+
+                                        19 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                        20 =>
+                                            match fc
+                                                _ => 0
+                                                10 => 0
+
+                                        21 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                        6 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        7 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        8 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        9 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        10 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        11 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        _ => 0
+
+
+
+                            else:
+                                (F.fields.type_repeat.start_eptr = F.eptr)
+                                                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 => 0
+                                    17 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (fc = unsafe: *F.eptr)
+                                            if (if fc == 13: 1 else: 0) != 0:
+                                                if (if (F.eptr = F.eptr + 1) >= mb.end_subject: 1 else: 0) != 0:
+                                                    break
+
+                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                    (F.eptr = F.eptr + 1)
+
+                                            else:
+                                                if (if (if fc != 10: 1 else: 0) != 0 and ((if (if mb.bsr_convention == 2: 1 else: 0) != 0 or ((if (if (if fc != 11: 1 else: 0) != 0 and (if fc != 12: 1 else: 0) != 0: 1 else: 0) != 0 and (if fc != 133: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                                    break
+
+                                                (F.eptr = F.eptr + 1)
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP00
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+                                if (if reptype == 2: 1 else: 0) != 0:
+                                    continue
+
+                                while true:
+                                    if (if F.eptr == F.fields.type_repeat.start_eptr: 1 else: 0) != 0:
+                                        break
+
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM34
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr - 1)
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[(0 - 1)] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (F.eptr = F.eptr - 1)
+
+
+
+
+                        OP_TYPEPOSPLUS =>
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 1)
+                            (F.fields.type_repeat.max = 4294967295)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            (F.fields.type_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.type_repeat.min = rep_min[fc])
+                            (F.fields.type_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATTYPE
+(F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
+                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == mb.nl[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (mb.hitend = 1)
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 =>
+                                        if (if F.eptr > (mb.end_subject - F.fields.type_repeat.min): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        F.eptr = F.eptr + F.fields.type_repeat.min
+                                    17 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ => 0
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                10 => 0
+                                                _ => 0
+
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+
+                            if (if F.fields.type_repeat.min == F.fields.type_repeat.max: 1 else: 0) != 0:
+                                continue
+
+                            if (if reptype == 0: 1 else: 0) != 0:
+                                                                while true:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM33
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (F.fields.type_repeat.min = F.fields.type_repeat.min + 1) >= F.fields.type_repeat.max: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    match F.fields.type_repeat.ctype
+                                        12 => 0
+                                        13 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        17 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        18 =>
+                                            match fc
+                                                _ => 0
+                                                9 => 0
+
+                                        19 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                        20 =>
+                                            match fc
+                                                _ => 0
+                                                10 => 0
+
+                                        21 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                        6 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        7 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        8 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        9 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        10 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        11 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        _ => 0
+
+
+
+                            else:
+                                (F.fields.type_repeat.start_eptr = F.eptr)
+                                                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 => 0
+                                    17 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (fc = unsafe: *F.eptr)
+                                            if (if fc == 13: 1 else: 0) != 0:
+                                                if (if (F.eptr = F.eptr + 1) >= mb.end_subject: 1 else: 0) != 0:
+                                                    break
+
+                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                    (F.eptr = F.eptr + 1)
+
+                                            else:
+                                                if (if (if fc != 10: 1 else: 0) != 0 and ((if (if mb.bsr_convention == 2: 1 else: 0) != 0 or ((if (if (if fc != 11: 1 else: 0) != 0 and (if fc != 12: 1 else: 0) != 0: 1 else: 0) != 0 and (if fc != 133: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                                    break
+
+                                                (F.eptr = F.eptr + 1)
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP00
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+                                if (if reptype == 2: 1 else: 0) != 0:
+                                    continue
+
+                                while true:
+                                    if (if F.eptr == F.fields.type_repeat.start_eptr: 1 else: 0) != 0:
+                                        break
+
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM34
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr - 1)
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[(0 - 1)] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (F.eptr = F.eptr - 1)
+
+
+
+
+                        OP_TYPEPOSQUERY =>
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            (F.fields.type_repeat.max = 1)
+                            (F.ecode = F.ecode + 1)
+                            comptime_error("goto not supported")
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.type_repeat.min = rep_min[fc])
+                            (F.fields.type_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATTYPE
+(F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
+                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == mb.nl[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (mb.hitend = 1)
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 =>
+                                        if (if F.eptr > (mb.end_subject - F.fields.type_repeat.min): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        F.eptr = F.eptr + F.fields.type_repeat.min
+                                    17 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ => 0
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                10 => 0
+                                                _ => 0
+
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+
+                            if (if F.fields.type_repeat.min == F.fields.type_repeat.max: 1 else: 0) != 0:
+                                continue
+
+                            if (if reptype == 0: 1 else: 0) != 0:
+                                                                while true:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM33
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (F.fields.type_repeat.min = F.fields.type_repeat.min + 1) >= F.fields.type_repeat.max: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    match F.fields.type_repeat.ctype
+                                        12 => 0
+                                        13 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        17 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        18 =>
+                                            match fc
+                                                _ => 0
+                                                9 => 0
+
+                                        19 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                        20 =>
+                                            match fc
+                                                _ => 0
+                                                10 => 0
+
+                                        21 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                        6 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        7 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        8 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        9 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        10 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        11 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        _ => 0
+
+
+
+                            else:
+                                (F.fields.type_repeat.start_eptr = F.eptr)
+                                                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 => 0
+                                    17 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (fc = unsafe: *F.eptr)
+                                            if (if fc == 13: 1 else: 0) != 0:
+                                                if (if (F.eptr = F.eptr + 1) >= mb.end_subject: 1 else: 0) != 0:
+                                                    break
+
+                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                    (F.eptr = F.eptr + 1)
+
+                                            else:
+                                                if (if (if fc != 10: 1 else: 0) != 0 and ((if (if mb.bsr_convention == 2: 1 else: 0) != 0 or ((if (if (if fc != 11: 1 else: 0) != 0 and (if fc != 12: 1 else: 0) != 0: 1 else: 0) != 0 and (if fc != 133: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                                    break
+
+                                                (F.eptr = F.eptr + 1)
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP00
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+                                if (if reptype == 2: 1 else: 0) != 0:
+                                    continue
+
+                                while true:
+                                    if (if F.eptr == F.fields.type_repeat.start_eptr: 1 else: 0) != 0:
+                                        break
+
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM34
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr - 1)
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[(0 - 1)] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (F.eptr = F.eptr - 1)
+
+
+
+
+                        OP_TYPEPOSUPTO =>
+                            (reptype = 2)
+                            (F.fields.type_repeat.min = 0)
+                            F.ecode = F.ecode + (1 + 2)
+                            comptime_error("goto not supported")
+                            (F.fields.type_repeat.min = rep_min[fc])
+                            (F.fields.type_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATTYPE
+(F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
+                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == mb.nl[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (mb.hitend = 1)
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 =>
+                                        if (if F.eptr > (mb.end_subject - F.fields.type_repeat.min): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        F.eptr = F.eptr + F.fields.type_repeat.min
+                                    17 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ => 0
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                10 => 0
+                                                _ => 0
+
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+
+                            if (if F.fields.type_repeat.min == F.fields.type_repeat.max: 1 else: 0) != 0:
+                                continue
+
+                            if (if reptype == 0: 1 else: 0) != 0:
+                                                                while true:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM33
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (F.fields.type_repeat.min = F.fields.type_repeat.min + 1) >= F.fields.type_repeat.max: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    match F.fields.type_repeat.ctype
+                                        12 => 0
+                                        13 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        17 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        18 =>
+                                            match fc
+                                                _ => 0
+                                                9 => 0
+
+                                        19 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                        20 =>
+                                            match fc
+                                                _ => 0
+                                                10 => 0
+
+                                        21 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                        6 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        7 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        8 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        9 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        10 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        11 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        _ => 0
+
+
+
+                            else:
+                                (F.fields.type_repeat.start_eptr = F.eptr)
+                                                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 => 0
+                                    17 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (fc = unsafe: *F.eptr)
+                                            if (if fc == 13: 1 else: 0) != 0:
+                                                if (if (F.eptr = F.eptr + 1) >= mb.end_subject: 1 else: 0) != 0:
+                                                    break
+
+                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                    (F.eptr = F.eptr + 1)
+
+                                            else:
+                                                if (if (if fc != 10: 1 else: 0) != 0 and ((if (if mb.bsr_convention == 2: 1 else: 0) != 0 or ((if (if (if fc != 11: 1 else: 0) != 0 and (if fc != 12: 1 else: 0) != 0: 1 else: 0) != 0 and (if fc != 133: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                                    break
+
+                                                (F.eptr = F.eptr + 1)
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP00
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+                                if (if reptype == 2: 1 else: 0) != 0:
+                                    continue
+
+                                while true:
+                                    if (if F.eptr == F.fields.type_repeat.start_eptr: 1 else: 0) != 0:
+                                        break
+
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM34
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr - 1)
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[(0 - 1)] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (F.eptr = F.eptr - 1)
+
+
+
+
+                        OP_TYPESTAR =>
+                            (F.fields.type_repeat.min = rep_min[fc])
+                            (F.fields.type_repeat.max = rep_max[fc])
+                            (reptype = rep_typ[fc])
+                            // label: REPEATTYPE
+(F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
+                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == mb.nl[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (mb.hitend = 1)
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 =>
+                                        if (if F.eptr > (mb.end_subject - F.fields.type_repeat.min): 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        F.eptr = F.eptr + F.fields.type_repeat.min
+                                    17 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ => 0
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                10 => 0
+                                                _ => 0
+
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = 1)
+                                        while (if i <= F.fields.type_repeat.min: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+
+                            if (if F.fields.type_repeat.min == F.fields.type_repeat.max: 1 else: 0) != 0:
+                                continue
+
+                            if (if reptype == 0: 1 else: 0) != 0:
+                                                                while true:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM33
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (F.fields.type_repeat.min = F.fields.type_repeat.min + 1) >= F.fields.type_repeat.max: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    match F.fields.type_repeat.ctype
+                                        12 => 0
+                                        13 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        17 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                13 =>
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (F.eptr = F.eptr + 1)
+
+                                                10 => 0
+                                                11 => 0
+
+                                        18 =>
+                                            match fc
+                                                _ => 0
+                                                9 => 0
+
+                                        19 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                9 => 0
+
+                                        20 =>
+                                            match fc
+                                                _ => 0
+                                                10 => 0
+
+                                        21 =>
+                                            match fc
+                                                _ =>
+                                                    while true:
+                                                        comptime_error("goto not supported")
+                                                        if not (0 != 0):
+                                                            break
+
+                                                10 => 0
+
+                                        6 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        7 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        8 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        9 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        10 =>
+                                            if (if 1 != 0 and (if ((mb.ctypes[fc] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        11 =>
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[fc] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        _ => 0
+
+
+
+                            else:
+                                (F.fields.type_repeat.start_eptr = F.eptr)
+                                                                match F.fields.type_repeat.ctype
+                                    12 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    13 => 0
+                                    17 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            (fc = unsafe: *F.eptr)
+                                            if (if fc == 13: 1 else: 0) != 0:
+                                                if (if (F.eptr = F.eptr + 1) >= mb.end_subject: 1 else: 0) != 0:
+                                                    break
+
+                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                    (F.eptr = F.eptr + 1)
+
+                                            else:
+                                                if (if (if fc != 10: 1 else: 0) != 0 and ((if (if mb.bsr_convention == 2: 1 else: 0) != 0 or ((if (if (if fc != 11: 1 else: 0) != 0 and (if fc != 12: 1 else: 0) != 0: 1 else: 0) != 0 and (if fc != 133: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                                    break
+
+                                                (F.eptr = F.eptr + 1)
+
+                                            (i = i + 1)
+
+                                    18 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP00
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    19 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                9 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP01
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    20 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    (F.eptr = F.eptr + 1)
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP02
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    21 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            match unsafe: *F.eptr
+                                                _ =>
+                                                    comptime_error("goto not supported")
+                                                10 => 0
+
+                                            (i = i + 1)
+
+                                        // label: ENDLOOP03
+break
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    6 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    7 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    8 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    9 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    10 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    11 =>
+                                        (i = F.fields.type_repeat.min)
+                                        while (if i < F.fields.type_repeat.max: 1 else: 0) != 0:
+                                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                                break
+
+                                            if (if (not 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                break
+
+                                            (F.eptr = F.eptr + 1)
+                                            (i = i + 1)
+
+                                    _ => 0
+
+                                if (if reptype == 2: 1 else: 0) != 0:
+                                    continue
+
+                                while true:
+                                    if (if F.eptr == F.fields.type_repeat.start_eptr: 1 else: 0) != 0:
+                                        break
+
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM34
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (F.eptr = F.eptr - 1)
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[(0 - 1)] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (F.eptr = F.eptr - 1)
+
+
+
+
+                        OP_DNREF =>
+                                                        var count: c_int = 0 // init: untranslatable
+                            var slot: *const u8 = null // init: untranslatable
+                            F.ecode = F.ecode + ((1 + (2 * 2)) + ((if (if F.op == OP_DNREFI: 1 else: 0) != 0: 1 else: 0)))
+                            while (if (count = count - 1) > 0: 1 else: 0) != 0:
+                                slot = slot + mb.name_entry_size
+
+
+                            comptime_error("goto not supported")
+                            (F.byte2 = (if ((if F.op == OP_REFI: 1 else: 0)) != 0: F.ecode[(1 + 2)] else: 0))
+                            F.ecode = F.ecode + ((1 + 2) + ((if (if F.op == OP_REFI: 1 else: 0) != 0: 1 else: 0)))
+                            // label: REF_REPEAT
+match unsafe: *F.ecode
+                                OP_CRSTAR =>
+                                    (F.fields.ref_repeat.min = rep_min[fc])
+                                    (F.fields.ref_repeat.max = rep_max[fc])
+                                    (reptype = rep_typ[fc])
+                                OP_CRRANGE =>
+                                    (reptype = rep_typ[(unsafe: *F.ecode - OP_CRSTAR)])
+                                    if (if F.fields.ref_repeat.max == 0: 1 else: 0) != 0:
+                                        (F.fields.ref_repeat.max = 4294967295)
+
+                                    F.ecode = F.ecode + (1 + (2 * 2))
+                                _ =>
+                                                                        (rrc = match_ref(F.fields.ref_repeat.offset, F.byte1, F.byte2, F, mb, &length))
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        if (if rrc > 0: 1 else: 0) != 0:
+                                            (F.eptr = mb.end_subject)
+
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+
+                                    F.eptr = F.eptr + length
+                                    continue
+
+                            (i = 1)
+                            while (if i <= F.fields.ref_repeat.min: 1 else: 0) != 0:
+                                var slength: c_ulong = 0 // init: untranslatable
+                                (rrc = match_ref(F.fields.ref_repeat.offset, F.byte1, F.byte2, F, mb, &slength))
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    if (if rrc > 0: 1 else: 0) != 0:
+                                        (F.eptr = mb.end_subject)
+
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                F.eptr = F.eptr + slength
+                                (i = i + 1)
+
+                            if (if F.fields.ref_repeat.min == F.fields.ref_repeat.max: 1 else: 0) != 0:
+                                continue
+
+                            if (if reptype == 0: 1 else: 0) != 0:
+                                while true:
+                                    var slength: c_ulong = 0 // init: untranslatable
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM20
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (F.fields.ref_repeat.min = F.fields.ref_repeat.min + 1) >= F.fields.ref_repeat.max: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (rrc = match_ref(F.fields.ref_repeat.offset, F.byte1, F.byte2, F, mb, &slength))
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        if (if rrc > 0: 1 else: 0) != 0:
+                                            (F.eptr = mb.end_subject)
+
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    F.eptr = F.eptr + slength
+
+                            else:
+                                var samelengths: c_int = 0 // init: untranslatable
+                                (F.fields.ref_repeat.start = F.eptr)
+                                (F.fields.ref_repeat.length = (F.ovector[(F.fields.ref_repeat.offset +% 1)] -% F.ovector[F.fields.ref_repeat.offset]))
+                                (i = F.fields.ref_repeat.min)
+                                while (if i < F.fields.ref_repeat.max: 1 else: 0) != 0:
+                                    var slength: c_ulong = 0 // init: untranslatable
+                                    (rrc = match_ref(F.fields.ref_repeat.offset, F.byte1, F.byte2, F, mb, &slength))
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        if (if (if (if rrc > 0: 1 else: 0) != 0 and (if mb.partial != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.end_subject > mb.start_used_ptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (mb.hitend = 1)
+
+                                        break
+
+                                    if (if slength != F.fields.ref_repeat.length: 1 else: 0) != 0:
+                                        (samelengths = 0)
+
+                                    F.eptr = F.eptr + slength
+                                    (i = i + 1)
+
+                                if (if reptype == 2: 1 else: 0) != 0:
+                                    break
+
+                                if samelengths != 0:
+                                    while (if F.eptr >= F.fields.ref_repeat.start: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM21
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        F.eptr = F.eptr - F.fields.ref_repeat.length
+
+                                else:
+                                    (F.fields.ref_repeat.max = i)
+                                    while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM22
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr == F.fields.ref_repeat.start: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.fields.ref_repeat.start)
+                                        (F.fields.ref_repeat.max = F.fields.ref_repeat.max - 1)
+                                        (i = F.fields.ref_repeat.min)
+                                        while (if i < F.fields.ref_repeat.max: 1 else: 0) != 0:
+                                            var slength: c_ulong = 0 // init: untranslatable
+                                            match_ref(F.fields.ref_repeat.offset, F.byte1, F.byte2, F, mb, &slength)
+                                            F.eptr = F.eptr + slength
+                                            (i = i + 1)
+
+
+
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                                                        var next_ecode: *const u8 = null // init: untranslatable
+                            (F.ecode = F.ecode + 1)
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM9
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (next_ecode = F.ecode)
+                            (F.ecode = ((next_ecode + (1 as isize as usize)) + (2 as isize as usize)))
+
+                        OP_REF =>
+                            (F.byte2 = (if ((if F.op == OP_REFI: 1 else: 0)) != 0: F.ecode[(1 + 2)] else: 0))
+                            F.ecode = F.ecode + ((1 + 2) + ((if (if F.op == OP_REFI: 1 else: 0) != 0: 1 else: 0)))
+                            // label: REF_REPEAT
+match unsafe: *F.ecode
+                                OP_CRSTAR =>
+                                    (F.fields.ref_repeat.min = rep_min[fc])
+                                    (F.fields.ref_repeat.max = rep_max[fc])
+                                    (reptype = rep_typ[fc])
+                                OP_CRRANGE =>
+                                    (reptype = rep_typ[(unsafe: *F.ecode - OP_CRSTAR)])
+                                    if (if F.fields.ref_repeat.max == 0: 1 else: 0) != 0:
+                                        (F.fields.ref_repeat.max = 4294967295)
+
+                                    F.ecode = F.ecode + (1 + (2 * 2))
+                                _ =>
+                                                                        (rrc = match_ref(F.fields.ref_repeat.offset, F.byte1, F.byte2, F, mb, &length))
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        if (if rrc > 0: 1 else: 0) != 0:
+                                            (F.eptr = mb.end_subject)
+
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+
+                                    F.eptr = F.eptr + length
+                                    continue
+
+                            (i = 1)
+                            while (if i <= F.fields.ref_repeat.min: 1 else: 0) != 0:
+                                var slength: c_ulong = 0 // init: untranslatable
+                                (rrc = match_ref(F.fields.ref_repeat.offset, F.byte1, F.byte2, F, mb, &slength))
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    if (if rrc > 0: 1 else: 0) != 0:
+                                        (F.eptr = mb.end_subject)
+
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                F.eptr = F.eptr + slength
+                                (i = i + 1)
+
+                            if (if F.fields.ref_repeat.min == F.fields.ref_repeat.max: 1 else: 0) != 0:
+                                continue
+
+                            if (if reptype == 0: 1 else: 0) != 0:
+                                while true:
+                                    var slength: c_ulong = 0 // init: untranslatable
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM20
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if (F.fields.ref_repeat.min = F.fields.ref_repeat.min + 1) >= F.fields.ref_repeat.max: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (rrc = match_ref(F.fields.ref_repeat.offset, F.byte1, F.byte2, F, mb, &slength))
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        if (if rrc > 0: 1 else: 0) != 0:
+                                            (F.eptr = mb.end_subject)
+
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    F.eptr = F.eptr + slength
+
+                            else:
+                                var samelengths: c_int = 0 // init: untranslatable
+                                (F.fields.ref_repeat.start = F.eptr)
+                                (F.fields.ref_repeat.length = (F.ovector[(F.fields.ref_repeat.offset +% 1)] -% F.ovector[F.fields.ref_repeat.offset]))
+                                (i = F.fields.ref_repeat.min)
+                                while (if i < F.fields.ref_repeat.max: 1 else: 0) != 0:
+                                    var slength: c_ulong = 0 // init: untranslatable
+                                    (rrc = match_ref(F.fields.ref_repeat.offset, F.byte1, F.byte2, F, mb, &slength))
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        if (if (if (if rrc > 0: 1 else: 0) != 0 and (if mb.partial != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.end_subject > mb.start_used_ptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (mb.hitend = 1)
+
+                                        break
+
+                                    if (if slength != F.fields.ref_repeat.length: 1 else: 0) != 0:
+                                        (samelengths = 0)
+
+                                    F.eptr = F.eptr + slength
+                                    (i = i + 1)
+
+                                if (if reptype == 2: 1 else: 0) != 0:
+                                    break
+
+                                if samelengths != 0:
+                                    while (if F.eptr >= F.fields.ref_repeat.start: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM21
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        F.eptr = F.eptr - F.fields.ref_repeat.length
+
+                                else:
+                                    (F.fields.ref_repeat.max = i)
+                                    while true:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM22
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        if (if rrc != 0: 1 else: 0) != 0:
+                                            while true:
+                                                comptime_error("goto not supported")
+                                                if not (0 != 0):
+                                                    break
+
+
+                                        if (if F.eptr == F.fields.ref_repeat.start: 1 else: 0) != 0:
+                                            break
+
+                                        (F.eptr = F.fields.ref_repeat.start)
+                                        (F.fields.ref_repeat.max = F.fields.ref_repeat.max - 1)
+                                        (i = F.fields.ref_repeat.min)
+                                        while (if i < F.fields.ref_repeat.max: 1 else: 0) != 0:
+                                            var slength: c_ulong = 0 // init: untranslatable
+                                            match_ref(F.fields.ref_repeat.offset, F.byte1, F.byte2, F, mb, &slength)
+                                            F.eptr = F.eptr + slength
+                                            (i = i + 1)
+
+
+
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                                                        var next_ecode: *const u8 = null // init: untranslatable
+                            (F.ecode = F.ecode + 1)
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM9
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (next_ecode = F.ecode)
+                            (F.ecode = ((next_ecode + (1 as isize as usize)) + (2 as isize as usize)))
+
+                        OP_BRAZERO =>
+                                                        var next_ecode: *const u8 = null // init: untranslatable
+                            (F.ecode = F.ecode + 1)
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM9
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (next_ecode = F.ecode)
+                            (F.ecode = ((next_ecode + (1 as isize as usize)) + (2 as isize as usize)))
+
+                        OP_BRAMINZERO =>
+                                                        var next_ecode: *const u8 = null // init: untranslatable
+                            (F.ecode = F.ecode + 1)
+                            (next_ecode = F.ecode)
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM10
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+
+                        OP_SKIPZERO =>
+                                                        var next_ecode: *const u8 = null // init: untranslatable
+                            (F.ecode = ((next_ecode + (1 as isize as usize)) + (2 as isize as usize)))
+
+                        OP_BRAPOSZERO =>
+                            (F.byte2 = 1)
+                            F.ecode = F.ecode + 1
+                            if (if (if unsafe: *F.ecode == OP_CBRAPOS: 1 else: 0) != 0 or (if unsafe: *F.ecode == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0:
+                                comptime_error("goto not supported")
+
+                            comptime_error("goto not supported")
+                            // label: POSSESSIVE_NON_CAPTURE
+(F.fields.op_brapos.frame_type = 131072)
+                            comptime_error("goto not supported")
+                            // label: POSSESSIVE_CAPTURE
+
+                            (F.fields.op_brapos.frame_type = (65536 | number))
+                            // label: POSSESSIVE_GROUP
+(F.byte1 = 0)
+                            (F.fields.op_brapos.start_group = F.ecode)
+                            while true:
+                                (F.fields.op_brapos.start_eptr = F.eptr)
+                                (group_frame_type = F.fields.op_brapos.frame_type)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM8
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                if (if unsafe: *F.ecode != OP_ALT: 1 else: 0) != 0:
+                                    break
+
+
+                            if (if F.byte1 != 0 or F.byte2 != 0: 1 else: 0) != 0:
+                                F.ecode = F.ecode + (1 + 2)
+                                break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            if (if mb.hasthen != 0 or (if F.rdepth == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (F.fields.op_bra.frame_type = 0)
+                                comptime_error("goto not supported")
+
+                            while true:
+                                var current_branch: *const u8 = null // init: untranslatable
+                                var next_branch: *const u8 = null // init: untranslatable
+                                if (if unsafe: *next_branch != OP_ALT: 1 else: 0) != 0:
+                                    break
+
+                                (F.ecode = next_branch)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM1
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+
+                            F.ecode = F.ecode + (1 + 2)
+                        OP_BRAPOS =>
+                            // label: POSSESSIVE_NON_CAPTURE
+(F.fields.op_brapos.frame_type = 131072)
+                            comptime_error("goto not supported")
+                            // label: POSSESSIVE_CAPTURE
+
+                            (F.fields.op_brapos.frame_type = (65536 | number))
+                            // label: POSSESSIVE_GROUP
+(F.byte1 = 0)
+                            (F.fields.op_brapos.start_group = F.ecode)
+                            while true:
+                                (F.fields.op_brapos.start_eptr = F.eptr)
+                                (group_frame_type = F.fields.op_brapos.frame_type)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM8
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                if (if unsafe: *F.ecode != OP_ALT: 1 else: 0) != 0:
+                                    break
+
+
+                            if (if F.byte1 != 0 or F.byte2 != 0: 1 else: 0) != 0:
+                                F.ecode = F.ecode + (1 + 2)
+                                break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            if (if mb.hasthen != 0 or (if F.rdepth == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (F.fields.op_bra.frame_type = 0)
+                                comptime_error("goto not supported")
+
+                            while true:
+                                var current_branch: *const u8 = null // init: untranslatable
+                                var next_branch: *const u8 = null // init: untranslatable
+                                if (if unsafe: *next_branch != OP_ALT: 1 else: 0) != 0:
+                                    break
+
+                                (F.ecode = next_branch)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM1
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+
+                            F.ecode = F.ecode + (1 + 2)
+                        OP_CBRAPOS =>
+                            // label: POSSESSIVE_CAPTURE
+
+                            (F.fields.op_brapos.frame_type = (65536 | number))
+                            // label: POSSESSIVE_GROUP
+(F.byte1 = 0)
+                            (F.fields.op_brapos.start_group = F.ecode)
+                            while true:
+                                (F.fields.op_brapos.start_eptr = F.eptr)
+                                (group_frame_type = F.fields.op_brapos.frame_type)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM8
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                if (if unsafe: *F.ecode != OP_ALT: 1 else: 0) != 0:
+                                    break
+
+
+                            if (if F.byte1 != 0 or F.byte2 != 0: 1 else: 0) != 0:
+                                F.ecode = F.ecode + (1 + 2)
+                                break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            if (if mb.hasthen != 0 or (if F.rdepth == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (F.fields.op_bra.frame_type = 0)
+                                comptime_error("goto not supported")
+
+                            while true:
+                                var current_branch: *const u8 = null // init: untranslatable
+                                var next_branch: *const u8 = null // init: untranslatable
+                                if (if unsafe: *next_branch != OP_ALT: 1 else: 0) != 0:
+                                    break
+
+                                (F.ecode = next_branch)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM1
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+
+                            F.ecode = F.ecode + (1 + 2)
+                        OP_BRA =>
+                            if (if mb.hasthen != 0 or (if F.rdepth == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (F.fields.op_bra.frame_type = 0)
+                                comptime_error("goto not supported")
+
+                            while true:
+                                var current_branch: *const u8 = null // init: untranslatable
+                                var next_branch: *const u8 = null // init: untranslatable
+                                if (if unsafe: *next_branch != OP_ALT: 1 else: 0) != 0:
+                                    break
+
+                                (F.ecode = next_branch)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM1
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+
+                            F.ecode = F.ecode + (1 + 2)
+                        OP_CBRA =>
+                            comptime_error("goto not supported")
+                            // label: GROUPLOOP
+while true:
+                                (group_frame_type = F.fields.op_bra.frame_type)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM2
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                if (if unsafe: *F.ecode != OP_ALT: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+
+                            if (if F.current_recurse != 4294967295: 1 else: 0) != 0:
+                                (offset = F.last_group_offset)
+
+                            (F.recurse_last_used = mb.last_used_ptr)
+                            (F.fields.op_recurse.start_branch = bracode)
+                            (F.fields.op_recurse.frame_type = (262144 | number))
+                            while true:
+                                var next_ecode: *const u8 = null // init: untranslatable
+                                (group_frame_type = F.fields.op_recurse.frame_type)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM11
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                (F.fields.op_recurse.start_branch = next_ecode)
+                                if (if unsafe: *F.fields.op_recurse.start_branch != OP_ALT: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+
+                            F.ecode = F.ecode + (1 + 2)
+                        OP_ONCE =>
+                            // label: GROUPLOOP
+while true:
+                                (group_frame_type = F.fields.op_bra.frame_type)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM2
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                if (if unsafe: *F.ecode != OP_ALT: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+
+                            if (if F.current_recurse != 4294967295: 1 else: 0) != 0:
+                                (offset = F.last_group_offset)
+
+                            (F.recurse_last_used = mb.last_used_ptr)
+                            (F.fields.op_recurse.start_branch = bracode)
+                            (F.fields.op_recurse.frame_type = (262144 | number))
+                            while true:
+                                var next_ecode: *const u8 = null // init: untranslatable
+                                (group_frame_type = F.fields.op_recurse.frame_type)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM11
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                (F.fields.op_recurse.start_branch = next_ecode)
+                                if (if unsafe: *F.fields.op_recurse.start_branch != OP_ALT: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+
+                            F.ecode = F.ecode + (1 + 2)
+                        OP_RECURSE =>
+                            if (if F.current_recurse != 4294967295: 1 else: 0) != 0:
+                                (offset = F.last_group_offset)
+
+                            (F.recurse_last_used = mb.last_used_ptr)
+                            (F.fields.op_recurse.start_branch = bracode)
+                            (F.fields.op_recurse.frame_type = (262144 | number))
+                            while true:
+                                var next_ecode: *const u8 = null // init: untranslatable
+                                (group_frame_type = F.fields.op_recurse.frame_type)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM11
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                (F.fields.op_recurse.start_branch = next_ecode)
+                                if (if unsafe: *F.fields.op_recurse.start_branch != OP_ALT: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+
+                            F.ecode = F.ecode + (1 + 2)
+                        OP_ASSERT =>
+                            F.ecode = F.ecode + (1 + 2)
+                        OP_ASSERT_NOT =>
+                            // label: ASSERT_NOT_FAILED
+F.ecode = F.ecode + (1 + 2)
+                        OP_ASSERT_SCS =>
+                            (length = 0)
+                                                        var ecode: *const u8 = null // init: untranslatable
+                            var count: c_int = 0
+                            var slot: *const u8 = null // init: untranslatable
+                            (offset = 0)
+                            offset
+                            while true:
+                                if (if unsafe: *ecode == OP_CREF: 1 else: 0) != 0:
+                                    length = length + 3
+                                    ecode = ecode + (1 + 2)
+                                    continue
+
+                                if (if unsafe: *ecode != OP_DNCREF: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                length = length + 5
+                                ecode = ecode + (1 + (2 * 2))
+                                while (if count > 0: 1 else: 0) != 0:
+                                    slot = slot + mb.name_entry_size
+                                    (count = count - 1)
+
+
+                            // label: SCS_OFFSET_FOUND
+while true:
+                                if (if unsafe: *ecode == OP_CREF: 1 else: 0) != 0:
+                                    length = length + 3
+                                    ecode = ecode + (1 + 2)
+                                else:
+                                    if (if unsafe: *ecode == OP_DNCREF: 1 else: 0) != 0:
+                                        length = length + 5
+                                        ecode = ecode + (1 + (2 * 2))
+                                    else:
+                                        break
+
+
+
+
+                            (F.fields.op_assert_scs.saved_end_subject = mb.end_subject)
+                            (F.fields.op_assert_scs.true_end_extra = ((mb.true_end_subject as usize -% mb.end_subject as usize) / sizeof[u8]()))
+                            (F.fields.op_assert_scs.saved_eptr = F.eptr)
+                            (F.fields.op_assert_scs.saved_moptions = mb.moptions)
+                            (F.eptr = (mb.start_subject + F.ovector[offset]))
+                            (mb.true_end_subject = (mb.end_subject = (mb.start_subject + F.ovector[(offset +% 1)])))
+                            mb.moptions = mb.moptions & (0 - 2 - 1)
+                            while true:
+                                (group_frame_type = 131072)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM38
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if unsafe: *F.ecode != OP_ALT: 1 else: 0) != 0:
+                                    (mb.end_subject = F.fields.op_assert_scs.saved_end_subject)
+                                    (mb.true_end_subject = (mb.end_subject + F.fields.op_assert_scs.true_end_extra))
+                                    (mb.moptions = F.fields.op_assert_scs.saved_moptions)
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                (length = 0)
+
+                            F.ecode = F.ecode + (1 + 2)
+                            (F.eptr = F.fields.op_assert_scs.saved_eptr)
+                        OP_CALLOUT =>
+                            if (if rrc > 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            if (if rrc < 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            F.ecode = F.ecode + length
+                        OP_COND =>
+                            if (if F.ecode[F.fields.op_cond.length] != OP_ALT: 1 else: 0) != 0:
+                                F.fields.op_cond.length = F.fields.op_cond.length - 3
+
+                            F.ecode = F.ecode + (1 + 2)
+                            if (if (if unsafe: *F.ecode == OP_CALLOUT: 1 else: 0) != 0 or (if unsafe: *F.ecode == OP_CALLOUT_STR: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (rrc = do_callout(F, mb, &length))
+                                if (if rrc > 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                if (if rrc < 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                F.ecode = F.ecode + length
+                                F.fields.op_cond.length = F.fields.op_cond.length - length
+
+                            (condition = 0)
+                            match unsafe: *F.ecode
+                                OP_RREF =>
+                                    if (if F.current_recurse != 4294967295: 1 else: 0) != 0:
+                                        (condition = ((if (if number == 65535: 1 else: 0) != 0 or (if number == F.current_recurse: 1 else: 0) != 0: 1 else: 0)))
+
+                                OP_DNRREF =>
+                                    if (if F.current_recurse != 4294967295: 1 else: 0) != 0:
+                                        var count: c_int = 0 // init: untranslatable
+                                        var slot: *const u8 = null // init: untranslatable
+                                        while (if (count = count - 1) > 0: 1 else: 0) != 0:
+                                            (condition = (if number == F.current_recurse: 1 else: 0))
+                                            if condition != 0:
+                                                break
+
+                                            slot = slot + mb.name_entry_size
+
+
+                                OP_CREF => 0
+                                OP_DNCREF =>
+                                                                        var count: c_int = 0 // init: untranslatable
+                                    var slot: *const u8 = null // init: untranslatable
+                                    while (if (count = count - 1) > 0: 1 else: 0) != 0:
+                                        if condition != 0:
+                                            break
+
+                                        slot = slot + mb.name_entry_size
+
+
+                                OP_FALSE =>
+                                    (condition = 1)
+                                OP_TRUE =>
+                                    (condition = 1)
+                                _ =>
+                                    (F.fields.op_cond.start_branch = F.ecode)
+                                    while true:
+                                        (group_frame_type = 196608)
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            // label: L_RM5
+// (empty)
+                                            if not (0 != 0):
+                                                break
+
+                                        match rrc
+                                            1 =>
+                                                (condition = F.byte1)
+                                            0 =>
+                                                if (if unsafe: *F.fields.op_cond.start_branch == OP_ALT: 1 else: 0) != 0:
+                                                    continue
+
+                                                (condition = (not F.byte1))
+                                            _ =>
+                                                while true:
+                                                    comptime_error("goto not supported")
+                                                    if not (0 != 0):
+                                                        break
+
+
+                                        break
+
+
+                            F.ecode = F.ecode + (if condition != 0: _pcre2_OP_lengths_8[unsafe: *F.ecode] else: F.fields.op_cond.length)
+                            if (if F.op == OP_SCOND: 1 else: 0) != 0:
+                                (group_frame_type = 131072)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM35
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                        OP_REVERSE =>
+                                                        F.eptr = F.eptr - number
+
+                            if (if F.eptr < mb.start_used_ptr: 1 else: 0) != 0:
+                                (mb.start_used_ptr = F.eptr)
+
+                            F.ecode = F.ecode + (1 + 2)
+                        OP_VREVERSE =>
+                                                        var diff: c_long = 0 // init: untranslatable
+                            var available: c_uint = 0 // init: untranslatable
+                            if (if F.fields.op_vreverse.min > available: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            if (if F.fields.op_vreverse.max > available: 1 else: 0) != 0:
+                                (F.fields.op_vreverse.max = available)
+
+                            F.eptr = F.eptr - F.fields.op_vreverse.max
+
+                            while true:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM37
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                if (if (F.fields.op_vreverse.max = F.fields.op_vreverse.max - 1) <= F.fields.op_vreverse.min: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                                (F.eptr = F.eptr + 1)
+
+                            (branch_end = F.ecode)
+                        OP_ALT =>
+                            (branch_end = F.ecode)
+                        OP_KET =>
+                            if (if branch_end == null: 1 else: 0) != 0:
+                                (branch_end = F.ecode)
+
+                            (branch_start = bracode)
+                            (branch_end = null)
+                            if (if (if unsafe: *bracode != OP_BRA: 1 else: 0) != 0 and (if unsafe: *bracode != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (F.last_group_offset = P.last_group_offset)
+                                if (if N.group_frame_type == 196608: 1 else: 0) != 0:
+                                    if (if (if ((if (if unsafe: *bracode == OP_ASSERTBACK: 1 else: 0) != 0 or (if unsafe: *bracode == OP_ASSERTBACK_NOT: 1 else: 0) != 0: 1 else: 0)) != 0 and (if branch_start[(1 + 2)] == OP_VREVERSE: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr != P.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    (P.offset_top = F.offset_top)
+                                    (P.mark = F.mark)
+                                    (F.back_frame = (((F as *mut i8) as usize -% (P as *mut i8) as usize) / sizeof[c_char]()))
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+                            else:
+                                (P = null)
+
+                            match unsafe: *bracode
+                                OP_BRA =>
+                                    if (if (if F.current_recurse != 0: 1 else: 0) != 0 or (if F.ecode[(1 + 2)] != OP_END: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        break
+
+                                    (offset = F.last_group_offset)
+                                    (F.last_group_offset = P.last_group_offset)
+                                    (F.ecode = ((P.ecode + (1 as isize as usize)) + (2 as isize as usize)))
+                                    if (if unsafe: *F.ecode != OP_CREF: 1 else: 0) != 0:
+                                        (F.offset_top = P.offset_top)
+                                    else:
+                                        recurse_update_offsets(F, P)
+
+                                    (F.capture_last = P.capture_last)
+                                    (F.current_recurse = P.current_recurse)
+                                    continue
+                                    if (if (if branch_start[(1 + 2)] == OP_VREVERSE: 1 else: 0) != 0 and (if F.eptr != P.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.eptr > mb.last_used_ptr: 1 else: 0) != 0:
+                                        (mb.last_used_ptr = F.eptr)
+
+                                    (F.eptr = P.eptr)
+                                OP_COND =>
+                                    if (if (if branch_start[(1 + 2)] == OP_VREVERSE: 1 else: 0) != 0 and (if F.eptr != P.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.eptr > mb.last_used_ptr: 1 else: 0) != 0:
+                                        (mb.last_used_ptr = F.eptr)
+
+                                    (F.eptr = P.eptr)
+                                OP_ASSERTBACK_NA =>
+                                    if (if (if branch_start[(1 + 2)] == OP_VREVERSE: 1 else: 0) != 0 and (if F.eptr != P.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.eptr > mb.last_used_ptr: 1 else: 0) != 0:
+                                        (mb.last_used_ptr = F.eptr)
+
+                                    (F.eptr = P.eptr)
+                                OP_ASSERT_NA =>
+                                    if (if F.eptr > mb.last_used_ptr: 1 else: 0) != 0:
+                                        (mb.last_used_ptr = F.eptr)
+
+                                    (F.eptr = P.eptr)
+                                OP_ASSERTBACK =>
+                                    if (if (if branch_start[(1 + 2)] == OP_VREVERSE: 1 else: 0) != 0 and (if F.eptr != P.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    if (if F.eptr > mb.last_used_ptr: 1 else: 0) != 0:
+                                        (mb.last_used_ptr = F.eptr)
+
+                                    (F.eptr = P.eptr)
+                                    (F.back_frame = ((((F as *mut i8) as usize -% (P as *mut i8) as usize) / sizeof[c_char]())))
+                                    while true:
+                                        var y: c_uint = 0 // init: untranslatable
+                                        if (if (P.ecode)[y] != OP_ALT: 1 else: 0) != 0:
+                                            break
+
+                                        P.ecode = P.ecode + y
+
+                                OP_ASSERT =>
+                                    if (if F.eptr > mb.last_used_ptr: 1 else: 0) != 0:
+                                        (mb.last_used_ptr = F.eptr)
+
+                                    (F.eptr = P.eptr)
+                                    (F.back_frame = ((((F as *mut i8) as usize -% (P as *mut i8) as usize) / sizeof[c_char]())))
+                                    while true:
+                                        var y: c_uint = 0 // init: untranslatable
+                                        if (if (P.ecode)[y] != OP_ALT: 1 else: 0) != 0:
+                                            break
+
+                                        P.ecode = P.ecode + y
+
+                                OP_ONCE =>
+                                    (F.back_frame = ((((F as *mut i8) as usize -% (P as *mut i8) as usize) / sizeof[c_char]())))
+                                    while true:
+                                        var y: c_uint = 0 // init: untranslatable
+                                        if (if (P.ecode)[y] != OP_ALT: 1 else: 0) != 0:
+                                            break
+
+                                        P.ecode = P.ecode + y
+
+                                OP_ASSERTBACK_NOT =>
+                                    if (if (if branch_start[(1 + 2)] == OP_VREVERSE: 1 else: 0) != 0 and (if F.eptr != P.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+                                    (F.fields.op_assert_scs.saved_end_subject = mb.end_subject)
+                                    (mb.end_subject = P.fields.op_assert_scs.saved_end_subject)
+                                    (mb.true_end_subject = (mb.end_subject + P.fields.op_assert_scs.true_end_extra))
+                                    (F.eptr = P.fields.op_assert_scs.saved_eptr)
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM39
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    (mb.end_subject = F.fields.op_assert_scs.saved_end_subject)
+                                    (mb.true_end_subject = mb.end_subject)
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+                                OP_ASSERT_NOT =>
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+                                    (F.fields.op_assert_scs.saved_end_subject = mb.end_subject)
+                                    (mb.end_subject = P.fields.op_assert_scs.saved_end_subject)
+                                    (mb.true_end_subject = (mb.end_subject + P.fields.op_assert_scs.true_end_extra))
+                                    (F.eptr = P.fields.op_assert_scs.saved_eptr)
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM39
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    (mb.end_subject = F.fields.op_assert_scs.saved_end_subject)
+                                    (mb.true_end_subject = mb.end_subject)
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+                                OP_ASSERT_SCS =>
+                                    (F.fields.op_assert_scs.saved_end_subject = mb.end_subject)
+                                    (mb.end_subject = P.fields.op_assert_scs.saved_end_subject)
+                                    (mb.true_end_subject = (mb.end_subject + P.fields.op_assert_scs.true_end_extra))
+                                    (F.eptr = P.fields.op_assert_scs.saved_eptr)
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM39
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    (mb.end_subject = F.fields.op_assert_scs.saved_end_subject)
+                                    (mb.true_end_subject = mb.end_subject)
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+                                OP_SCRIPT_RUN =>
+                                    if (not _pcre2_script_run_8(P.eptr, F.eptr, utf)) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                OP_CBRA =>
+                                    if (if F.current_recurse == number: 1 else: 0) != 0:
+                                        (F.ecode = ((P.ecode + (1 as isize as usize)) + (2 as isize as usize)))
+                                        if (if unsafe: *F.ecode != OP_CREF: 1 else: 0) != 0:
+                                            (F.offset_top = P.offset_top)
+                                        else:
+                                            recurse_update_offsets(F, P)
+
+                                        (F.capture_last = P.capture_last)
+                                        (F.current_recurse = P.current_recurse)
+                                        continue
+
+                                    (offset = (((number << 1)) -% 2))
+                                    (F.capture_last = number)
+                                    (F.ovector[offset] = ((P.eptr as usize -% mb.start_subject as usize) / sizeof[u8]()))
+                                    (F.ovector[(offset +% 1)] = ((F.eptr as usize -% mb.start_subject as usize) / sizeof[u8]()))
+                                    if (if offset >= F.offset_top: 1 else: 0) != 0:
+                                        (F.offset_top = (offset +% 2))
+
+                                _ => 0
+
+                            if (if unsafe: *F.ecode == OP_KETRPOS: 1 else: 0) != 0:
+                                with_memcpy(((P as *mut i8) + 64) as *i8, ((F as *mut i8) + 64) as *i8, frame_copy_size as i64)
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            if (if (if F.op != OP_KET: 1 else: 0) != 0 and ((if (if P == null: 1 else: 0) != 0 or (if F.eptr != P.eptr: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                if (if F.op == OP_KETRMIN: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        // label: L_RM6
+// (empty)
+                                        if not (0 != 0):
+                                            break
+
+                                    if (if rrc != 0: 1 else: 0) != 0:
+                                        while true:
+                                            comptime_error("goto not supported")
+                                            if not (0 != 0):
+                                                break
+
+
+                                    break
+
+                                while true:
+                                    comptime_error("goto not supported")
+                                    // label: L_RM7
+// (empty)
+                                    if not (0 != 0):
+                                        break
+
+                                if (if rrc != 0: 1 else: 0) != 0:
+                                    while true:
+                                        comptime_error("goto not supported")
+                                        if not (0 != 0):
+                                            break
+
+
+
+                            F.ecode = F.ecode + (1 + 2)
+                        OP_CIRC =>
+                            if (if (if F.eptr != mb.start_subject: 1 else: 0) != 0 or (if ((mb.moptions & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_SOD =>
+                            if (if F.eptr != mb.start_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_DOLL =>
+                            if (if ((mb.moptions & 2)) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            if (if ((mb.poptions & 16)) == 0: 1 else: 0) != 0:
+                                comptime_error("goto not supported")
+
+                            if (if F.eptr < mb.true_end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            if (if mb.partial != 0: 1 else: 0) != 0:
+                                (mb.hitend = 1)
+
+                            (F.ecode = F.ecode + 1)
+                        OP_EOD =>
+                            if (if F.eptr < mb.true_end_subject: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            if (if mb.partial != 0: 1 else: 0) != 0:
+                                (mb.hitend = 1)
+
+                            (F.ecode = F.ecode + 1)
+                        OP_EODN =>
+                            // label: ASSERT_NL_OR_EOS
+
+                            if (if mb.partial != 0: 1 else: 0) != 0:
+                                (mb.hitend = 1)
+
+                            (F.ecode = F.ecode + 1)
+                        OP_CIRCM =>
+                            if (if (if ((mb.moptions & 1)) != 0: 1 else: 0) != 0 and (if F.eptr == mb.start_subject: 1 else: 0) != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_DOLLM =>
+                            (F.ecode = F.ecode + 1)
+                        OP_SOM =>
+                            if (if F.eptr != (mb.start_subject + mb.start_offset): 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (F.ecode = F.ecode + 1)
+                        OP_SET_SOM =>
+                            (F.start_match = F.eptr)
+                            (F.ecode = F.ecode + 1)
+                        OP_NOT_WORD_BOUNDARY =>
+                            if (if F.eptr >= mb.end_subject: 1 else: 0) != 0:
+                                (cur_is_word = 0)
+                            else:
+                                var nextptr: *const u8 = null // init: untranslatable
+                                (fc = unsafe: *F.eptr)
+                                if (if nextptr > mb.last_used_ptr: 1 else: 0) != 0:
+                                    (mb.last_used_ptr = nextptr)
+
+                                (cur_is_word = (if 1 != 0 and (if ((mb.ctypes[fc] & 16)) != 0: 1 else: 0) != 0: 1 else: 0))
+
+                            if (if ((if (if unsafe: *(F.ecode = F.ecode + 1) == OP_WORD_BOUNDARY: 1 else: 0) != 0 or (if F.op == OP_UCP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0)) != 0: (if cur_is_word == prev_is_word: 1 else: 0) else: (if cur_is_word != prev_is_word: 1 else: 0)) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                        OP_MARK =>
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM12
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM13
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM36
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM14
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM15
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM16
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = F.eptr)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (mb.skip_arg_count = mb.skip_arg_count + 1)
+                            if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM17
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = (F.ecode + (2 as isize as usize)))
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM18
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM19
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                        OP_FAIL =>
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM13
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM36
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM14
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM15
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM16
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = F.eptr)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (mb.skip_arg_count = mb.skip_arg_count + 1)
+                            if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM17
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = (F.ecode + (2 as isize as usize)))
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM18
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM19
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                        OP_COMMIT =>
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM13
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM36
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM14
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM15
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM16
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = F.eptr)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (mb.skip_arg_count = mb.skip_arg_count + 1)
+                            if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM17
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = (F.ecode + (2 as isize as usize)))
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM18
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM19
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                        OP_COMMIT_ARG =>
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM36
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM14
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM15
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM16
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = F.eptr)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (mb.skip_arg_count = mb.skip_arg_count + 1)
+                            if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM17
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = (F.ecode + (2 as isize as usize)))
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM18
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM19
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                        OP_PRUNE =>
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM14
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM15
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM16
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = F.eptr)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (mb.skip_arg_count = mb.skip_arg_count + 1)
+                            if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM17
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = (F.ecode + (2 as isize as usize)))
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM18
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM19
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                        OP_PRUNE_ARG =>
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM15
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM16
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = F.eptr)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (mb.skip_arg_count = mb.skip_arg_count + 1)
+                            if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM17
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = (F.ecode + (2 as isize as usize)))
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM18
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM19
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                        OP_SKIP =>
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM16
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = F.eptr)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (mb.skip_arg_count = mb.skip_arg_count + 1)
+                            if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM17
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = (F.ecode + (2 as isize as usize)))
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM18
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM19
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                        OP_SKIP_ARG =>
+                            (mb.skip_arg_count = mb.skip_arg_count + 1)
+                            if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM17
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_skip_ptr = (F.ecode + (2 as isize as usize)))
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM18
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM19
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                        OP_THEN =>
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM18
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM19
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                        OP_THEN_ARG =>
+                            (F.mark = (mb.nomatch_mark = (F.ecode + (2 as isize as usize))))
+                            while true:
+                                comptime_error("goto not supported")
+                                // label: L_RM19
+// (empty)
+                                if not (0 != 0):
+                                    break
+
+                            if (if rrc != 0: 1 else: 0) != 0:
+                                while true:
+                                    comptime_error("goto not supported")
+                                    if not (0 != 0):
+                                        break
+
+
+                            (mb.verb_ecode_ptr = F.ecode)
+                            (mb.verb_current_recurse = F.current_recurse)
+                            while true:
+                                comptime_error("goto not supported")
+                                if not (0 != 0):
+                                    break
+
+                        _ => 0
+
+
+                __pc = 57
+                continue
+            57 =>  // RETURN_SWITCH
+                if (if F.eptr > mb.last_used_ptr: 1 else: 0) != 0:
+                    (mb.last_used_ptr = F.eptr)
+
+                if (if F.rdepth == 0: 1 else: 0) != 0:
+                    return rrc
+
+                mb.cb.callout_flags = mb.cb.callout_flags | 2
+                match F.return_id
+                    1 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    2 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    3 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    4 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    5 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    6 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    7 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    8 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    9 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    10 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    11 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    12 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    13 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    14 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    15 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    16 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    17 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    18 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    19 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    20 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    21 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    22 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    23 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    24 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    25 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    26 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    27 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    28 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    29 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    30 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    31 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    32 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    33 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    34 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    35 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    36 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    37 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    38 =>
+                        comptime_error("goto not supported")
+                        comptime_error("goto not supported")
+                    39 =>
+                        comptime_error("goto not supported")
+                    _ => 0
+
+            _ => break
+
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0

@@ -2,6 +2,14 @@
 use std.re.defs
 
 type BOOL = c_int
+extern fn imaxabs(j: c_long) -> c_long
+type imaxdiv_t { quot: c_long = 0, rem: c_long = 0 }
+type struct_imaxdiv_t = imaxdiv_t
+extern fn imaxdiv(__numer: c_long, __denom: c_long) -> imaxdiv_t
+extern fn strtoimax(__nptr: *const i8, __endptr: *mut *mut i8, __base: c_int) -> c_long
+extern fn strtoumax(__nptr: *const i8, __endptr: *mut *mut i8, __base: c_int) -> c_ulong
+extern fn wcstoimax(__nptr: *const c_int, __endptr: *mut *mut c_int, __base: c_int) -> c_long
+extern fn wcstoumax(__nptr: *const c_int, __endptr: *mut *mut c_int, __base: c_int) -> c_ulong
 type PCRE2_UCHAR8 = u8
 type PCRE2_SPTR8 = *const u8
 type pcre2_general_context_8 = pcre2_real_general_context_8
@@ -747,6 +755,628 @@ extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_
 extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
 extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
 extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
+let POSIX_START_REGEX: c_uint = 0
+let POSIX_ANCHORED: c_uint = 1
+let POSIX_NOT_BRACKET: c_uint = 2
+let POSIX_CLASS_NOT_STARTED: c_uint = 3
+let POSIX_CLASS_STARTING: c_uint = 4
+let POSIX_CLASS_STARTED: c_uint = 5
+extern var pcre2_escaped_literals: *const i8
+extern var posix_meta_escapes: *const i8
+extern var posix_classes: *const i8
+fn convert_posix(pattype: c_uint, pattern: *const u8, plength: c_ulong, utf: c_int, use_buffer: *mut u8, use_length: c_ulong, bufflenptr: *mut c_ulong, dummyrun: c_int, ccontext: *mut pcre2_real_convert_context_8) -> c_int:
+    var plength = plength
+    var posix: *const u8 = null
+    var p: *mut u8 = null
+    var pp: *mut u8 = null
+    var endp: *mut u8 = null
+    var convlength: c_ulong = 0
+    var bracount: c_uint = 0
+    var posix_state: c_uint = 0
+    var lastspecial: c_uint = 0
+    var extended: c_int = 0
+    var nextisliteral: c_int = 0
+    var s: *const i8 = null
+    var c: c_uint = 0
+    var sc: c_uint = 0
+    var clength: c_int = 0
+    var __pc: i32 = 0
+    while true:
+        match __pc
+            0 =>
+                utf
+                ccontext
+                (unsafe: *bufflenptr = plength)
+                // (empty)
+                while (if plength > 0: 1 else: 0) != 0:
+                    var c: c_uint = 0 // init failed
+                    var sc: c_uint = 0 // init failed
+                    var clength: c_int = 1
+                    convlength = convlength + ((p as usize -% pp as usize) / sizeof[u8]())
+                    if dummyrun != 0:
+                        (p = use_buffer)
+
+                    (pp = p)
+                    (c = unsafe: *posix)
+                    posix = posix + clength
+                    plength = plength - clength
+                    (sc = (if nextisliteral != 0: 0 else: c))
+                    (nextisliteral = 0)
+                    if (if posix_state >= 3: 1 else: 0) != 0:
+                        if (if c == 93: 1 else: 0) != 0:
+                            // (empty)
+                            (posix_state = 2)
+                        else:
+                            match posix_state
+                                5 =>
+                                    (posix_state = 3)
+                                    if (if (if (if c == 58: 1 else: 0) != 0 and (if plength > 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *posix == 93: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        // (empty)
+                                        (plength = plength - 1)
+                                        (posix = posix + 1)
+                                        continue
+
+                                    if (if c == 91: 1 else: 0) != 0:
+                                        (posix_state = 4)
+
+                                3 =>
+                                    if (if c == 91: 1 else: 0) != 0:
+                                        (posix_state = 4)
+
+                                4 =>
+                                    if (if c == 58: 1 else: 0) != 0:
+                                        (posix_state = 5)
+
+                                _ => 0
+
+                            // (empty)
+                            p = p + clength
+
+                    else:
+                        match sc
+                            91 =>
+                                // (empty)
+                                (posix_state = 3)
+                                if (if plength > 0: 1 else: 0) != 0:
+                                    if (if unsafe: *posix == 94: 1 else: 0) != 0:
+                                        (posix = posix + 1)
+                                        (plength = plength - 1)
+                                        // (empty)
+
+                                    if (if (if plength > 0: 1 else: 0) != 0 and (if unsafe: *posix == 93: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (posix = posix + 1)
+                                        (plength = plength - 1)
+                                        // (empty)
+
+
+                            92 =>
+                                if (if plength == 0: 1 else: 0) != 0:
+                                    return 101
+
+                                if extended != 0:
+                                    (nextisliteral = 1)
+                                else:
+                                    if (if (if unsafe: *posix < 255: 1 else: 0) != 0 and (if string_find_char(posix_meta_escapes, unsafe: *posix) != null: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        // (empty)
+                                        (lastspecial = (unsafe: *(p = p + 1) = unsafe: *(posix = posix + 1)))
+                                        (plength = plength - 1)
+                                    else:
+                                        (nextisliteral = 1)
+
+
+                            41 =>
+                                if (if (not extended) != 0 or (if bracount == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    comptime_error("goto not supported")
+
+                                (bracount = bracount - 1)
+                                comptime_error("goto not supported")
+                                (bracount = bracount + 1)
+                                // label: COPY_SPECIAL
+(lastspecial = c)
+                                (unsafe: *(p = p + 1) = c)
+                            40 =>
+                                (bracount = bracount + 1)
+                                // label: COPY_SPECIAL
+(lastspecial = c)
+                                (unsafe: *(p = p + 1) = c)
+                            63 =>
+                                // label: COPY_SPECIAL
+(lastspecial = c)
+                                (unsafe: *(p = p + 1) = c)
+                            46 =>
+                                // label: COPY_SPECIAL
+(lastspecial = c)
+                                (unsafe: *(p = p + 1) = c)
+                            42 =>
+                                if (if lastspecial != 42: 1 else: 0) != 0:
+                                    if (if (not extended) != 0 and ((if (if posix_state < 2: 1 else: 0) != 0 or (if lastspecial == 40: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        comptime_error("goto not supported")
+
+                                    comptime_error("goto not supported")
+
+                            94 =>
+                                if extended != 0:
+                                    comptime_error("goto not supported")
+
+                                if (if (if posix_state == 0: 1 else: 0) != 0 or (if lastspecial == 40: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (posix_state = 1)
+                                    comptime_error("goto not supported")
+
+                                if (if (if c < 255: 1 else: 0) != 0 and (if string_find_char(pcre2_escaped_literals, c) != null: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    // label: ESCAPE_LITERAL
+
+                                    // (empty)
+
+                                (lastspecial = 255)
+                                p = p + clength
+                                (posix_state = 2)
+                            _ =>
+                                if (if (if c < 255: 1 else: 0) != 0 and (if string_find_char(pcre2_escaped_literals, c) != null: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    // label: ESCAPE_LITERAL
+
+                                    // (empty)
+
+                                (lastspecial = 255)
+                                p = p + clength
+                                (posix_state = 2)
+
+
+
+                if (if posix_state >= 3: 1 else: 0) != 0:
+                    return 106
+
+                convlength = convlength + ((p as usize -% pp as usize) / sizeof[u8]())
+                (unsafe: *bufflenptr = convlength)
+                (unsafe: *(p = p + 1) = 0)
+                return 0
+            _ => break
+
+type pcre2_output_context { output: *mut u8 = null, output_end: *const u8 = null, output_size: c_ulong = 0, out_str: [8]u8 }
+type struct_pcre2_output_context = pcre2_output_context
+fn convert_glob_write(out: *mut pcre2_output_context, chr: u8):
+    (out.output_size = out.output_size + 1)
+    if (if out.output < out.output_end: 1 else: 0) != 0:
+        (unsafe: *(out.output = out.output + 1) = chr)
+
+
+fn convert_glob_write_str(out: *mut pcre2_output_context, length: c_ulong):
+    var length = length
+    var out_str: *mut u8 = null // init: untranslatable
+    var output: *mut u8 = null // init: untranslatable
+    var output_end: *const u8 = null // init: untranslatable
+    var output_size: c_ulong = 0 // init: untranslatable
+    while true:
+        (output_size = output_size + 1)
+        if (if output < output_end: 1 else: 0) != 0:
+            (unsafe: *(output = output + 1) = unsafe: *(out_str = out_str + 1))
+
+        if not ((if (length = length - 1) != 0: 1 else: 0) != 0):
+            break
+
+    (out.output = output)
+    (out.output_size = output_size)
+
+fn convert_glob_print_separator(out: *mut pcre2_output_context, separator: u8, with_escape: c_int):
+    if with_escape != 0:
+        convert_glob_write(out, 92)
+
+    convert_glob_write(out, separator)
+
+fn convert_glob_print_wildcard(out: *mut pcre2_output_context, separator: u8, with_escape: c_int):
+    (out.out_str[0] = 91)
+    (out.out_str[1] = 94)
+    convert_glob_write_str(out, 2)
+    convert_glob_print_separator(out, separator, with_escape)
+    convert_glob_write(out, 93)
+
+fn convert_glob_parse_class(from: *mut *const u8, pattern_end: *const u8, out: *mut pcre2_output_context) -> c_int:
+    var start: *const u8 = null // init: untranslatable
+    var pattern: *const u8 = null // init: untranslatable
+    var class_ptr: *const i8 = null
+    var c: u8 = 0 // init: untranslatable
+    var class_index: c_int = 0
+    while 1 != 0:
+        if (if pattern >= pattern_end: 1 else: 0) != 0:
+            return 0
+
+        (c = unsafe: *(pattern = pattern + 1))
+        if (if (if c < 97: 1 else: 0) != 0 or (if c > 122: 1 else: 0) != 0: 1 else: 0) != 0:
+            break
+
+
+    if (if (if (if c != 58: 1 else: 0) != 0 or (if pattern >= pattern_end: 1 else: 0) != 0: 1 else: 0) != 0 or (if unsafe: *pattern != 93: 1 else: 0) != 0: 1 else: 0) != 0:
+        return 0
+
+    (class_ptr = posix_classes)
+    (class_index = 1)
+    while 1 != 0:
+        if (if unsafe: *class_ptr == 0: 1 else: 0) != 0:
+            return 0
+
+        (pattern = start)
+        while (if unsafe: *class_ptr != 58: 1 else: 0) != 0:
+(class_ptr = class_ptr + 1)
+        (class_ptr = class_ptr + 1)
+        (class_index = class_index + 1)
+
+
+fn convert_glob_char_in_class(class_index: c_int, c: u8) -> c_int:
+    var cbits: *const u8 = null // init: untranslatable
+    var cbit: c_int = 0
+    match class_index
+        1 =>
+            if (if c == 95: 1 else: 0) != 0:
+                return 0
+
+            if (if ((((cbits + (64 as isize as usize)))[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0) != 0:
+                return 0
+
+            (cbit = 160)
+        2 =>
+            (cbit = 128)
+        3 =>
+            (cbit = 96)
+        4 =>
+            if (if c == 95: 1 else: 0) != 0:
+                return 0
+
+            (cbit = 160)
+        5 =>
+            if (if ((((cbits + (288 as isize as usize)))[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0) != 0:
+                return 1
+
+            (cbit = 224)
+        6 =>
+            if (if (if (if (if c == 10: 1 else: 0) != 0 or (if c == 11: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 12: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                return 0
+
+            (cbit = 0)
+        7 =>
+            (cbit = 288)
+        8 =>
+            (cbit = 64)
+        9 =>
+            (cbit = 192)
+        10 =>
+            (cbit = 224)
+        11 =>
+            (cbit = 256)
+        12 =>
+            (cbit = 0)
+        13 =>
+            (cbit = 160)
+        14 =>
+            (cbit = 32)
+        _ =>
+            return 0
+
+    return (if ((((cbits + (cbit as isize as usize)))[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0)
+
+fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *mut pcre2_output_context, utf: c_int, separator: u8, with_escape: c_int, escape: u8, no_wildsep: c_int) -> c_int:
+    var is_negative: c_int = 0 // init: untranslatable
+    var separator_seen: c_int = 0 // init: untranslatable
+    var has_prev_c: c_int = 0 // init: untranslatable
+    var pattern: *const u8 = null // init: untranslatable
+    var char_start: *const u8 = null // init: untranslatable
+    var c: c_uint = 0 // init: untranslatable
+    var prev_c: c_uint = 0 // init: untranslatable
+    var len: c_int = 0
+    var class_index: c_int = 0
+    utf
+    if (if pattern >= pattern_end: 1 else: 0) != 0:
+        (unsafe: *from = pattern)
+        return 106
+
+    if (if (if unsafe: *pattern == 33: 1 else: 0) != 0 or (if unsafe: *pattern == 94: 1 else: 0) != 0: 1 else: 0) != 0:
+        (pattern = pattern + 1)
+        if (if pattern >= pattern_end: 1 else: 0) != 0:
+            (unsafe: *from = pattern)
+            return 106
+
+        (is_negative = 1)
+        (out.out_str[0] = 91)
+        (out.out_str[1] = 94)
+        (len = 2)
+        if (not no_wildsep) != 0:
+            if with_escape != 0:
+                (out.out_str[len] = 92)
+                (len = len + 1)
+
+
+        convert_glob_write_str(out, (len + 1))
+    else:
+        convert_glob_write(out, 91)
+
+    (has_prev_c = 0)
+    (prev_c = 0)
+    if (if unsafe: *pattern == 93: 1 else: 0) != 0:
+        (out.out_str[0] = 92)
+        (out.out_str[1] = 93)
+        convert_glob_write_str(out, 2)
+        (has_prev_c = 1)
+        (prev_c = 93)
+        (pattern = pattern + 1)
+
+    while (if pattern < pattern_end: 1 else: 0) != 0:
+        (char_start = pattern)
+        // (empty)
+        if (if c == 93: 1 else: 0) != 0:
+            convert_glob_write(out, c)
+            if (if (if (not is_negative) != 0 and (not no_wildsep) != 0: 1 else: 0) != 0 and separator_seen != 0: 1 else: 0) != 0:
+                (out.out_str[0] = 40)
+                (out.out_str[1] = 63)
+                (out.out_str[2] = 60)
+                (out.out_str[3] = 33)
+                convert_glob_write_str(out, 4)
+                convert_glob_print_separator(out, separator, with_escape)
+                convert_glob_write(out, 41)
+
+            (unsafe: *from = pattern)
+            return 0
+
+        if (if pattern >= pattern_end: 1 else: 0) != 0:
+            break
+
+        if (if (if c == 91: 1 else: 0) != 0 and (if unsafe: *pattern == 58: 1 else: 0) != 0: 1 else: 0) != 0:
+            (unsafe: *from = pattern)
+            (class_index = convert_glob_parse_class(from, pattern_end, out))
+            if (if class_index != 0: 1 else: 0) != 0:
+                (pattern = unsafe: *from)
+                (has_prev_c = 0)
+                (prev_c = 0)
+                if (if (not is_negative) != 0 and convert_glob_char_in_class(class_index, separator) != 0: 1 else: 0) != 0:
+                    (separator_seen = 1)
+
+                continue
+
+        else:
+            if (if (if (if c == 45: 1 else: 0) != 0 and has_prev_c != 0: 1 else: 0) != 0 and (if unsafe: *pattern != 93: 1 else: 0) != 0: 1 else: 0) != 0:
+                convert_glob_write(out, 45)
+                (char_start = pattern)
+                // (empty)
+                if (if pattern >= pattern_end: 1 else: 0) != 0:
+                    break
+
+                if (if (if escape != 0: 1 else: 0) != 0 and (if c == escape: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (char_start = pattern)
+                    // (empty)
+                else:
+                    if (if (if c == 91: 1 else: 0) != 0 and (if unsafe: *pattern == 58: 1 else: 0) != 0: 1 else: 0) != 0:
+                        (unsafe: *from = pattern)
+
+
+                if (if prev_c > c: 1 else: 0) != 0:
+                    (unsafe: *from = pattern)
+
+                if (if (if prev_c < separator: 1 else: 0) != 0 and (if separator < c: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (separator_seen = 1)
+
+                (has_prev_c = 0)
+                (prev_c = 0)
+            else:
+                if (if (if escape != 0: 1 else: 0) != 0 and (if c == escape: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (char_start = pattern)
+                    // (empty)
+                    if (if pattern >= pattern_end: 1 else: 0) != 0:
+                        break
+
+
+                (has_prev_c = 1)
+                (prev_c = c)
+
+
+        if (if (if (if (if c == 91: 1 else: 0) != 0 or (if c == 93: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 92: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 45: 1 else: 0) != 0: 1 else: 0) != 0:
+            convert_glob_write(out, 92)
+
+        if (if c == separator: 1 else: 0) != 0:
+            (separator_seen = 1)
+
+        while true:
+convert_glob_write(out, unsafe: *(char_start = char_start + 1))            if not ((if char_start < pattern: 1 else: 0) != 0):
+                break
+
+
+    (unsafe: *from = pattern)
+    return 106
+
+fn convert_glob_print_commit(out: *mut pcre2_output_context):
+    (out.out_str[0] = 40)
+    (out.out_str[1] = 42)
+    (out.out_str[2] = 67)
+    (out.out_str[3] = 79)
+    (out.out_str[4] = 77)
+    (out.out_str[5] = 77)
+    (out.out_str[6] = 73)
+    (out.out_str[7] = 84)
+    convert_glob_write_str(out, 8)
+    convert_glob_write(out, 41)
+
+fn convert_glob(options: c_uint, pattern: *const u8, plength: c_ulong, utf: c_int, use_buffer: *mut u8, use_length: c_ulong, bufflenptr: *mut c_ulong, dummyrun: c_int, ccontext: *mut pcre2_real_convert_context_8) -> c_int:
+    var pattern = pattern
+    var out = 0 // init: untranslatable (pcre2_output_context)
+    var pattern_start: *const u8 = null // init: untranslatable
+    var pattern_end: *const u8 = null // init: untranslatable
+    var separator: u8 = 0 // init: untranslatable
+    var escape: u8 = 0 // init: untranslatable
+    var c: u8 = 0 // init: untranslatable
+    var no_wildsep: c_int = 0 // init: untranslatable
+    var no_starstar: c_int = 0 // init: untranslatable
+    var in_atomic: c_int = 0 // init: untranslatable
+    var after_starstar: c_int = 0 // init: untranslatable
+    var no_slash_z: c_int = 0 // init: untranslatable
+    var with_escape: c_int = 0 // init: untranslatable
+    var is_start: c_int = 0 // init: untranslatable
+    var after_separator: c_int = 0 // init: untranslatable
+    var result: c_int = 0
+    utf
+    (with_escape = (if string_find_char(pcre2_escaped_literals, separator) != null: 1 else: 0))
+    (out.output = use_buffer)
+    (out.output_end = (use_buffer + use_length))
+    (out.output_size = 0)
+    (out.out_str[0] = 40)
+    (out.out_str[1] = 63)
+    (out.out_str[2] = 115)
+    (out.out_str[3] = 41)
+    convert_glob_write_str(&out, 4)
+    (is_start = 1)
+    if (if (if pattern < pattern_end: 1 else: 0) != 0 and (if pattern[0] == 42: 1 else: 0) != 0: 1 else: 0) != 0:
+        if no_wildsep != 0:
+            (is_start = 0)
+        else:
+            if (if (if (not no_starstar) != 0 and (if (pattern + (1 as isize as usize)) < pattern_end: 1 else: 0) != 0: 1 else: 0) != 0 and (if pattern[1] == 42: 1 else: 0) != 0: 1 else: 0) != 0:
+                (is_start = 0)
+
+
+
+    if is_start != 0:
+        (out.out_str[0] = 92)
+        (out.out_str[1] = 65)
+        convert_glob_write_str(&out, 2)
+
+    while (if pattern < pattern_end: 1 else: 0) != 0:
+        (c = unsafe: *(pattern = pattern + 1))
+        if (if c == 42: 1 else: 0) != 0:
+            (is_start = (if pattern == (pattern_start + (1 as isize as usize)): 1 else: 0))
+            if in_atomic != 0:
+                convert_glob_write(&out, 41)
+                (in_atomic = 0)
+
+            if (if (if (not no_starstar) != 0 and (if pattern < pattern_end: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *pattern == 42: 1 else: 0) != 0: 1 else: 0) != 0:
+                (after_separator = (if is_start != 0 or ((if pattern[(0 - 2)] == separator: 1 else: 0)) != 0: 1 else: 0))
+                while true:
+(pattern = pattern + 1)                    if not ((if (if pattern < pattern_end: 1 else: 0) != 0 and (if unsafe: *pattern == 42: 1 else: 0) != 0: 1 else: 0) != 0):
+                        break
+
+                if (if pattern >= pattern_end: 1 else: 0) != 0:
+                    (no_slash_z = 1)
+                    break
+
+                (after_starstar = 1)
+                if (if (if (if (if after_separator != 0 and (if escape != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *pattern == escape: 1 else: 0) != 0: 1 else: 0) != 0 and (if (pattern + (1 as isize as usize)) < pattern_end: 1 else: 0) != 0: 1 else: 0) != 0 and (if pattern[1] == separator: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (pattern = pattern + 1)
+
+                if is_start != 0:
+                    if (if unsafe: *pattern != separator: 1 else: 0) != 0:
+                        continue
+
+                    (out.out_str[0] = 40)
+                    (out.out_str[1] = 63)
+                    (out.out_str[2] = 58)
+                    (out.out_str[3] = 92)
+                    (out.out_str[4] = 65)
+                    (out.out_str[5] = 124)
+                    convert_glob_write_str(&out, 6)
+                    convert_glob_print_separator(&out, separator, with_escape)
+                    convert_glob_write(&out, 41)
+                    (pattern = pattern + 1)
+                    continue
+
+                convert_glob_print_commit(&out)
+                if (if (not after_separator) != 0 or (if unsafe: *pattern != separator: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (out.out_str[0] = 46)
+                    (out.out_str[1] = 42)
+                    (out.out_str[2] = 63)
+                    convert_glob_write_str(&out, 3)
+                    continue
+
+                (out.out_str[0] = 40)
+                (out.out_str[1] = 63)
+                (out.out_str[2] = 58)
+                (out.out_str[3] = 46)
+                (out.out_str[4] = 42)
+                (out.out_str[5] = 63)
+                convert_glob_write_str(&out, 6)
+                convert_glob_print_separator(&out, separator, with_escape)
+                (out.out_str[0] = 41)
+                (out.out_str[1] = 63)
+                (out.out_str[2] = 63)
+                convert_glob_write_str(&out, 3)
+                (pattern = pattern + 1)
+                continue
+
+            if (if (if pattern < pattern_end: 1 else: 0) != 0 and (if unsafe: *pattern == 42: 1 else: 0) != 0: 1 else: 0) != 0:
+                while true:
+(pattern = pattern + 1)                    if not ((if (if pattern < pattern_end: 1 else: 0) != 0 and (if unsafe: *pattern == 42: 1 else: 0) != 0: 1 else: 0) != 0):
+                        break
+
+
+            if no_wildsep != 0:
+                if (if pattern >= pattern_end: 1 else: 0) != 0:
+                    (no_slash_z = 1)
+                    break
+
+                if is_start != 0:
+                    continue
+
+
+            if (not is_start) != 0:
+                if after_starstar != 0:
+                    (out.out_str[0] = 40)
+                    (out.out_str[1] = 63)
+                    (out.out_str[2] = 62)
+                    convert_glob_write_str(&out, 3)
+                    (in_atomic = 1)
+                else:
+                    convert_glob_print_commit(&out)
+
+
+            if no_wildsep != 0:
+                convert_glob_write(&out, 46)
+            else:
+                convert_glob_print_wildcard(&out, separator, with_escape)
+
+            (out.out_str[0] = 42)
+            (out.out_str[1] = 63)
+            if (if pattern >= pattern_end: 1 else: 0) != 0:
+                (out.out_str[1] = 43)
+
+            convert_glob_write_str(&out, 2)
+            continue
+
+        if (if c == 63: 1 else: 0) != 0:
+            if no_wildsep != 0:
+                convert_glob_write(&out, 46)
+            else:
+                convert_glob_print_wildcard(&out, separator, with_escape)
+
+            continue
+
+        if (if c == 91: 1 else: 0) != 0:
+            (result = convert_glob_parse_range(&pattern, pattern_end, &out, utf, separator, with_escape, escape, no_wildsep))
+            if (if result != 0: 1 else: 0) != 0:
+                break
+
+            continue
+
+        if (if (if escape != 0: 1 else: 0) != 0 and (if c == escape: 1 else: 0) != 0: 1 else: 0) != 0:
+            if (if pattern >= pattern_end: 1 else: 0) != 0:
+                break
+
+            (c = unsafe: *(pattern = pattern + 1))
+
+        if (if (if c < 255: 1 else: 0) != 0 and (if string_find_char(pcre2_escaped_literals, c) != null: 1 else: 0) != 0: 1 else: 0) != 0:
+            convert_glob_write(&out, 92)
+
+        convert_glob_write(&out, c)
+
+    if (if result == 0: 1 else: 0) != 0:
+        if (not no_slash_z) != 0:
+            (out.out_str[0] = 92)
+            (out.out_str[1] = 122)
+            convert_glob_write_str(&out, 2)
+
+        if in_atomic != 0:
+            convert_glob_write(&out, 41)
+
+        convert_glob_write(&out, 0)
+
+    if (if result != 0: 1 else: 0) != 0:
+        (unsafe: *bufflenptr = ((pattern as usize -% pattern_start as usize) / sizeof[u8]()))
+        return result
+
+    (unsafe: *bufflenptr = (out.output_size -% 1))
+    return 0
+
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0
