@@ -90,6 +90,14 @@ fn pcre2_serialize_encode_8(__p0: *mut *const pcre2_real_code_8, __p1: c_int, __
     var serialized_bytes = __p2
     var serialized_size = __p3
     var gcontext = __p4
+    var bytes: *mut u8 = null // init: untranslatable
+    var dst_bytes: *mut u8 = null // init: untranslatable
+    var i: c_int = 0 // init: untranslatable
+    var total_size: c_ulong = 0 // init: untranslatable
+    var re: *const pcre2_real_code_8 = null // init: untranslatable
+    var tables: *const u8 = null // init: untranslatable
+    var data: *mut pcre2_serialized_data = null // init: untranslatable
+    var memctl: *const pcre2_memctl = null // init: untranslatable
     (total_size = (sizeof[pcre2_serialized_data]() +% 1088))
     (tables = ((0 as *mut c_void)))
     (i = 0)
@@ -146,6 +154,7 @@ fn pcre2_serialize_decode_8(__p0: *mut *mut pcre2_real_code_8, __p1: c_int, __p2
                 mem_copy(tables, src_bytes, 1088)
                 (i = 0)
                 while (if i < number_of_codes: 1 else: 0) != 0:
+                    var blocksize: c_ulong = 0 // init: untranslatable
                     mem_copy(&blocksize, (src_bytes + 72), sizeof[c_ulong]())
                     if (if blocksize <= sizeof[pcre2_real_code_8](): 1 else: 0) != 0:
                         comptime_error("goto not supported")
@@ -182,12 +191,14 @@ memctl.free(dst_re, memctl.memory_data)
 @[c_export("pcre2_serialize_get_number_of_codes_8")]
 fn pcre2_serialize_get_number_of_codes_8(__p0: *const u8) -> c_int:
     var bytes = __p0
+    var data: *const pcre2_serialized_data = null // init: untranslatable
     return data.number_of_codes
 
 @[c_export("pcre2_serialize_free_8")]
 fn pcre2_serialize_free_8(__p0: *mut u8):
     var bytes = __p0
     if (if bytes != ((0 as *mut c_void)): 1 else: 0) != 0:
+        var memctl: *mut pcre2_memctl = null // init: untranslatable
         memctl.free(memctl, memctl.memory_data)
 
 

@@ -4000,7 +4000,7 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                     if default_val.len() > 0:
                         result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ default_val
                     else:
-                        return ""  // Can't zero-init complex type → bail
+                        result = result ++ "var " ++ vname ++ " = 0 // no default for " ++ vty_str
             i = i + 1
         return result
 
@@ -4308,22 +4308,27 @@ fn ci_trans_decl_stmt_scoped(session: i64, cursor: i32, indent: i32, scope: str)
                 new_scope = ci_scope_add_mangled(new_scope, escaped, mangled)
             else:
                 new_scope = ci_scope_add(new_scope, escaped)
+            if result.len() > 0:
+                result = result ++ "\n" ++ ci_indent_str(indent)
             if child_nc > 0:
                 let init = ci_trans_expr(session, with_ci_child(session, child, 0), new_scope)
                 if init.len() > 0:
-                    if result.len() > 0:
-                        result = result ++ "\n" ++ ci_indent_str(indent)
                     result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ init
                 else:
-                    return ""
+                    // Initializer failed to translate — emit declaration with
+                    // default value. NEVER drop a declaration silently.
+                    let default_val = ci_default_for_type(vty_str)
+                    if default_val.len() > 0:
+                        result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ default_val ++ " // init: untranslatable"
+                    else:
+                        result = result ++ "var " ++ mangled ++ " = 0 // init: untranslatable (" ++ vty_str ++ ")"
             else:
-                if result.len() > 0:
-                    result = result ++ "\n" ++ ci_indent_str(indent)
+                // No initializer — C zero-initializes statics, locals are undefined
                 let default_val = ci_default_for_type(vty_str)
                 if default_val.len() > 0:
                     result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ default_val
                 else:
-                    return ""
+                    result = result ++ "var " ++ mangled ++ " = 0 // no default for " ++ vty_str
         i = i + 1
     if new_scope != scope:
         return "SCOPE:" ++ new_scope ++ "\n" ++ result

@@ -217,13 +217,17 @@ if (if (not startline) and (if ((re.flags & 64)) != 0: 1 else: 0): 1 else: 0) !=
                 (memchr_found_first_cu = ((0 as *mut c_void)))
                 (memchr_found_first_cu2 = ((0 as *mut c_void)))
                 while true:
+                    var new_start_match: *const u8 = null // init: untranslatable
                     if (if ((re.optimization_flags & 4)) != 0: 1 else: 0) != 0:
                         if firstline != 0:
+                            var t: *const u8 = null // init: untranslatable
                             (end_subject = t)
 
                         if anchored != 0:
                             if (if has_first_cu or (if start_bits != ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
+                                var ok: c_int = 0 // init: untranslatable
                                 if ok != 0:
+                                    var c: u8 = 0 // init: untranslatable
                                     (ok = (if has_first_cu and ((if (if c == first_cu: 1 else: 0) or (if c == first_cu2: 1 else: 0): 1 else: 0)): 1 else: 0))
                                     if (if (not ok) and (if start_bits != ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
                                         (ok = (if ((start_bits[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0))
@@ -237,6 +241,9 @@ if (if (not startline) and (if ((re.flags & 64)) != 0: 1 else: 0): 1 else: 0) !=
                         else:
                             if has_first_cu != 0:
                                 if (if first_cu != first_cu2: 1 else: 0) != 0:
+                                    var pp1: *const u8 = null // init: untranslatable
+                                    var pp2: *const u8 = null // init: untranslatable
+                                    var searchlength: c_ulong = 0 // init: untranslatable
                                     if (if (if memchr_found_first_cu == ((0 as *mut c_void)): 1 else: 0) or (if start_match > memchr_found_first_cu: 1 else: 0): 1 else: 0) != 0:
                                         (pp1 = memchr(start_match, first_cu, searchlength))
                                         (memchr_found_first_cu = (if ((if pp1 == ((0 as *mut c_void)): 1 else: 0)) != 0: end_subject else: pp1))
@@ -274,6 +281,7 @@ if (if (not startline) and (if ((re.flags & 64)) != 0: 1 else: 0): 1 else: 0) !=
                                 else:
                                     if (if start_bits != ((0 as *mut c_void)): 1 else: 0) != 0:
                                         while (if start_match < end_subject: 1 else: 0) != 0:
+                                            var c: c_uint = 0 // init: untranslatable
                                             if (if ((start_bits[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0) != 0:
                                                 break
 
@@ -289,14 +297,17 @@ if (if (not startline) and (if ((re.flags & 64)) != 0: 1 else: 0): 1 else: 0) !=
 
                         (end_subject = mb.end_subject)
                         if (if mb.partial == 0: 1 else: 0) != 0:
+                            var p: *const u8 = null // init: untranslatable
                             if (if ((end_subject as usize -% start_match as usize) / sizeof[u8]()) < re.minlength: 1 else: 0) != 0:
                                 (rc = 0)
                                 break
 
                             (p = (start_match + (((if has_first_cu != 0: 1 else: 0)) as isize as usize)))
                             if (if has_req_cu and (if p > req_cu_ptr: 1 else: 0): 1 else: 0) != 0:
+                                var check_length: c_ulong = 0 // init: untranslatable
                                 if (if (if check_length < 5000: 1 else: 0) or ((if (not anchored) and (if check_length < 5000000: 1 else: 0): 1 else: 0)): 1 else: 0) != 0:
                                     if (if req_cu != req_cu2: 1 else: 0) != 0:
+                                        var pp: *const u8 = null // init: untranslatable
                                         (p = memchr(pp, req_cu, ((end_subject as usize -% pp as usize) / sizeof[u8]())))
                                         if (if p == ((0 as *mut c_void)): 1 else: 0) != 0:
                                             (p = memchr(pp, req_cu2, ((end_subject as usize -% pp as usize) / sizeof[u8]())))
