@@ -19,6 +19,13 @@ type struct_pcre2_callout_enumerate_block_8 = pcre2_callout_enumerate_block_8
 type pcre2_substitute_callout_block_8 { version: c_uint = 0, input: *const u8 = null, output: *const u8 = null, output_offsets: [2]c_ulong, ovector: *mut c_ulong = null, oveccount: c_uint = 0, subscount: c_uint = 0 }
 type struct_pcre2_substitute_callout_block_8 = pcre2_substitute_callout_block_8
 extern fn pcre2_config_8(p0: c_uint, p1: *mut c_void) -> c_int
+// Internal PCRE2 symbols (static in C, need extern in With)
+extern let _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern let _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern let _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern fn default_malloc(size: c_ulong, data: *mut c_void) -> *mut c_void
+extern fn default_free(block: *mut c_void, data: *mut c_void) -> void
+
 @[c_export("pcre2_general_context_copy_8")]
 fn pcre2_general_context_copy_8(gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_general_context_8:
     var newcontext: *mut pcre2_real_general_context_8 = null // init: untranslatable

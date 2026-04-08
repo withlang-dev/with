@@ -699,6 +699,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
     var utf = __param_utf
     var t: u8 = 0 // init: untranslatable
     var not_negated: c_int = 0 // init: untranslatable
+    var matched: c_uint = 0
     var type_: c_uint = 0 // init: untranslatable
     var max_index: c_uint = 0 // init: untranslatable
     var min_index: c_uint = 0 // init: untranslatable
@@ -782,7 +783,6 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
             4 =>
                 (ptr = ptr + 1)
             5 =>
-                                var matched: c_uint = 0 // init: untranslatable
                 (stack = (((stack << 1)) | matched))
                 (stack_depth = stack_depth + 1)
                 break
