@@ -1364,6 +1364,28 @@ fn Sema.ensure_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: Type
         self.type_extra.push(params.get(pi as i64))
     self.add_type(TypeKind.TY_FN, te_start, param_count, ret as i32)
 
+fn Sema.callable_fn_type(self: Sema, tid: TypeId) -> i32:
+    var current = tid as i32
+    while current != 0:
+        let resolved = self.resolve_alias(current as TypeId) as i32
+        let tk = self.get_type_kind(resolved)
+        if tk == TypeKind.TY_FN:
+            return resolved
+        if tk != TypeKind.TY_PTR and tk != TypeKind.TY_REF:
+            return 0
+        current = self.get_type_d0(resolved)
+    0
+
+fn Sema.callable_fn_param_type(self: Sema, tid: TypeId, param_i: i32) -> i32:
+    let fn_tid = self.callable_fn_type(tid)
+    if fn_tid == 0 or param_i < 0:
+        return 0
+    let param_count = self.get_type_d1(fn_tid)
+    if param_i >= param_count:
+        return 0
+    let te_start = self.get_type_d0(fn_tid)
+    self.type_extra.get((te_start + param_i) as i64)
+
 fn sema_generic_inst_hash(base_sym: i32, args: Vec[i32], arg_count: i32) -> i64:
     var h: i64 = base_sym as i64
     for ai in 0..arg_count:

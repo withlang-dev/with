@@ -2854,8 +2854,8 @@ fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, cal
                 return "/*ambiguous_call*/"
             if local_fn_sym > 0:
                 return self.resolve_call_named_callee(body, local_fn_sym, args_id, dest_place)
-        let callee_tid = self.sema.resolve_alias(self.operand_tid_no_infer(body, callee_operand))
-        if self.sema.get_type_kind(callee_tid) == TypeKind.TY_FN:
+        let callee_tid = self.callee_fn_type_from_operand(body, callee_operand)
+        if callee_tid != 0:
             return self.place_text(body, od)
         let inferred = self.infer_direct_call_sym(body, args_id, dest_place)
         if inferred == 0 - 2:
@@ -2906,8 +2906,8 @@ fn CCodegen.call_return_tid(self: CCodegen, body: MirBody, bb: i32, callee_opera
     let od = body.operand_d0.get(callee_operand as i64)
 
     if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
-        let callee_tid = self.sema.resolve_alias(self.operand_tid(body, callee_operand))
-        if self.sema.get_type_kind(callee_tid) == TypeKind.TY_FN:
+        let callee_tid = self.sema.callable_fn_type(self.operand_tid(body, callee_operand) as TypeId)
+        if callee_tid != 0:
             return self.sema.get_type_d2(callee_tid)
         let local_id = self.place_local_id(body, od)
         if local_id >= 0 and self.place_is_direct_local(body, od, local_id) != 0:
@@ -3098,6 +3098,14 @@ fn CCodegen.infer_local_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32
     self.local_infer_cache_store(body.fn_sym, local_id, declared)
     declared
 
+fn CCodegen.callee_fn_type_from_operand(self: CCodegen, body: MirBody, callee_op: i32) -> i32:
+    if callee_op < 0 or callee_op >= body.operand_kinds.len() as i32:
+        return 0
+    let ok = body.operand_kinds.get(callee_op as i64)
+    if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
+        return self.sema.callable_fn_type(self.operand_tid_no_infer(body, callee_op) as TypeId)
+    0
+
 fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_operand: i32) -> str:
     if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
         return ""
@@ -3105,7 +3113,8 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_o
     let count = body.call_arg_counts.get(args_id as i64)
     // Resolve callee signature to know which params expect pointers
     let callee_sig = self.callee_sig_from_operand(body, callee_operand)
-    let callee_param_count = if callee_sig >= 0: self.sema.sig_get_param_count(callee_sig) else: 0
+    let callee_fn_tid = if callee_sig >= 0: 0 else: self.callee_fn_type_from_operand(body, callee_operand)
+    let callee_param_count = if callee_sig >= 0: self.sema.sig_get_param_count(callee_sig) else: if callee_fn_tid != 0: self.sema.get_type_d1(callee_fn_tid) else: 0
     var out = ""
     for i in 0..count:
         if i > 0:
@@ -3114,7 +3123,7 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_o
         let arg_text = self.operand_text(body, op_id)
         // If the argument is a struct value but the callee expects a pointer, emit &
         if i < callee_param_count:
-            let p_tid = self.sema.sig_param_type(callee_sig, i)
+            let p_tid = if callee_sig >= 0: self.sema.sig_param_type(callee_sig, i) else: self.sema.callable_fn_param_type(callee_fn_tid as TypeId, i)
             let p_resolved = self.sema.resolve_alias(p_tid)
             let p_tk = self.sema.get_type_kind(p_resolved)
             if p_tk == TypeKind.TY_PTR or p_tk == TypeKind.TY_REF:

@@ -1570,8 +1570,28 @@ fn MirBuilder.lower_method_bin_op(self: MirBuilder, lhs_expr: i32, rhs_expr: i32
     arg_nodes.push(rhs_expr)
     self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, self.expr_type(node), node)
 
+fn MirBuilder.lower_fn_address(self: MirBuilder, expr: i32, type_id: i32) -> i32:
+    if expr == 0:
+        return 0 - 1
+    let kind = self.ast.kind(expr)
+    if kind == NodeKind.NK_GROUPED:
+        return self.lower_fn_address(self.ast.get_data0(expr), type_id)
+    if kind != NodeKind.NK_IDENT:
+        return 0 - 1
+    let sym = self.ast.get_data0(expr)
+    if self.lookup_local(sym) >= 0:
+        return 0 - 1
+    if self.lookup_alias_place(sym) >= 0:
+        return 0 - 1
+    if self.sema.get_sig(sym) >= 0 or self.sema.generic_fn_nodes.contains(sym):
+        return self.lower_var(sym, type_id)
+    0 - 1
+
 fn MirBuilder.lower_un_op(self: MirBuilder, op: i32, expr: i32, node: i32) -> i32:
     if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF:
+        let fn_addr = self.lower_fn_address(expr, self.expr_type(node))
+        if fn_addr >= 0:
+            return fn_addr
         let place = self.lower_expr_place(expr)
         let rv = self.body.new_rvalue(RvalueKind.RK_REF, if op == UnaryOp.UOP_MUT_REF: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED, place, 0)
         let ty = self.expr_type(node)
@@ -3179,6 +3199,7 @@ fn MirBuilder.lower_match(self: MirBuilder, scrutinee_expr: i32, arms_start: i32
 fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
     let fn_op = self.lower_expr(fn_expr)
     let sig_idx = self.call_sig_for_expr(fn_expr)
+    let callable_fn_tid = if sig_idx >= 0: 0 else: self.callable_fn_type_for_expr(fn_expr)
 
     let args: Vec[i32] = Vec.new()
     // Use sema-resolved arg order for named-arg and implicit-arg calls
@@ -3191,13 +3212,13 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
                 let impl_sym = 0 - arg_node
                 args.push(self.lower_var(impl_sym, 0))
             else if arg_node != 0:
-                args.push(self.lower_call_arg(arg_node, sig_idx, i))
+                args.push(self.lower_call_arg(arg_node, sig_idx, callable_fn_tid, i))
             else:
                 args.push(self.unit_operand())
     else:
         for i in 0..arg_exprs_count:
             let arg_node = self.ast.get_extra(arg_exprs_start + i)
-            args.push(self.lower_call_arg(arg_node, sig_idx, i))
+            args.push(self.lower_call_arg(arg_node, sig_idx, callable_fn_tid, i))
 
         // Fill in default parameter values for missing arguments
         if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT:
@@ -3211,7 +3232,7 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
                     for di in arg_exprs_count..param_count:
                         let def_node = self.ast.get_fn_param_default(param_start, di)
                         if def_node != 0:
-                            args.push(self.lower_call_arg(def_node, sig_idx, di))
+                            args.push(self.lower_call_arg(def_node, sig_idx, callable_fn_tid, di))
 
     let args_id = self.body.new_call_args(args)
     let result_local = self.new_temp(ret_type_id)
@@ -3231,7 +3252,7 @@ fn MirBuilder.lower_call_redirected(self: MirBuilder, fn_op: i32, fn_sym: i32, a
     let args: Vec[i32] = Vec.new()
     for i in 0..arg_exprs_count:
         let arg_node = self.ast.get_extra(arg_exprs_start + i)
-        args.push(self.lower_call_arg(arg_node, sig_idx, i))
+        args.push(self.lower_call_arg(arg_node, sig_idx, 0, i))
     let args_id = self.body.new_call_args(args)
     let result_local = self.new_temp(ret_type_id)
     let result_place = self.place_for_local(result_local)
@@ -3249,7 +3270,7 @@ fn MirBuilder.lower_call_with_arg_nodes(self: MirBuilder, fn_op: i32, callee_sym
     let sig_idx = self.call_sig_for_sym(callee_sym)
     let args: Vec[i32] = Vec.new()
     for i in 0..arg_node_vec.len() as i32:
-        args.push(self.lower_call_arg(arg_node_vec.get(i as i64), sig_idx, i))
+        args.push(self.lower_call_arg(arg_node_vec.get(i as i64), sig_idx, 0, i))
     let args_id = self.body.new_call_args(args)
     let result_local = self.new_temp(ret_type_id)
     let result_place = self.place_for_local(result_local)
@@ -3279,10 +3300,22 @@ fn MirBuilder.call_sig_for_expr(self: MirBuilder, fn_expr: i32) -> i32:
         return -1
     self.call_sig_for_sym(self.ast.get_data0(fn_expr))
 
-fn MirBuilder.lower_call_arg(self: MirBuilder, arg_node: i32, sig_idx: i32, arg_i: i32) -> i32:
+fn MirBuilder.callable_fn_type_for_expr(self: MirBuilder, fn_expr: i32) -> i32:
+    if fn_expr == 0:
+        return 0
+    let expr_tid = self.expr_type(fn_expr)
+    if expr_tid == 0:
+        return 0
+    self.sema.callable_fn_type(expr_tid as TypeId)
+
+fn MirBuilder.lower_call_arg(self: MirBuilder, arg_node: i32, sig_idx: i32, callable_fn_tid: i32, arg_i: i32) -> i32:
     let saved_expected = self.expected_type
     if sig_idx >= 0 and arg_i >= 0 and arg_i < self.sema.sig_get_param_count(sig_idx):
         let expected_ty = self.sema.sig_param_type(sig_idx, arg_i)
+        if expected_ty != 0 and expected_ty != self.sema.ty_void:
+            self.expected_type = expected_ty
+    else if callable_fn_tid != 0:
+        let expected_ty = self.sema.callable_fn_param_type(callable_fn_tid as TypeId, arg_i)
         if expected_ty != 0 and expected_ty != self.sema.ty_void:
             self.expected_type = expected_ty
     let lowered = self.lower_expr(arg_node)

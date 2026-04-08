@@ -3021,6 +3021,37 @@ fn Sema.transmute_target_type(self: Sema, callee: i32) -> i32:
         self.ast.get_data1(callee)
     self.resolve_type_expr(tp_node) as i32
 
+fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, node: i32, extra_start: i32, arg_count: i32, param_offset: i32, has_resolved: i32, arg_types: Vec[i32]) -> i32:
+    let expected = self.get_type_d1(fn_tid)
+    let actual = arg_count + param_offset
+    if self.ast.has_call_named_args(node) == 0 and self.has_resolved_call_args(node) == 0:
+        if actual != expected:
+            if call_name.len() > 0:
+                self.emit_error(f"callable '{call_name}' expects {expected} argument(s), found {actual}", node)
+            else:
+                self.emit_error(f"callable value expects {expected} argument(s), found {actual}", node)
+
+    for ai in 0..arg_count:
+        let param_i = ai + param_offset
+        if param_i >= expected:
+            break
+        let expected_ty = self.callable_fn_param_type(fn_tid as TypeId, param_i)
+        let arg_ty = arg_types.get(ai as i64)
+        if expected_ty != 0 and arg_ty != 0:
+            let exp_resolved = self.resolve_alias(expected_ty)
+            if self.type_is_dyn_object(exp_resolved) == 0:
+                if self.types_compatible(expected_ty, arg_ty) == 0:
+                    if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
+                        let err_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
+                        self.emit_argument_type_mismatch(call_name, 0, ai, param_i, expected_ty, arg_ty, if err_arg_node > 0: err_arg_node else: node)
+        let eph_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
+        if eph_arg_node > 0 and self.expr_is_ephemeral_task(eph_arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
+            self.emit_warning("ephemeral Task passed by value may escape", eph_arg_node)
+
+    let ret = self.get_type_d2(fn_tid)
+    self.typed_expr_types.insert(node, ret)
+    ret
+
 fn Sema.check_call(self: Sema, node: i32) -> i32:
     let callee = self.ast.get_data0(node)
     let extra_start = self.ast.get_data1(node)
@@ -3045,6 +3076,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     // Direct call: callee should be ident
     var fn_sym = 0
+    var local_tid = 0 - 1
+    var callable_value_tid = 0
     if self.ast.kind(callee) == NodeKind.NK_IDENT:
         fn_sym = self.ast.get_data0(callee)
         // Resolve for-comprehension _Payload marker to Some or Ok
@@ -3060,19 +3093,16 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             else:
                 fn_sym = self.syms.some
             self.comp_resolved.insert(node, fn_sym)
+        local_tid = self.scope_lookup(fn_sym)
+        if local_tid >= 0:
+            callable_value_tid = self.callable_fn_type(local_tid as TypeId)
     else:
-        self.check_expr(callee)
-        for ai in 0..arg_count:
-            self.check_expr(self.ast.get_extra(extra_start + ai))
-        return 0
+        callable_value_tid = self.callable_fn_type(self.check_expr(callee) as TypeId)
 
     // Reject named args on closures and function pointers (spec §F4 rule 7)
     if self.ast.has_call_named_args(node) != 0:
-        let local_tid = self.scope_lookup(fn_sym)
-        if local_tid >= 0:
-            let resolved_callee = self.resolve_alias(local_tid)
-            if self.get_type_kind(resolved_callee) == TypeKind.TY_FN:
-                self.emit_error("named arguments are not supported for closures or function pointers", node)
+        if callable_value_tid != 0:
+            self.emit_error("named arguments are not supported for closures or function pointers", node)
 
     let param_offset = if self.in_pipeline_rhs != 0: 1 else: 0
     let sig_idx_raw = if self.generic_fn_nodes.contains(fn_sym): 0 - 1 else: self.get_sig(fn_sym)
@@ -3216,6 +3246,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 expected_ty = self.sig_param_type(sig_idx, param_i)
         else if ai < variant_payload_tys.len() as i32:
             expected_ty = variant_payload_tys.get(ai as i64)
+        else if callable_value_tid != 0:
+            expected_ty = self.callable_fn_param_type(callable_value_tid as TypeId, ai + param_offset)
         if arg_node == 0:
             arg_types.push(0)
             continue
@@ -3294,14 +3326,12 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         self.typed_expr_types.insert(node, ret)
         return ret
 
-    // Local variable (function pointer)
-    let local_tid = self.scope_lookup(fn_sym)
+    if callable_value_tid != 0:
+        let call_name = if self.ast.kind(callee) == NodeKind.NK_IDENT: self.pool_resolve(fn_sym) else: ""
+        return self.check_callable_value_call(call_name, callable_value_tid, node, resolved_extra_start, resolved_arg_count, param_offset, has_resolved, arg_types)
+
+    // Local variable (not callable)
     if local_tid >= 0:
-        let resolved = self.resolve_alias(local_tid)
-        if self.get_type_kind(resolved) == TypeKind.TY_FN:
-            let ret = self.get_type_d2(resolved)
-            self.typed_expr_types.insert(node, ret)
-            return ret
         self.emit_error("value is not callable", callee)
         return 0
 
@@ -3349,6 +3379,10 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         let ret = self.check_intrinsic_call(fn_sym, node, arg_types, arg_count)
         self.typed_expr_types.insert(node, ret)
         return ret
+
+    if self.ast.kind(callee) != NodeKind.NK_IDENT:
+        self.emit_error("value is not callable", callee)
+        return 0
 
     let callee_ty = self.check_ident(fn_sym, callee)
     if callee_ty != 0:
