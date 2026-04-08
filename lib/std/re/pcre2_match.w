@@ -65,11 +65,11 @@ extern fn pcre2_match_data_create_from_pattern_8(p0: *const pcre2_real_code_8, p
 extern fn pcre2_match_data_free_8(p0: *mut pcre2_real_match_data_8) -> void
 extern fn pcre2_dfa_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8, p7: *mut c_int, p8: c_ulong) -> c_int
 @[c_export("pcre2_match_8")]
-fn pcre2_match_8(code: *const pcre2_real_code_8, subject: *const u8, length: c_ulong, start_offset: c_ulong, options: c_uint, match_data: *mut pcre2_real_match_data_8, mcontext: *mut pcre2_real_match_context_8) -> c_int:
-    var subject = subject
-    var length = length
-    var options = options
-    var mcontext = mcontext
+fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, start_offset: c_ulong, __param_options: c_uint, match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8) -> c_int:
+    var subject = __param_subject
+    var length = __param_length
+    var options = __param_options
+    var mcontext = __param_mcontext
     var rc: c_int = 0
     var start_bits: *const u8 = null
     var re: *const pcre2_real_code_8 = null

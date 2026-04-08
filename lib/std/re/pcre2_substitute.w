@@ -88,14 +88,14 @@ extern fn pcre2_serialize_decode_8(p0: *mut *mut pcre2_real_code_8, p1: c_int, p
 extern fn pcre2_serialize_get_number_of_codes_8(p0: *const u8) -> c_int
 extern fn pcre2_serialize_free_8(p0: *mut u8) -> void
 @[c_export("pcre2_substitute_8")]
-fn pcre2_substitute_8(code: *const pcre2_real_code_8, subject: *const u8, length: c_ulong, start_offset: c_ulong, options: c_uint, match_data: *mut pcre2_real_match_data_8, mcontext: *mut pcre2_real_match_context_8, replacement: *const u8, rlength: c_ulong, buffer: *mut u8, blength: *mut c_ulong) -> c_int:
-    var subject = subject
-    var length = length
-    var start_offset = start_offset
-    var options = options
-    var match_data = match_data
-    var replacement = replacement
-    var rlength = rlength
+fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, mcontext: *mut pcre2_real_match_context_8, __param_replacement: *const u8, __param_rlength: c_ulong, buffer: *mut u8, blength: *mut c_ulong) -> c_int:
+    var subject = __param_subject
+    var length = __param_length
+    var start_offset = __param_start_offset
+    var options = __param_options
+    var match_data = __param_match_data
+    var replacement = __param_replacement
+    var rlength = __param_rlength
     var rc: c_int = 0
     var subs: c_int = 0
     var ovector_count: c_uint = 0

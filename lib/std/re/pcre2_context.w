@@ -29,9 +29,9 @@ fn pcre2_general_context_copy_8(gcontext: *mut pcre2_real_general_context_8) -> 
     return newcontext
 
 @[c_export("pcre2_general_context_create_8")]
-fn pcre2_general_context_create_8(private_malloc: *const fn(c_ulong, *mut c_void) -> *mut c_void, private_free: *const fn(*mut c_void, *mut c_void) -> void, memory_data: *mut c_void) -> *mut pcre2_real_general_context_8:
-    var private_malloc = private_malloc
-    var private_free = private_free
+fn pcre2_general_context_create_8(__param_private_malloc: *const fn(c_ulong, *mut c_void) -> *mut c_void, __param_private_free: *const fn(*mut c_void, *mut c_void) -> void, memory_data: *mut c_void) -> *mut pcre2_real_general_context_8:
+    var private_malloc = __param_private_malloc
+    var private_free = __param_private_free
     var gcontext: *mut pcre2_real_general_context_8 = null // init: untranslatable
     if (if private_malloc == null: 1 else: 0) != 0:
         (private_malloc = default_malloc)

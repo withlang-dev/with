@@ -675,8 +675,8 @@ extern fn _pcre2_check_escape_8(p0: *mut *const u8, p1: *const u8, p2: *mut c_ui
 extern fn _pcre2_ckd_smul_8(p0: *mut c_ulong, p1: c_int, p2: c_int) -> c_int
 extern fn _pcre2_extuni_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int, p5: *mut c_int) -> *const u8
 @[c_export("_pcre2_find_bracket_8")]
-fn _pcre2_find_bracket_8(code: *const u8, utf: c_int, number: c_int) -> *const u8:
-    var code = code
+fn _pcre2_find_bracket_8(__param_code: *const u8, utf: c_int, number: c_int) -> *const u8:
+    var code = __param_code
     while true:
         var c: u8 = 0 // init: untranslatable
         if (if c == OP_END: 1 else: 0) != 0:

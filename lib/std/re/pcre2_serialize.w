@@ -124,8 +124,8 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
     return number_of_codes
 
 @[c_export("pcre2_serialize_decode_8")]
-fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, number_of_codes: c_int, bytes: *const u8, gcontext: *mut pcre2_real_general_context_8) -> c_int:
-    var number_of_codes = number_of_codes
+fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_of_codes: c_int, bytes: *const u8, gcontext: *mut pcre2_real_general_context_8) -> c_int:
+    var number_of_codes = __param_number_of_codes
     var data: *const pcre2_serialized_data = null
     var memctl: *const pcre2_memctl = null
     var src_bytes: *const u8 = null

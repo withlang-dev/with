@@ -684,9 +684,9 @@ extern fn _pcre2_memctl_malloc_8(p0: c_ulong, p1: *mut pcre2_memctl) -> *mut c_v
 extern fn _pcre2_ord2utf_8(p0: c_uint, p1: *mut u8) -> c_uint
 extern fn _pcre2_script_run_8(p0: *const u8, p1: *const u8, p2: c_int) -> c_int
 @[c_export("_pcre2_strcmp_8")]
-fn _pcre2_strcmp_8(str1: *const u8, str2: *const u8) -> c_int:
-    var str1 = str1
-    var str2 = str2
+fn _pcre2_strcmp_8(__param_str1: *const u8, __param_str2: *const u8) -> c_int:
+    var str1 = __param_str1
+    var str2 = __param_str2
     var c1: u8 = 0 // init: untranslatable
     var c2: u8 = 0 // init: untranslatable
     while (if (if unsafe: *str1 != 0: 1 else: 0) != 0 or (if unsafe: *str2 != 0: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -699,9 +699,9 @@ fn _pcre2_strcmp_8(str1: *const u8, str2: *const u8) -> c_int:
     return 0
 
 @[c_export("_pcre2_strcmp_c8_8")]
-fn _pcre2_strcmp_c8_8(str1: *const u8, str2: *const i8) -> c_int:
-    var str1 = str1
-    var str2 = str2
+fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) -> c_int:
+    var str1 = __param_str1
+    var str2 = __param_str2
     var c1: u8 = 0 // init: untranslatable
     var c2: u8 = 0 // init: untranslatable
     while (if (if unsafe: *str1 != 0: 1 else: 0) != 0 or (if unsafe: *str2 != 0: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -714,8 +714,8 @@ fn _pcre2_strcmp_c8_8(str1: *const u8, str2: *const i8) -> c_int:
     return 0
 
 @[c_export("_pcre2_strcpy_c8_8")]
-fn _pcre2_strcpy_c8_8(str1: *mut u8, str2: *const i8) -> c_ulong:
-    var str2 = str2
+fn _pcre2_strcpy_c8_8(str1: *mut u8, __param_str2: *const i8) -> c_ulong:
+    var str2 = __param_str2
     var t: *mut u8 = null // init: untranslatable
     while (if unsafe: *str2 != 0: 1 else: 0) != 0:
 (unsafe: *(t = t + 1) = unsafe: *(str2 = str2 + 1))
@@ -723,18 +723,18 @@ fn _pcre2_strcpy_c8_8(str1: *mut u8, str2: *const i8) -> c_ulong:
     return ((t as usize -% str1 as usize) / sizeof[u8]())
 
 @[c_export("_pcre2_strlen_8")]
-fn _pcre2_strlen_8(str: *const u8) -> c_ulong:
-    var str = str
+fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong:
+    var str = __param_str
     var c: c_ulong = 0 // init: untranslatable
     while (if unsafe: *(str = str + 1) != 0: 1 else: 0) != 0:
 (c = c + 1)
     return c
 
 @[c_export("_pcre2_strncmp_8")]
-fn _pcre2_strncmp_8(str1: *const u8, str2: *const u8, len: c_ulong) -> c_int:
-    var str1 = str1
-    var str2 = str2
-    var len = len
+fn _pcre2_strncmp_8(__param_str1: *const u8, __param_str2: *const u8, __param_len: c_ulong) -> c_int:
+    var str1 = __param_str1
+    var str2 = __param_str2
+    var len = __param_len
     var c1: u8 = 0 // init: untranslatable
     var c2: u8 = 0 // init: untranslatable
     while (if len > 0: 1 else: 0) != 0:
@@ -748,10 +748,10 @@ fn _pcre2_strncmp_8(str1: *const u8, str2: *const u8, len: c_ulong) -> c_int:
     return 0
 
 @[c_export("_pcre2_strncmp_c8_8")]
-fn _pcre2_strncmp_c8_8(str1: *const u8, str2: *const i8, len: c_ulong) -> c_int:
-    var str1 = str1
-    var str2 = str2
-    var len = len
+fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const i8, __param_len: c_ulong) -> c_int:
+    var str1 = __param_str1
+    var str2 = __param_str2
+    var len = __param_len
     var c1: u8 = 0 // init: untranslatable
     var c2: u8 = 0 // init: untranslatable
     while (if len > 0: 1 else: 0) != 0:

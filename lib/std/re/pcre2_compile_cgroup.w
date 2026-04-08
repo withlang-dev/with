@@ -833,9 +833,9 @@ fn _pcre2_compile_find_named_group8(name: *const u8, length: c_uint, cb: *mut co
     return null
 
 @[c_export("_pcre2_compile_add_name_to_table8")]
-fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, ng: *mut named_group_8, tablecount: c_uint) -> c_uint:
-    var ng = ng
-    var tablecount = tablecount
+fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut named_group_8, __param_tablecount: c_uint) -> c_uint:
+    var ng = __param_ng
+    var tablecount = __param_tablecount
     var i: c_uint = 0 // init: untranslatable
     var name: *const u8 = null // init: untranslatable
     var length: c_int = ng.length
@@ -917,8 +917,8 @@ fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexpt
     return 1
 
 @[c_export("_pcre2_compile_parse_scan_substr_args8")]
-fn _pcre2_compile_parse_scan_substr_args8(pptr: *mut c_uint, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint:
-    var pptr = pptr
+fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint:
+    var pptr = __param_pptr
     var captures: *mut u8 = null // init: untranslatable
     var capture_ptr: *mut u8 = null // init: untranslatable
     var bit: u8 = 0 // init: untranslatable
