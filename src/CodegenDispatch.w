@@ -175,6 +175,47 @@ fn Codegen.mir_build_closure_fn_type(self: Codegen, sema_ty: i32) -> i64:
             param_types.push(self.type_fallback())
     wl_function_type(llvm_ret, vec_data_i64(&param_types), param_count + 1, 0)
 
+fn Codegen.mir_build_raw_fn_type(self: Codegen, sema_ty: i32) -> i64:
+    var resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    var tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
+        resolved = self.sema.resolve_alias(resolved) as i32
+        tk = self.sema.get_type_kind(resolved)
+
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        let pointee = if resolved >= self.mir_input.sema_type_kinds.len() as i32: self.sema.get_type_d0(resolved) else: self.mir_input.mir_get_type_d0(resolved)
+        resolved = self.mir_input.mir_resolve_alias(pointee)
+        tk = self.mir_input.mir_get_type_kind(resolved)
+        if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
+            resolved = self.sema.resolve_alias(resolved) as i32
+            tk = self.sema.get_type_kind(resolved)
+
+    if tk != TypeKind.TY_FN:
+        return 0
+
+    var extra_start = self.mir_input.mir_get_type_d0(resolved)
+    var param_count = self.mir_input.mir_get_type_d1(resolved)
+    var ret_ty_id = self.mir_input.mir_get_type_d2(resolved)
+    if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+        extra_start = self.sema.get_type_d0(resolved)
+        param_count = self.sema.get_type_d1(resolved)
+        ret_ty_id = self.sema.get_type_d2(resolved)
+    let ret_ty = self.mir_sema_type_to_llvm(ret_ty_id)
+    let llvm_ret = if ret_ty != 0: ret_ty else: wl_void_type(self.context)
+    let param_types: Vec[i64] = Vec.new()
+    for pi in 0..param_count:
+        var p_sema_ty = self.mir_input.mir_get_type_extra(extra_start + pi)
+        if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+            let te_idx = extra_start + pi
+            if te_idx >= 0 and te_idx < self.sema.type_extra.len() as i32:
+                p_sema_ty = self.sema.type_extra.get(te_idx as i64)
+        let p_llvm_ty = self.mir_sema_type_to_llvm(p_sema_ty)
+        if p_llvm_ty != 0:
+            param_types.push(p_llvm_ty)
+        else:
+            param_types.push(self.type_fallback())
+    wl_function_type(llvm_ret, vec_data_i64(&param_types), param_count, 0)
+
 fn Codegen.mir_get_or_create_local_ptr(self: Codegen, local_id: i32, ty: i64) -> i64:
     let existing = self.mir_local_ptrs.get(local_id)
     if existing.is_some():
@@ -5568,6 +5609,15 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         let gvt2 = wl_global_get_value_type(callee)
         if gvt2 != 0 and wl_get_type_kind(gvt2) == wl_function_type_kind():
             call_ft = gvt2
+    if call_ft == 0 and callee_operand >= 0 and callee_operand < body.operand_kinds.len() as i32:
+        let co_ok = body.operand_kinds.get(callee_operand as i64)
+        let co_od = body.operand_d0.get(callee_operand as i64)
+        if (co_ok == OperandKind.OK_COPY or co_ok == OperandKind.OK_MOVE) and co_od >= 0 and co_od < body.place_locals.len() as i32:
+            let co_local = body.place_locals.get(co_od as i64)
+            if co_local >= 0 and co_local < body.local_type_ids.len() as i32:
+                let co_sema_ty = body.local_type_ids.get(co_local as i64)
+                if co_sema_ty > 0:
+                    call_ft = self.mir_build_raw_fn_type(co_sema_ty)
     if call_ft == 0:
         return false
 
