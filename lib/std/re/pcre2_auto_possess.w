@@ -672,8 +672,8 @@ type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, sta
 type struct_dfa_match_block_8 = dfa_match_block_8
 // Static functions and internal data (not auto-migrated)
 extern fn get_repeat_base(c: u8) -> u8
-extern fn get_chr_property_list(code: *const u8, utf: BOOL, ucp: BOOL, fcc: *const u8, list: *mut c_uint) -> *const u8
-extern fn compare_opcodes(code: *const u8, utf: BOOL, ucp: BOOL, cb: *const compile_block_8, base_list: *const c_uint, base_end: *const u8, rec_limit: *mut c_int) -> BOOL
+extern fn get_chr_property_list(code: *const u8, utf: c_int, ucp: c_int, fcc: *const u8, list: *mut c_uint) -> *const u8
+extern fn compare_opcodes(code: *const u8, utf: c_int, ucp: c_int, cb: *const compile_block_8, base_list: *mut c_uint, base_end: *const u8, rec_limit: *mut c_int) -> c_int
 extern let _pcre2_OP_lengths_8: *const u8
 
 @[c_export("_pcre2_auto_possessify_8")]
@@ -682,7 +682,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
     var c: u8 = 0 // init: untranslatable
     var end: *const u8 = null // init: untranslatable
     var repeat_opcode: *mut u8 = null // init: untranslatable
-    var list = 0 // init: untranslatable ([8]c_uint)
+    var list: [8]c_uint
     var rec_limit: c_int = 1000
     var utf: c_int = 0 // init: untranslatable
     var ucp: c_int = 0 // init: untranslatable

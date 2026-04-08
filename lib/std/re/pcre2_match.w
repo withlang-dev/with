@@ -65,7 +65,7 @@ extern fn pcre2_match_data_create_from_pattern_8(p0: *const pcre2_real_code_8, p
 extern fn pcre2_match_data_free_8(p0: *mut pcre2_real_match_data_8) -> void
 extern fn pcre2_dfa_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8, p7: *mut c_int, p8: c_ulong) -> c_int
 // Internal PCRE2 symbols
-extern let null_str: u8
+extern let null_str: *const u8
 
 // Internal PCRE2 symbols
 extern fn match_(start: *const u8, start_code: *const u8, top_bracket: c_uint, frame_size: c_ulong, match_data: *mut pcre2_real_match_data_8, mb: *mut match_block_8) -> c_int
@@ -124,7 +124,8 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
 
                 (start_match = (subject + start_offset))
                 (req_cu_ptr = (start_match - (1 as isize as usize)))
-                (true_end_subject = (end_subject = (subject + length)))
+                end_subject = (subject + length)
+                true_end_subject = end_subject
                 (mb.partial = (if ((if ((options & 32)) != 0: 1 else: 0)) != 0: 2 else: (if ((if ((options & 16)) != 0: 1 else: 0)) != 0: 1 else: 0)))
                 if (if ((match_data.flags & 1)) != 0: 1 else: 0) != 0:
                     match_data.memctl.free((match_data.subject as *mut c_void), match_data.memctl.memory_data)
@@ -157,7 +158,8 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                 (mb.allowlookaroundbsk = (if ((re.extra_options & 64)) != 0: 1 else: 0))
                 (mb.poptions = re.overall_options)
                 (mb.ignore_skip_arg = 0)
-                (mb.mark = (mb.nomatch_mark = null))
+                mb.nomatch_mark = null
+                mb.mark = null
                 (mb.name_count = re.name_count)
                 (mb.name_entry_size = re.name_entry_size)
                 (mb.bsr_convention = re.bsr_convention)
@@ -220,7 +222,8 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                         (req_cu2 = ((mb.fcc)[req_cu]))
 
 
-                (start_partial = (match_partial = null))
+                match_partial = null
+                    start_partial = null
                 (mb.hitend = 0)
                 (memchr_found_first_cu = null)
                 (memchr_found_first_cu2 = null)
