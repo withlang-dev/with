@@ -248,9 +248,6 @@ fn pcre2_regfree(preg: *mut regex_t):
     pcre2_match_data_free_8(preg.re_match_data)
     pcre2_code_free_8(preg.re_pcre2_code)
 
-extern var eint1: [24]c_int
-extern var eint2: [16]c_int
-extern var pstring: [18]*const i8
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0
