@@ -56,6 +56,10 @@ extern fn pcre2_set_recursion_limit_8(p0: *mut pcre2_real_match_context_8, p1: c
 extern fn pcre2_set_recursion_memory_management_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(c_ulong, *mut c_void) -> *mut c_void, p2: *const fn(*mut c_void, *mut c_void) -> void, p3: *mut c_void) -> c_int
 @[c_export("pcre2_compile_8")]
 fn pcre2_compile_8(pattern: *const u8, patlen: c_ulong, options: c_uint, errorptr: *mut c_int, erroroffset: *mut c_ulong, ccontext: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_code_8:
+    var pattern = pattern
+    var patlen = patlen
+    var options = options
+    var ccontext = ccontext
     var utf: c_int = 0
     var ucp: c_int = 0
     var has_lookbehind: c_int = 0
@@ -357,7 +361,7 @@ fn pcre2_compile_8(pattern: *const u8, patlen: c_ulong, options: c_uint, errorpt
             continue
 
 
-                    with_memset(cb.groupinfo, 0, ((((2 *% cb.bracount) +% 1)) *% sizeof[c_uint]()))
+                    with_memset(cb.groupinfo as *i8, 0, ((((2 *% cb.bracount) +% 1)) *% sizeof[c_uint]()) as i64)
                     (errorcode = check_lookbehinds(cb.parsed_pattern, null, null, &cb, &loopcount))
                     if (if errorcode != 0: 1 else: 0) != 0:
                         __pc = 2
@@ -392,11 +396,11 @@ fn pcre2_compile_8(pattern: *const u8, patlen: c_ulong, options: c_uint, errorpt
                     __pc = 2
             continue
 
-                with_memset((((re as *mut i8) + sizeof[pcre2_real_code_8]()) - (8 as isize as usize)), 0, 8)
+                with_memset((((re as *mut i8) + sizeof[pcre2_real_code_8]()) - (8 as isize as usize)) as *i8, 0, 8 as i64)
                 (re.memctl = ccontext.memctl)
                 (re.tables = tables)
                 (re.executable_jit = null)
-                with_memset(re.start_bitmap, 0, (32 *% sizeof[u8]()))
+                with_memset(re.start_bitmap as *i8, 0, (32 *% sizeof[u8]()) as i64)
                 (re.blocksize = re_blocksize)
                 (re.magic_number = 1346589253)
                 (re.compile_options = options)
@@ -640,7 +644,7 @@ fn pcre2_code_copy_8(code: *const pcre2_real_code_8) -> *mut pcre2_real_code_8:
     if (if newcode == null: 1 else: 0) != 0:
         return null
 
-    with_memcpy(newcode, code, code.blocksize)
+    with_memcpy(newcode as *i8, code as *i8, code.blocksize as i64)
     (newcode.executable_jit = null)
     if (if ((code.flags & 262144)) != 0: 1 else: 0) != 0:
         ((unsafe: *ref_count) = (unsafe: *ref_count) + 1)
@@ -659,14 +663,14 @@ fn pcre2_code_copy_with_tables_8(code: *const pcre2_real_code_8) -> *mut pcre2_r
     if (if newcode == null: 1 else: 0) != 0:
         return null
 
-    with_memcpy(newcode, code, code.blocksize)
+    with_memcpy(newcode as *i8, code as *i8, code.blocksize as i64)
     (newcode.executable_jit = null)
     (newtables = code.memctl.malloc((1088 +% sizeof[c_ulong]()), code.memctl.memory_data))
     if (if newtables == null: 1 else: 0) != 0:
         code.memctl.free((newcode as *mut c_void), code.memctl.memory_data)
         return null
 
-    with_memcpy(newtables, code.tables, 1088)
+    with_memcpy(newtables as *i8, code.tables as *i8, 1088 as i64)
     (unsafe: *ref_count = 1)
     (newcode.tables = newtables)
     newcode.flags = newcode.flags | 262144
@@ -1284,6 +1288,69 @@ type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: 
 type struct_match_block_8 = match_block_8
 type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, start_subject: *const u8 = null, end_subject: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, tables: *const u8 = null, start_offset: c_ulong = 0, heap_limit: c_uint = 0, heap_used: c_ulong = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, allowemptypartial: c_int = 0, nl: [4]u8, bsr_convention: c_ushort = 0, cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null, recursive: *mut dfa_recursion_info = null }
 type struct_dfa_match_block_8 = dfa_match_block_8
+extern fn _pcre2_auto_possessify_8(p0: *mut u8, p1: *const compile_block_8) -> c_int
+@[c_export("_pcre2_check_escape_8")]
+fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut c_uint, errorcodeptr: *mut c_int, options: c_uint, xoptions: c_uint, bracount: c_uint, isclass: c_int, cb: *mut compile_block_8) -> c_int:
+    var utf: c_int = 0
+    var alt_bsux: c_int = 0
+    var ptr: *const u8 = null
+    var c: c_uint = 0
+    var cc: c_uint = 0
+    var escape: c_int = 0
+    var i: c_int = 0
+    var p: *const u8 = null
+    var s: c_int = 0
+    var oldptr: *const u8 = null
+    var overflow: c_int = 0
+    var xc: c_uint = 0
+    var hptr: *const u8 = null
+    var __pc: i32 = 0
+    while true:
+        match __pc
+            0 =>
+                escape = 0
+                if (if ptr >= ptrend: 1 else: 0) != 0:
+                    (unsafe: *errorcodeptr = ERR1)
+                    return 0
+
+                // (empty)
+                (unsafe: *errorcodeptr = 0)
+                __pc = 2
+                continue
+            2 =>  // EXIT
+                (unsafe: *ptrptr = ptr)
+                (unsafe: *chptr = c)
+                return escape
+                __pc = 3
+                continue
+            3 =>  // ESCAPE_FAILED_FORWARD
+                (ptr = ptr + 1)
+                __pc = 2
+                continue
+            _ => break
+
+extern fn _pcre2_ckd_smul_8(p0: *mut c_ulong, p1: c_int, p2: c_int) -> c_int
+extern fn _pcre2_extuni_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int, p5: *mut c_int) -> *const u8
+extern fn _pcre2_find_bracket_8(p0: *const u8, p1: c_int, p2: c_int) -> *const u8
+extern fn _pcre2_is_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_jit_free_rodata_8(p0: *mut c_void, p1: *mut c_void) -> void
+extern fn _pcre2_jit_free_8(p0: *mut c_void, p1: *mut pcre2_memctl) -> void
+extern fn _pcre2_jit_get_size_8(p0: *mut c_void) -> c_ulong
+extern fn _pcre2_jit_get_target_8() -> *const i8
+extern fn _pcre2_memctl_malloc_8(p0: c_ulong, p1: *mut pcre2_memctl) -> *mut c_void
+extern fn _pcre2_ord2utf_8(p0: c_uint, p1: *mut u8) -> c_uint
+extern fn _pcre2_script_run_8(p0: *const u8, p1: *const u8, p2: c_int) -> c_int
+extern fn _pcre2_strcmp_8(p0: *const u8, p1: *const u8) -> c_int
+extern fn _pcre2_strcmp_c8_8(p0: *const u8, p1: *const i8) -> c_int
+extern fn _pcre2_strcpy_c8_8(p0: *mut u8, p1: *const i8) -> c_ulong
+extern fn _pcre2_strlen_8(p0: *const u8) -> c_ulong
+extern fn _pcre2_strncmp_8(p0: *const u8, p1: *const u8, p2: c_ulong) -> c_int
+extern fn _pcre2_strncmp_c8_8(p0: *const u8, p1: *const i8, p2: c_ulong) -> c_int
+extern fn _pcre2_study_8(p0: *mut pcre2_real_code_8) -> c_int
+extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_int
+extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
+extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
 let ERR0: c_uint = 100
 let ERR1: c_uint = 101
 let ERR2: c_uint = 102
@@ -1407,6 +1474,15 @@ let ERR119: c_uint = 219
 let ERR120: c_uint = 220
 type eclass_op_info { code_start: *mut u8 = null, length: c_ulong = 0, op_single_type: u8 = 0, bits: class_bits_storage }
 type struct_eclass_op_info = eclass_op_info
+extern fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, classbits: *mut u8) -> void
+extern fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_ptr: *mut c_uint, pcode: *mut *mut u8, negate_class: c_int, has_bitmap: *mut c_int, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint
+extern fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *mut c_uint, pcode: *mut *mut u8, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> c_int
+extern fn _pcre2_compile_get_hash_from_name8(name: *const u8, length: c_uint) -> c_ushort
+extern fn _pcre2_compile_find_named_group8(name: *const u8, length: c_uint, cb: *mut compile_block_8) -> *mut named_group_8
+extern fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, ng: *mut named_group_8, tablecount: c_uint) -> c_uint
+extern fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexptr: *mut c_int, countptr: *mut c_int, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_int
+extern fn _pcre2_compile_parse_scan_substr_args8(pptr: *mut c_uint, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint
+extern fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_int
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0

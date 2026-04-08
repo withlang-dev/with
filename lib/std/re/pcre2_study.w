@@ -670,6 +670,138 @@ type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: 
 type struct_match_block_8 = match_block_8
 type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, start_subject: *const u8 = null, end_subject: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, tables: *const u8 = null, start_offset: c_ulong = 0, heap_limit: c_uint = 0, heap_used: c_ulong = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, allowemptypartial: c_int = 0, nl: [4]u8, bsr_convention: c_ushort = 0, cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null, recursive: *mut dfa_recursion_info = null }
 type struct_dfa_match_block_8 = dfa_match_block_8
+extern fn _pcre2_auto_possessify_8(p0: *mut u8, p1: *const compile_block_8) -> c_int
+extern fn _pcre2_check_escape_8(p0: *mut *const u8, p1: *const u8, p2: *mut c_uint, p3: *mut c_int, p4: c_uint, p5: c_uint, p6: c_uint, p7: c_int, p8: *mut compile_block_8) -> c_int
+extern fn _pcre2_ckd_smul_8(p0: *mut c_ulong, p1: c_int, p2: c_int) -> c_int
+extern fn _pcre2_extuni_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int, p5: *mut c_int) -> *const u8
+extern fn _pcre2_find_bracket_8(p0: *const u8, p1: c_int, p2: c_int) -> *const u8
+extern fn _pcre2_is_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_jit_free_rodata_8(p0: *mut c_void, p1: *mut c_void) -> void
+extern fn _pcre2_jit_free_8(p0: *mut c_void, p1: *mut pcre2_memctl) -> void
+extern fn _pcre2_jit_get_size_8(p0: *mut c_void) -> c_ulong
+extern fn _pcre2_jit_get_target_8() -> *const i8
+extern fn _pcre2_memctl_malloc_8(p0: c_ulong, p1: *mut pcre2_memctl) -> *mut c_void
+extern fn _pcre2_ord2utf_8(p0: c_uint, p1: *mut u8) -> c_uint
+extern fn _pcre2_script_run_8(p0: *const u8, p1: *const u8, p2: c_int) -> c_int
+extern fn _pcre2_strcmp_8(p0: *const u8, p1: *const u8) -> c_int
+extern fn _pcre2_strcmp_c8_8(p0: *const u8, p1: *const i8) -> c_int
+extern fn _pcre2_strcpy_c8_8(p0: *mut u8, p1: *const i8) -> c_ulong
+extern fn _pcre2_strlen_8(p0: *const u8) -> c_ulong
+extern fn _pcre2_strncmp_8(p0: *const u8, p1: *const u8, p2: c_ulong) -> c_int
+extern fn _pcre2_strncmp_c8_8(p0: *const u8, p1: *const i8, p2: c_ulong) -> c_int
+@[c_export("_pcre2_study_8")]
+fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int:
+    var count: c_int = 0
+    var code: *mut u8 = null
+    var utf: c_int = 0
+    var ucp: c_int = 0
+    var depth: c_int = 0
+    var rc: c_int = 0
+    var i: c_int = 0
+    var a: c_int = 0
+    var b: c_int = 0
+    var p: *mut u8 = null
+    var flags: c_uint = 0
+    var x: u8 = 0
+    var c: c_int = 0
+    var y: u8 = 0
+    var d: c_int = 0
+    var min: c_int = 0
+    var __pc: i32 = 0
+    while true:
+        match __pc
+            0 =>
+                count = 0
+                if (if ((re.flags & ((16 | 512)))) == 0: 1 else: 0) != 0:
+                    var depth: c_int = 0
+                    var rc: c_int = set_start_bits(re, code, utf, ucp, &depth)
+                    if (if rc == SSB_UNKNOWN: 1 else: 0) != 0:
+                        return 1
+
+                    if (if rc == SSB_DONE: 1 else: 0) != 0:
+                        var i: c_int = 0
+                        var a: c_int = (0 - 1)
+                        var b: c_int = (0 - 1)
+                        var p: *mut u8 = null // init failed
+                        var flags: c_uint = 0 // init failed
+                        (i = 0)
+                        while (if i < 256: 1 else: 0) != 0:
+                            var x: u8 = 0 // init: untranslatable
+                            if (if x != 0: 1 else: 0) != 0:
+                                var c: c_int = 0
+                                var y: u8 = 0 // init: untranslatable
+                                if (if y != x: 1 else: 0) != 0:
+                                    comptime_error("goto not supported")
+
+                                (c = i)
+                                match x
+                                    1 => 0
+                                    2 =>
+                                        c = c + 1
+                                    4 =>
+                                        c = c + 2
+                                    8 =>
+                                        c = c + 3
+                                    16 =>
+                                        c = c + 4
+                                    32 =>
+                                        c = c + 5
+                                    64 =>
+                                        c = c + 6
+                                    128 =>
+                                        c = c + 7
+                                    _ => 0
+
+                                if (if utf != 0 and (if c > 127: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    comptime_error("goto not supported")
+
+                                if (if a < 0: 1 else: 0) != 0:
+                                    (a = c)
+                                else:
+                                    if (if b < 0: 1 else: 0) != 0:
+                                        var d: c_int = (((re.tables + (256 as isize as usize)))[(c as c_uint)])
+                                        if (if d != a: 1 else: 0) != 0:
+                                            comptime_error("goto not supported")
+
+                                        (b = c)
+                                    else:
+                                        comptime_error("goto not supported")
+
+
+
+
+                        if (if a >= 0: 1 else: 0) != 0:
+                            (re.first_codeunit = a)
+                            (flags = 16)
+                            if (if b >= 0: 1 else: 0) != 0:
+                                flags = flags | 32
+
+
+                        re.flags = re.flags | flags
+
+
+                if (if (if ((re.flags & ((8192 | 8388608)))) == 0: 1 else: 0) != 0 and (if re.top_backref <= 128: 1 else: 0) != 0: 1 else: 0) != 0:
+                    var min: c_int = 0
+                    var backref_cache: [129]c_int = (128 + 1)
+                    (backref_cache[0] = 0)
+                    (min = find_minlength(re, code, code, utf, null, &count, backref_cache))
+                    match min
+                        (0 - 1) => 0
+                        (0 - 2) =>
+                            return 2
+                        (0 - 3) =>
+                            return 3
+                        _ =>
+                            (re.minlength = (if ((if min > (65535 as c_int): 1 else: 0)) != 0: (65535 as c_int) else: min))
+
+
+                return 0
+            _ => break
+
+extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_int
+extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
+extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0

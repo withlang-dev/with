@@ -25,4 +25,4 @@ extern fn with_clzll(x: i64) -> i32
 extern fn with_ctzl(x: i64) -> i32
 extern fn with_ctzll(x: i64) -> i32
 extern fn with_abs(x: i32) -> i32
-extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> void
+

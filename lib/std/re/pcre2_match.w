@@ -66,6 +66,10 @@ extern fn pcre2_match_data_free_8(p0: *mut pcre2_real_match_data_8) -> void
 extern fn pcre2_dfa_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8, p7: *mut c_int, p8: c_ulong) -> c_int
 @[c_export("pcre2_match_8")]
 fn pcre2_match_8(code: *const pcre2_real_code_8, subject: *const u8, length: c_ulong, start_offset: c_ulong, options: c_uint, match_data: *mut pcre2_real_match_data_8, mcontext: *mut pcre2_real_match_context_8) -> c_int:
+    var subject = subject
+    var length = length
+    var options = options
+    var mcontext = mcontext
     var rc: c_int = 0
     var start_bits: *const u8 = null
     var re: *const pcre2_real_code_8 = null
@@ -191,7 +195,7 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, subject: *const u8, length: c_u
 
                     (match_data.heapframes_size = heapframes_size)
 
-                with_memset((((match_data.heapframes) as *mut i8) + 120), 255, (frame_size -% 120))
+                with_memset((((match_data.heapframes) as *mut i8) + 120) as *i8, 255, (frame_size -% 120) as i64)
                 (mb.lcc = (re.tables + (0 as isize as usize)))
                 (mb.fcc = (re.tables + (256 as isize as usize)))
                 if (if ((re.flags & 16)) != 0: 1 else: 0) != 0:
@@ -990,6 +994,30 @@ type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: 
 type struct_match_block_8 = match_block_8
 type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, start_subject: *const u8 = null, end_subject: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, tables: *const u8 = null, start_offset: c_ulong = 0, heap_limit: c_uint = 0, heap_used: c_ulong = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, allowemptypartial: c_int = 0, nl: [4]u8, bsr_convention: c_ushort = 0, cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null, recursive: *mut dfa_recursion_info = null }
 type struct_dfa_match_block_8 = dfa_match_block_8
+extern fn _pcre2_auto_possessify_8(p0: *mut u8, p1: *const compile_block_8) -> c_int
+extern fn _pcre2_check_escape_8(p0: *mut *const u8, p1: *const u8, p2: *mut c_uint, p3: *mut c_int, p4: c_uint, p5: c_uint, p6: c_uint, p7: c_int, p8: *mut compile_block_8) -> c_int
+extern fn _pcre2_ckd_smul_8(p0: *mut c_ulong, p1: c_int, p2: c_int) -> c_int
+extern fn _pcre2_extuni_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int, p5: *mut c_int) -> *const u8
+extern fn _pcre2_find_bracket_8(p0: *const u8, p1: c_int, p2: c_int) -> *const u8
+extern fn _pcre2_is_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_jit_free_rodata_8(p0: *mut c_void, p1: *mut c_void) -> void
+extern fn _pcre2_jit_free_8(p0: *mut c_void, p1: *mut pcre2_memctl) -> void
+extern fn _pcre2_jit_get_size_8(p0: *mut c_void) -> c_ulong
+extern fn _pcre2_jit_get_target_8() -> *const i8
+extern fn _pcre2_memctl_malloc_8(p0: c_ulong, p1: *mut pcre2_memctl) -> *mut c_void
+extern fn _pcre2_ord2utf_8(p0: c_uint, p1: *mut u8) -> c_uint
+extern fn _pcre2_script_run_8(p0: *const u8, p1: *const u8, p2: c_int) -> c_int
+extern fn _pcre2_strcmp_8(p0: *const u8, p1: *const u8) -> c_int
+extern fn _pcre2_strcmp_c8_8(p0: *const u8, p1: *const i8) -> c_int
+extern fn _pcre2_strcpy_c8_8(p0: *mut u8, p1: *const i8) -> c_ulong
+extern fn _pcre2_strlen_8(p0: *const u8) -> c_ulong
+extern fn _pcre2_strncmp_8(p0: *const u8, p1: *const u8, p2: c_ulong) -> c_int
+extern fn _pcre2_strncmp_c8_8(p0: *const u8, p1: *const i8, p2: c_ulong) -> c_int
+extern fn _pcre2_study_8(p0: *mut pcre2_real_code_8) -> c_int
+extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_int
+extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
+extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0

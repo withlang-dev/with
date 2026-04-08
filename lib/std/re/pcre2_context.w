@@ -25,11 +25,13 @@ fn pcre2_general_context_copy_8(gcontext: *mut pcre2_real_general_context_8) -> 
     if (if newcontext == null: 1 else: 0) != 0:
         return null
 
-    with_memcpy(newcontext, gcontext, sizeof[pcre2_real_general_context_8]())
+    with_memcpy(newcontext as *i8, gcontext as *i8, sizeof[pcre2_real_general_context_8]() as i64)
     return newcontext
 
 @[c_export("pcre2_general_context_create_8")]
 fn pcre2_general_context_create_8(private_malloc: *const fn(c_ulong, *mut c_void) -> *mut c_void, private_free: *const fn(*mut c_void, *mut c_void) -> void, memory_data: *mut c_void) -> *mut pcre2_real_general_context_8:
+    var private_malloc = private_malloc
+    var private_free = private_free
     var gcontext: *mut pcre2_real_general_context_8 = null // init: untranslatable
     if (if private_malloc == null: 1 else: 0) != 0:
         (private_malloc = default_malloc)
@@ -58,7 +60,7 @@ fn pcre2_compile_context_copy_8(ccontext: *mut pcre2_real_compile_context_8) -> 
     if (if newcontext == null: 1 else: 0) != 0:
         return null
 
-    with_memcpy(newcontext, ccontext, sizeof[pcre2_real_compile_context_8]())
+    with_memcpy(newcontext as *i8, ccontext as *i8, sizeof[pcre2_real_compile_context_8]() as i64)
     return newcontext
 
 @[c_export("pcre2_compile_context_create_8")]
@@ -153,7 +155,7 @@ fn pcre2_convert_context_copy_8(ccontext: *mut pcre2_real_convert_context_8) -> 
     if (if newcontext == null: 1 else: 0) != 0:
         return null
 
-    with_memcpy(newcontext, ccontext, sizeof[pcre2_real_convert_context_8]())
+    with_memcpy(newcontext as *i8, ccontext as *i8, sizeof[pcre2_real_convert_context_8]() as i64)
     return newcontext
 
 @[c_export("pcre2_convert_context_create_8")]
@@ -189,7 +191,7 @@ fn pcre2_match_context_copy_8(mcontext: *mut pcre2_real_match_context_8) -> *mut
     if (if newcontext == null: 1 else: 0) != 0:
         return null
 
-    with_memcpy(newcontext, mcontext, sizeof[pcre2_real_match_context_8]())
+    with_memcpy(newcontext as *i8, mcontext as *i8, sizeof[pcre2_real_match_context_8]() as i64)
     return newcontext
 
 @[c_export("pcre2_match_context_create_8")]
@@ -873,6 +875,45 @@ type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: 
 type struct_match_block_8 = match_block_8
 type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, start_subject: *const u8 = null, end_subject: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, tables: *const u8 = null, start_offset: c_ulong = 0, heap_limit: c_uint = 0, heap_used: c_ulong = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, allowemptypartial: c_int = 0, nl: [4]u8, bsr_convention: c_ushort = 0, cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null, recursive: *mut dfa_recursion_info = null }
 type struct_dfa_match_block_8 = dfa_match_block_8
+extern fn _pcre2_auto_possessify_8(p0: *mut u8, p1: *const compile_block_8) -> c_int
+extern fn _pcre2_check_escape_8(p0: *mut *const u8, p1: *const u8, p2: *mut c_uint, p3: *mut c_int, p4: c_uint, p5: c_uint, p6: c_uint, p7: c_int, p8: *mut compile_block_8) -> c_int
+extern fn _pcre2_ckd_smul_8(p0: *mut c_ulong, p1: c_int, p2: c_int) -> c_int
+extern fn _pcre2_extuni_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int, p5: *mut c_int) -> *const u8
+extern fn _pcre2_find_bracket_8(p0: *const u8, p1: c_int, p2: c_int) -> *const u8
+extern fn _pcre2_is_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_jit_free_rodata_8(p0: *mut c_void, p1: *mut c_void) -> void
+extern fn _pcre2_jit_free_8(p0: *mut c_void, p1: *mut pcre2_memctl) -> void
+extern fn _pcre2_jit_get_size_8(p0: *mut c_void) -> c_ulong
+extern fn _pcre2_jit_get_target_8() -> *const i8
+@[c_export("_pcre2_memctl_malloc_8")]
+fn _pcre2_memctl_malloc_8(size: c_ulong, memctl: *mut pcre2_memctl) -> *mut c_void:
+    var newmemctl: *mut pcre2_memctl = null // init: untranslatable
+    var yield_: *mut c_void = (if ((if memctl == null: 1 else: 0)) != 0: with_alloc(size as i64) else: memctl.malloc(size, memctl.memory_data))
+    if (if yield_ == null: 1 else: 0) != 0:
+        return null
+
+    if (if memctl == null: 1 else: 0) != 0:
+        (newmemctl.malloc = default_malloc)
+        (newmemctl.free = default_free)
+        (newmemctl.memory_data = null)
+    else:
+        (unsafe: *newmemctl = unsafe: *memctl)
+
+    return yield_
+
+extern fn _pcre2_ord2utf_8(p0: c_uint, p1: *mut u8) -> c_uint
+extern fn _pcre2_script_run_8(p0: *const u8, p1: *const u8, p2: c_int) -> c_int
+extern fn _pcre2_strcmp_8(p0: *const u8, p1: *const u8) -> c_int
+extern fn _pcre2_strcmp_c8_8(p0: *const u8, p1: *const i8) -> c_int
+extern fn _pcre2_strcpy_c8_8(p0: *mut u8, p1: *const i8) -> c_ulong
+extern fn _pcre2_strlen_8(p0: *const u8) -> c_ulong
+extern fn _pcre2_strncmp_8(p0: *const u8, p1: *const u8, p2: c_ulong) -> c_int
+extern fn _pcre2_strncmp_c8_8(p0: *const u8, p1: *const i8, p2: c_ulong) -> c_int
+extern fn _pcre2_study_8(p0: *mut pcre2_real_code_8) -> c_int
+extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_int
+extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
+extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0
