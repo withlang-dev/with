@@ -147,6 +147,7 @@ fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_o
                 with_memcpy(tables as *i8, src_bytes as *i8, 1088 as i64)
                 (i = 0)
                 while (if i < number_of_codes: 1 else: 0) != 0:
+                    var blocksize: c_ulong = 0 // init: untranslatable
                     with_memcpy(&blocksize as *i8, (src_bytes + 72) as *i8, sizeof[c_ulong]() as i64)
                     if (if blocksize <= sizeof[pcre2_real_code_8](): 1 else: 0) != 0:
                         comptime_error("goto not supported")

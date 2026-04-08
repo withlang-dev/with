@@ -5317,10 +5317,32 @@ fn ci_collect_var_decls(session: i64, cursor: i32, names: &mut str, types: &mut 
 fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -> str:
     let label_map = ci_collect_labels(session, body_cursor)
 
-    // Collect and hoist variable declarations
+    // Collect and hoist variable declarations.
+    // Skip vars that are already in the scope (param rebindings).
     var var_names = ""
     var var_types = ""
     ci_collect_var_decls(session, body_cursor, &mut var_names, &mut var_types)
+    // Remove hoisted vars that are already param-rebound (in scope)
+    var filtered_names = ""
+    var filtered_types = ""
+    var fvi = 1
+    var ftype_idx = 0
+    let flen = var_names.len() as i32
+    while fvi < flen:
+        var fve = fvi
+        while fve < flen and var_names.byte_at(fve as i64) != 124:
+            fve = fve + 1
+        let vn = var_names.slice(fvi as i64, fve as i64)
+        if not ci_str_contains(scope, "|" ++ vn ++ "|"):
+            filtered_names = filtered_names ++ "|" ++ vn ++ "|"
+            let vt = ci_get_nth_pipe_entry(var_types, ftype_idx)
+            filtered_types = filtered_types ++ "|" ++ vt ++ "|"
+        ftype_idx = ftype_idx + 1
+        fvi = fve + 1
+        if fvi < flen and var_names.byte_at(fvi as i64) == 124:
+            fvi = fvi + 1
+    var_names = filtered_names
+    var_types = filtered_types
 
     var output = ""
 
