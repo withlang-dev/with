@@ -142,7 +142,7 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                 (anchored = (if ((((re.overall_options | options)) & 2147483648)) != 0: 1 else: 0))
                 (firstline = (if (not anchored) != 0 and (if ((re.overall_options & 256)) != 0: 1 else: 0) != 0: 1 else: 0))
                 (startline = (if ((re.flags & 512)) != 0: 1 else: 0))
-                (mb.cb = &cb)
+                (mb.cb = &cb as *mut pcre2_callout_block_8)
                 (cb.version = 2)
                 (cb.subject = subject)
                 (cb.callout_flags = 0)
@@ -213,7 +213,7 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
 
                 else:
                     if (if (not startline) != 0 and (if ((re.flags & 64)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                        (start_bits = re.start_bitmap)
+                        (start_bits = re.start_bitmap as *const u8)
 
 
                 if (if ((re.flags & 128)) != 0: 1 else: 0) != 0:

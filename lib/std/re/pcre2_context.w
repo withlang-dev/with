@@ -46,7 +46,7 @@ fn pcre2_general_context_create_8(__param_private_malloc: *const fn(c_ulong, *mu
     if (if private_free == null: 1 else: 0) != 0:
         (private_free = default_free)
 
-    (gcontext = private_malloc(sizeof[pcre2_real_general_context_8](), memory_data))
+    (gcontext = private_malloc(sizeof[pcre2_real_general_context_8](), memory_data) as *mut pcre2_real_general_context_8)
     if (if gcontext == null: 1 else: 0) != 0:
         return null
 
@@ -895,7 +895,7 @@ extern fn _pcre2_jit_get_target_8() -> *const i8
 @[c_export("_pcre2_memctl_malloc_8")]
 fn _pcre2_memctl_malloc_8(size: c_ulong, memctl: *mut pcre2_memctl) -> *mut c_void:
     var newmemctl: *mut pcre2_memctl = null // init: untranslatable
-    var yield_: *mut c_void = (if ((if memctl == null: 1 else: 0)) != 0: with_alloc(size as i64) else: memctl.malloc(size, memctl.memory_data))
+    var yield_: *mut c_void = (if ((if memctl == null: 1 else: 0)) != 0: with_alloc(size as i64) as *mut c_void else: memctl.malloc(size, memctl.memory_data))
     if (if yield_ == null: 1 else: 0) != 0:
         return null
 
