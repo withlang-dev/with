@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_convert.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int
@@ -59,11 +59,11 @@ fn pcre2_pattern_convert_8(p0: *const u8, p1: c_ulong, p2: c_uint, p3: *mut *mut
 
     var i: c_int = 0
     while (if i < 2: 1 else: 0) != 0:
-        match pattype:
-            16 ->
+        match pattype
+            16 =>
                 (rc = convert_glob((options & (0 - 16 - 1)), pattern, plength, utf, use_buffer, use_length, bufflenptr, dummyrun, ccontext))
-            4 -> pass
-            _ ->
+            4 => 0
+            _ =>
                 (unsafe: *bufflenptr = 0)
 
         if (if allocated == ((0 as *mut c_void)): 1 else: 0) != 0:

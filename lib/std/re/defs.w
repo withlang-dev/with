@@ -1,4 +1,4 @@
-// std.re.defs — shared C type aliases for migrated PCRE2 code.
+// std.re.defs -- shared C type aliases for migrated PCRE2 code.
 
 use std.mem
 use std.string

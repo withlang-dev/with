@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_pattern_info.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int
@@ -60,48 +60,48 @@ extern fn pcre2_code_copy_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_cod
 extern fn pcre2_code_copy_with_tables_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8
 @[c_export("pcre2_pattern_info_8")]
 fn pcre2_pattern_info_8(p0: *const pcre2_real_code_8, p1: c_uint, p2: *mut c_void) -> c_int:
-    if (if where == ((0 as *mut c_void)): 1 else: 0) != 0:
-        match what:
-            0 ->
+    if (if where_ == ((0 as *mut c_void)): 1 else: 0) != 0:
+        match what
+            0 =>
                 return 8
-            7 ->
+            7 =>
                 return 8
-            10 ->
+            10 =>
                 return 8
-            19 ->
+            19 =>
                 return 8
-            _ -> pass
+            _ => 0
 
 
-    match what:
-        0 -> pass
-        1 -> pass
-        2 -> pass
-        3 -> pass
-        4 -> pass
-        21 -> pass
-        26 -> pass
-        6 -> pass
-        5 -> pass
-        7 -> pass
-        24 -> pass
-        23 -> pass
-        8 -> pass
-        25 -> pass
-        9 -> pass
-        10 -> pass
-        12 -> pass
-        11 -> pass
-        13 -> pass
-        14 -> pass
-        15 -> pass
-        16 -> pass
-        18 -> pass
-        17 -> pass
-        19 -> pass
-        20 -> pass
-        22 -> pass
-        _ -> pass
+    match what
+        0 => 0
+        1 => 0
+        2 => 0
+        3 => 0
+        4 => 0
+        21 => 0
+        26 => 0
+        6 => 0
+        5 => 0
+        7 => 0
+        24 => 0
+        23 => 0
+        8 => 0
+        25 => 0
+        9 => 0
+        10 => 0
+        12 => 0
+        11 => 0
+        13 => 0
+        14 => 0
+        15 => 0
+        16 => 0
+        18 => 0
+        17 => 0
+        19 => 0
+        20 => 0
+        22 => 0
+        _ => 0
 
     return 0
 
@@ -110,13 +110,13 @@ fn pcre2_callout_enumerate_8(p0: *const pcre2_real_code_8, p1: *const fn(*mut pc
     (cb.version = 0)
     while 1 != 0:
         var rc: c_int = 0
-        match unsafe: *cc:
-            OP_END ->
+        match unsafe: *cc
+            OP_END =>
                 return 0
-            OP_CHAR -> pass
-            OP_TYPESTAR -> pass
-            OP_MARK -> pass
-            OP_CALLOUT ->
+            OP_CHAR => 0
+            OP_TYPESTAR => 0
+            OP_MARK => 0
+            OP_CALLOUT =>
                 (cb.callout_number = cc[(1 + (2 * 2))])
                 (cb.callout_string_offset = 0)
                 (cb.callout_string_length = 0)
@@ -125,13 +125,13 @@ fn pcre2_callout_enumerate_8(p0: *const pcre2_real_code_8, p1: *const fn(*mut pc
                 if (if rc != 0: 1 else: 0) != 0:
 return rc
                 cc = cc + _pcre2_OP_lengths_8[unsafe: *cc]
-            OP_CALLOUT_STR ->
+            OP_CALLOUT_STR =>
                 (cb.callout_number = 0)
                 (cb.callout_string = ((cc + (((1 + (4 * 2))) as isize as usize)) + (1 as isize as usize)))
                 (rc = callback(&cb, callout_data))
                 if (if rc != 0: 1 else: 0) != 0:
 return rc
-            _ ->
+            _ =>
                 cc = cc + _pcre2_OP_lengths_8[unsafe: *cc]
 
 

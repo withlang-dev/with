@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_substitute.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int
@@ -153,8 +153,8 @@ fn pcre2_substitute_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, 
     var additional: c_ulong = 0
     var __pc: i32 = 0
     while true:
-        match __pc:
-            0 ->
+        match __pc
+            0 =>
                 substitute_case_callout_data = ((0 as *mut c_void))
                 (buff_offset = 0)
                 (lengthleft = (buff_length = unsafe: *blength))
@@ -360,7 +360,7 @@ break
                                         if (if group > code.top_bracket: 1 else: 0) != 0:
                                             if (if ((suboptions & 2048)) != 0: 1 else: 0) != 0:
                                                 while (if (if (if { ptr = ptr + 1; ptr } < repend: 1 else: 0) and (if unsafe: *ptr >= 48: 1 else: 0): 1 else: 0) and (if unsafe: *ptr <= 57: 1 else: 0): 1 else: 0) != 0:
-pass
+// (empty)
                                                 break
                                             else:
                                                 comptime_error("goto not supported")
@@ -486,12 +486,12 @@ while true:
 if (if (if ((suboptions & 512)) != 0: 1 else: 0) and (if unsafe: *ptr == 92: 1 else: 0): 1 else: 0) != 0:
                                     var errorcode: c_int = 0
                                     if (if ptr < (repend - (1 as isize as usize)): 1 else: 0) != 0:
-match ptr[1]:
-                                            76 ->
+match ptr[1]
+                                            76 =>
                                                 (new_forcecase.to_case = 1)
                                                 (new_forcecase.single_char = 0)
                                                 ptr = ptr + 2
-                                            108 ->
+                                            108 =>
                                                 (new_forcecase.to_case = 1)
                                                 (new_forcecase.single_char = 1)
                                                 ptr = ptr + 2
@@ -500,11 +500,11 @@ match ptr[1]:
                                                     (new_forcecase.single_char = 0)
                                                     ptr = ptr + 2
 
-                                            85 ->
+                                            85 =>
                                                 (new_forcecase.to_case = 2)
                                                 (new_forcecase.single_char = 0)
                                                 ptr = ptr + 2
-                                            117 ->
+                                            117 =>
                                                 (new_forcecase.to_case = 3)
                                                 (new_forcecase.single_char = 1)
                                                 ptr = ptr + 2
@@ -513,7 +513,7 @@ match ptr[1]:
                                                     (new_forcecase.single_char = 0)
                                                     ptr = ptr + 2
 
-                                            _ -> pass
+                                            _ => 0
 
                                     if (if new_forcecase.to_case != 0: 1 else: 0) != 0:
                                         // label: SETFORCECASE
@@ -527,8 +527,8 @@ match ptr[1]:
                                     (rc = _pcre2_check_escape_8(&ptr, repend, &ch, &errorcode, code.overall_options, code.extra_options, code.top_bracket, 0, ((0 as *mut c_void))))
                                     if (if errorcode != 0: 1 else: 0) != 0:
 comptime_error("goto not supported")
-                                    match rc:
-                                        ESC_E ->
+                                    match rc
+                                        ESC_E =>
                                             comptime_error("goto not supported")
                                             (escaped_literal = 1)
                                             continue
@@ -574,7 +574,7 @@ comptime_error("goto not supported")
                                                 comptime_error("goto not supported")
 
                                             comptime_error("goto not supported")
-                                        ESC_Q ->
+                                        ESC_Q =>
                                             (escaped_literal = 1)
                                             continue
                                             if (if rc == ESC_v: 1 else: 0) != 0:
@@ -619,7 +619,7 @@ comptime_error("goto not supported")
                                                 comptime_error("goto not supported")
 
                                             comptime_error("goto not supported")
-                                        0 ->
+                                        0 =>
                                             if (if rc == ESC_v: 1 else: 0) != 0:
 (ch = 11)
                                                                                         (temp[0] = ch)
@@ -662,7 +662,7 @@ comptime_error("goto not supported")
                                                 comptime_error("goto not supported")
 
                                             comptime_error("goto not supported")
-                                        ESC_g ->
+                                        ESC_g =>
                                                                                         if (if (if ptr >= repend: 1 else: 0) or (if unsafe: *ptr != 60: 1 else: 0): 1 else: 0) != 0:
 comptime_error("goto not supported")
                                             { ptr = ptr + 1; ptr }
@@ -682,7 +682,7 @@ comptime_error("goto not supported")
                                                 comptime_error("goto not supported")
 
                                             comptime_error("goto not supported")
-                                        _ ->
+                                        _ =>
                                             if (if rc < 0: 1 else: 0) != 0:
                                                 (special = 0)
                                                 (group = ((0 - rc) - 1))
@@ -693,7 +693,7 @@ comptime_error("goto not supported")
                                 else:
                                     // label: LOADLITERAL
 (ch_start = ptr)
-                                    pass
+                                    // (empty)
                                     ch
                                     if (if (if forcecase.to_case != 0: 1 else: 0) and (if substitute_case_callout == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
 while true:
@@ -769,30 +769,30 @@ suboptions = suboptions & ((0 - 256 - 1))
                     (unsafe: *blength = (buff_offset -% 1))
 
                 __pc = 6; continue
-            6 ->  // EXIT
+            6 =>  // EXIT
                 if (if internal_match_data != ((0 as *mut c_void)): 1 else: 0) != 0:
 pcre2_match_data_free_8(internal_match_data)                else:
 (match_data.rc = rc)
                 return rc
                 __pc = 7; continue
-            7 ->  // NOROOM
+            7 =>  // NOROOM
                 __pc = 6; continue
                 __pc = 8; continue
-            8 ->  // CASEERROR
+            8 =>  // CASEERROR
                 __pc = 6; continue
                 __pc = 9; continue
-            9 ->  // TOOLARGEREPLACE
+            9 =>  // TOOLARGEREPLACE
                 __pc = 6; continue
                 __pc = 10; continue
-            10 ->  // BAD
+            10 =>  // BAD
                 __pc = 12; continue
                 __pc = 11; continue
-            11 ->  // BADESCAPE
+            11 =>  // BADESCAPE
                 // empty
                 __pc = 12; continue
-            12 ->  // PTREXIT
+            12 =>  // PTREXIT
                 __pc = 6; continue
-            _ -> break
+            _ => break
 
 extern fn pcre2_jit_compile_8(p0: *mut pcre2_real_code_8, p1: c_uint) -> c_int
 extern fn pcre2_jit_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8) -> c_int

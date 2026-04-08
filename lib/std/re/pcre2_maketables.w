@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_maketables.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int
@@ -98,9 +98,9 @@ extern fn pcre2_get_error_message_8(p0: c_int, p1: *mut u8, p2: c_ulong) -> c_in
 @[c_export("pcre2_maketables_8")]
 fn pcre2_maketables_8(p0: *mut pcre2_real_general_context_8) -> *const u8:
     var i: c_int = 0
-    if (if yield == ((0 as *mut c_void)): 1 else: 0) != 0:
+    if (if yield_ == ((0 as *mut c_void)): 1 else: 0) != 0:
 return ((0 as *mut c_void))
-    (p = yield)
+    (p = yield_)
     (i = 0)
     while (if i < 256: 1 else: 0) != 0:
         var c: c_int = (to_lower((i)))
@@ -157,7 +157,7 @@ x = x + 16
         (unsafe: *{ let __tmp = p; p = p + 1; __tmp } = x)
         { let __tmp = i; i = i + 1; __tmp }
 
-    return yield
+    return yield_
 
 @[c_export("pcre2_maketables_free_8")]
 fn pcre2_maketables_free_8(p0: *mut pcre2_real_general_context_8, p1: *const u8):

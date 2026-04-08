@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2posix.c
+// Migrated from PCRE2
 use std.re.defs
 
 type PCRE2_UCHAR8 = u8
@@ -192,8 +192,8 @@ return REG_INVARG
 
         return 0
 
-    match rc:
-        _ ->
+    match rc
+        _ =>
             return REG_ASSERT
 
 

@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_compile.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int
@@ -111,8 +111,8 @@ fn pcre2_compile_8(p0: *const u8, p1: c_ulong, p2: c_uint, p3: *mut c_int, p4: *
     var next_data: *mut compile_data = null
     var __pc: i32 = 0
     while true:
-        match __pc:
-            0 ->
+        match __pc
+            0 =>
                 newline = 0
                 bsr = 0
                 errorcode = 0
@@ -190,20 +190,20 @@ optim_flags = optim_flags & (0 - 4 - 1)
                         while (if i < (sizeof[[23]pso]() / sizeof[pso]()): 1 else: 0) != 0:
                             if (if (if ((patlen -% skipatstart) -% 2) >= p.length: 1 else: 0) and (if _pcre2_strncmp_c8_8(((ptr + skipatstart) + (2 as isize as usize)), p.name, p.length) == 0: 1 else: 0): 1 else: 0) != 0:
                                 skipatstart = skipatstart + (p.length + 2)
-                                match p.type_:
-                                    PSO_OPT ->
+                                match p.type_
+                                    PSO_OPT =>
                                         cb.external_options = cb.external_options | p.value
-                                    PSO_XOPT ->
+                                    PSO_XOPT =>
                                         xoptions = xoptions | p.value
-                                    PSO_FLG ->
+                                    PSO_FLG =>
                                         setflags = setflags | p.value
-                                    PSO_NL ->
+                                    PSO_NL =>
                                         (newline = p.value)
                                         setflags = setflags | 32768
-                                    PSO_BSR ->
+                                    PSO_BSR =>
                                         (bsr = p.value)
                                         setflags = setflags | 16384
-                                    PSO_LIMM ->
+                                    PSO_LIMM =>
                                         (pp = skipatstart)
                                         if (if (if (if pp >= patlen: 1 else: 0) or (if pp == skipatstart: 1 else: 0): 1 else: 0) or (if ptr[pp] != 41: 1 else: 0): 1 else: 0) != 0:
                                             (errorcode = ERR60)
@@ -217,18 +217,18 @@ if (if p.type_ == PSO_LIMM: 1 else: 0) != 0:
 (limit_match = c)                                            else:
 (limit_depth = c)
                                         (skipatstart = { pp = pp + 1; pp })
-                                    PSO_OPTMZ ->
+                                    PSO_OPTMZ =>
                                         optim_flags = optim_flags & (0 - (p.value) - 1)
-                                        match p.value:
-                                            1 ->
+                                        match p.value
+                                            1 =>
                                                 cb.external_options = cb.external_options | 16384
-                                            2 ->
+                                            2 =>
                                                 cb.external_options = cb.external_options | 32768
-                                            4 ->
+                                            4 =>
                                                 cb.external_options = cb.external_options | 65536
-                                            _ -> pass
+                                            _ => 0
 
-                                    _ -> pass
+                                    _ => 0
 
                                 break
 
@@ -276,25 +276,25 @@ __pc = 4; continue
                 if (if newline == 0: 1 else: 0) != 0:
 (newline = ccontext.newline_convention)
                 (cb.nltype = 0)
-                match newline:
-                    1 ->
+                match newline
+                    1 =>
                         (cb.nllen = 1)
                         (cb.nl[0] = 13)
-                    2 ->
+                    2 =>
                         (cb.nllen = 1)
                         (cb.nl[0] = 10)
-                    6 ->
+                    6 =>
                         (cb.nllen = 1)
                         (cb.nl[0] = 0)
-                    3 ->
+                    3 =>
                         (cb.nllen = 2)
                         (cb.nl[0] = 13)
                         (cb.nl[1] = 10)
-                    4 ->
+                    4 =>
                         (cb.nltype = 1)
-                    5 ->
+                    5 =>
                         (cb.nltype = 2)
-                    _ ->
+                    _ =>
                         (errorcode = ERR56)
                         comptime_error("goto not supported")
 
@@ -507,7 +507,7 @@ re.flags = re.flags | 256
 (re.minlength = minminlength)
 
                 __pc = 1; continue
-            1 ->  // EXIT
+            1 =>  // EXIT
                 if (if cb.parsed_pattern != stack_parsed_pattern: 1 else: 0) != 0:
 ccontext.memctl.free(cb.parsed_pattern, ccontext.memctl.memory_data)
                 if (if cb.named_group_list_size > 20: 1 else: 0) != 0:
@@ -516,13 +516,13 @@ ccontext.memctl.free((cb.named_groups as *mut c_void), ccontext.memctl.memory_da
 ccontext.memctl.free((cb.groupinfo as *mut c_void), ccontext.memctl.memory_data)
                 return re
                 __pc = 2; continue
-            2 ->  // HAD_CB_ERROR
+            2 =>  // HAD_CB_ERROR
                 (ptr = (pattern + cb.erroroffset))
                 __pc = 3; continue
-            3 ->  // HAD_EARLY_ERROR
+            3 =>  // HAD_EARLY_ERROR
                 (unsafe: *erroroffset = ((ptr as usize -% pattern as usize) / sizeof[u8]()))
                 __pc = 4; continue
-            4 ->  // HAD_ERROR
+            4 =>  // HAD_ERROR
                 (unsafe: *errorptr = errorcode)
                 pcre2_code_free_8(re)
                 (re = ((0 as *mut c_void)))
@@ -535,7 +535,7 @@ ccontext.memctl.free((cb.groupinfo as *mut c_void), ccontext.memctl.memory_data)
 
 
                 __pc = 1; continue
-            _ -> break
+            _ => break
 
 @[c_export("pcre2_code_free_8")]
 fn pcre2_code_free_8(p0: *mut pcre2_real_code_8):

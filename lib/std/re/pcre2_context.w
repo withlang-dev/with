@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_context.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int
@@ -66,10 +66,10 @@ ccontext.memctl.free(ccontext, ccontext.memctl.memory_data)
 
 @[c_export("pcre2_set_bsr_8")]
 fn pcre2_set_bsr_8(p0: *mut pcre2_real_compile_context_8, p1: c_uint) -> c_int:
-    match value:
-        2 ->
+    match value
+        2 =>
             return 0
-        _ -> pass
+        _ => 0
 
 
 @[c_export("pcre2_set_character_tables_8")]
@@ -99,10 +99,10 @@ fn pcre2_set_max_varlookbehind_8(p0: *mut pcre2_real_compile_context_8, p1: c_ui
 
 @[c_export("pcre2_set_newline_8")]
 fn pcre2_set_newline_8(p0: *mut pcre2_real_compile_context_8, p1: c_uint) -> c_int:
-    match newline:
-        1 ->
+    match newline
+        1 =>
             return 0
-        _ -> pass
+        _ => 0
 
 
 @[c_export("pcre2_set_parens_nest_limit_8")]
@@ -118,12 +118,12 @@ fn pcre2_set_compile_recursion_guard_8(p0: *mut pcre2_real_compile_context_8, p1
 
 @[c_export("pcre2_set_optimize_8")]
 fn pcre2_set_optimize_8(p0: *mut pcre2_real_compile_context_8, p1: c_uint) -> c_int:
-    match directive:
-        0 ->
+    match directive
+        0 =>
             (ccontext.optimization_flags = 0)
-        1 ->
+        1 =>
             (ccontext.optimization_flags = 7)
-        _ ->
+        _ =>
             if (if (if directive >= 64: 1 else: 0) and (if directive <= 69: 1 else: 0): 1 else: 0) != 0:
                 if (if ((directive & 1)) != 0: 1 else: 0) != 0:
 ccontext.optimization_flags = ccontext.optimization_flags & (0 - ((1 << ((((directive >> 1)) -% 32)))) - 1)                else:

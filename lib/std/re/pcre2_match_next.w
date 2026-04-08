@@ -1,4 +1,4 @@
-// Migrated from PCRE2 — pcre2_match_next.c
+// Migrated from PCRE2
 use std.re.defs
 
 type BOOL = c_int

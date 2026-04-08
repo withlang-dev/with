@@ -3335,6 +3335,20 @@ fn ci_escape_reserved(name: str) -> str:
     if name == "continue": return "continue_"
     if name == "var": return "var_"
     if name == "comptime": return "comptime_"
+    if name == "where": return "where_"
+    if name == "trait": return "trait_"
+    if name == "impl": return "impl_"
+    if name == "enum": return "enum_"
+    if name == "struct": return "struct_"
+    if name == "defer": return "defer_"
+    if name == "async": return "async_"
+    if name == "await": return "await_"
+    if name == "spawn": return "spawn_"
+    if name == "move": return "move_"
+    if name == "yield": return "yield_"
+    if name == "gen": return "gen_"
+    if name == "with": return "with_"
+    if name == "error": return "error_"
     name
 
 // ── String helpers ──────────────────────────────────────────
@@ -3909,9 +3923,9 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     if kind == CXK_CONTINUE_STMT:
         return "continue"
 
-    // Null statement
+    // Null statement (empty ; in C)
     if kind == CXK_NULL_STMT:
-        return "pass"
+        return "// (empty)"
 
     // Switch statement — translate to match expression
     if kind == CXK_SWITCH_STMT:
@@ -4052,7 +4066,7 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32, 
 
     // Generate match expression when no fallthrough
     if not has_fallthrough and case_count > 0:
-        var result = "match " ++ cond ++ ":\n"
+        var result = "match " ++ cond ++ "\n"
         i = 0
         while i < nc:
             let child = with_ci_child(session, body_cursor, i)
@@ -4063,13 +4077,13 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32, 
                     let case_val = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
                     let case_body = ci_trans_stmt_strip_break(session, with_ci_child(session, child, 1), indent + 2, scope)
                     if case_val.len() > 0 and case_body.len() > 0:
-                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " ->\n" ++ case_body
+                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " =>\n" ++ case_body
             else if ck == CXK_DEFAULT_STMT:
                 let case_nc = with_ci_num_children(session, child)
                 if case_nc >= 1:
                     let case_body = ci_trans_stmt_strip_break(session, with_ci_child(session, child, 0), indent + 2, scope)
                     if case_body.len() > 0:
-                        result = result ++ ci_indent_str(indent + 1) ++ "_ ->\n" ++ case_body
+                        result = result ++ ci_indent_str(indent + 1) ++ "_ =>\n" ++ case_body
             i = i + 1
         return result
 
@@ -4077,7 +4091,7 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32, 
     // For each case, walk forward through the remaining switch body,
     // collecting all statements until break/return. This means a case
     // that falls through includes the next case's statements too.
-    var result = "match " ++ cond ++ ":\n"
+    var result = "match " ++ cond ++ "\n"
     var has_default = false
     i = 0
     while i < nc:
@@ -4092,19 +4106,19 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32, 
                     // Walk forward from this case's body through remaining switch body
                     let prong_body = ci_trans_switch_prong_forward(session, body_cursor, i, nc, indent + 2, scope)
                     if prong_body.len() > 0:
-                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " ->\n" ++ prong_body
+                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " =>\n" ++ prong_body
                     else:
-                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " -> pass\n"
+                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " => 0\n"
         else if ck == CXK_DEFAULT_STMT:
             has_default = true
             let prong_body = ci_trans_switch_prong_forward(session, body_cursor, i, nc, indent + 2, scope)
             if prong_body.len() > 0:
-                result = result ++ ci_indent_str(indent + 1) ++ "_ ->\n" ++ prong_body
+                result = result ++ ci_indent_str(indent + 1) ++ "_ =>\n" ++ prong_body
             else:
-                result = result ++ ci_indent_str(indent + 1) ++ "_ -> pass\n"
+                result = result ++ ci_indent_str(indent + 1) ++ "_ => 0\n"
         i = i + 1
     if not has_default:
-        result = result ++ ci_indent_str(indent + 1) ++ "_ -> pass\n"
+        result = result ++ ci_indent_str(indent + 1) ++ "_ => 0\n"
     result
 
 // Walk forward from case at position `start_idx` through the switch body,
@@ -5207,14 +5221,14 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
     // Emit state machine dispatch loop
     output = output ++ ci_indent_str(indent) ++ "var __pc: i32 = 0\n"
     output = output ++ ci_indent_str(indent) ++ "while true:\n"
-    output = output ++ ci_indent_str(indent + 1) ++ "match __pc:\n"
+    output = output ++ ci_indent_str(indent + 1) ++ "match __pc\n"
 
     // Walk body children, assigning each label's block to its state
     let nc = with_ci_num_children(session, body_cursor)
     var current_state = 0
     var arm_has_content = false
     // Emit entry state arm
-    output = output ++ ci_indent_str(indent + 2) ++ "0 ->\n"
+    output = output ++ ci_indent_str(indent + 2) ++ "0 =>\n"
 
     var i = 0
     while i < nc:
@@ -5231,7 +5245,7 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
                 output = output ++ ci_indent_str(indent + 3) ++ "__pc = " ++ i64_to_string(target_state as i64) ++ "; continue\n"
                 // Start new arm for this label
                 current_state = target_state
-                output = output ++ ci_indent_str(indent + 2) ++ i64_to_string(target_state as i64) ++ " ->  // " ++ label_name ++ "\n"
+                output = output ++ ci_indent_str(indent + 2) ++ i64_to_string(target_state as i64) ++ " =>  // " ++ label_name ++ "\n"
                 arm_has_content = false
             // Translate the label's body child (child[0] of LabelStmt)
             let lnc = with_ci_num_children(session, child)
@@ -5286,7 +5300,7 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
         output = output ++ ci_indent_str(indent + 3) ++ "// empty\n"
 
     // Default arm
-    output = output ++ ci_indent_str(indent + 2) ++ "_ -> break\n"
+    output = output ++ ci_indent_str(indent + 2) ++ "_ => break\n"
     output
 
 // Translate a statement inside a goto-containing function.
