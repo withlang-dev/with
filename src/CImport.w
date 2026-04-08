@@ -2280,17 +2280,17 @@ fn ci_translate_builtin_call(name: str, args: str, params: str, known: str) -> s
         return ""
 
     if name == "__builtin___memcpy_chk":
-        // __builtin___memcpy_chk(dst, src, n, objsize) → memcpy(dst, src, n)
+        // __builtin___memcpy_chk(dst, src, n, objsize) → with_memcpy(dst, src, n)
         let translated_args = ci_translate_call_args(args, params, known)
         if translated_args.len() > 0:
-            return "memcpy(" ++ ci_first_n_args(translated_args, 3) ++ ")"
+            return "with_memcpy(" ++ ci_first_n_args(translated_args, 3) ++ ")"
         return ""
 
     if name == "__builtin___memset_chk":
-        // __builtin___memset_chk(dst, val, n, objsize) → memset(dst, val, n)
+        // __builtin___memset_chk(dst, val, n, objsize) → with_memset(dst, val, n)
         let translated_args = ci_translate_call_args(args, params, known)
         if translated_args.len() > 0:
-            return "memset(" ++ ci_first_n_args(translated_args, 3) ++ ")"
+            return "with_memset(" ++ ci_first_n_args(translated_args, 3) ++ ")"
         return ""
 
     if name == "__builtin_huge_valf":
@@ -4419,27 +4419,11 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
                 init_scope = init_scope ++ "|" ++ cpname ++ "|"
         cpi = cpi + 1
 
-    // Emit var re-bindings for all params (C params are always mutable,
-    // With params are immutable by default).
-    // We rename params to __pN in the signature and rebind as var with the original name.
+    // Note: C params are always mutable, With params are immutable.
+    // If the body assigns to a param, it will get "cannot assign to
+    // immutable variable" error. This is acceptable — the user fixes
+    // it by adding `var param = param` at the function start.
     var param_rebinds = ""
-    var param_renames = ""  // "|original=__pN|" for signature rewriting
-    var pri = 0
-    var prpos = 1
-    let prlen = cursor_params.len() as i32
-    while prpos < prlen:
-        var prend = prpos
-        while prend < prlen and cursor_params.byte_at(prend as i64) != 124:
-            prend = prend + 1
-        if prend > prpos:
-            let pname = cursor_params.slice(prpos as i64, prend as i64)
-            let renamed = "__p" ++ i64_to_string(pri as i64)
-            param_rebinds = param_rebinds ++ "    var " ++ pname ++ " = " ++ renamed ++ "\n"
-            param_renames = param_renames ++ "|" ++ pname ++ "=" ++ renamed ++ "|"
-            pri = pri + 1
-        prpos = prend + 1
-        if prpos < prlen and cursor_params.byte_at(prpos as i64) == 124:
-            prpos = prpos + 1
 
     // Check for gotos — use state machine transform if present
     if ci_has_goto(session, body_cursor):
@@ -5100,9 +5084,14 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
             has_unsupported = true
             unsupported_reason = ptype.slice(14, ptype.len())
 
-        // Use __pN in the signature. The body translator will rebind
-        // as `var original_name = __pN` to make params mutable.
-        params = params ++ f"__p{pi}" ++ ": " ++ ptype
+        // Use cursor API name if available, fall back to old API
+        var pname = with_cimport_fn_param_name(session, idx, pi)
+        if pname.len() == 0:
+            pname = ci_get_nth_pipe_entry(cursor_param_names, pi)
+        if pname.len() > 0:
+            params = params ++ ci_escape_reserved(pname) ++ ": " ++ ptype
+        else:
+            params = params ++ f"p{pi}" ++ ": " ++ ptype
 
     if is_variadic != 0:
         if param_count > 0:
@@ -5420,13 +5409,17 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
         if nc >= 2:
             let cond = ci_trans_bool_expr(session, with_ci_child(session, cursor, 0), scope)
             if cond.len() > 0:
-                let then_body = ci_trans_stmt_goto(session, with_ci_child(session, cursor, 1), indent + 1, scope, label_map)
+                let then_child = with_ci_child(session, cursor, 1)
+                let then_body = ci_trans_stmt_goto(session, then_child, indent + 1, scope, label_map)
                 if then_body.len() > 0:
-                    var result = "if " ++ cond ++ ":\n" ++ then_body
+                    let then_text = if with_ci_cursor_kind(session, then_child) != CXK_COMPOUND_STMT: ci_indent_str(indent + 1) ++ then_body ++ "\n" else: then_body
+                    var result = "if " ++ cond ++ ":\n" ++ then_text
                     if nc > 2:
-                        let else_body = ci_trans_stmt_goto(session, with_ci_child(session, cursor, 2), indent + 1, scope, label_map)
+                        let else_child = with_ci_child(session, cursor, 2)
+                        let else_body = ci_trans_stmt_goto(session, else_child, indent + 1, scope, label_map)
                         if else_body.len() > 0:
-                            result = result ++ ci_indent_str(indent) ++ "else:\n" ++ else_body
+                            let else_text = if with_ci_cursor_kind(session, else_child) != CXK_COMPOUND_STMT: ci_indent_str(indent + 1) ++ else_body ++ "\n" else: else_body
+                            result = result ++ ci_indent_str(indent) ++ "else:\n" ++ else_text
                     return result
         return ""
 
@@ -5635,11 +5628,11 @@ fn ci_map_libc_call(callee: str, args: str) -> str:
     // macOS builtin wrappers for memory functions
     // These have an extra bounds-checking arg: (dst, src, n, obj_size) → (dst, src, n)
     if callee == "__builtin___memcpy_chk":
-        return "mem_copy(" ++ ci_strip_last_arg(args) ++ ")"
+        return "with_memcpy(" ++ ci_strip_last_arg(args) ++ ")"
     if callee == "__builtin___memmove_chk":
-        return "mem_move(" ++ ci_strip_last_arg(args) ++ ")"
+        return "with_memmove(" ++ ci_strip_last_arg(args) ++ ")"
     if callee == "__builtin___memset_chk":
-        return "mem_set(" ++ ci_strip_last_arg(args) ++ ")"
+        return "with_memset(" ++ ci_strip_last_arg(args) ++ ")"
     if callee == "__builtin_object_size":
         return "0"  // bounds check size — not needed in With
     // Skip other __builtin functions — emit as 0 or comptime_error

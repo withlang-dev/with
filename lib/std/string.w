@@ -73,6 +73,34 @@ pub fn is_digit(c: i32) -> bool:
 pub fn is_space(c: i32) -> bool:
     c == 32 or c == 9 or c == 10 or c == 13 or c == 12 or c == 11
 
+/// Returns true if the character code is alphanumeric (letter or digit).
+pub fn is_alnum(c: i32) -> bool:
+    is_alpha(c) or is_digit(c)
+
+/// Returns true if the character code is an uppercase letter (A-Z).
+pub fn is_upper(c: i32) -> bool:
+    c >= 65 and c <= 90
+
+/// Returns true if the character code is a lowercase letter (a-z).
+pub fn is_lower(c: i32) -> bool:
+    c >= 97 and c <= 122
+
+/// Returns true if the character code is a hex digit (0-9, a-f, A-F).
+pub fn is_xdigit(c: i32) -> bool:
+    (c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)
+
+/// Returns true if the character code is printable (0x20-0x7E).
+pub fn is_print(c: i32) -> bool:
+    c >= 32 and c <= 126
+
+/// Convert uppercase to lowercase (ASCII). Returns unchanged if not uppercase.
+pub fn to_lower(c: i32) -> i32:
+    if c >= 65 and c <= 90: c + 32 else: c
+
+/// Convert lowercase to uppercase (ASCII). Returns unchanged if not lowercase.
+pub fn to_upper(c: i32) -> i32:
+    if c >= 97 and c <= 122: c - 32 else: c
+
 /// Convert a string to an i64 integer. Returns 0 on invalid input.
 pub fn string_to_int(s: str) -> i64:
     with_parse_i64(s)
