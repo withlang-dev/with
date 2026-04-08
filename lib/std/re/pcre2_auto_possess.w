@@ -670,6 +670,103 @@ type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: 
 type struct_match_block_8 = match_block_8
 type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, start_subject: *const u8 = null, end_subject: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, tables: *const u8 = null, start_offset: c_ulong = 0, heap_limit: c_uint = 0, heap_used: c_ulong = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, allowemptypartial: c_int = 0, nl: [4]u8, bsr_convention: c_ushort = 0, cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null, recursive: *mut dfa_recursion_info = null }
 type struct_dfa_match_block_8 = dfa_match_block_8
+@[c_export("_pcre2_auto_possessify_8")]
+fn _pcre2_auto_possessify_8(code: *mut u8, cb: *const compile_block_8) -> c_int:
+    var code = code
+    var c: u8 = 0 // init: untranslatable
+    var end: *const u8 = null // init: untranslatable
+    var repeat_opcode: *mut u8 = null // init: untranslatable
+    var list = 0 // init: untranslatable ([8]c_uint)
+    var rec_limit: c_int = 1000
+    var utf: c_int = 0 // init: untranslatable
+    var ucp: c_int = 0 // init: untranslatable
+    while true:
+        (c = unsafe: *code)
+        if (if c >= OP_TABLE_LENGTH: 1 else: 0) != 0:
+            return (0 - 1)
+
+        if (if (if c >= OP_STAR: 1 else: 0) != 0 and (if c <= OP_TYPEPOSUPTO: 1 else: 0) != 0: 1 else: 0) != 0:
+            c = c - (get_repeat_base(c) - OP_STAR)
+            (end = (if ((if c <= OP_MINUPTO: 1 else: 0)) != 0: get_chr_property_list(code, utf, ucp, cb.fcc, list) else: null))
+            (list[1] = (if (if (if (if c == OP_STAR: 1 else: 0) != 0 or (if c == OP_PLUS: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == OP_QUERY: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == OP_UPTO: 1 else: 0) != 0: 1 else: 0))
+            if (if (if end != null: 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, list, end, &rec_limit) != 0: 1 else: 0) != 0:
+                match c
+                    OP_STAR =>
+                        unsafe: *code = unsafe: *code + (OP_POSSTAR - OP_STAR)
+                    OP_MINSTAR =>
+                        unsafe: *code = unsafe: *code + (OP_POSSTAR - OP_MINSTAR)
+                    OP_PLUS =>
+                        unsafe: *code = unsafe: *code + (OP_POSPLUS - OP_PLUS)
+                    OP_MINPLUS =>
+                        unsafe: *code = unsafe: *code + (OP_POSPLUS - OP_MINPLUS)
+                    OP_QUERY =>
+                        unsafe: *code = unsafe: *code + (OP_POSQUERY - OP_QUERY)
+                    OP_MINQUERY =>
+                        unsafe: *code = unsafe: *code + (OP_POSQUERY - OP_MINQUERY)
+                    OP_UPTO =>
+                        unsafe: *code = unsafe: *code + (OP_POSUPTO - OP_UPTO)
+                    OP_MINUPTO =>
+                        unsafe: *code = unsafe: *code + (OP_POSUPTO - OP_MINUPTO)
+                    _ => 0
+
+
+            (c = unsafe: *code)
+        else:
+            if (if (if c == OP_CLASS: 1 else: 0) != 0 or (if c == OP_NCLASS: 1 else: 0) != 0: 1 else: 0) != 0:
+                (repeat_opcode = ((code + (1 as isize as usize)) + ((32 / sizeof[u8]()))))
+                (c = unsafe: *repeat_opcode)
+                if (if (if c >= OP_CRSTAR: 1 else: 0) != 0 and (if c <= OP_CRMINRANGE: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (end = get_chr_property_list(code, utf, ucp, cb.fcc, list))
+                    (list[1] = (if ((c & 1)) == 0: 1 else: 0))
+                    if (if (if end != null: 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, list, end, &rec_limit) != 0: 1 else: 0) != 0:
+                        match c
+                            OP_CRSTAR => 0
+                            OP_CRPLUS => 0
+                            OP_CRQUERY => 0
+                            OP_CRRANGE => 0
+                            _ => 0
+
+
+
+                (c = unsafe: *code)
+
+
+        match c
+            OP_END =>
+                return 0
+            OP_TYPESTAR => 0
+            OP_TYPEUPTO => 0
+            OP_CALLOUT_STR => 0
+            OP_MARK => 0
+            _ => 0
+
+        code = code + _pcre2_OP_lengths_8[c]
+        (utf)
+
+
+extern fn _pcre2_check_escape_8(p0: *mut *const u8, p1: *const u8, p2: *mut c_uint, p3: *mut c_int, p4: c_uint, p5: c_uint, p6: c_uint, p7: c_int, p8: *mut compile_block_8) -> c_int
+extern fn _pcre2_ckd_smul_8(p0: *mut c_ulong, p1: c_int, p2: c_int) -> c_int
+extern fn _pcre2_extuni_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int, p5: *mut c_int) -> *const u8
+extern fn _pcre2_find_bracket_8(p0: *const u8, p1: c_int, p2: c_int) -> *const u8
+extern fn _pcre2_is_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_jit_free_rodata_8(p0: *mut c_void, p1: *mut c_void) -> void
+extern fn _pcre2_jit_free_8(p0: *mut c_void, p1: *mut pcre2_memctl) -> void
+extern fn _pcre2_jit_get_size_8(p0: *mut c_void) -> c_ulong
+extern fn _pcre2_jit_get_target_8() -> *const i8
+extern fn _pcre2_memctl_malloc_8(p0: c_ulong, p1: *mut pcre2_memctl) -> *mut c_void
+extern fn _pcre2_ord2utf_8(p0: c_uint, p1: *mut u8) -> c_uint
+extern fn _pcre2_script_run_8(p0: *const u8, p1: *const u8, p2: c_int) -> c_int
+extern fn _pcre2_strcmp_8(p0: *const u8, p1: *const u8) -> c_int
+extern fn _pcre2_strcmp_c8_8(p0: *const u8, p1: *const i8) -> c_int
+extern fn _pcre2_strcpy_c8_8(p0: *mut u8, p1: *const i8) -> c_ulong
+extern fn _pcre2_strlen_8(p0: *const u8) -> c_ulong
+extern fn _pcre2_strncmp_8(p0: *const u8, p1: *const u8, p2: c_ulong) -> c_int
+extern fn _pcre2_strncmp_c8_8(p0: *const u8, p1: *const i8, p2: c_ulong) -> c_int
+extern fn _pcre2_study_8(p0: *mut pcre2_real_code_8) -> c_int
+extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_int
+extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
+extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0

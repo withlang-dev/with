@@ -670,6 +670,30 @@ type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: 
 type struct_match_block_8 = match_block_8
 type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, start_subject: *const u8 = null, end_subject: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, tables: *const u8 = null, start_offset: c_ulong = 0, heap_limit: c_uint = 0, heap_used: c_ulong = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, allowemptypartial: c_int = 0, nl: [4]u8, bsr_convention: c_ushort = 0, cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null, recursive: *mut dfa_recursion_info = null }
 type struct_dfa_match_block_8 = dfa_match_block_8
+extern fn _pcre2_auto_possessify_8(p0: *mut u8, p1: *const compile_block_8) -> c_int
+extern fn _pcre2_check_escape_8(p0: *mut *const u8, p1: *const u8, p2: *mut c_uint, p3: *mut c_int, p4: c_uint, p5: c_uint, p6: c_uint, p7: c_int, p8: *mut compile_block_8) -> c_int
+extern fn _pcre2_ckd_smul_8(p0: *mut c_ulong, p1: c_int, p2: c_int) -> c_int
+extern fn _pcre2_extuni_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int, p5: *mut c_int) -> *const u8
+extern fn _pcre2_find_bracket_8(p0: *const u8, p1: c_int, p2: c_int) -> *const u8
+extern fn _pcre2_is_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_jit_free_rodata_8(p0: *mut c_void, p1: *mut c_void) -> void
+extern fn _pcre2_jit_free_8(p0: *mut c_void, p1: *mut pcre2_memctl) -> void
+extern fn _pcre2_jit_get_size_8(p0: *mut c_void) -> c_ulong
+extern fn _pcre2_jit_get_target_8() -> *const i8
+extern fn _pcre2_memctl_malloc_8(p0: c_ulong, p1: *mut pcre2_memctl) -> *mut c_void
+extern fn _pcre2_ord2utf_8(p0: c_uint, p1: *mut u8) -> c_uint
+extern fn _pcre2_script_run_8(p0: *const u8, p1: *const u8, p2: c_int) -> c_int
+extern fn _pcre2_strcmp_8(p0: *const u8, p1: *const u8) -> c_int
+extern fn _pcre2_strcmp_c8_8(p0: *const u8, p1: *const i8) -> c_int
+extern fn _pcre2_strcpy_c8_8(p0: *mut u8, p1: *const i8) -> c_ulong
+extern fn _pcre2_strlen_8(p0: *const u8) -> c_ulong
+extern fn _pcre2_strncmp_8(p0: *const u8, p1: *const u8, p2: c_ulong) -> c_int
+extern fn _pcre2_strncmp_c8_8(p0: *const u8, p1: *const i8, p2: c_ulong) -> c_int
+extern fn _pcre2_study_8(p0: *mut pcre2_real_code_8) -> c_int
+extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_int
+extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
+extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
 let ERR0: c_uint = 100
 let ERR1: c_uint = 101
 let ERR2: c_uint = 102
@@ -793,6 +817,198 @@ let ERR119: c_uint = 219
 let ERR120: c_uint = 220
 type eclass_op_info { code_start: *mut u8 = null, length: c_ulong = 0, op_single_type: u8 = 0, bits: class_bits_storage }
 type struct_eclass_op_info = eclass_op_info
+extern fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, classbits: *mut u8) -> void
+extern fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_ptr: *mut c_uint, pcode: *mut *mut u8, negate_class: c_int, has_bitmap: *mut c_int, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint
+extern fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *mut c_uint, pcode: *mut *mut u8, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> c_int
+@[c_export("_pcre2_compile_get_hash_from_name8")]
+fn _pcre2_compile_get_hash_from_name8(name: *const u8, length: c_uint) -> c_ushort:
+    var hash: c_ushort = 0 // init: untranslatable
+    return hash
+
+@[c_export("_pcre2_compile_find_named_group8")]
+fn _pcre2_compile_find_named_group8(name: *const u8, length: c_uint, cb: *mut compile_block_8) -> *mut named_group_8:
+    var hash: c_ushort = 0 // init: untranslatable
+    var ng: *mut named_group_8 = null // init: untranslatable
+    var end: *mut named_group_8 = null // init: untranslatable
+    return null
+
+@[c_export("_pcre2_compile_add_name_to_table8")]
+fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, ng: *mut named_group_8, tablecount: c_uint) -> c_uint:
+    var ng = ng
+    var tablecount = tablecount
+    var i: c_uint = 0 // init: untranslatable
+    var name: *const u8 = null // init: untranslatable
+    var length: c_int = ng.length
+    var duplicate_count: c_uint = 0 // init: untranslatable
+    var slot: *mut u8 = null // init: untranslatable
+    if (if ((ng.hash_dup & 32768)) != 0: 1 else: 0) != 0:
+        var ng_it: *mut named_group_8 = null // init: untranslatable
+        var end: *mut named_group_8 = null // init: untranslatable
+        (ng_it = (ng + (1 as isize as usize)))
+        while (if ng_it < end: 1 else: 0) != 0:
+if (if ng_it.name == name: 1 else: 0) != 0:
+                (duplicate_count = duplicate_count + 1)
+            (ng_it = ng_it + 1)
+
+
+    (i = 0)
+    while (if i < tablecount: 1 else: 0) != 0:
+        var crc: c_int = 0 // init: untranslatable
+        if (if (if crc == 0: 1 else: 0) != 0 and (if slot[(2 + length)] != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+            (crc = (0 - 1))
+
+        if (if crc < 0: 1 else: 0) != 0:
+            break
+
+        slot = slot + cb.name_entry_size
+        (i = i + 1)
+
+    tablecount = tablecount + duplicate_count
+    while 1 != 0:
+        if (if (duplicate_count = duplicate_count - 1) == 0: 1 else: 0) != 0:
+            break
+
+        while 1 != 0:
+            (ng = ng + 1)
+            if (if ng.name == name: 1 else: 0) != 0:
+                break
+
+
+        slot = slot + cb.name_entry_size
+
+    return tablecount
+
+@[c_export("_pcre2_compile_find_dupname_details8")]
+fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexptr: *mut c_int, countptr: *mut c_int, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_int:
+    var i: c_uint = 0 // init: untranslatable
+    var groupnumber: c_uint = 0 // init: untranslatable
+    var count: c_int = 0
+    var slot: *mut u8 = null // init: untranslatable
+    (i = 0)
+    while (if i < cb.names_found: 1 else: 0) != 0:
+        if (if (if _pcre2_strncmp_8(name, (slot + (2 as isize as usize)), length) == 0: 1 else: 0) != 0 and (if slot[(2 +% length)] == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+            break
+
+        slot = slot + cb.name_entry_size
+        (i = i + 1)
+
+    if (if i >= cb.names_found: 1 else: 0) != 0:
+        (unsafe: *errorcodeptr = ERR53)
+        (cb.erroroffset = ((name as usize -% cb.start_pattern as usize) / sizeof[u8]()))
+        return 0
+
+    (unsafe: *indexptr = i)
+    (count = 0)
+    while true:
+        (count = count + 1)
+        cb.backref_map = cb.backref_map | (if ((if groupnumber < 32: 1 else: 0)) != 0: ((1 << groupnumber)) else: 1)
+        if (if groupnumber > cb.top_backref: 1 else: 0) != 0:
+            (cb.top_backref = groupnumber)
+
+        if (if (i = i + 1) >= cb.names_found: 1 else: 0) != 0:
+            break
+
+        slot = slot + cb.name_entry_size
+        if (if (if _pcre2_strncmp_8(name, (slot + (2 as isize as usize)), length) != 0: 1 else: 0) != 0 or (if ((slot + (2 as isize as usize)))[length] != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+            break
+
+
+    (unsafe: *countptr = count)
+    return 1
+
+@[c_export("_pcre2_compile_parse_scan_substr_args8")]
+fn _pcre2_compile_parse_scan_substr_args8(pptr: *mut c_uint, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint:
+    var pptr = pptr
+    var captures: *mut u8 = null // init: untranslatable
+    var capture_ptr: *mut u8 = null // init: untranslatable
+    var bit: u8 = 0 // init: untranslatable
+    var name: *const u8 = null // init: untranslatable
+    var ng: *mut named_group_8 = null // init: untranslatable
+    var end: *mut named_group_8 = null // init: untranslatable
+    var all_found: c_int = 0 // init: untranslatable
+    var size: c_ulong = 0 // init: untranslatable
+    if (if _pcre2_compile_process_capture_list((pptr - (1 as isize as usize)), 0, errorcodeptr, cb) == 0: 1 else: 0) != 0:
+        return null
+
+    (size = ((((cb.bracount +% 1) +% 7)) >> 3))
+    if (if captures == null: 1 else: 0) != 0:
+        (unsafe: *errorcodeptr = ERR21)
+        // (empty)
+        return null
+
+    with_memset(captures as *i8, 0, size as i64)
+    while 1 != 0:
+        break
+
+    cb.cx.memctl.free(captures, cb.cx.memctl.memory_data)
+    return (pptr - (1 as isize as usize))
+
+@[c_export("_pcre2_compile_parse_recurse_args8")]
+fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_int:
+    var pptr: *mut c_uint = null // init: untranslatable
+    var i: c_ulong = 0 // init: untranslatable
+    var size: c_ulong = 0 // init: untranslatable
+    var name: *const u8 = null // init: untranslatable
+    var ng: *mut named_group_8 = null // init: untranslatable
+    var end: *mut named_group_8 = null // init: untranslatable
+    var args: *mut recurse_arguments = null // init: untranslatable
+    var captures: *mut c_ushort = null // init: untranslatable
+    var current: *mut c_ushort = null // init: untranslatable
+    var captures_end: *mut c_ushort = null // init: untranslatable
+    var tmp: c_ushort = 0 // init: untranslatable
+    (size = _pcre2_compile_process_capture_list(pptr, offset, errorcodeptr, cb))
+    if (if size == 0: 1 else: 0) != 0:
+        return 0
+
+    (args = cb.cx.memctl.malloc((sizeof[recurse_arguments]() +% (size *% sizeof[c_ushort]())), cb.cx.memctl.memory_data))
+    if (if args == null: 1 else: 0) != 0:
+        (unsafe: *errorcodeptr = ERR21)
+        (cb.erroroffset = offset)
+        return 0
+
+    (args.header.next = null)
+    (args.size = size)
+    if (if cb.last_data != null: 1 else: 0) != 0:
+        (cb.last_data.next = &args.header)
+    else:
+        (cb.first_data = &args.header)
+
+    (cb.last_data = &args.header)
+    while 1 != 0:
+        (pptr = pptr + 1)
+        break
+
+    if (if size == 1: 1 else: 0) != 0:
+        return 1
+
+    (i = (((size >> 1)) -% 1))
+    while 1 != 0:
+        do_heapify_u16(captures, size, i)
+        if (if i == 0: 1 else: 0) != 0:
+            break
+
+        (i = i - 1)
+
+    (i = (size -% 1))
+    while (if i > 0: 1 else: 0) != 0:
+        (tmp = captures[0])
+        (captures[0] = captures[i])
+        (captures[i] = tmp)
+        do_heapify_u16(captures, i, 0)
+        (i = i - 1)
+
+    (captures_end = (captures + size))
+    (tmp = unsafe: *(captures = captures + 1))
+    (current = captures)
+    while (if current < captures_end: 1 else: 0) != 0:
+        if (if unsafe: *current != tmp: 1 else: 0) != 0:
+            (tmp = unsafe: *current)
+            (unsafe: *(captures = captures + 1) = tmp)
+
+        (current = current + 1)
+
+    return 1
+
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0

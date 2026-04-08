@@ -670,6 +670,30 @@ type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: 
 type struct_match_block_8 = match_block_8
 type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, start_subject: *const u8 = null, end_subject: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, tables: *const u8 = null, start_offset: c_ulong = 0, heap_limit: c_uint = 0, heap_used: c_ulong = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, allowemptypartial: c_int = 0, nl: [4]u8, bsr_convention: c_ushort = 0, cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null, recursive: *mut dfa_recursion_info = null }
 type struct_dfa_match_block_8 = dfa_match_block_8
+extern fn _pcre2_auto_possessify_8(p0: *mut u8, p1: *const compile_block_8) -> c_int
+extern fn _pcre2_check_escape_8(p0: *mut *const u8, p1: *const u8, p2: *mut c_uint, p3: *mut c_int, p4: c_uint, p5: c_uint, p6: c_uint, p7: c_int, p8: *mut compile_block_8) -> c_int
+extern fn _pcre2_ckd_smul_8(p0: *mut c_ulong, p1: c_int, p2: c_int) -> c_int
+extern fn _pcre2_extuni_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int, p5: *mut c_int) -> *const u8
+extern fn _pcre2_find_bracket_8(p0: *const u8, p1: c_int, p2: c_int) -> *const u8
+extern fn _pcre2_is_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_jit_free_rodata_8(p0: *mut c_void, p1: *mut c_void) -> void
+extern fn _pcre2_jit_free_8(p0: *mut c_void, p1: *mut pcre2_memctl) -> void
+extern fn _pcre2_jit_get_size_8(p0: *mut c_void) -> c_ulong
+extern fn _pcre2_jit_get_target_8() -> *const i8
+extern fn _pcre2_memctl_malloc_8(p0: c_ulong, p1: *mut pcre2_memctl) -> *mut c_void
+extern fn _pcre2_ord2utf_8(p0: c_uint, p1: *mut u8) -> c_uint
+extern fn _pcre2_script_run_8(p0: *const u8, p1: *const u8, p2: c_int) -> c_int
+extern fn _pcre2_strcmp_8(p0: *const u8, p1: *const u8) -> c_int
+extern fn _pcre2_strcmp_c8_8(p0: *const u8, p1: *const i8) -> c_int
+extern fn _pcre2_strcpy_c8_8(p0: *mut u8, p1: *const i8) -> c_ulong
+extern fn _pcre2_strlen_8(p0: *const u8) -> c_ulong
+extern fn _pcre2_strncmp_8(p0: *const u8, p1: *const u8, p2: c_ulong) -> c_int
+extern fn _pcre2_strncmp_c8_8(p0: *const u8, p1: *const i8, p2: c_ulong) -> c_int
+extern fn _pcre2_study_8(p0: *mut pcre2_real_code_8) -> c_int
+extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_int
+extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
+extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
+extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
 let ERR0: c_uint = 100
 let ERR1: c_uint = 101
 let ERR2: c_uint = 102
@@ -793,6 +817,145 @@ let ERR119: c_uint = 219
 let ERR120: c_uint = 220
 type eclass_op_info { code_start: *mut u8 = null, length: c_ulong = 0, op_single_type: u8 = 0, bits: class_bits_storage }
 type struct_eclass_op_info = eclass_op_info
+extern fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, classbits: *mut u8) -> void
+@[c_export("_pcre2_compile_class_not_nested_8")]
+fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_ptr: *mut c_uint, pcode: *mut *mut u8, negate_class: c_int, has_bitmap: *mut c_int, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint:
+    var pptr: *mut c_uint = null
+    var code: *mut u8 = null
+    var should_flip_negation: c_int = 0
+    var cbits: *const u8 = null
+    var classbits: *mut u8 = null
+    var utf: c_int = 0
+    var meta: c_uint = 0
+    var local_negate: c_int = 0
+    var posix_class: c_int = 0
+    var taboffset: c_int = 0
+    var tabopt: c_int = 0
+    var escape: c_uint = 0
+    var c: c_uint = 0
+    var i: c_int = 0
+    var classwords: *mut c_uint = null
+    var d: c_uint = 0
+    var __pc: i32 = 0
+    while true:
+        match __pc
+            0 =>
+                has_bitmap
+                errorcodeptr
+                lengthptr
+                (should_flip_negation = 0)
+                with_memset(classbits as *i8, 0, 32 as i64)
+                while 1 != 0:
+                    var meta: c_uint = 0 // init failed
+                    var local_negate: c_int = 0 // init failed
+                    var posix_class: c_int = 0
+                    var taboffset: c_int = 0
+                    var tabopt: c_int = 0
+                    var pbits = 0 // init failed: class_bits_storage
+                    var escape: c_uint = 0 // init failed
+                    var c: c_uint = 0 // init failed
+                    (c = meta)
+                    if (if (if c == 13: 1 else: 0) != 0 or (if c == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                        cb.external_flags = cb.external_flags | 2048
+
+                    if (if (if unsafe: *pptr == 2149777408: 1 else: 0) != 0 or (if unsafe: *pptr == 2149711872: 1 else: 0) != 0: 1 else: 0) != 0:
+                        var d: c_uint = 0 // init failed
+                        (pptr = pptr + 1)
+                        (d = unsafe: *((pptr = pptr + 1)))
+                        if (if d == 2147811328: 1 else: 0) != 0:
+                            (d = unsafe: *((pptr = pptr + 1)))
+
+                        if (if (if d == 13: 1 else: 0) != 0 or (if d == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                            cb.external_flags = cb.external_flags | 2048
+
+                        add_to_class(options, xoptions, cb, c, d)
+                        continue
+
+                    add_to_class(options, xoptions, cb, meta, meta)
+
+                __pc = 1
+                continue
+            1 =>  // END_PROCESSING
+                if negate_class != 0:
+                    var classwords: *mut c_uint = null // init failed
+                    var i: c_int = 0
+                    while (if i < 8: 1 else: 0) != 0:
+(classwords[i] = (0 - classwords[i] - 1))                        (i = i + 1)
+
+
+                (unsafe: *(code = code + 1) = (if ((if negate_class == should_flip_negation: 1 else: 0)) != 0: OP_CLASS else: OP_NCLASS))
+                with_memcpy(code as *i8, classbits as *i8, 32 as i64)
+                code = code + (32 / sizeof[u8]())
+                __pc = 2
+                continue
+            2 =>  // DONE
+                (unsafe: *pcode = code)
+                return (pptr - (1 as isize as usize))
+            _ => break
+
+@[c_export("_pcre2_compile_class_nested_8")]
+fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *mut c_uint, pcode: *mut *mut u8, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> c_int:
+    var context = 0 // init: untranslatable (eclass_context)
+    var op_info = 0 // init: untranslatable (eclass_op_info)
+    var previous_length: c_ulong = 0 // init: untranslatable
+    var code: *mut u8 = null // init: untranslatable
+    var previous: *mut u8 = null // init: untranslatable
+    var allbitsone: c_int = 0 // init: untranslatable
+    (context.needs_bitmap = 0)
+    (context.options = options)
+    (context.xoptions = xoptions)
+    (context.errorcodeptr = errorcodeptr)
+    (context.cb = cb)
+    (previous = code)
+    (unsafe: *(code = code + 1) = 113)
+    code = code + 2
+    (unsafe: *(code = code + 1) = 0)
+    if (not compile_eclass_nested(&context, 0, pptr, &code, &op_info, lengthptr)) != 0:
+        return 0
+
+    if (if lengthptr != null: 1 else: 0) != 0:
+        unsafe: *lengthptr = unsafe: *lengthptr + ((code as usize -% previous as usize) / sizeof[u8]())
+        (code = previous)
+
+    var i: c_int = 0
+    while (if i < 8: 1 else: 0) != 0:
+if (if op_info.bits.classwords[i] != 4294967295: 1 else: 0) != 0:
+            (allbitsone = 0)
+            break
+        (i = i + 1)
+
+        (code = previous)
+    if (if (if op_info.op_single_type == 6: 1 else: 0) != 0 and allbitsone != 0: 1 else: 0) != 0:
+        if (if lengthptr != null: 1 else: 0) != 0:
+            unsafe: *lengthptr = unsafe: *lengthptr - 1
+
+        (unsafe: *(code = code + 1) = 13)
+    else:
+        if (if (if op_info.op_single_type == 6: 1 else: 0) != 0 or (if op_info.op_single_type == 7: 1 else: 0) != 0: 1 else: 0) != 0:
+            var required_len: c_ulong = 0 // init: untranslatable
+            if (if lengthptr != null: 1 else: 0) != 0:
+                if (if required_len > ((unsafe: *lengthptr -% previous_length)): 1 else: 0) != 0:
+                    (unsafe: *lengthptr = (previous_length +% required_len))
+
+
+            if (if lengthptr != null: 1 else: 0) != 0:
+                unsafe: *lengthptr = unsafe: *lengthptr - required_len
+
+            (unsafe: *(code = code + 1) = (if ((if op_info.op_single_type == 6: 1 else: 0)) != 0: OP_NCLASS else: OP_CLASS))
+            with_memcpy(code as *i8, op_info.bits.classbits as *i8, 32 as i64)
+            code = code + (32 / sizeof[u8]())
+
+
+
+    (unsafe: *pcode = code)
+    return 1
+
+extern fn _pcre2_compile_get_hash_from_name8(name: *const u8, length: c_uint) -> c_ushort
+extern fn _pcre2_compile_find_named_group8(name: *const u8, length: c_uint, cb: *mut compile_block_8) -> *mut named_group_8
+extern fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, ng: *mut named_group_8, tablecount: c_uint) -> c_uint
+extern fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexptr: *mut c_int, countptr: *mut c_int, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_int
+extern fn _pcre2_compile_parse_scan_substr_args8(pptr: *mut c_uint, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint
+extern fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_int
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0

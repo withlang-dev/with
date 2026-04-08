@@ -4419,11 +4419,23 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
                 init_scope = init_scope ++ "|" ++ cpname ++ "|"
         cpi = cpi + 1
 
-    // Note: C params are always mutable, With params are immutable.
-    // If the body assigns to a param, it will get "cannot assign to
-    // immutable variable" error. This is acceptable — the user fixes
-    // it by adding `var param = param` at the function start.
+    // C params are always mutable, With params are immutable.
+    // Detect which params are assigned to in the body and rebind those.
     var param_rebinds = ""
+    var prpos2 = 1
+    let prlen2 = cursor_params.len() as i32
+    while prpos2 < prlen2:
+        var prend2 = prpos2
+        while prend2 < prlen2 and cursor_params.byte_at(prend2 as i64) != 124:
+            prend2 = prend2 + 1
+        if prend2 > prpos2:
+            let pname = cursor_params.slice(prpos2 as i64, prend2 as i64)
+            // Check if this param is assigned to anywhere in the body
+            if ci_body_assigns_to(session, body_cursor, pname):
+                param_rebinds = param_rebinds ++ "    var " ++ pname ++ " = " ++ pname ++ "\n"
+        prpos2 = prend2 + 1
+        if prpos2 < prlen2 and cursor_params.byte_at(prpos2 as i64) == 124:
+            prpos2 = prpos2 + 1
 
     // Check for gotos — use state machine transform if present
     if ci_has_goto(session, body_cursor):
@@ -4868,12 +4880,9 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
         output = output ++ "extern fn with_ctzll(x: i64) -> i32\n"
         output = output ++ "extern fn with_abs(x: i32) -> i32\n"
         // Memory operations (accept any pointer via implicit *i8 coercion)
-        output = output ++ "extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> void\n"
-        output = output ++ "extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> void\n"
-        output = output ++ "extern fn with_memset(ptr: *i8, c: i32, n: i64) -> void\n"
-        output = output ++ "extern fn with_memcmp(a: *i8, b: *i8, n: i64) -> i32\n"
-        output = output ++ "extern fn with_alloc(size: i64) -> *i8\n"
-        output = output ++ "extern fn with_free(ptr: *i8) -> void\n"
+        // Memory operations available via `use std.mem` — no redeclaration needed.
+        // with_memcpy, with_memmove, with_memset, with_memcmp take *i8.
+        // with_alloc/with_free also take *i8. Callers cast at call site.
         with_cimport_mark_name_emitted("with_clz")
 
     output = output ++ "\n"
@@ -5039,9 +5048,12 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     if name.len() == 0:
         return ""
 
-    // Skip internal names (starting with _)
-    if name.byte_at(0) == 95:
-        return ""
+    // Skip system internal names (__ prefix or _[A-Z] prefix)
+    // but keep application-internal names like _pcre2_*
+    if name.len() >= 2 and name.byte_at(0) == 95:
+        let second = name.byte_at(1)
+        if second == 95 or (second >= 65 and second <= 90):
+            return ""
 
     // Skip libc functions that are mapped to With equivalents
     if ci_is_mapped_libc_fn(name):
@@ -5130,6 +5142,48 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
 
 // Count occurrences of a substring in a string
 // ── Goto elimination: state-variable transform ─────────────
+
+// Check if a function body assigns to a variable with the given name.
+// Used to detect which function parameters need var rebinding.
+fn ci_body_assigns_to(session: i64, cursor: i32, name: str) -> bool:
+    let kind = with_ci_cursor_kind(session, cursor)
+    // Binary assignment: lhs = rhs (kind 114 = BinaryOp)
+    if kind == CXK_BINARY_OP:
+        let op = with_ci_binary_op(session, cursor)
+        if op >= 18:  // BO_ASSIGN or compound assign (18-29)
+            let nc = with_ci_num_children(session, cursor)
+            if nc >= 1:
+                let lhs = with_ci_child(session, cursor, 0)
+                // Check if LHS is a DeclRefExpr with the param name
+                if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF:
+                    if with_ci_cursor_spelling(session, lhs) == name:
+                        return true
+    // Compound assignment (kind 115)
+    if kind == CXK_COMPOUND_ASSIGN_OP:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 1:
+            let lhs = with_ci_child(session, cursor, 0)
+            if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF:
+                if with_ci_cursor_spelling(session, lhs) == name:
+                    return true
+    // Unary increment/decrement (pre/post)
+    if kind == CXK_UNARY_OP:
+        let op = with_ci_unary_op(session, cursor)
+        if op >= 6 and op <= 9:  // UO_PRE_INC through UO_POST_DEC
+            let nc = with_ci_num_children(session, cursor)
+            if nc >= 1:
+                let operand = with_ci_child(session, cursor, 0)
+                if with_ci_cursor_kind(session, operand) == CXK_DECL_REF:
+                    if with_ci_cursor_spelling(session, operand) == name:
+                        return true
+    // Recurse into children
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        if ci_body_assigns_to(session, with_ci_child(session, cursor, i), name):
+            return true
+        i = i + 1
+    false
 
 // Check if a function body (or any subtree) contains a goto statement.
 fn ci_has_goto(session: i64, cursor: i32) -> bool:
@@ -5452,6 +5506,53 @@ fn ci_find_fn_cursor(session: i64, name: str) -> i32:
         i = i + 1
     -1
 
+// Cast memcpy args: (dst, src, n) → (dst as *i8, src as *i8, n as i64)
+fn ci_cast_memcpy_args(args: str) -> str:
+    let first_comma = ci_find_arg_comma(args, 0)
+    if first_comma < 0: return args
+    let second_comma = ci_find_arg_comma(args, first_comma + 1)
+    if second_comma < 0: return args
+    let dst = ci_trim(args.slice(0, first_comma as i64))
+    let src = ci_trim(args.slice((first_comma + 1) as i64, second_comma as i64))
+    let n = ci_trim(args.slice((second_comma + 1) as i64, args.len()))
+    dst ++ " as *i8, " ++ src ++ " as *i8, " ++ n ++ " as i64"
+
+// Cast memset args: (ptr, c, n) → (ptr as *i8, c, n as i64)
+fn ci_cast_memset_args(args: str) -> str:
+    let first_comma = ci_find_arg_comma(args, 0)
+    if first_comma < 0: return args
+    let second_comma = ci_find_arg_comma(args, first_comma + 1)
+    if second_comma < 0: return args
+    let ptr = ci_trim(args.slice(0, first_comma as i64))
+    let c = ci_trim(args.slice((first_comma + 1) as i64, second_comma as i64))
+    let n = ci_trim(args.slice((second_comma + 1) as i64, args.len()))
+    ptr ++ " as *i8, " ++ c ++ ", " ++ n ++ " as i64"
+
+// Cast memcmp args: (a, b, n) → (a as *i8, b as *i8, n as i64)
+fn ci_cast_memcmp_args(args: str) -> str:
+    let first_comma = ci_find_arg_comma(args, 0)
+    if first_comma < 0: return args
+    let second_comma = ci_find_arg_comma(args, first_comma + 1)
+    if second_comma < 0: return args
+    let a = ci_trim(args.slice(0, first_comma as i64))
+    let b = ci_trim(args.slice((first_comma + 1) as i64, second_comma as i64))
+    let n = ci_trim(args.slice((second_comma + 1) as i64, args.len()))
+    a ++ " as *i8, " ++ b ++ " as *i8, " ++ n ++ " as i64"
+
+// Find the Nth comma in args string at depth 0 (respecting parens)
+fn ci_find_arg_comma(args: str, start: i32) -> i32:
+    var depth = 0
+    var i = start
+    let alen = args.len() as i32
+    while i < alen:
+        let c = args.byte_at(i as i64)
+        if c == 40: depth = depth + 1      // (
+        else if c == 41: depth = depth - 1  // )
+        else if c == 44 and depth == 0:     // ,
+            return i
+        i = i + 1
+    -1
+
 // Strip the last comma-separated argument from an args string.
 // "a, b, c, d" → "a, b, c"
 fn ci_strip_last_arg(args: str) -> str:
@@ -5504,8 +5605,11 @@ fn ci_is_system_path(loc: str) -> bool:
 // This filters out the noise from stdlib.h, string.h, ctype.h, etc.
 fn ci_is_system_decl(name: str) -> bool:
     if name.len() == 0: return true
-    // Already filtered by _ prefix elsewhere, but double-check
-    if name.byte_at(0) == 95: return true
+    // Skip system internal names (__ prefix or _[A-Z]) but keep _pcre2_* etc.
+    if name.len() >= 2 and name.byte_at(0) == 95:
+        let second = name.byte_at(1)
+        if second == 95 or (second >= 65 and second <= 90):
+            return true
     // Known system types
     if ci_starts_with(name, "malloc_type") or ci_starts_with(name, "malloc_zone"): return true
     if name == "malloc_zone_t" or name == "malloc_type_id_t": return true
@@ -5573,7 +5677,7 @@ fn ci_is_mapped_libc_fn(name: str) -> bool:
 // Map C standard library function calls to With equivalents.
 // This enables migrated code to be pure With (no c_import needed).
 fn ci_map_libc_call(callee: str, args: str) -> str:
-    // Memory allocation — use runtime externs directly
+    // Memory allocation — use runtime externs with pointer casts
     if callee == "malloc":
         return "with_alloc(" ++ args ++ " as i64)"
     if callee == "free":
@@ -5583,15 +5687,15 @@ fn ci_map_libc_call(callee: str, args: str) -> str:
     if callee == "realloc":
         return "realloc_mem(" ++ args ++ ")"
 
-    // Memory operations — use runtime externs directly (accept any pointer via *i8)
+    // Memory operations — cast pointer args to *mut u8 / *const u8
     if callee == "memcpy":
-        return "with_memcpy(" ++ args ++ ")"
+        return "with_memcpy(" ++ ci_cast_memcpy_args(args) ++ ")"
     if callee == "memmove":
-        return "with_memmove(" ++ args ++ ")"
+        return "with_memmove(" ++ ci_cast_memcpy_args(args) ++ ")"
     if callee == "memset":
-        return "with_memset(" ++ args ++ ")"
+        return "with_memset(" ++ ci_cast_memset_args(args) ++ ")"
     if callee == "memcmp":
-        return "with_memcmp(" ++ args ++ ")"
+        return "with_memcmp(" ++ ci_cast_memcmp_args(args) ++ ")"
 
     // String operations
     if callee == "strlen":
@@ -5624,15 +5728,21 @@ fn ci_map_libc_call(callee: str, args: str) -> str:
         return "to_lower(" ++ args ++ ")"
     if callee == "toupper":
         return "to_upper(" ++ args ++ ")"
+    if callee == "isgraph":
+        return "(if is_print(" ++ args ++ ") and not is_space(" ++ args ++ "): 1 else: 0)"
+    if callee == "ispunct":
+        return "(if is_print(" ++ args ++ ") and not is_alnum(" ++ args ++ ") and not is_space(" ++ args ++ "): 1 else: 0)"
+    if callee == "iscntrl":
+        return "(if (" ++ args ++ ") < 32 or (" ++ args ++ ") == 127: 1 else: 0)"
 
     // macOS builtin wrappers for memory functions
     // These have an extra bounds-checking arg: (dst, src, n, obj_size) → (dst, src, n)
     if callee == "__builtin___memcpy_chk":
-        return "with_memcpy(" ++ ci_strip_last_arg(args) ++ ")"
+        return "with_memcpy(" ++ ci_cast_memcpy_args(ci_strip_last_arg(args)) ++ ")"
     if callee == "__builtin___memmove_chk":
-        return "with_memmove(" ++ ci_strip_last_arg(args) ++ ")"
+        return "with_memmove(" ++ ci_cast_memcpy_args(ci_strip_last_arg(args)) ++ ")"
     if callee == "__builtin___memset_chk":
-        return "with_memset(" ++ ci_strip_last_arg(args) ++ ")"
+        return "with_memset(" ++ ci_cast_memset_args(ci_strip_last_arg(args)) ++ ")"
     if callee == "__builtin_object_size":
         return "0"  // bounds check size — not needed in With
     // Skip other __builtin functions — emit as 0 or comptime_error
