@@ -728,8 +728,10 @@ fn _pcre2_strcpy_c8_8(str1: *mut u8, __param_str2: *const i8) -> c_ulong:
 fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong:
     var str = __param_str
     var c: c_ulong = 0 // init: untranslatable
-    while (if unsafe: *(str = str + 1) != 0: 1 else: 0) != 0:
-(c = c + 1)
+    while true:
+        str = str + 1
+        if unsafe: *str == 0: break
+        c = c + 1
     return c
 
 @[c_export("_pcre2_strncmp_8")]
