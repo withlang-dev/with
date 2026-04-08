@@ -64,6 +64,9 @@ extern fn pcre2_match_data_create_8(p0: c_uint, p1: *mut pcre2_real_general_cont
 extern fn pcre2_match_data_create_from_pattern_8(p0: *const pcre2_real_code_8, p1: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8
 extern fn pcre2_match_data_free_8(p0: *mut pcre2_real_match_data_8) -> void
 extern fn pcre2_dfa_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8, p7: *mut c_int, p8: c_ulong) -> c_int
+// Internal PCRE2 symbols
+extern let null_str: u8
+
 @[c_export("pcre2_match_8")]
 fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, start_offset: c_ulong, __param_options: c_uint, match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8) -> c_int:
     var subject = __param_subject
@@ -184,7 +187,6 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                     (heapframes_size = 20480)
 
                 if (if (heapframes_size / 1024) > mb.heap_limit: 1 else: 0) != 0:
-                    var max_size: c_ulong = 0 // init failed
                     (heapframes_size = max_size)
 
                 if (if match_data.heapframes_size < heapframes_size: 1 else: 0) != 0:
@@ -219,17 +221,13 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                 (memchr_found_first_cu = null)
                 (memchr_found_first_cu2 = null)
                 while true:
-                    var new_start_match: *const u8 = null // init: untranslatable
                     if (if ((re.optimization_flags & 4)) != 0: 1 else: 0) != 0:
                         if firstline != 0:
-                            var t: *const u8 = null // init: untranslatable
                             (end_subject = t)
 
                         if anchored != 0:
                             if (if has_first_cu != 0 or (if start_bits != null: 1 else: 0) != 0: 1 else: 0) != 0:
-                                var ok: c_int = 0 // init: untranslatable
                                 if ok != 0:
-                                    var c: u8 = 0 // init: untranslatable
                                     (ok = (if has_first_cu != 0 and ((if (if c == first_cu: 1 else: 0) != 0 or (if c == first_cu2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0))
                                     if (if (not ok) != 0 and (if start_bits != null: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (ok = (if ((start_bits[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0))
@@ -243,9 +241,6 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                         else:
                             if has_first_cu != 0:
                                 if (if first_cu != first_cu2: 1 else: 0) != 0:
-                                    var pp1: *const u8 = null // init: untranslatable
-                                    var pp2: *const u8 = null // init: untranslatable
-                                    var searchlength: c_ulong = 0 // init: untranslatable
                                     if (if (if memchr_found_first_cu == null: 1 else: 0) != 0 or (if start_match > memchr_found_first_cu: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (pp1 = memchr(start_match, first_cu, searchlength))
                                         (memchr_found_first_cu = (if ((if pp1 == null: 1 else: 0)) != 0: end_subject else: pp1))
@@ -283,7 +278,6 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                                 else:
                                     if (if start_bits != null: 1 else: 0) != 0:
                                         while (if start_match < end_subject: 1 else: 0) != 0:
-                                            var c: c_uint = 0 // init: untranslatable
                                             if (if ((start_bits[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0) != 0:
                                                 break
 
@@ -299,17 +293,14 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
 
                         (end_subject = mb.end_subject)
                         if (if mb.partial == 0: 1 else: 0) != 0:
-                            var p: *const u8 = null // init: untranslatable
                             if (if ((end_subject as usize -% start_match as usize) / sizeof[u8]()) < re.minlength: 1 else: 0) != 0:
                                 (rc = 0)
                                 break
 
                             (p = (start_match + (((if has_first_cu != 0: 1 else: 0)) as isize as usize)))
                             if (if has_req_cu != 0 and (if p > req_cu_ptr: 1 else: 0) != 0: 1 else: 0) != 0:
-                                var check_length: c_ulong = 0 // init: untranslatable
                                 if (if (if check_length < 5000: 1 else: 0) != 0 or ((if (not anchored) != 0 and (if check_length < 5000000: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                                     if (if req_cu != req_cu2: 1 else: 0) != 0:
-                                        var pp: *const u8 = null // init: untranslatable
                                         (p = memchr(pp, req_cu, ((end_subject as usize -% pp as usize) / sizeof[u8]())))
                                         if (if p == null: 1 else: 0) != 0:
                                             (p = memchr(pp, req_cu2, ((end_subject as usize -% pp as usize) / sizeof[u8]())))

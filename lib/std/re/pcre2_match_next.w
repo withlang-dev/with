@@ -71,6 +71,8 @@ extern fn pcre2_get_match_data_heapframes_size_8(p0: *mut pcre2_real_match_data_
 extern fn pcre2_get_ovector_count_8(p0: *mut pcre2_real_match_data_8) -> c_uint
 extern fn pcre2_get_ovector_pointer_8(p0: *mut pcre2_real_match_data_8) -> *mut c_ulong
 extern fn pcre2_get_startchar_8(p0: *mut pcre2_real_match_data_8) -> c_ulong
+extern fn do_bumpalong(match_data: *mut pcre2_real_match_data_8, offset: c_ulong) -> c_ulong
+
 @[c_export("pcre2_next_match_8")]
 fn pcre2_next_match_8(match_data: *mut pcre2_real_match_data_8, pstart_offset: *mut c_ulong, poptions: *mut c_uint) -> c_int:
     var rc: c_int = match_data.rc
