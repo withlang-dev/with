@@ -158,7 +158,7 @@ fn pcre2_regcomp(preg: *mut regex_t, pattern: *const i8, cflags: c_int) -> c_int
         errorcode = errorcode - 100
         (i = 0)
         while true:
-if (if errorcode == eint2[i]: 1 else: 0) != 0:
+            if (if errorcode == eint2[i]: 1 else: 0) != 0:
                 return eint2[(i +% 1)]
             i = i + 2
 

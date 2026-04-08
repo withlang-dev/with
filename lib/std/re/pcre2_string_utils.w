@@ -718,7 +718,9 @@ fn _pcre2_strcpy_c8_8(str1: *mut u8, __param_str2: *const i8) -> c_ulong:
     var str2 = __param_str2
     var t: *mut u8 = null // init: untranslatable
     while (if unsafe: *str2 != 0: 1 else: 0) != 0:
-(unsafe: *(t = t + 1) = unsafe: *(str2 = str2 + 1))
+        unsafe: *t = unsafe: *str2
+        t = t + 1
+        str2 = str2 + 1
     (unsafe: *t = 0)
     return ((t as usize -% str1 as usize) / sizeof[u8]())
 
