@@ -135,8 +135,7 @@ fn link_stage_undefined_symbols_for_object(obj_path: str) -> str:
     let _ = ("rm -f " ++ report_path) |> with_system
     symbols
 
-fn link_stage_object_needs_helpers_runtime(obj_path: str) -> i32:
-    let undef = link_stage_undefined_symbols_for_object(obj_path)
+fn link_stage_undefined_symbols_need_helpers_runtime(undef: str) -> i32:
     if undef == "<probe-failed>":
         return 1
     if undef.len() == 0:
@@ -151,8 +150,7 @@ fn link_stage_object_needs_helpers_runtime(obj_path: str) -> i32:
         return 1
     0
 
-fn link_stage_object_needs_fiber_runtime(obj_path: str) -> i32:
-    let undef = link_stage_undefined_symbols_for_object(obj_path)
+fn link_stage_undefined_symbols_need_fiber_runtime(undef: str) -> i32:
     if undef == "<probe-failed>":
         return 0
     if undef.len() == 0:
@@ -232,17 +230,16 @@ fn link_stage_make_archive(obj_path: str) -> str:
     // Wrap a .o file in a .a archive so the linker treats it as a library
     // (only pulling in symbols that aren't already defined).
     let ar_path = obj_path ++ ".a"
-    let cmd = "ar rcs " ++ ar_path ++ " " ++ obj_path
+    let cmd = "if [ ! -f " ++ ar_path ++ " ] || [ " ++ obj_path ++ " -nt " ++ ar_path ++ " ]; then ar rcs " ++ ar_path ++ " " ++ obj_path ++ "; fi"
     let rc = with_system(cmd)
     if rc == 0:
         return ar_path
     ""
 
-fn link_stage_should_use_rt_core(obj_path: str) -> bool:
+fn link_stage_should_use_rt_core_from_undef(undef: str) -> bool:
     // Use the libc-free runtime for user programs that don't need LLVM bridge
     // or c_import. The compiler itself (which needs wl_* symbols) always uses
     // the libc-backed helpers.o runtime.
-    let undef = link_stage_undefined_symbols_for_object(obj_path)
     if undef == "<probe-failed>":
         return false
     // If it needs LLVM bridge, it's the compiler — use libc runtime
@@ -264,9 +261,8 @@ fn link_stage_should_use_rt_core(obj_path: str) -> bool:
         return true
     false
 
-fn link_stage_object_needs_llvm_bridge(obj_path: str) -> bool:
-    let probe = "nm -u " ++ obj_path ++ " 2>/dev/null | grep -q '_wl_'"
-    (probe |> with_system) == 0
+fn link_stage_undefined_symbols_need_llvm_bridge(undef: str) -> bool:
+    link_stage_str_contains(undef, "_wl_")
 
 fn link_stage_dirname(path: str) -> str:
     var last_slash = -1
@@ -325,7 +321,8 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
     let extras: Vec[str] = Vec.new()
     for i in 0..link_search_paths.len() as i32:
         extras.push("-L" ++ link_search_paths.get(i as i64))
-    let needs_fiber_runtime = if needs_async_runtime: 1 else: link_stage_object_needs_fiber_runtime(obj_path)
+    let undef = link_stage_undefined_symbols_for_object(obj_path)
+    let needs_fiber_runtime = if needs_async_runtime: 1 else: link_stage_undefined_symbols_need_fiber_runtime(undef)
     if needs_fiber_runtime != 0:
         let channel_runtime_path = link_stage_find_runtime_object_path("channel_runtime.o")
         if channel_runtime_path.len() == 0:
@@ -348,10 +345,10 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
             return false
         extras.push(fiber_asm_path)
 
-    let needs_helpers_runtime = link_stage_object_needs_helpers_runtime(obj_path)
+    let needs_helpers_runtime = link_stage_undefined_symbols_need_helpers_runtime(undef)
     if needs_helpers_runtime != 0:
-        let use_rt_core = link_stage_should_use_rt_core(obj_path)
-        let needs_llvm = link_stage_object_needs_llvm_bridge(obj_path)
+        let use_rt_core = link_stage_should_use_rt_core_from_undef(undef)
+        let needs_llvm = link_stage_undefined_symbols_need_llvm_bridge(undef)
         if use_rt_core:
             // Pure With program — rt_core.o + platform backend + panic runtime.
             // Non-async builds also link fiber_stubs.o for lifecycle and fiber
@@ -448,7 +445,7 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
             let helpers_ar = link_stage_make_archive(helpers_path)
             extras.push(if helpers_ar.len() > 0: helpers_ar else: helpers_path)
 
-    if link_stage_object_needs_llvm_bridge(obj_path):
+    if link_stage_undefined_symbols_need_llvm_bridge(undef):
         let static_bridge = link_stage_find_llvm_static_bridge()
         if static_bridge.len() > 0:
             // Static LLVM linking: use llvm_bridge.o + LLVM static libs
