@@ -118,7 +118,7 @@ fn pcre2_get_ovector_count_8(match_data: *mut pcre2_real_match_data_8) -> c_uint
 
 @[c_export("pcre2_get_ovector_pointer_8")]
 fn pcre2_get_ovector_pointer_8(match_data: *mut pcre2_real_match_data_8) -> *mut c_ulong:
-    return match_data.ovector
+    return &match_data.ovector as *mut c_ulong  // flexible array member
 
 @[c_export("pcre2_get_startchar_8")]
 fn pcre2_get_startchar_8(match_data: *mut pcre2_real_match_data_8) -> c_ulong:

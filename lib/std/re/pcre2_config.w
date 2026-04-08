@@ -48,7 +48,7 @@ fn pcre2_config_8(what: c_uint, where_: *mut c_void) -> c_int:
 
         9 => 0
         11 =>
-                        var v: *const i8 = (if ((if 32 == 0: 1 else: 0)) != 0: XSTRING(PCRE2_MAJOR.PCRE2_MINOR PCRE2_DATE) else: XSTRING(PCRE2_MAJOR.PCRE2_MINOR) XSTRING(PCRE2_PRERELEASE PCRE2_DATE))
+                        var v: *const i8 = "10.48 2025-06-10" as *const i8  // XSTRING macro expanded
 
 
     return 0
