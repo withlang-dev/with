@@ -2447,6 +2447,8 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
 
     if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
         var v_name = self.ast.get_data0(node)
+        let bind_count = self.ast.get_data2(node)
+        let subject_enum_ty = self.enum_pattern_type(subject_type)
         // Resolve for-comprehension markers: _Payload → Some/Ok, _Empty → None/Err
         let v_name_str = self.pool_resolve(v_name)
         if v_name_str == "_Payload" or v_name_str == "_Empty":
@@ -2460,11 +2462,21 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                 if self.enum_has_variant(resolved_st as i32, try_sym2) != 0:
                     v_name = try_sym2
             self.comp_resolved.insert(node, v_name)
+        if kind == NodeKind.NK_PAT_VARIANT and bind_count == 0 and subject_enum_ty == 0 and self.ast.pattern_qualifier(node) == 0:
+            let value_sym = self.pattern_variant_value_sym(node, v_name)
+            if self.try_mark_value_pattern(node, subject_type, value_sym) != 0:
+                return
         let pattern_enum_ty = self.resolve_variant_pattern_enum_type(node, subject_type, v_name)
         if pattern_enum_ty == 0:
             return
         let v_extra = self.ast.get_data1(node)
-        let bind_count = self.ast.get_data2(node)
+        if subject_enum_ty == 0:
+            if bind_count != 0:
+                self.emit_error("variant payload pattern requires an enum subject", node)
+                return
+            let value_sym = self.pattern_variant_value_sym(node, v_name)
+            self.pattern_value_syms.insert(node, value_sym)
+            return
         var payload_start = 0
         var payload_count = 0
         var found_variant = 0
@@ -3576,6 +3588,32 @@ fn Sema.resolve_variant_pattern_enum_type(self: Sema, node: i32, subject_type: i
         self.emit_error("variant '" ++ self.pool_resolve(variant_name) ++ "' does not belong to enum '" ++ self.pool_resolve(subject_enum_sym) ++ "'", node)
         return 0
     subject_enum_ty
+
+fn Sema.pattern_variant_value_sym(self: Sema, node: i32, variant_name: i32) -> i32:
+    let qualifier_sym = self.ast.pattern_qualifier(node)
+    if qualifier_sym == 0:
+        return variant_name
+    let qual_name = self.pool_resolve(qualifier_sym) ++ "." ++ self.pool_resolve(variant_name)
+    self.pool_intern(qual_name)
+
+fn Sema.try_mark_value_pattern(self: Sema, node: i32, subject_type: i32, value_sym: i32) -> i32:
+    if node == 0 or subject_type == 0 or value_sym == 0:
+        return 0
+    let value_ty = self.check_ident(value_sym, node)
+    if value_ty == 0:
+        return 1
+    if self.types_compatible(subject_type as TypeId, value_ty as TypeId) == 0:
+        let value_name = self.type_name(value_ty)
+        let subject_name = self.type_name(subject_type)
+        self.emit_error(
+            "pattern value '" ++ self.pool_resolve(value_sym) ++
+            "' has type '" ++ value_name ++
+            "', which does not match subject type '" ++ subject_name ++ "'",
+            node
+        )
+        return 1
+    self.pattern_value_syms.insert(node, value_sym)
+    1
 
 fn Sema.check_dyn_trait_call_compat(self: Sema, fn_sym: i32, call_extra_start: i32, arg_types: Vec[i32], arg_count: i32, param_offset: i32):
     if not self.fn_decl_nodes.contains(fn_sym):
