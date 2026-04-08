@@ -61,8 +61,8 @@ extern fn pcre2_code_copy_with_tables_8(p0: *const pcre2_real_code_8) -> *mut pc
 extern fn pcre2_pattern_info_8(p0: *const pcre2_real_code_8, p1: c_uint, p2: *mut c_void) -> c_int
 extern fn pcre2_callout_enumerate_8(p0: *const pcre2_real_code_8, p1: *const fn(*mut pcre2_callout_enumerate_block_8, *mut c_void) -> c_int, p2: *mut c_void) -> c_int
 @[c_export("pcre2_match_data_create_8")]
-fn pcre2_match_data_create_8(oveccount: c_uint, gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8:
-    var oveccount = oveccount
+fn pcre2_match_data_create_8(__param_oveccount: c_uint, gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8:
+    var oveccount = __param_oveccount
     var yield_: *mut pcre2_real_match_data_8 = null // init: untranslatable
     if (if oveccount < 1: 1 else: 0) != 0:
         (oveccount = 1)
@@ -80,8 +80,8 @@ fn pcre2_match_data_create_8(oveccount: c_uint, gcontext: *mut pcre2_real_genera
     return yield_
 
 @[c_export("pcre2_match_data_create_from_pattern_8")]
-fn pcre2_match_data_create_from_pattern_8(code: *const pcre2_real_code_8, gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8:
-    var gcontext = gcontext
+fn pcre2_match_data_create_from_pattern_8(code: *const pcre2_real_code_8, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8:
+    var gcontext = __param_gcontext
     if (if code == null: 1 else: 0) != 0:
         return null
 

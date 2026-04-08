@@ -173,8 +173,8 @@ if (if errorcode == eint2[i]: 1 else: 0) != 0:
     return 0
 
 @[c_export("pcre2_regexec")]
-fn pcre2_regexec(preg: *const regex_t, string: *const i8, nmatch: c_ulong, pmatch: *mut regmatch_t, eflags: c_int) -> c_int:
-    var nmatch = nmatch
+fn pcre2_regexec(preg: *const regex_t, string: *const i8, __param_nmatch: c_ulong, pmatch: *mut regmatch_t, eflags: c_int) -> c_int:
+    var nmatch = __param_nmatch
     var rc: c_int = 0
     var so: c_int = 0
     var eo: c_int = 0

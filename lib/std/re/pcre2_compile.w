@@ -55,11 +55,11 @@ extern fn pcre2_set_offset_limit_8(p0: *mut pcre2_real_match_context_8, p1: c_ul
 extern fn pcre2_set_recursion_limit_8(p0: *mut pcre2_real_match_context_8, p1: c_uint) -> c_int
 extern fn pcre2_set_recursion_memory_management_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(c_ulong, *mut c_void) -> *mut c_void, p2: *const fn(*mut c_void, *mut c_void) -> void, p3: *mut c_void) -> c_int
 @[c_export("pcre2_compile_8")]
-fn pcre2_compile_8(pattern: *const u8, patlen: c_ulong, options: c_uint, errorptr: *mut c_int, erroroffset: *mut c_ulong, ccontext: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_code_8:
-    var pattern = pattern
-    var patlen = patlen
-    var options = options
-    var ccontext = ccontext
+fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_options: c_uint, errorptr: *mut c_int, erroroffset: *mut c_ulong, __param_ccontext: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_code_8:
+    var pattern = __param_pattern
+    var patlen = __param_patlen
+    var options = __param_options
+    var ccontext = __param_ccontext
     var utf: c_int = 0
     var ucp: c_int = 0
     var has_lookbehind: c_int = 0

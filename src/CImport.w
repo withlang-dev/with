@@ -4430,9 +4430,10 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
             prend2 = prend2 + 1
         if prend2 > prpos2:
             let pname = cursor_params.slice(prpos2 as i64, prend2 as i64)
-            // Check if this param is assigned to anywhere in the body
+            // Check if this param is assigned to anywhere in the body.
+            // The signature renames mutated params to __param_NAME.
             if ci_body_assigns_to(session, body_cursor, pname):
-                param_rebinds = param_rebinds ++ "    var " ++ pname ++ " = " ++ pname ++ "\n"
+                param_rebinds = param_rebinds ++ "    var " ++ pname ++ " = __param_" ++ pname ++ "\n"
         prpos2 = prend2 + 1
         if prpos2 < prlen2 and cursor_params.byte_at(prpos2 as i64) == 124:
             prpos2 = prpos2 + 1
@@ -5091,8 +5092,17 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     // Build parameter list — use cursor API for real param names
     // (the old decl API returns "" for many PCRE2 functions)
     var cursor_param_names = ""
+    var fn_body_cursor = -1
     let fn_cursor = ci_find_fn_cursor(session, name)
     if fn_cursor >= 0:
+        // Find the CompoundStmt body for param mutation detection
+        let fnc = with_ci_num_children(session, fn_cursor)
+        var fci = 0
+        while fci < fnc:
+            if with_ci_cursor_kind(session, with_ci_child(session, fn_cursor, fci)) == CXK_COMPOUND_STMT:
+                fn_body_cursor = with_ci_child(session, fn_cursor, fci)
+                break
+            fci = fci + 1
         let fn_nc = with_ci_num_children(session, fn_cursor)
         var cpi = 0
         while cpi < fn_nc:
@@ -5120,10 +5130,13 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
         var pname = with_cimport_fn_param_name(session, idx, pi)
         if pname.len() == 0:
             pname = ci_get_nth_pipe_entry(cursor_param_names, pi)
-        if pname.len() > 0:
-            params = params ++ ci_escape_reserved(pname) ++ ": " ++ ptype
-        else:
-            params = params ++ f"p{pi}" ++ ": " ++ ptype
+        let escaped_pname = if pname.len() > 0: ci_escape_reserved(pname) else: f"p{pi}"
+        // If this param is mutated in the body, rename it in the signature
+        // to avoid shadowing when the body emits `var pname = __param_pname`
+        var sig_pname = escaped_pname
+        if fn_body_cursor >= 0 and ci_body_assigns_to(session, fn_body_cursor, escaped_pname):
+            sig_pname = "__param_" ++ escaped_pname
+        params = params ++ sig_pname ++ ": " ++ ptype
 
     if is_variadic != 0:
         if param_count > 0:

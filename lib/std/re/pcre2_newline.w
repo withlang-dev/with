@@ -724,8 +724,8 @@ extern fn _pcre2_strncmp_c8_8(p0: *const u8, p1: *const i8, p2: c_ulong) -> c_in
 extern fn _pcre2_study_8(p0: *mut pcre2_real_code_8) -> c_int
 extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_int
 @[c_export("_pcre2_was_newline_8")]
-fn _pcre2_was_newline_8(ptr: *const u8, type_: c_uint, startptr: *const u8, lenptr: *mut c_uint, utf: c_int) -> c_int:
-    var ptr = ptr
+fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const u8, lenptr: *mut c_uint, utf: c_int) -> c_int:
+    var ptr = __param_ptr
     var c: c_uint = 0 // init: untranslatable
     (ptr = ptr - 1)
     utf

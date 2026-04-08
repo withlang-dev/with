@@ -693,10 +693,10 @@ extern fn _pcre2_study_8(p0: *mut pcre2_real_code_8) -> c_int
 extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_int
 extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
 @[c_export("_pcre2_xclass_8")]
-fn _pcre2_xclass_8(c: c_uint, data: *const u8, char_lists_end: *const u8, utf: c_int) -> c_int:
-    var c = c
-    var data = data
-    var utf = utf
+fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *const u8, __param_utf: c_int) -> c_int:
+    var c = __param_c
+    var data = __param_data
+    var utf = __param_utf
     var t: u8 = 0 // init: untranslatable
     var not_negated: c_int = 0 // init: untranslatable
     var type_: c_uint = 0 // init: untranslatable
