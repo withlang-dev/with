@@ -103,12 +103,13 @@ fn pcre2_get_error_message_8(p0: c_int, p1: *mut u8, p2: c_ulong) -> c_int:
         (message = compile_error_texts)
         (n = (enumber - 100))
     else:
-if (if enumber < 0: 1 else: 0) != 0:
+        if (if enumber < 0: 1 else: 0) != 0:
             (message = match_error_texts)
             (n = (0 - enumber))
         else:
             (message = ("\0" as *const u8))
             (n = 1)
+
 
     (i = 0)
     while (if unsafe: *message != 0: 1 else: 0) != 0:

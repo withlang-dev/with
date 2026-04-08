@@ -90,23 +90,24 @@ fn pcre2_serialize_encode_8(p0: *mut *const pcre2_real_code_8, p1: c_int, p2: *m
     (i = 0)
     while (if i < number_of_codes: 1 else: 0) != 0:
         if (if tables == ((0 as *mut c_void)): 1 else: 0) != 0:
-(tables = re.tables)
+            (tables = re.tables)
+
         total_size = total_size + re.blocksize
         { let __tmp = i; i = i + 1; __tmp }
 
     (bytes = memctl.malloc((total_size +% sizeof[pcre2_memctl]()), memctl.memory_data))
-    __builtin___memcpy_chk(bytes, memctl, sizeof[pcre2_memctl](), __builtin_object_size(bytes, 0))
+    mem_copy(bytes, memctl, sizeof[pcre2_memctl](), __builtin_object_size(bytes, 0))
     bytes = bytes + sizeof[pcre2_memctl]()
     (data.magic = 1347564115)
     (data.version = 3145738)
     (data.config = 526337)
     (data.number_of_codes = number_of_codes)
     (dst_bytes = (bytes + sizeof[pcre2_serialized_data]()))
-    __builtin___memcpy_chk(dst_bytes, tables, 1088, __builtin_object_size(dst_bytes, 0))
+    mem_copy(dst_bytes, tables, 1088, __builtin_object_size(dst_bytes, 0))
     (i = 0)
     while (if i < number_of_codes: 1 else: 0) != 0:
-        __builtin___memcpy_chk(dst_bytes, (re as *const i8), re.blocksize, __builtin_object_size(dst_bytes, 0))
-        __builtin___memset_chk((dst_bytes + 0), 0, sizeof[pcre2_memctl](), __builtin_object_size((dst_bytes + 0), 0))
+        mem_copy(dst_bytes, (re as *const i8), re.blocksize, __builtin_object_size(dst_bytes, 0))
+        mem_set((dst_bytes + 0), 0, sizeof[pcre2_memctl](), __builtin_object_size((dst_bytes + 0), 0))
         dst_bytes = dst_bytes + re.blocksize
         { let __tmp = i; i = i + 1; __tmp }
 
@@ -133,10 +134,10 @@ fn pcre2_serialize_decode_8(p0: *mut *mut pcre2_real_code_8, p1: c_int, p2: *con
 (number_of_codes = data.number_of_codes)
                 (src_bytes = (bytes + sizeof[pcre2_serialized_data]()))
                 (tables = memctl.malloc((1088 +% sizeof[c_ulong]()), memctl.memory_data))
-                __builtin___memcpy_chk(tables, src_bytes, 1088, __builtin_object_size(tables, 0))
+                mem_copy(tables, src_bytes, 1088, __builtin_object_size(tables, 0))
                 (i = 0)
                 while (if i < number_of_codes: 1 else: 0) != 0:
-                    __builtin___memcpy_chk(&blocksize, (src_bytes + 72), sizeof[c_ulong](), __builtin_object_size(&blocksize, 0))
+                    mem_copy(&blocksize, (src_bytes + 72), sizeof[c_ulong](), __builtin_object_size(&blocksize, 0))
                     if (if blocksize <= sizeof[pcre2_real_code_8](): 1 else: 0) != 0:
                         comptime_error("goto not supported")
 

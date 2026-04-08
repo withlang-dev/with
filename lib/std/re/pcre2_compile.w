@@ -212,10 +212,14 @@ optim_flags = optim_flags & (0 - 4 - 1)
                                             comptime_error("goto not supported")
 
                                         if (if p.type_ == PSO_LIMH: 1 else: 0) != 0:
-(limit_heap = c)                                        else:
-if (if p.type_ == PSO_LIMM: 1 else: 0) != 0:
-(limit_match = c)                                            else:
-(limit_depth = c)
+                                            (limit_heap = c)
+                                        else:
+                                            if (if p.type_ == PSO_LIMM: 1 else: 0) != 0:
+                                                (limit_match = c)
+                                            else:
+                                                (limit_depth = c)
+
+
                                         (skipatstart = { pp = pp + 1; pp })
                                     PSO_OPTMZ =>
                                         optim_flags = optim_flags & (0 - (p.value) - 1)
@@ -325,7 +329,7 @@ __pc = 2; continue
                             __pc = 2; continue
 
 
-                    __builtin___memset_chk(cb.groupinfo, 0, ((((2 *% cb.bracount) +% 1)) *% sizeof[c_uint]()), __builtin_object_size(cb.groupinfo, 0))
+                    mem_set(cb.groupinfo, 0, ((((2 *% cb.bracount) +% 1)) *% sizeof[c_uint]()), __builtin_object_size(cb.groupinfo, 0))
                     (errorcode = check_lookbehinds(cb.parsed_pattern, ((0 as *mut c_void)), ((0 as *mut c_void)), &cb, &loopcount))
                     if (if errorcode != 0: 1 else: 0) != 0:
 __pc = 2; continue
@@ -353,11 +357,11 @@ __pc = 2; continue
                     (cb.erroroffset = 0)
                     __pc = 2; continue
 
-                __builtin___memset_chk((((re as *mut i8) + sizeof[pcre2_real_code_8]()) - (8 as isize as usize)), 0, 8, __builtin_object_size((((re as *mut i8) + sizeof[pcre2_real_code_8]()) - (8 as isize as usize)), 0))
+                mem_set((((re as *mut i8) + sizeof[pcre2_real_code_8]()) - (8 as isize as usize)), 0, 8, __builtin_object_size((((re as *mut i8) + sizeof[pcre2_real_code_8]()) - (8 as isize as usize)), 0))
                 (re.memctl = ccontext.memctl)
                 (re.tables = tables)
                 (re.executable_jit = ((0 as *mut c_void)))
-                __builtin___memset_chk(re.start_bitmap, 0, (32 *% sizeof[u8]()), __builtin_object_size(re.start_bitmap, 0))
+                mem_set(re.start_bitmap, 0, (32 *% sizeof[u8]()), __builtin_object_size(re.start_bitmap, 0))
                 (re.blocksize = re_blocksize)
                 (re.magic_number = 1346589253)
                 (re.compile_options = options)
@@ -389,7 +393,8 @@ __pc = 2; continue
                     (i = 0)
                     while (if i < cb.names_found: 1 else: 0) != 0:
 if (if ng.length > 0: 1 else: 0) != 0:
-(tablecount = _pcre2_compile_add_name_to_table8(&cb, ng, tablecount))
+                            (tablecount = _pcre2_compile_add_name_to_table8(&cb, ng, tablecount))
+
 
                 (pptr = cb.parsed_pattern)
                 (unsafe: *code = 137)
@@ -419,7 +424,8 @@ re.flags = re.flags | 8192
                         var p: c_int = 0
                         var groupnumber: c_int = 0
                         if (if groupnumber == 0: 1 else: 0) != 0:
-(rgroup = codestart)                        else:
+                            (rgroup = codestart)
+                        else:
                             (rgroup = ((0 as *mut c_void)))
                             while (if i < ccount: 1 else: 0) != 0:
                                 if (if groupnumber == rc[p].groupnumber: 1 else: 0) != 0:
@@ -427,7 +433,8 @@ re.flags = re.flags | 8192
                                     break
 
                                 if (if groupnumber > rc[p].groupnumber: 1 else: 0) != 0:
-(search_from = rc[p].group)
+                                    (search_from = rc[p].group)
+
 
                             if (if rgroup == ((0 as *mut c_void)): 1 else: 0) != 0:
                                 (rgroup = _pcre2_find_bracket_8(search_from, utf, groupnumber))
@@ -436,11 +443,13 @@ re.flags = re.flags | 8192
                                     break
 
                                 if (if { start = start - 1; start } < 0: 1 else: 0) != 0:
-(start = (8 - 1))
+                                    (start = (8 - 1))
+
                                 (rc[start].groupnumber = groupnumber)
                                 (rc[start].group = rgroup)
                                 if (if ccount < 8: 1 else: 0) != 0:
-{ let __tmp = ccount; ccount = ccount + 1; __tmp }
+                                    { let __tmp = ccount; ccount = ccount + 1; __tmp }
+
 
 
                         (rcode = find_recurse(((rcode + (1 as isize as usize)) + (2 as isize as usize)), utf))
@@ -544,7 +553,8 @@ fn pcre2_code_free_8(p0: *mut pcre2_real_code_8):
             if (if unsafe: *ref_count > 0: 1 else: 0) != 0:
                 { let __tmp = (unsafe: *ref_count); (unsafe: *ref_count) = (unsafe: *ref_count) - 1; __tmp }
                 if (if unsafe: *ref_count == 0: 1 else: 0) != 0:
-code.memctl.free((code.tables as *mut c_void), code.memctl.memory_data)
+                    code.memctl.free((code.tables as *mut c_void), code.memctl.memory_data)
+
 
 
         code.memctl.free(code, code.memctl.memory_data)
@@ -553,11 +563,13 @@ code.memctl.free((code.tables as *mut c_void), code.memctl.memory_data)
 @[c_export("pcre2_code_copy_8")]
 fn pcre2_code_copy_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8:
     if (if code == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
+        return ((0 as *mut c_void))
+
     (newcode = code.memctl.malloc(code.blocksize, code.memctl.memory_data))
     if (if newcode == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
-    __builtin___memcpy_chk(newcode, code, code.blocksize, __builtin_object_size(newcode, 0))
+        return ((0 as *mut c_void))
+
+    mem_copy(newcode, code, code.blocksize, __builtin_object_size(newcode, 0))
     (newcode.executable_jit = ((0 as *mut c_void)))
     if (if ((code.flags & 262144)) != 0: 1 else: 0) != 0:
         { let __tmp = (unsafe: *ref_count); (unsafe: *ref_count) = (unsafe: *ref_count) + 1; __tmp }
@@ -567,18 +579,20 @@ return ((0 as *mut c_void))
 @[c_export("pcre2_code_copy_with_tables_8")]
 fn pcre2_code_copy_with_tables_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8:
     if (if code == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
+        return ((0 as *mut c_void))
+
     (newcode = code.memctl.malloc(code.blocksize, code.memctl.memory_data))
     if (if newcode == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
-    __builtin___memcpy_chk(newcode, code, code.blocksize, __builtin_object_size(newcode, 0))
+        return ((0 as *mut c_void))
+
+    mem_copy(newcode, code, code.blocksize, __builtin_object_size(newcode, 0))
     (newcode.executable_jit = ((0 as *mut c_void)))
     (newtables = code.memctl.malloc((1088 +% sizeof[c_ulong]()), code.memctl.memory_data))
     if (if newtables == ((0 as *mut c_void)): 1 else: 0) != 0:
         code.memctl.free((newcode as *mut c_void), code.memctl.memory_data)
         return ((0 as *mut c_void))
 
-    __builtin___memcpy_chk(newtables, code.tables, 1088, __builtin_object_size(newtables, 0))
+    mem_copy(newtables, code.tables, 1088, __builtin_object_size(newtables, 0))
     (unsafe: *ref_count = 1)
     (newcode.tables = newtables)
     newcode.flags = newcode.flags | 262144

@@ -126,30 +126,39 @@ fn pcre2_regcomp(p0: *mut regex_t, p1: *const i8, p2: c_int) -> c_int:
     (preg.re_match_data = ((0 as *mut c_void)))
     (preg.re_pcre2_code = ((0 as *mut c_void)))
     if (if ((cflags & 1)) != 0: 1 else: 0) != 0:
-options = options | 8
+        options = options | 8
+
     if (if ((cflags & 2)) != 0: 1 else: 0) != 0:
-options = options | 1024
+        options = options | 1024
+
     if (if ((cflags & 16)) != 0: 1 else: 0) != 0:
-options = options | 32
+        options = options | 32
+
     if (if ((cflags & 4096)) != 0: 1 else: 0) != 0:
-options = options | 33554432
+        options = options | 33554432
+
     if (if ((cflags & 64)) != 0: 1 else: 0) != 0:
-options = options | 524288
+        options = options | 524288
+
     if (if ((cflags & 1024)) != 0: 1 else: 0) != 0:
-options = options | 131072
+        options = options | 131072
+
     if (if ((cflags & 512)) != 0: 1 else: 0) != 0:
-options = options | 262144
+        options = options | 262144
+
     (preg.re_cflags = cflags)
     (preg.re_erroffset = erroffset)
     if (if preg.re_pcre2_code == ((0 as *mut c_void)): 1 else: 0) != 0:
         var i: c_uint = 0
         if (if errorcode < 100: 1 else: 0) != 0:
-return REG_BADPAT
+            return REG_BADPAT
+
         errorcode = errorcode - 100
         (i = 0)
         while true:
 if (if errorcode == eint2[i]: 1 else: 0) != 0:
-return eint2[(i +% 1)]            i = i + 2
+                return eint2[(i +% 1)]
+            i = i + 2
 
         return REG_BADPAT
 
@@ -168,18 +177,24 @@ fn pcre2_regexec(p0: *const regex_t, p1: *const i8, p2: c_ulong, p3: *mut regmat
     var eo: c_int = 0
     var options: c_int = 0
     if (if string == ((0 as *mut c_void)): 1 else: 0) != 0:
-return REG_INVARG
+        return REG_INVARG
+
     if (if ((eflags & 4)) != 0: 1 else: 0) != 0:
-options = options | 1
+        options = options | 1
+
     if (if ((eflags & 8)) != 0: 1 else: 0) != 0:
-options = options | 2
+        options = options | 2
+
     if (if ((eflags & 256)) != 0: 1 else: 0) != 0:
-options = options | 4
+        options = options | 4
+
     if (if (if ((preg.re_cflags & 32)) != 0: 1 else: 0) or (if pmatch == ((0 as *mut c_void)): 1 else: 0): 1 else: 0) != 0:
-(nmatch = 0)
+        (nmatch = 0)
+
     if (if ((eflags & 128)) != 0: 1 else: 0) != 0:
         if (if pmatch == ((0 as *mut c_void)): 1 else: 0) != 0:
-return REG_INVARG
+            return REG_INVARG
+
         (so = pmatch[0].rm_so)
         (eo = pmatch[0].rm_eo)
     else:
@@ -206,15 +221,18 @@ fn pcre2_regerror(p0: c_int, p1: *const regex_t, p2: *mut i8, p3: c_ulong) -> c_
     (i = 0)
     while (if unsafe: *message != 0: 1 else: 0) != 0:
 if (if (i +% 1) < errbuf_size: 1 else: 0) != 0:
-(errbuf[i] = unsafe: *message)
+            (errbuf[i] = unsafe: *message)
+
     if have_offset != 0:
         (message = offset_buf)
         while (if unsafe: *message != 0: 1 else: 0) != 0:
 if (if (i +% 1) < errbuf_size: 1 else: 0) != 0:
-(errbuf[i] = unsafe: *message)
+                (errbuf[i] = unsafe: *message)
+
 
     if (if errbuf_size > 0: 1 else: 0) != 0:
-(errbuf[(if ((if i < errbuf_size: 1 else: 0)) != 0: i else: (errbuf_size -% 1))] = 0)
+        (errbuf[(if ((if i < errbuf_size: 1 else: 0)) != 0: i else: (errbuf_size -% 1))] = 0)
+
     { let __tmp = i; i = i + 1; __tmp }
     return (i as c_int)
 

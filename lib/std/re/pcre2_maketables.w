@@ -99,7 +99,8 @@ extern fn pcre2_get_error_message_8(p0: c_int, p1: *mut u8, p2: c_ulong) -> c_in
 fn pcre2_maketables_8(p0: *mut pcre2_real_general_context_8) -> *const u8:
     var i: c_int = 0
     if (if yield_ == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
+        return ((0 as *mut c_void))
+
     (p = yield_)
     (i = 0)
     while (if i < 256: 1 else: 0) != 0:
@@ -113,31 +114,42 @@ return ((0 as *mut c_void))
         (unsafe: *{ let __tmp = p; p = p + 1; __tmp } = (if ((if c < 256: 1 else: 0)) != 0: c else: i))
         { let __tmp = i; i = i + 1; __tmp }
 
-    __builtin___memset_chk(p, 0, 320, __builtin_object_size(p, 0))
+    mem_set(p, 0, 320, __builtin_object_size(p, 0))
     (i = 0)
     while (if i < 256: 1 else: 0) != 0:
         if is_digit((i)) != 0:
-p[(64 + (i / 8))] = p[(64 + (i / 8))] | (1 << ((i & 7)))
+            p[(64 + (i / 8))] = p[(64 + (i / 8))] | (1 << ((i & 7)))
+
         if is_upper((i)) != 0:
-p[(96 + (i / 8))] = p[(96 + (i / 8))] | (1 << ((i & 7)))
+            p[(96 + (i / 8))] = p[(96 + (i / 8))] | (1 << ((i & 7)))
+
         if is_lower((i)) != 0:
-p[(128 + (i / 8))] = p[(128 + (i / 8))] | (1 << ((i & 7)))
+            p[(128 + (i / 8))] = p[(128 + (i / 8))] | (1 << ((i & 7)))
+
         if is_alnum((i)) != 0:
-p[(160 + (i / 8))] = p[(160 + (i / 8))] | (1 << ((i & 7)))
+            p[(160 + (i / 8))] = p[(160 + (i / 8))] | (1 << ((i & 7)))
+
         if (if i == 95: 1 else: 0) != 0:
-p[(160 + (i / 8))] = p[(160 + (i / 8))] | (1 << ((i & 7)))
+            p[(160 + (i / 8))] = p[(160 + (i / 8))] | (1 << ((i & 7)))
+
         if is_space((i)) != 0:
-p[(0 + (i / 8))] = p[(0 + (i / 8))] | (1 << ((i & 7)))
+            p[(0 + (i / 8))] = p[(0 + (i / 8))] | (1 << ((i & 7)))
+
         if is_xdigit((i)) != 0:
-p[(32 + (i / 8))] = p[(32 + (i / 8))] | (1 << ((i & 7)))
+            p[(32 + (i / 8))] = p[(32 + (i / 8))] | (1 << ((i & 7)))
+
         if isgraph((i)) != 0:
-p[(192 + (i / 8))] = p[(192 + (i / 8))] | (1 << ((i & 7)))
+            p[(192 + (i / 8))] = p[(192 + (i / 8))] | (1 << ((i & 7)))
+
         if is_print((i)) != 0:
-p[(224 + (i / 8))] = p[(224 + (i / 8))] | (1 << ((i & 7)))
+            p[(224 + (i / 8))] = p[(224 + (i / 8))] | (1 << ((i & 7)))
+
         if ispunct((i)) != 0:
-p[(256 + (i / 8))] = p[(256 + (i / 8))] | (1 << ((i & 7)))
+            p[(256 + (i / 8))] = p[(256 + (i / 8))] | (1 << ((i & 7)))
+
         if iscntrl((i)) != 0:
-p[(288 + (i / 8))] = p[(288 + (i / 8))] | (1 << ((i & 7)))
+            p[(288 + (i / 8))] = p[(288 + (i / 8))] | (1 << ((i & 7)))
+
         { let __tmp = i; i = i + 1; __tmp }
 
     p = p + 320
@@ -145,15 +157,20 @@ p[(288 + (i / 8))] = p[(288 + (i / 8))] | (1 << ((i & 7)))
     while (if i < 256: 1 else: 0) != 0:
         var x: c_int = 0
         if is_space((i)) != 0:
-x = x + 1
+            x = x + 1
+
         if is_alpha((i)) != 0:
-x = x + 2
+            x = x + 2
+
         if is_lower((i)) != 0:
-x = x + 4
+            x = x + 4
+
         if is_digit((i)) != 0:
-x = x + 8
+            x = x + 8
+
         if (if is_alnum((i)) or (if i == 95: 1 else: 0): 1 else: 0) != 0:
-x = x + 16
+            x = x + 16
+
         (unsafe: *{ let __tmp = p; p = p + 1; __tmp } = x)
         { let __tmp = i; i = i + 1; __tmp }
 
@@ -162,8 +179,10 @@ x = x + 16
 @[c_export("pcre2_maketables_free_8")]
 fn pcre2_maketables_free_8(p0: *mut pcre2_real_general_context_8, p1: *const u8):
     if (if gcontext != ((0 as *mut c_void)): 1 else: 0) != 0:
-gcontext.memctl.free((tables as *mut c_void), gcontext.memctl.memory_data)    else:
-free_mem((tables as *mut c_void) as *i8)
+        gcontext.memctl.free((tables as *mut c_void), gcontext.memctl.memory_data)
+    else:
+        free_mem((tables as *mut c_void) as *i8)
+
 
 let ucp_C: c_uint = 0
 let ucp_L: c_uint = 1

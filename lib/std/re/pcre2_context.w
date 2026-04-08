@@ -22,19 +22,23 @@ extern fn pcre2_config_8(p0: c_uint, p1: *mut c_void) -> c_int
 @[c_export("pcre2_general_context_copy_8")]
 fn pcre2_general_context_copy_8(p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_general_context_8:
     if (if newcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
-    __builtin___memcpy_chk(newcontext, gcontext, sizeof[pcre2_real_general_context_8](), __builtin_object_size(newcontext, 0))
+        return ((0 as *mut c_void))
+
+    mem_copy(newcontext, gcontext, sizeof[pcre2_real_general_context_8](), __builtin_object_size(newcontext, 0))
     return newcontext
 
 @[c_export("pcre2_general_context_create_8")]
 fn pcre2_general_context_create_8(p0: *const fn(c_ulong, *mut c_void) -> *mut c_void, p1: *const fn(*mut c_void, *mut c_void) -> void, p2: *mut c_void) -> *mut pcre2_real_general_context_8:
     if (if private_malloc == ((0 as *mut c_void)): 1 else: 0) != 0:
-(private_malloc = default_malloc)
+        (private_malloc = default_malloc)
+
     if (if private_free == ((0 as *mut c_void)): 1 else: 0) != 0:
-(private_free = default_free)
+        (private_free = default_free)
+
     (gcontext = private_malloc(sizeof[pcre2_real_general_context_8](), memory_data))
     if (if gcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
+        return ((0 as *mut c_void))
+
     (gcontext.memctl.malloc = private_malloc)
     (gcontext.memctl.free = private_free)
     (gcontext.memctl.memory_data = memory_data)
@@ -43,26 +47,30 @@ return ((0 as *mut c_void))
 @[c_export("pcre2_general_context_free_8")]
 fn pcre2_general_context_free_8(p0: *mut pcre2_real_general_context_8):
     if (if gcontext != ((0 as *mut c_void)): 1 else: 0) != 0:
-gcontext.memctl.free(gcontext, gcontext.memctl.memory_data)
+        gcontext.memctl.free(gcontext, gcontext.memctl.memory_data)
+
 
 @[c_export("pcre2_compile_context_copy_8")]
 fn pcre2_compile_context_copy_8(p0: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_compile_context_8:
     if (if newcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
-    __builtin___memcpy_chk(newcontext, ccontext, sizeof[pcre2_real_compile_context_8](), __builtin_object_size(newcontext, 0))
+        return ((0 as *mut c_void))
+
+    mem_copy(newcontext, ccontext, sizeof[pcre2_real_compile_context_8](), __builtin_object_size(newcontext, 0))
     return newcontext
 
 @[c_export("pcre2_compile_context_create_8")]
 fn pcre2_compile_context_create_8(p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_compile_context_8:
     if (if ccontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
+        return ((0 as *mut c_void))
+
     (unsafe: *ccontext = _pcre2_default_compile_context_8)
     return ccontext
 
 @[c_export("pcre2_compile_context_free_8")]
 fn pcre2_compile_context_free_8(p0: *mut pcre2_real_compile_context_8):
     if (if ccontext != ((0 as *mut c_void)): 1 else: 0) != 0:
-ccontext.memctl.free(ccontext, ccontext.memctl.memory_data)
+        ccontext.memctl.free(ccontext, ccontext.memctl.memory_data)
+
 
 @[c_export("pcre2_set_bsr_8")]
 fn pcre2_set_bsr_8(p0: *mut pcre2_real_compile_context_8, p1: c_uint) -> c_int:
@@ -126,8 +134,10 @@ fn pcre2_set_optimize_8(p0: *mut pcre2_real_compile_context_8, p1: c_uint) -> c_
         _ =>
             if (if (if directive >= 64: 1 else: 0) and (if directive <= 69: 1 else: 0): 1 else: 0) != 0:
                 if (if ((directive & 1)) != 0: 1 else: 0) != 0:
-ccontext.optimization_flags = ccontext.optimization_flags & (0 - ((1 << ((((directive >> 1)) -% 32)))) - 1)                else:
-ccontext.optimization_flags = ccontext.optimization_flags | (1 << ((((directive >> 1)) -% 32)))
+                    ccontext.optimization_flags = ccontext.optimization_flags & (0 - ((1 << ((((directive >> 1)) -% 32)))) - 1)
+                else:
+                    ccontext.optimization_flags = ccontext.optimization_flags | (1 << ((((directive >> 1)) -% 32)))
+
                 return 0
 
 
@@ -136,21 +146,24 @@ ccontext.optimization_flags = ccontext.optimization_flags | (1 << ((((directive 
 @[c_export("pcre2_convert_context_copy_8")]
 fn pcre2_convert_context_copy_8(p0: *mut pcre2_real_convert_context_8) -> *mut pcre2_real_convert_context_8:
     if (if newcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
-    __builtin___memcpy_chk(newcontext, ccontext, sizeof[pcre2_real_convert_context_8](), __builtin_object_size(newcontext, 0))
+        return ((0 as *mut c_void))
+
+    mem_copy(newcontext, ccontext, sizeof[pcre2_real_convert_context_8](), __builtin_object_size(newcontext, 0))
     return newcontext
 
 @[c_export("pcre2_convert_context_create_8")]
 fn pcre2_convert_context_create_8(p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_convert_context_8:
     if (if ccontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
+        return ((0 as *mut c_void))
+
     (unsafe: *ccontext = _pcre2_default_convert_context_8)
     return ccontext
 
 @[c_export("pcre2_convert_context_free_8")]
 fn pcre2_convert_context_free_8(p0: *mut pcre2_real_convert_context_8):
     if (if ccontext != ((0 as *mut c_void)): 1 else: 0) != 0:
-ccontext.memctl.free(ccontext, ccontext.memctl.memory_data)
+        ccontext.memctl.free(ccontext, ccontext.memctl.memory_data)
+
 
 @[c_export("pcre2_set_glob_escape_8")]
 fn pcre2_set_glob_escape_8(p0: *mut pcre2_real_convert_context_8, p1: c_uint) -> c_int:
@@ -167,21 +180,24 @@ extern fn pcre2_converted_pattern_free_8(p0: *mut u8) -> void
 @[c_export("pcre2_match_context_copy_8")]
 fn pcre2_match_context_copy_8(p0: *mut pcre2_real_match_context_8) -> *mut pcre2_real_match_context_8:
     if (if newcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
-    __builtin___memcpy_chk(newcontext, mcontext, sizeof[pcre2_real_match_context_8](), __builtin_object_size(newcontext, 0))
+        return ((0 as *mut c_void))
+
+    mem_copy(newcontext, mcontext, sizeof[pcre2_real_match_context_8](), __builtin_object_size(newcontext, 0))
     return newcontext
 
 @[c_export("pcre2_match_context_create_8")]
 fn pcre2_match_context_create_8(p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_context_8:
     if (if mcontext == ((0 as *mut c_void)): 1 else: 0) != 0:
-return ((0 as *mut c_void))
+        return ((0 as *mut c_void))
+
     (unsafe: *mcontext = _pcre2_default_match_context_8)
     return mcontext
 
 @[c_export("pcre2_match_context_free_8")]
 fn pcre2_match_context_free_8(p0: *mut pcre2_real_match_context_8):
     if (if mcontext != ((0 as *mut c_void)): 1 else: 0) != 0:
-mcontext.memctl.free(mcontext, mcontext.memctl.memory_data)
+        mcontext.memctl.free(mcontext, mcontext.memctl.memory_data)
+
 
 @[c_export("pcre2_set_callout_8")]
 fn pcre2_set_callout_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int, p2: *mut c_void) -> c_int:

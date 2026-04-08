@@ -3826,13 +3826,19 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
         if nc >= 2:
             let cond = ci_trans_bool_expr(session, with_ci_child(session, cursor, 0), scope)
             if cond.len() > 0:
-                let then_body = ci_trans_stmt(session, with_ci_child(session, cursor, 1), indent + 1, scope)
+                let then_child = with_ci_child(session, cursor, 1)
+                let then_body = ci_trans_stmt(session, then_child, indent + 1, scope)
                 if then_body.len() > 0:
-                    var result = "if " ++ cond ++ ":\n" ++ then_body
+                    // If then_body is a single statement (not a compound block),
+                    // it needs indentation added
+                    let then_text = if with_ci_cursor_kind(session, then_child) != CXK_COMPOUND_STMT: ci_indent_str(indent + 1) ++ then_body ++ "\n" else: then_body
+                    var result = "if " ++ cond ++ ":\n" ++ then_text
                     if nc > 2:
-                        let else_body = ci_trans_stmt(session, with_ci_child(session, cursor, 2), indent + 1, scope)
+                        let else_child = with_ci_child(session, cursor, 2)
+                        let else_body = ci_trans_stmt(session, else_child, indent + 1, scope)
                         if else_body.len() > 0:
-                            result = result ++ ci_indent_str(indent) ++ "else:\n" ++ else_body
+                            let else_text = if with_ci_cursor_kind(session, else_child) != CXK_COMPOUND_STMT: ci_indent_str(indent + 1) ++ else_body ++ "\n" else: else_body
+                            result = result ++ ci_indent_str(indent) ++ "else:\n" ++ else_text
                     return result
         return ""
 
@@ -5507,6 +5513,16 @@ fn ci_map_libc_call(callee: str, args: str) -> str:
         return "to_lower(" ++ args ++ ")"
     if callee == "toupper":
         return "to_upper(" ++ args ++ ")"
+
+    // macOS builtin wrappers for memory functions
+    if callee == "__builtin___memcpy_chk":
+        // __builtin___memcpy_chk(dst, src, n, obj_size) → mem_copy(dst, src, n)
+        // Drop the 4th arg (object size for bounds checking)
+        return "mem_copy(" ++ args ++ ")"  // TODO: strip 4th arg
+    if callee == "__builtin___memmove_chk":
+        return "mem_move(" ++ args ++ ")"
+    if callee == "__builtin___memset_chk":
+        return "mem_set(" ++ args ++ ")"
 
     // I/O (keep as extern — these truly need libc)
     // printf, fprintf, snprintf stay as-is (will need c_import for programs that use them)
