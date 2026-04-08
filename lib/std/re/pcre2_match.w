@@ -67,6 +67,9 @@ extern fn pcre2_dfa_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_u
 // Internal PCRE2 symbols
 extern let null_str: u8
 
+// Internal PCRE2 symbols
+extern fn match_(start: *const u8, start_code: *const u8, top_bracket: c_uint, frame_size: c_ulong, match_data: *mut pcre2_real_match_data_8, mb: *mut match_block_8) -> c_int
+
 @[c_export("pcre2_match_8")]
 fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, start_offset: c_ulong, __param_options: c_uint, match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8) -> c_int:
     var subject = __param_subject
@@ -111,6 +114,7 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
     var p: *const u8 = null
     var check_length: c_ulong = 0
     var pp: *const u8 = null
+    var cb: pcre2_callout_block_8 = pcre2_callout_block_8 {}
     var __pc: i32 = 0
     while true:
         match __pc

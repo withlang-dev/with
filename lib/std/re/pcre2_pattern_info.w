@@ -58,6 +58,8 @@ extern fn pcre2_compile_8(p0: *const u8, p1: c_ulong, p2: c_uint, p3: *mut c_int
 extern fn pcre2_code_free_8(p0: *mut pcre2_real_code_8) -> void
 extern fn pcre2_code_copy_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8
 extern fn pcre2_code_copy_with_tables_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8
+extern let _pcre2_OP_lengths_8: *const u8
+
 @[c_export("pcre2_pattern_info_8")]
 fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *mut c_void) -> c_int:
     var re: *const pcre2_real_code_8 = null // init: untranslatable
