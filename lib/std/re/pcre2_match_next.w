@@ -2,6 +2,14 @@
 use std.re.defs
 
 type BOOL = c_int
+extern fn imaxabs(j: c_long) -> c_long
+type imaxdiv_t { quot: c_long = 0, rem: c_long = 0 }
+type struct_imaxdiv_t = imaxdiv_t
+extern fn imaxdiv(__numer: c_long, __denom: c_long) -> imaxdiv_t
+extern fn strtoimax(__nptr: *const i8, __endptr: *mut *mut i8, __base: c_int) -> c_long
+extern fn strtoumax(__nptr: *const i8, __endptr: *mut *mut i8, __base: c_int) -> c_ulong
+extern fn wcstoimax(__nptr: *const c_int, __endptr: *mut *mut c_int, __base: c_int) -> c_long
+extern fn wcstoumax(__nptr: *const c_int, __endptr: *mut *mut c_int, __base: c_int) -> c_ulong
 type PCRE2_UCHAR8 = u8
 type PCRE2_SPTR8 = *const u8
 type pcre2_general_context_8 = pcre2_real_general_context_8
@@ -721,6 +729,17 @@ extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_
 extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
 extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
 extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
+fn do_bumpalong(match_data: *mut pcre2_real_match_data_8, offset: c_ulong) -> c_ulong:
+    var subject: *const u8 = null // init: untranslatable
+    var subject_length: c_ulong = 0 // init: untranslatable
+    if (if (if (if subject[offset] == 13: 1 else: 0) != 0 and (if (offset +% 1) < subject_length: 1 else: 0) != 0: 1 else: 0) != 0 and (if subject[(offset +% 1)] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+        match match_data.code.newline_convention
+            3 => 0
+            _ => 0
+
+
+    return (offset +% 1)
+
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0

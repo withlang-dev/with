@@ -2,6 +2,14 @@
 use std.re.defs
 
 type BOOL = c_int
+extern fn imaxabs(j: c_long) -> c_long
+type imaxdiv_t { quot: c_long = 0, rem: c_long = 0 }
+type struct_imaxdiv_t = imaxdiv_t
+extern fn imaxdiv(__numer: c_long, __denom: c_long) -> imaxdiv_t
+extern fn strtoimax(__nptr: *const i8, __endptr: *mut *mut i8, __base: c_int) -> c_long
+extern fn strtoumax(__nptr: *const i8, __endptr: *mut *mut i8, __base: c_int) -> c_ulong
+extern fn wcstoimax(__nptr: *const c_int, __endptr: *mut *mut c_int, __base: c_int) -> c_long
+extern fn wcstoumax(__nptr: *const c_int, __endptr: *mut *mut c_int, __base: c_int) -> c_ulong
 type PCRE2_UCHAR8 = u8
 type PCRE2_SPTR8 = *const u8
 type pcre2_general_context_8 = pcre2_real_general_context_8
@@ -1008,6 +1016,45 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
         (current = current + 1)
 
     return 1
+
+fn _pcre2_compile_process_capture_list(pptr: *mut c_uint, offset: c_ulong, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_ulong:
+    var pptr = pptr
+    var offset = offset
+    var i: c_ulong = 0 // init: untranslatable
+    var size: c_ulong = 0 // init: untranslatable
+    var ng: *mut named_group_8 = null // init: untranslatable
+    var name: *const u8 = null // init: untranslatable
+    var length: c_uint = 0 // init: untranslatable
+    var end: *mut named_group_8 = null // init: untranslatable
+    while 1 != 0:
+        (pptr = pptr + 1)
+        return size
+
+
+fn do_heapify_u16(captures: *mut c_ushort, size: c_ulong, i: c_ulong):
+    var i = i
+    var max: c_ulong = 0 // init: untranslatable
+    var left: c_ulong = 0 // init: untranslatable
+    var right: c_ulong = 0 // init: untranslatable
+    var tmp: c_ushort = 0 // init: untranslatable
+    while 1 != 0:
+        (max = i)
+        (left = (((i << 1)) +% 1))
+        (right = (left +% 1))
+        if (if (if left < size: 1 else: 0) != 0 and (if captures[left] > captures[max]: 1 else: 0) != 0: 1 else: 0) != 0:
+            (max = left)
+
+        if (if (if right < size: 1 else: 0) != 0 and (if captures[right] > captures[max]: 1 else: 0) != 0: 1 else: 0) != 0:
+            (max = right)
+
+        if (if i == max: 1 else: 0) != 0:
+            return
+
+        (tmp = captures[i])
+        (captures[i] = captures[max])
+        (captures[max] = tmp)
+        (i = max)
+
 
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
