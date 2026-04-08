@@ -40,6 +40,8 @@ extern fn pcre2_convert_context_create_8(p0: *mut pcre2_real_general_context_8) 
 extern fn pcre2_convert_context_free_8(p0: *mut pcre2_real_convert_context_8) -> void
 extern fn pcre2_set_glob_escape_8(p0: *mut pcre2_real_convert_context_8, p1: c_uint) -> c_int
 extern fn pcre2_set_glob_separator_8(p0: *mut pcre2_real_convert_context_8, p1: c_uint) -> c_int
+extern fn convert_glob(options: c_uint, pattern: *const u8, plength: c_ulong, utf: c_int, use_buffer: *mut u8, use_length: c_ulong, bufflenptr: *mut c_ulong, dummyrun: c_int, ccontext: *mut pcre2_real_convert_context_8) -> c_int
+
 @[c_export("pcre2_pattern_convert_8")]
 fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong, options: c_uint, buffptr: *mut *mut u8, bufflenptr: *mut c_ulong, __param_ccontext: *mut pcre2_real_convert_context_8) -> c_int:
     var pattern = __param_pattern

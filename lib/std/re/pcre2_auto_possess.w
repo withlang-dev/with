@@ -670,6 +670,12 @@ type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: 
 type struct_match_block_8 = match_block_8
 type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, start_subject: *const u8 = null, end_subject: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, tables: *const u8 = null, start_offset: c_ulong = 0, heap_limit: c_uint = 0, heap_used: c_ulong = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, allowemptypartial: c_int = 0, nl: [4]u8, bsr_convention: c_ushort = 0, cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null, recursive: *mut dfa_recursion_info = null }
 type struct_dfa_match_block_8 = dfa_match_block_8
+// Static functions and internal data (not auto-migrated)
+extern fn get_repeat_base(c: u8) -> u8
+extern fn get_chr_property_list(code: *const u8, utf: BOOL, ucp: BOOL, fcc: *const u8, list: *mut c_uint) -> *const u8
+extern fn compare_opcodes(code: *const u8, utf: BOOL, ucp: BOOL, cb: *const compile_block_8, base_list: *const c_uint, base_end: *const u8, rec_limit: *mut c_int) -> BOOL
+extern let _pcre2_OP_lengths_8: *const u8
+
 @[c_export("_pcre2_auto_possessify_8")]
 fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -> c_int:
     var code = __param_code
