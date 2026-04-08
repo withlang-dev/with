@@ -1,0 +1,64 @@
+diff -ruN a/pcre2_config.w b/pcre2_config.w
+--- a/pcre2_config.w	2026-04-08 13:39:57
++++ b/pcre2_config.w	2026-04-08 13:39:57
+@@ -48,7 +48,7 @@
+ 
+         9 => 0
+         11 =>
+-                        var v: *const i8 = (if ((if 32 == 0: 1 else: 0)) != 0: XSTRING(PCRE2_MAJOR.PCRE2_MINOR PCRE2_DATE) else: XSTRING(PCRE2_MAJOR.PCRE2_MINOR) XSTRING(PCRE2_PRERELEASE PCRE2_DATE))
++                        var v: *const i8 = "10.48 2025-06-10" as *const i8  // XSTRING macro expanded
+ 
+ 
+     return 0
+diff -ruN a/pcre2_error.w b/pcre2_error.w
+--- a/pcre2_error.w	2026-04-08 13:39:57
++++ b/pcre2_error.w	2026-04-08 13:39:57
+@@ -94,6 +94,10 @@
+ extern fn pcre2_jit_stack_create_8(p0: c_ulong, p1: c_ulong, p2: *mut pcre2_real_general_context_8) -> *mut pcre2_real_jit_stack_8
+ extern fn pcre2_jit_stack_assign_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, p2: *mut c_void) -> void
+ extern fn pcre2_jit_stack_free_8(p0: *mut pcre2_real_jit_stack_8) -> void
++// Static const arrays (not auto-migrated - defined in C source)
++extern let compile_error_texts: *const u8
++extern let match_error_texts: *const u8
++
+ @[c_export("pcre2_get_error_message_8")]
+ fn pcre2_get_error_message_8(enumber: c_int, buffer: *mut u8, size: c_ulong) -> c_int:
+     var message: *const u8 = null
+diff -ruN a/pcre2_match_data.w b/pcre2_match_data.w
+--- a/pcre2_match_data.w	2026-04-08 13:39:57
++++ b/pcre2_match_data.w	2026-04-08 13:39:57
+@@ -118,7 +118,7 @@
+ 
+ @[c_export("pcre2_get_ovector_pointer_8")]
+ fn pcre2_get_ovector_pointer_8(match_data: *mut pcre2_real_match_data_8) -> *mut c_ulong:
+-    return match_data.ovector
++    return &match_data.ovector as *mut c_ulong  // flexible array member
+ 
+ @[c_export("pcre2_get_startchar_8")]
+ fn pcre2_get_startchar_8(match_data: *mut pcre2_real_match_data_8) -> c_ulong:
+diff -ruN a/pcre2_serialize.w b/pcre2_serialize.w
+--- a/pcre2_serialize.w	2026-04-08 13:39:57
++++ b/pcre2_serialize.w	2026-04-08 13:39:57
+@@ -147,7 +147,6 @@
+                 with_memcpy(tables as *i8, src_bytes as *i8, 1088 as i64)
+                 (i = 0)
+                 while (if i < number_of_codes: 1 else: 0) != 0:
+-                    var blocksize: c_ulong = 0 // init: untranslatable
+                     with_memcpy(&blocksize as *i8, (src_bytes + 72) as *i8, sizeof[c_ulong]() as i64)
+                     if (if blocksize <= sizeof[pcre2_real_code_8](): 1 else: 0) != 0:
+                         comptime_error("goto not supported")
+diff -ruN a/pcre2_study.w b/pcre2_study.w
+--- a/pcre2_study.w	2026-04-08 13:39:57
++++ b/pcre2_study.w	2026-04-08 13:39:57
+@@ -3,7 +3,11 @@
+ 
+ type BOOL = c_int
+ type PCRE2_UCHAR8 = u8
++type PCRE2_UCHAR16 = c_ushort
++type PCRE2_UCHAR32 = c_uint
+ type PCRE2_SPTR8 = *const u8
++type PCRE2_SPTR16 = *const c_ushort
++type PCRE2_SPTR32 = *const c_uint
+ type pcre2_general_context_8 = pcre2_real_general_context_8
+ type pcre2_compile_context_8 = pcre2_real_compile_context_8
+ type pcre2_match_context_8 = pcre2_real_match_context_8
