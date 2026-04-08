@@ -17,7 +17,8 @@ set -euo pipefail
 #
 # Environment:
 #   WITH_TEST_JOBS=N     — number of parallel jobs (default: CPU count)
-#   WITH_TEST_TIMING=1   — show per-test timing, slowest-tests summary, and >5s/>10s buckets
+#   WITH_TEST_TIMING=1   — show per-test timing, under-load summaries, suite throughput, and isolated reruns
+#   WITH_TEST_TIMING_ISOLATED_TOP=N — with timing enabled, rerun top N slow under-load tests serially (default: 10, 0 disables)
 #   WITH_TEST_TIMEOUT=N  — per-test timeout in seconds (default: 30)
 #   WITH_TEST_DEBUG=1    — keep debug info for ephemeral test binaries (default: 0, pass -g0)
 
@@ -29,6 +30,7 @@ COMPILER="${WITH:-./out/bin/with-stage2}"
 RUN_TIMEOUT_SECS="${WITH_TEST_TIMEOUT:-30}"
 JOBS="${WITH_TEST_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)}"
 SHOW_TIMING="${WITH_TEST_TIMING:-0}"
+ISOLATED_TIMING_TOP="${WITH_TEST_TIMING_ISOLATED_TOP:-10}"
 KEEP_TEST_DEBUG="${WITH_TEST_DEBUG:-0}"
 
 # Portable millisecond clock. Uses perl for sub-second precision
@@ -101,7 +103,7 @@ run_single_test() {
     local t_end
     t_end="$(_epoch_ms)"
     local elapsed_ms=$(( t_end - t_start ))
-    printf '%s\t%d\n' "$msg" "$elapsed_ms" > "$result_file"
+    printf '%s\t%d\t%s\n' "$msg" "$elapsed_ms" "$file" > "$result_file"
   }
 
   local my_tmp
@@ -283,6 +285,8 @@ run_single_test() {
 export -f run_single_test _epoch_ms
 export results_dir
 
+suite_start_ms="$(_epoch_ms)"
+
 # Run tests in parallel
 idx=0
 for f in "${test_files[@]}"; do
@@ -298,6 +302,9 @@ for f in "${test_files[@]}"; do
 done
 wait
 
+suite_end_ms="$(_epoch_ms)"
+suite_elapsed_ms=$(( suite_end_ms - suite_start_ms ))
+
 # Collect results
 passed=0
 failed=0
@@ -307,12 +314,15 @@ timing_data=""
 for result_file in "$results_dir"/result_*; do
   [[ -e "$result_file" ]] || continue
   raw="$(cat "$result_file")"
-  # Split on tab: message \t elapsed_ms
+  # Split on tab: message \t elapsed_ms \t file
   msg="${raw%%	*}"
-  ms="${raw##*	}"
-  # If no tab (shouldn't happen), treat whole line as message, ms=0
+  rest="${raw#*	}"
+  ms="${rest%%	*}"
+  file="${rest#*	}"
+  # If no tab (shouldn't happen), treat whole line as message, ms=0, file=""
   if [[ "$msg" == "$raw" ]]; then
     ms=0
+    file=""
   fi
 
   if [[ "$SHOW_TIMING" == "1" ]]; then
@@ -321,7 +331,7 @@ for result_file in "$results_dir"/result_*; do
     echo "$msg"
   fi
 
-  timing_data="${timing_data}${ms}	${msg}\n"
+  timing_data="${timing_data}${ms}	${msg}	${file}\n"
 
   case "$msg" in
     PASS*)
@@ -345,9 +355,18 @@ if [[ -n "$failures_list" ]]; then
 fi
 
 if [[ "$SHOW_TIMING" == "1" ]]; then
+  suite_elapsed_secs="$(awk -v ms="$suite_elapsed_ms" 'BEGIN { printf "%.3f", ms / 1000.0 }')"
+  tests_per_sec="$(awk -v count="$passed" -v failed="$failed" -v ms="$suite_elapsed_ms" 'BEGIN { if (ms <= 0) { print "0.00"; } else { printf "%.2f", (count + failed) * 1000.0 / ms } }')"
+
   echo ""
-  echo "--- slowest tests ---"
-  printf "%b" "$timing_data" | sort -t'	' -k1 -rn | head -20 | while IFS='	' read -r tms tname; do
+  echo "--- suite throughput ---"
+  printf "  %6d ms  full suite wall time under load\n" "$suite_elapsed_ms"
+  printf "  %6s s   elapsed seconds\n" "$suite_elapsed_secs"
+  printf "  %6s     tests/sec with jobs=%s\n" "$tests_per_sec" "$JOBS"
+
+  echo ""
+  echo "--- slowest tests under load ---"
+  printf "%b" "$timing_data" | sort -t'	' -k1 -rn | head -20 | while IFS='	' read -r tms tname tfile; do
     [[ -z "$tms" ]] && continue
     printf "  %6d ms  %s\n" "$tms" "$tname"
   done
@@ -362,7 +381,7 @@ if [[ "$SHOW_TIMING" == "1" ]]; then
     )"
 
     echo ""
-    echo "--- tests over ${label} (${count}) ---"
+    echo "--- tests over ${label} under load (${count}) ---"
     if [[ "$count" -eq 0 ]]; then
       return
     fi
@@ -371,7 +390,7 @@ if [[ "$SHOW_TIMING" == "1" ]]; then
       awk -F'	' -v min_ms="$threshold_ms" 'NF >= 2 && ($1 + 0) > min_ms { print }' |
       sort -t'	' -k1 -rn |
       head -20 |
-      while IFS='	' read -r tms tname; do
+      while IFS='	' read -r tms tname tfile; do
         [[ -z "$tms" ]] && continue
         printf "  %6d ms  %s\n" "$tms" "$tname"
       done
@@ -379,6 +398,38 @@ if [[ "$SHOW_TIMING" == "1" ]]; then
 
   print_threshold_summary 5000 "5s"
   print_threshold_summary 10000 "10s"
+
+  if [[ "$failed" -eq 0 && "$ISOLATED_TIMING_TOP" -gt 0 ]]; then
+    isolated_tmp="$(mktemp -d)"
+    top_under_load_file="$isolated_tmp/top_under_load.tsv"
+
+    printf "%b" "$timing_data" |
+      awk -F'	' 'NF >= 3 && $3 != "" { print }' |
+      sort -t'	' -k1 -rn |
+      head -"$ISOLATED_TIMING_TOP" > "$top_under_load_file"
+
+    echo ""
+    echo "--- isolated rerun of top ${ISOLATED_TIMING_TOP} under-load tests ---"
+
+    while IFS='	' read -r under_ms under_msg under_file; do
+      [[ -z "$under_file" ]] && continue
+      isolated_result="$isolated_tmp/result.tsv"
+      run_single_test "$under_file" "$isolated_result"
+      isolated_raw="$(cat "$isolated_result")"
+      isolated_msg="${isolated_raw%%	*}"
+      isolated_rest="${isolated_raw#*	}"
+      isolated_ms="${isolated_rest%%	*}"
+      delta_ms=$(( under_ms - isolated_ms ))
+
+      if [[ "$isolated_msg" != PASS* ]]; then
+        printf "  %6d ms isolated / %6d ms under load  %s  (isolated rerun: %s)\n" "$isolated_ms" "$under_ms" "$isolated_msg" "$isolated_msg"
+      else
+        printf "  %6d ms isolated / %6d ms under load  %s  (contention %+d ms)\n" "$isolated_ms" "$under_ms" "$isolated_msg" "$delta_ms"
+      fi
+    done < "$top_under_load_file"
+
+    rm -rf "$isolated_tmp"
+  fi
 fi
 
 if [[ "$failed" -gt 0 ]]; then
