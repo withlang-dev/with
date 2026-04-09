@@ -3848,11 +3848,14 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                     let pointee = with_ci_cursor_pointee_type(session, cursor)
                     if pointee.len() > 0:
                         return "(&" ++ inner ++ "[0] as *mut " ++ pointee ++ ")"
-            // Pointer-to-pointer cast (e.g., void* to typed*)
+            // Pointer-to-pointer cast — only emit when converting TO a
+            // concrete typed pointer (not void*). Casts to void* are C-isms
+            // that don't help in With where function signatures use *i8.
             if with_ci_type_is_pointer(session, cursor) != 0 and with_ci_type_is_pointer(session, child_0) != 0 and outer_ty_str != inner_ty_str:
-                let inner = ci_trans_expr(session, child_0, scope)
-                if inner.len() > 0:
-                    return "(" ++ inner ++ " as " ++ outer_ty_str ++ ")"
+                if not ci_str_contains(outer_ty_str, "c_void"):
+                    let inner = ci_trans_expr(session, child_0, scope)
+                    if inner.len() > 0:
+                        return "(" ++ inner ++ " as " ++ outer_ty_str ++ ")"
             return ci_trans_expr(session, child_0, scope)
         if nc > 0:
             return ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
