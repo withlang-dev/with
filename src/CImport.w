@@ -417,6 +417,19 @@ fn ci_mark_cached_names(text: str):
                 with_cimport_mark_name_emitted(name)
         pos = line_end + 1
 
+// Escape a string for use inside single quotes in a shell command.
+// Replaces ' with '\'' (end quote, escaped quote, start quote).
+fn ci_shell_escape(s: str) -> str:
+    var result = ""
+    var i = 0
+    while i as i64 < s.len():
+        if s.byte_at(i as i64) == 39:  // '\''
+            result = result ++ "'\\''"
+        else:
+            result = result ++ s.slice(i as i64, i as i64 + 1)
+        i = i + 1
+    result
+
 fn ci_extract_ident(s: str) -> str:
     var end = 0
     while end as i64 < s.len():
@@ -5290,7 +5303,7 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str) -> i32:
     with_fs_mkdir_p(output_dir)
 
     // Find all .c files using shell
-    let find_cmd = "find '" ++ input_dir ++ "' -name '*.c' -not -name '.*' -type f 2>/dev/null"
+    let find_cmd = "find '" ++ ci_shell_escape(input_dir) ++ "' -name '*.c' -not -name '.*' -type f 2>/dev/null"
     let find_result = with_fs_read_file_cmd(find_cmd)
     if find_result.len() == 0:
         eprint("migrate: no .c files found in " ++ input_dir)
