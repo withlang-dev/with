@@ -3426,9 +3426,9 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     if kind == CXK_INT_LITERAL:
         if with_ci_eval_int_valid(session, cursor) != 0:
             let ival = with_ci_eval_int_value(session, cursor)
-            // Values > i32 max that fit in u32: emit as hex with explicit cast
+            // Values > i32 max that fit in u32: emit as hex
             if ival > 2147483647 and ival <= 4294967295:
-                return "(" ++ ci_i64_to_hex(ival) ++ " as c_uint)"
+                return ci_i64_to_hex(ival)
             return f"{ival}"
         return with_ci_cursor_source_text(session, cursor)
 
