@@ -826,7 +826,8 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             self.emit_error("unsafe is not allowed in comptime", node)
         let saved_unsafe = self.in_unsafe
         self.in_unsafe = 1
-        let unsafe_result = self.check_expr(self.ast.get_data0(node))
+        // Propagate expected type through unsafe block
+        let unsafe_result = if self.has_expected_type != 0: self.check_expr_with_expected(self.ast.get_data0(node), self.expected_expr_type) else: self.check_expr(self.ast.get_data0(node))
         self.in_unsafe = saved_unsafe
         return unsafe_result
 
