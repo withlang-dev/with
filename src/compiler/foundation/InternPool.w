@@ -31,7 +31,8 @@ fn FndInternStringArena.store(self: FndInternStringArena, s: str) -> str:
     let len = s.len()
     let need = len + 1
     if self.offset + need > FND_INTERN_PAGE_SIZE:
-        let page = with_alloc(FND_INTERN_PAGE_SIZE)
+        let page_size = if need > FND_INTERN_PAGE_SIZE: need else: FND_INTERN_PAGE_SIZE
+        let page = with_alloc(page_size)
         self.pages.push(page)
         self.offset = 0
     let page = self.pages.get(self.pages.len() - 1)
