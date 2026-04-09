@@ -3426,9 +3426,9 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     if kind == CXK_INT_LITERAL:
         if with_ci_eval_int_valid(session, cursor) != 0:
             let ival = with_ci_eval_int_value(session, cursor)
-            // Values > i32 max that fit in u32: emit as hex for unsigned clarity
+            // Values > i32 max that fit in u32: emit as hex with explicit cast
             if ival > 2147483647 and ival <= 4294967295:
-                return ci_i64_to_hex(ival)
+                return "(" ++ ci_i64_to_hex(ival) ++ " as c_uint)"
             return f"{ival}"
         return with_ci_cursor_source_text(session, cursor)
 
@@ -3616,7 +3616,11 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                     if with_ci_type_is_unsigned(session, cursor) != 0:
                         return "(0 -% " ++ operand ++ ")"
                     return "(0 - " ++ operand ++ ")"
-                if op == UO_LNOT: return "(not " ++ operand ++ ")"
+                if op == UO_LNOT:
+                    // C's ! on non-bool produces int (0 or 1), not bool
+                    if not with_ci_type_is_bool(session, with_ci_child(session, cursor, 0)):
+                        return "(if " ++ operand ++ " != 0: 0 else: 1)"
+                    return "(not " ++ operand ++ ")"
                 if op == UO_NOT: return "(0 - " ++ operand ++ " - 1)"
                 if op == UO_PLUS: return operand
                 if op == UO_DEREF: return "unsafe: *" ++ operand

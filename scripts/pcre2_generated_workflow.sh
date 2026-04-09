@@ -74,6 +74,16 @@ prepare_generated_tree() {
         printf '\n// Cross-module extern symbols\n'
         printf '%s\n' 'extern let _pcre2_OP_lengths_8: [186]u8'
         printf '%s\n' 'extern let _pcre2_default_tables_8: *const u8'
+        # STRING_* constants from pcre2_internal.h
+        printf '\n// PCRE2 string constants (from pcre2_internal.h macros)\n'
+        printf '%s\n' 'let STRING_MARK: *const u8 = "MARK"'
+        printf '%s\n' 'let STRING_DEFINE: *const u8 = "DEFINE"'
+        printf '%s\n' 'let STRING_VERSION: *const u8 = "VERSION"'
+        printf '%s\n' 'let STRING_WEIRD_STARTWORD: *const u8 = "[:<:]]"'
+        printf '%s\n' 'let STRING_WEIRD_ENDWORD: *const u8 = "[:>:]]"'
+        # Helper function for strchr mapping
+        printf '\n// strchr mapping (migrator emits string_find_char for strchr)\n'
+        printf '%s\n' 'fn string_find_char(s: *const i8, c: i32) -> *const i8: memchr(s, c, strlen(s))'
     } > "$generated_dir/defs.w"
 
     local dst line
@@ -93,6 +103,13 @@ prepare_generated_tree() {
         grep -v 'pcre2_.*_16\b\|pcre2_.*_32\b\|PCRE2_UCHAR16\|PCRE2_UCHAR32\|PCRE2_SPTR16\|PCRE2_SPTR32' "$dst" > "$clean_tmp" || true
         mv "$clean_tmp" "$dst"
         perl -0pi -e 's/\(\(0 as \*mut c_void\)\)/null/g' "$dst"
+        # Expand XSTRING macros in pcre2_config (stringify version strings)
+        if [ "$(basename "$dst")" = "pcre2_config.w" ]; then
+            perl -pi -e 's/XSTRING\(PCRE2_MAJOR\.PCRE2_MINOR PCRE2_DATE\)/"10.48 2025-10-21"/g' "$dst"
+            perl -pi -e 's/XSTRING\(PCRE2_MAJOR\.PCRE2_MINOR\) XSTRING\(PCRE2_PRERELEASE PCRE2_DATE\)/"10.48" "-DEV 2025-10-21"/g' "$dst"
+            perl -pi -e 's/XSTRING\(PCRE2_MAJOR\.PCRE2_MINOR\)/"10.48"/g' "$dst"
+            perl -pi -e 's/XSTRING\(PCRE2_PRERELEASE PCRE2_DATE\)/"-DEV 2025-10-21"/g' "$dst"
+        fi
     done
 }
 
