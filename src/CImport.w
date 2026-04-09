@@ -3580,16 +3580,6 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                     let log_op = if op == BO_LAND: "and" else: "or"
                     return "(if " ++ bool_lhs ++ " " ++ log_op ++ " " ++ bool_rhs ++ ": 1 else: 0)"
 
-                // Chained assignment: a = (b = c) → decompose to (b = c)\n(a = b)
-                if op == BO_ASSIGN:
-                    let rhs_kind = with_ci_cursor_kind(session, rhs_cursor)
-                    if rhs_kind == CXK_BINARY_OP and with_ci_binary_op(session, rhs_cursor) == BO_ASSIGN:
-                        // rhs is itself an assignment — flatten the chain
-                        let inner_lhs = ci_trans_expr(session, with_ci_child(session, rhs_cursor, 0), scope)
-                        let inner_assign = ci_trans_expr(session, rhs_cursor, scope)
-                        return inner_assign ++ "\n" ++ "(" ++ lhs ++ " = " ++ inner_lhs ++ ")"
-                    return "(" ++ lhs ++ " = " ++ rhs ++ ")"
-
                 let op_str = ci_bo_to_str_typed(op, is_unsigned)
                 if op_str.len() > 0:
                     // C comparisons return int, not bool.
@@ -4113,6 +4103,21 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                         result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = 0"
             i = i + 1
         return result
+
+    // Chained assignment: a = (b = c) → decompose into sequential statements
+    if kind == CXK_BINARY_OP:
+        let bo = with_ci_binary_op(session, cursor)
+        if bo == BO_ASSIGN:
+            let nc = with_ci_num_children(session, cursor)
+            if nc >= 2:
+                let rhs_cursor = with_ci_child(session, cursor, 1)
+                if with_ci_cursor_kind(session, rhs_cursor) == CXK_BINARY_OP and with_ci_binary_op(session, rhs_cursor) == BO_ASSIGN:
+                    // Decompose: emit inner assignment as statement first, then outer
+                    let inner_stmt = ci_trans_stmt(session, rhs_cursor, indent, scope)
+                    let inner_lhs = ci_trans_expr(session, with_ci_child(session, rhs_cursor, 0), scope)
+                    let outer_lhs = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+                    if inner_stmt.len() > 0 and outer_lhs.len() > 0 and inner_lhs.len() > 0:
+                        return inner_stmt ++ "\n" ++ ci_indent_str(indent) ++ "(" ++ outer_lhs ++ " = " ++ inner_lhs ++ ")"
 
     // Expression statement — translate as expression
     let expr = ci_trans_expr(session, cursor, scope)
