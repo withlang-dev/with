@@ -1185,10 +1185,21 @@ fn ci_default_for_type(ty: str) -> str:
     // Check: if the type resolves to a primitive int alias, use 0.
     // Otherwise leave empty (no default) for struct/union/opaque types.
     if ci_starts_with(ty, "Vector("): return ""
-    // Array types [N]T → use unsafe_zeroed
-    if ty.len() > 0 and ty.byte_at(0) == 91: return "unsafe_zeroed()"
-    // Struct/union/opaque types → use unsafe_zeroed
-    "unsafe_zeroed()"
+    // Array types [N]T → emit [0 as T; N]
+    if ty.len() > 0 and ty.byte_at(0) == 91:
+        // Parse [N]T to get element type and count
+        var close = 1
+        while close as i64 < ty.len() and ty.byte_at(close as i64) != 93:
+            close = close + 1
+        if close as i64 < ty.len():
+            let count = ty.slice(1, close as i64)
+            let elem = ty.slice((close + 1) as i64, ty.len())
+            let elem_default = ci_default_for_type(elem)
+            if elem_default.len() > 0:
+                return "[" ++ elem_default ++ " as " ++ elem ++ "; " ++ count ++ "]"
+        return ""
+    // Unknown types (struct/union/opaque) — no safe default
+    ""
 
 // ── Enum translation ────────────────────────────────────────
 
@@ -4051,9 +4062,9 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                         // Can't translate initializer — emit with default value
                         let default_val = ci_default_for_type(vty_str)
                         if default_val.len() > 0:
-                            result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ default_val ++ " // init failed"
+                            result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ default_val
                         else:
-                            result = result ++ "var " ++ vname ++ " = 0 // init failed: " ++ vty_str
+                            result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = 0"
                 else:
                     if result.len() > 0:
                         result = result ++ "\n" ++ ci_indent_str(indent)
@@ -4061,7 +4072,7 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                     if default_val.len() > 0:
                         result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ default_val
                     else:
-                        result = result ++ "var " ++ vname ++ " = 0 // no default for " ++ vty_str
+                        result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = 0"
             i = i + 1
         return result
 
@@ -4527,20 +4538,19 @@ fn ci_trans_decl_stmt_scoped(session: i64, cursor: i32, indent: i32, scope: str)
                 if init.len() > 0:
                     result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ init
                 else:
-                    // Initializer failed to translate — emit declaration with
-                    // default value. NEVER drop a declaration silently.
+                    // Initializer failed to translate — emit declaration with default
                     let default_val = ci_default_for_type(vty_str)
                     if default_val.len() > 0:
-                        result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ default_val ++ " // init: untranslatable"
+                        result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ default_val
                     else:
-                        result = result ++ "var " ++ mangled ++ " = 0 // init: untranslatable (" ++ vty_str ++ ")"
+                        result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = 0"
             else:
                 // No initializer — C zero-initializes statics, locals are undefined
                 let default_val = ci_default_for_type(vty_str)
                 if default_val.len() > 0:
                     result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ default_val
                 else:
-                    result = result ++ "var " ++ mangled ++ " = 0 // no default for " ++ vty_str
+                    result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = 0"
         i = i + 1
     if new_scope != scope:
         return "SCOPE:" ++ new_scope ++ "\n" ++ result
@@ -6086,6 +6096,26 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
                 let body_cursor = with_ci_child(session, cursor, 1)
                 return ci_trans_switch_body_goto(session, body_cursor, cond, indent, scope, label_map, loop_depth)
         return ""
+
+    // Declaration statement inside goto body — variable was hoisted,
+    // so emit assignment instead of re-declaration to avoid shadowing.
+    if kind == CXK_DECL_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        var result = ""
+        var di = 0
+        while di < nc:
+            let dchild = with_ci_child(session, cursor, di)
+            if with_ci_cursor_kind(session, dchild) == CXK_VAR_DECL:
+                let vname = ci_escape_reserved(with_ci_cursor_spelling(session, dchild))
+                let init_nc = with_ci_num_children(session, dchild)
+                if init_nc > 0:
+                    let init_expr = ci_trans_expr(session, with_ci_child(session, dchild, 0), scope)
+                    if init_expr.len() > 0:
+                        if result.len() > 0:
+                            result = result ++ "\n"
+                        result = result ++ vname ++ " = " ++ init_expr
+            di = di + 1
+        return result
 
     // Everything else: use the normal translator (break, continue, return, etc.)
     ci_trans_stmt(session, cursor, indent, scope)
