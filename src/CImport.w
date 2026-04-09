@@ -4166,12 +4166,16 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                 // *(ptr = ptr + 1) = value → decompose LHS deref-of-assign
                 if with_ci_cursor_kind(session, lhs_cursor) == CXK_UNARY_OP and with_ci_unary_op(session, lhs_cursor) == UO_DEREF:
                     let deref_child = with_ci_child(session, lhs_cursor, 0)
-                    // Skip implicit cast wrappers (kind 100)
+                    // Skip implicit cast (kind 100) and ParenExpr wrappers
                     var inner_assign_cursor = deref_child
-                    if with_ci_cursor_kind(session, deref_child) == 100:
-                        let icc = with_ci_num_children(session, deref_child)
-                        if icc == 1:
-                            inner_assign_cursor = with_ci_child(session, deref_child, 0)
+                    var skip_depth = 0
+                    while skip_depth < 3:
+                        let ick = with_ci_cursor_kind(session, inner_assign_cursor)
+                        if (ick == 100 or ick == CXK_PAREN_EXPR) and with_ci_num_children(session, inner_assign_cursor) == 1:
+                            inner_assign_cursor = with_ci_child(session, inner_assign_cursor, 0)
+                            skip_depth = skip_depth + 1
+                        else:
+                            break
                     if with_ci_cursor_kind(session, inner_assign_cursor) == CXK_BINARY_OP and with_ci_binary_op(session, inner_assign_cursor) == BO_ASSIGN:
                         // *(ptr_assign) = rhs → decompose to: (ptr_assign), then (unsafe: *ptr = rhs)
                         let ptr_stmt = ci_trans_stmt(session, inner_assign_cursor, indent, scope)
