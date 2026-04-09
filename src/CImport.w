@@ -3828,12 +3828,32 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
 
     // VA_ARG expression — not directly translatable
     // CXCursor_UnexposedExpr can contain va_arg
-    if kind == 100:  // CXCursor_UnexposedExpr
+    if kind == 100:  // CXCursor_UnexposedExpr — often an ImplicitCastExpr
         // Try to evaluate as constant
         if with_ci_eval_int_valid(session, cursor) != 0:
-            return f"{with_ci_eval_int_value(session, cursor)}"
-        // Try to translate first child (implicit unwrap)
+            let ival = with_ci_eval_int_value(session, cursor)
+            if ival > 2147483647 and ival <= 4294967295:
+                return ci_i64_to_hex(ival)
+            return f"{ival}"
+        // Check for implicit cast semantics using safe type-string comparison
         let nc = with_ci_num_children(session, cursor)
+        if nc == 1:
+            let child_0 = with_ci_child(session, cursor, 0)
+            let outer_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
+            let inner_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, child_0))
+            // Array-to-pointer decay: inner is [N]T, outer is pointer
+            if inner_ty_str.len() > 0 and inner_ty_str.byte_at(0) == 91 and with_ci_type_is_pointer(session, cursor) != 0:
+                let inner = ci_trans_expr(session, child_0, scope)
+                if inner.len() > 0:
+                    let pointee = with_ci_cursor_pointee_type(session, cursor)
+                    if pointee.len() > 0:
+                        return "(&" ++ inner ++ "[0] as *mut " ++ pointee ++ ")"
+            // Pointer-to-pointer cast (e.g., void* to typed*)
+            if with_ci_type_is_pointer(session, cursor) != 0 and with_ci_type_is_pointer(session, child_0) != 0 and outer_ty_str != inner_ty_str:
+                let inner = ci_trans_expr(session, child_0, scope)
+                if inner.len() > 0:
+                    return "(" ++ inner ++ " as " ++ outer_ty_str ++ ")"
+            return ci_trans_expr(session, child_0, scope)
         if nc > 0:
             return ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
         return ""
