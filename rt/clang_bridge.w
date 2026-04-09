@@ -1541,16 +1541,23 @@ pub fn cimport_parse_macros(header_code: str) -> i64:
     *(((&mut c_path) as i64 + tlen + 2) as *mut u8) = 0
     let _ = rename(&template_path as *const [40]u8 as *const u8, &c_path as *const [64]u8 as *const u8)
 
-    // Build command: cc -E -dM file.c
+    // Build command: cc [-isysroot ...] [-I ...]* -E -dM file.c
     var cmd: [1024]u8 = [0 as u8; 1024]
     var cpos: i64 = 0
     let sysroot = get_sdk_path()
     if sysroot as i64 != 0:
         buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "cc -isysroot '\0" as *const u8)
         buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, sysroot)
-        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "' -E -dM '\0" as *const u8)
+        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "'\0" as *const u8)
     else:
-        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "cc -E -dM '\0" as *const u8)
+        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "cc\0" as *const u8)
+    var ip: i32 = 0
+    while ip < g_cimport_include_count:
+        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, " -I '\0" as *const u8)
+        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, g_cimport_include_paths[ip as i64] as *const u8)
+        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "'\0" as *const u8)
+        ip = ip + 1
+    buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, " -E -dM '\0" as *const u8)
     buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, &c_path as *const [64]u8 as *const u8)
     buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "' 2>/dev/null\0" as *const u8)
 
