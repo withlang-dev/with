@@ -3414,7 +3414,11 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     // Integer literal
     if kind == CXK_INT_LITERAL:
         if with_ci_eval_int_valid(session, cursor) != 0:
-            return f"{with_ci_eval_int_value(session, cursor)}"
+            let ival = with_ci_eval_int_value(session, cursor)
+            // Values > i32 max that fit in u32: emit as hex for unsigned clarity
+            if ival > 2147483647 and ival <= 4294967295:
+                return ci_i64_to_hex(ival)
+            return f"{ival}"
         return with_ci_cursor_source_text(session, cursor)
 
     // Float literal
@@ -4915,6 +4919,17 @@ fn ci_strip_float_suffix(s: str) -> str:
             break
     s.slice(0, end as i64)
 
+fn ci_i64_to_hex(val: i64) -> str:
+    let hex_chars = "0123456789abcdef"
+    var result = ""
+    var v = val
+    if v == 0: return "0x0"
+    while v > 0:
+        let digit = (v % 16) as i32
+        result = hex_chars.slice(digit as i64, (digit + 1) as i64) ++ result
+        v = v / 16
+    "0x" ++ result
+
 fn ci_is_integer_string(s: str) -> bool:
     if s.len() == 0: return false
     var i = 0
@@ -5847,6 +5862,8 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
         let default_val = ci_default_for_type(vtype)
         if default_val.len() > 0:
             output = output ++ ci_indent_str(indent) ++ "var " ++ vname ++ ": " ++ vtype ++ " = " ++ default_val ++ "\n"
+        else:
+            output = output ++ ci_indent_str(indent) ++ "var " ++ vname ++ ": " ++ vtype ++ " = 0\n"
 
         vi = name_end + 1
         if vi < var_names.len() as i32 and var_names.byte_at(vi as i64) == 124:
