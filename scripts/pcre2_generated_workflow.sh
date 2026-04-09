@@ -106,10 +106,15 @@ prepare_generated_tree() {
         # Expand XSTRING macros in pcre2_config (stringify version strings)
         if [ "$(basename "$dst")" = "pcre2_config.w" ]; then
             perl -pi -e 's/XSTRING\(PCRE2_MAJOR\.PCRE2_MINOR PCRE2_DATE\)/"10.48 2025-10-21"/g' "$dst"
-            perl -pi -e 's/XSTRING\(PCRE2_MAJOR\.PCRE2_MINOR\) XSTRING\(PCRE2_PRERELEASE PCRE2_DATE\)/"10.48" "-DEV 2025-10-21"/g' "$dst"
+            perl -pi -e 's/XSTRING\(PCRE2_MAJOR\.PCRE2_MINOR\) XSTRING\(PCRE2_PRERELEASE PCRE2_DATE\)/"10.48-DEV 2025-10-21"/g' "$dst"
             perl -pi -e 's/XSTRING\(PCRE2_MAJOR\.PCRE2_MINOR\)/"10.48"/g' "$dst"
             perl -pi -e 's/XSTRING\(PCRE2_PRERELEASE PCRE2_DATE\)/"-DEV 2025-10-21"/g' "$dst"
         fi
+    done
+
+    # Concatenate adjacent string literals: "foo" "bar" → "foobar"
+    for dst in "$generated_dir"/*.w; do
+        perl -pi -e 's/"([^"]*)" "([^"]*)"/"$1$2"/g' "$dst"
     done
 }
 
