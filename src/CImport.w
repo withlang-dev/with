@@ -5076,7 +5076,9 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
         eprint("migrate: libclang not available")
         return 1
 
-    // Add the file's directory as an include path
+    // Clear accumulated include paths from prior files, then add
+    // this file's directory as an include path
+    with_cimport_clear_include_paths()
     var dir_end = input_path.len() as i32 - 1
     while dir_end > 0 and input_path.byte_at(dir_end as i64) != 47:  // '/'
         dir_end = dir_end - 1
