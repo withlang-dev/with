@@ -4152,6 +4152,8 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     if kind == CXK_BINARY_OP:
         let bo = with_ci_binary_op(session, cursor)
         if bo == BO_ASSIGN:
+            let dbg_lhs = with_ci_child(session, cursor, 0)
+            // debug removed
             let nc = with_ci_num_children(session, cursor)
             if nc >= 2:
                 let lhs_cursor = with_ci_child(session, cursor, 0)
@@ -4164,8 +4166,18 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                     if inner_stmt.len() > 0 and outer_lhs.len() > 0 and inner_lhs.len() > 0:
                         return inner_stmt ++ "\n" ++ ci_indent_str(indent) ++ "(" ++ outer_lhs ++ " = " ++ inner_lhs ++ ")"
                 // *(ptr = ptr + 1) = value → decompose LHS deref-of-assign
-                if with_ci_cursor_kind(session, lhs_cursor) == CXK_UNARY_OP and with_ci_unary_op(session, lhs_cursor) == UO_DEREF:
-                    let deref_child = with_ci_child(session, lhs_cursor, 0)
+                // Skip wrappers to find the deref
+                var deref_cursor = lhs_cursor
+                var dsk = 0
+                while dsk < 3:
+                    let dck = with_ci_cursor_kind(session, deref_cursor)
+                    if (dck == 100 or dck == CXK_PAREN_EXPR) and with_ci_num_children(session, deref_cursor) == 1:
+                        deref_cursor = with_ci_child(session, deref_cursor, 0)
+                        dsk = dsk + 1
+                    else:
+                        break
+                if with_ci_cursor_kind(session, deref_cursor) == CXK_UNARY_OP and with_ci_unary_op(session, deref_cursor) == UO_DEREF:
+                    let deref_child = with_ci_child(session, deref_cursor, 0)
                     // Skip implicit cast (kind 100) and ParenExpr wrappers
                     var inner_assign_cursor = deref_child
                     var skip_depth = 0
@@ -4176,13 +4188,27 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                             skip_depth = skip_depth + 1
                         else:
                             break
-                    if with_ci_cursor_kind(session, inner_assign_cursor) == CXK_BINARY_OP and with_ci_binary_op(session, inner_assign_cursor) == BO_ASSIGN:
-                        // *(ptr_assign) = rhs → decompose to: (ptr_assign), then (unsafe: *ptr = rhs)
+                    let iac_kind = with_ci_cursor_kind(session, inner_assign_cursor)
+                    // BO_ASSIGN: *(ptr = ptr + 1) = rhs
+                    if iac_kind == CXK_BINARY_OP and with_ci_binary_op(session, inner_assign_cursor) == BO_ASSIGN:
                         let ptr_stmt = ci_trans_stmt(session, inner_assign_cursor, indent, scope)
                         let ptr_lhs = ci_trans_expr(session, with_ci_child(session, inner_assign_cursor, 0), scope)
                         let rhs_val = ci_trans_expr(session, rhs_cursor, scope)
                         if ptr_stmt.len() > 0 and ptr_lhs.len() > 0 and rhs_val.len() > 0:
                             return ptr_stmt ++ "\n" ++ ci_indent_str(indent) ++ "(unsafe: *" ++ ptr_lhs ++ " = " ++ rhs_val ++ ")"
+                    // UO_POST_INC / UO_PRE_INC: *(ptr++) = rhs or *(++ptr) = rhs
+                    if iac_kind == CXK_UNARY_OP:
+                        let uop = with_ci_unary_op(session, inner_assign_cursor)
+                        if uop == UO_POST_INC or uop == UO_PRE_INC:
+                            let ptr_operand = ci_trans_expr(session, with_ci_child(session, inner_assign_cursor, 0), scope)
+                            let rhs_val = ci_trans_expr(session, rhs_cursor, scope)
+                            if ptr_operand.len() > 0 and rhs_val.len() > 0:
+                                if uop == UO_PRE_INC:
+                                    // *++ptr = rhs → ptr = ptr + 1; *ptr = rhs
+                                    return "(" ++ ptr_operand ++ " = " ++ ptr_operand ++ " + 1)\n" ++ ci_indent_str(indent) ++ "(unsafe: *" ++ ptr_operand ++ " = " ++ rhs_val ++ ")"
+                                else:
+                                    // *ptr++ = rhs → *ptr = rhs; ptr = ptr + 1
+                                    return "(unsafe: *" ++ ptr_operand ++ " = " ++ rhs_val ++ ")\n" ++ ci_indent_str(indent) ++ "(" ++ ptr_operand ++ " = " ++ ptr_operand ++ " + 1)"
 
     // Expression statement — translate as expression
     let expr = ci_trans_expr(session, cursor, scope)
