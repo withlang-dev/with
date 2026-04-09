@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
-.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test fixpoint install install-user update-seed clean seed print-version emit-c-test emit-c-fixpoint cross FORCE \
-	__build __stage1 __stage2 __stage3 __runtime __selfcheck __smoke __test __fixpoint __install __install-user __update-seed __clean __seed
+.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test fixpoint install install-user update-seed clean seed print-version emit-c-test emit-c-fixpoint cross regex-migrate-raw regex-prepare regex-check regex-promote FORCE \
+	__build __stage1 __stage2 __stage3 __runtime __selfcheck __smoke __test __fixpoint __install __install-user __update-seed __clean __seed __regex-migrate-raw __regex-prepare __regex-check __regex-promote
 
 ROOT_DIR := $(CURDIR)
 REPO_FULL_NAME ?= QuixiAI/with
@@ -31,6 +31,13 @@ GEN_BOOTSTRAP_ENTRY := $(OUT_GEN_DIR)/bootstrap_main.w
 GEN_EMIT_TEMP_ENTRY := $(OUT_GEN_DIR)/main_emit_temp.w
 GEN_VERSION_FILE := $(OUT_GEN_DIR)/version.txt
 GEN_STAMP := $(OUT_GEN_DIR)/.generated-stamp
+REGEX_RAW_STAMP := $(OUT_GEN_DIR)/.regex-raw-stamp
+REGEX_PREPARE_STAMP := $(OUT_GEN_DIR)/.regex-prepare-stamp
+
+REGEX_PCRE2_SRC := .reference/pcre2/src
+REGEX_RAW_DIR := $(OUT)/pcre2_migrate_raw
+REGEX_GENERATED_DIR := $(OUT)/pcre2_generated
+REGEX_PROMOTE_DIR := lib/std/re
 
 RUNTIME_LINK := $(OUT_BIN_DIR)/runtime
 EMBEDDED_STDLIB_RUNTIME_SRC := $(OUT_GEN_DIR)/embedded_stdlib_runtime.w
@@ -51,6 +58,7 @@ LLVM_LINK_RSP := $(OUT_LIB_DIR)/llvm_link.rsp
 LLVM_CC_FILE := $(OUT_LIB_DIR)/llvm_cc
 LLVM_LINK_STAMP := $(OUT_LIB_DIR)/.llvm-link-ready
 RUNTIME_C_ALLOWLIST_STAMP := $(OUT_GEN_DIR)/.runtime-c-allowlist
+REGEX_REF_SOURCES := $(shell find $(REGEX_PCRE2_SRC) -type f 2>/dev/null | sort)
 
 STAGE1_BIN := $(OUT_BIN_DIR)/with-stage1
 STAGE2_BIN := $(OUT_BIN_DIR)/with-stage2
@@ -203,7 +211,7 @@ define WITH_REPO_LOCK
 			owner="target=<unknown> pid=<unknown> started=<unknown>"; \
 		fi; \
 		echo "error: another top-level build/check/test/install target is already running: $$owner" >&2; \
-		echo "run build, selfcheck, smoke, test, fixpoint, install, and clean serially" >&2; \
+		echo "run build, selfcheck, smoke, test, fixpoint, install, clean, and regex targets serially" >&2; \
 		exit 1; \
 	fi
 endef
@@ -234,6 +242,18 @@ print-version:
 
 seed: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __seed)
+
+regex-migrate-raw: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-migrate-raw)
+
+regex-prepare: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-prepare)
+
+regex-check: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-check)
+
+regex-promote: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-promote)
 
 __build: $(CANONICAL_BIN)
 
@@ -277,6 +297,23 @@ __seed:
 	chmod +x "$$dest"; \
 	echo "seed installed: $$dest"
 
+__regex-migrate-raw: $(REGEX_RAW_STAMP)
+
+__regex-prepare: $(REGEX_PREPARE_STAMP)
+
+__regex-check: $(REGEX_PREPARE_STAMP) scripts/pcre2_generated_workflow.sh
+	@bash "$(ROOT_DIR)/scripts/pcre2_generated_workflow.sh" check \
+		"$(ROOT_DIR)/$(CANONICAL_BIN)" \
+		"$(ROOT_DIR)/$(REGEX_RAW_DIR)" \
+		"$(ROOT_DIR)/$(REGEX_GENERATED_DIR)"
+
+__regex-promote: $(REGEX_PREPARE_STAMP) scripts/pcre2_generated_workflow.sh
+	@bash "$(ROOT_DIR)/scripts/pcre2_generated_workflow.sh" promote \
+		"$(ROOT_DIR)/$(CANONICAL_BIN)" \
+		"$(ROOT_DIR)/$(REGEX_RAW_DIR)" \
+		"$(ROOT_DIR)/$(REGEX_GENERATED_DIR)" \
+		"$(ROOT_DIR)/$(REGEX_PROMOTE_DIR)"
+
 $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR) $(OUT_GEN_DIR):
 	@mkdir -p "$@"
 
@@ -294,9 +331,48 @@ $(GEN_STAMP): FORCE | $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR
 	printf '%s\n' "$$version" > "$(GEN_VERSION_FILE)"; \
 	touch "$@"
 
-STD_SOURCES := $(shell find lib/std -name '*.w' 2>/dev/null)
-$(EMBEDDED_STDLIB_RUNTIME_SRC): scripts/generate_embedded_stdlib.py $(STD_SOURCES) | $(OUT_GEN_DIR)
+STD_SOURCES := $(shell find lib/std -name '*.w' 2>/dev/null | sort)
+EMBED_STD_SOURCES := $(filter-out lib/std/re/%,$(STD_SOURCES))
+$(EMBEDDED_STDLIB_RUNTIME_SRC): scripts/generate_embedded_stdlib.py $(EMBED_STD_SOURCES) | $(OUT_GEN_DIR)
+	@for f in $(EMBED_STD_SOURCES); do \
+		sz=$$(wc -c < "$$f"); \
+		if [ "$$sz" -gt 500000 ]; then \
+			echo "ERROR: $$f is $${sz} bytes — too large for embedded stdlib (max 500KB)" >&2; \
+			exit 1; \
+		fi; \
+	done
 	@python3 "$(ROOT_DIR)/scripts/generate_embedded_stdlib.py" "$(ROOT_DIR)" "$@"
+
+$(REGEX_RAW_STAMP): $(CANONICAL_BIN) $(REGEX_REF_SOURCES) | $(OUT_GEN_DIR)
+	@set -euo pipefail; \
+	src="$(ROOT_DIR)/$(REGEX_PCRE2_SRC)"; \
+	out="$(ROOT_DIR)/$(REGEX_RAW_DIR)"; \
+	if [ ! -d "$$src" ]; then \
+		echo "error: missing PCRE2 source tree at $$src" >&2; \
+		exit 1; \
+	fi; \
+	if [ ! -f "$$src/pcre2.h" ]; then \
+		cp "$$src/pcre2.h.generic" "$$src/pcre2.h"; \
+		echo "generated $$src/pcre2.h"; \
+	fi; \
+	if [ ! -f "$$src/config.h" ]; then \
+		cp "$$src/config.h.generic" "$$src/config.h"; \
+		echo "generated $$src/config.h"; \
+	fi; \
+	if [ ! -f "$$src/pcre2_chartables.c" ]; then \
+		cp "$$src/pcre2_chartables.c.dist" "$$src/pcre2_chartables.c"; \
+		echo "generated $$src/pcre2_chartables.c"; \
+	fi; \
+	rm -rf "$$out"; \
+	mkdir -p "$$out"; \
+	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$out/" -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1 -D SUPPORT_PCRE2_8=1; \
+	touch "$@"
+
+$(REGEX_PREPARE_STAMP): $(REGEX_RAW_STAMP) scripts/pcre2_generated_workflow.sh | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
+	@bash "$(ROOT_DIR)/scripts/pcre2_generated_workflow.sh" prepare \
+		"$(ROOT_DIR)/$(REGEX_RAW_DIR)" \
+		"$(ROOT_DIR)/$(REGEX_GENERATED_DIR)"
+	@touch "$@"
 
 $(COMPAT_RUNTIME_SRC): rt/compat_runtime.w $(EMBEDDED_STDLIB_RUNTIME_SRC) | $(OUT_GEN_DIR)
 	@cat "$(ROOT_DIR)/rt/compat_runtime.w" "$(EMBEDDED_STDLIB_RUNTIME_SRC)" > "$@"
