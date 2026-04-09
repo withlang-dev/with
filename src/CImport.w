@@ -3498,6 +3498,9 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
             if cast_kind == CI_CAST_TO_VOID:
                 return inner
             if cast_kind == CI_CAST_ARRAY_TO_PTR:
+                let pointee = with_ci_cursor_pointee_type(session, cursor)
+                if pointee.len() > 0:
+                    return "(&" ++ inner ++ "[0] as *mut " ++ pointee ++ ")"
                 return "&" ++ inner
             if cast_kind == CI_CAST_INT_TO_PTR:
                 return "(" ++ inner ++ " as usize as *mut c_void)"
@@ -3593,14 +3596,6 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                     let bool_rhs = ci_trans_bool_expr(session, rhs_cursor, scope)
                     let log_op = if op == BO_LAND: "and" else: "or"
                     return "(if " ++ bool_lhs ++ " " ++ log_op ++ " " ++ bool_rhs ++ ": 1 else: 0)"
-
-                // Array-to-pointer decay in assignment RHS
-                if op == BO_ASSIGN:
-                    if rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91:
-                        let elem_start = ci_find_array_elem_start(rhs_ty_str)
-                        if elem_start > 0:
-                            let elem_ty = rhs_ty_str.slice(elem_start as i64, rhs_ty_str.len())
-                            return "(" ++ lhs ++ " = (&" ++ rhs ++ "[0] as *mut " ++ elem_ty ++ "))"
 
                 let op_str = ci_bo_to_str_typed(op, is_unsigned)
                 if op_str.len() > 0:
