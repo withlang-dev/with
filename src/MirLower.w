@@ -1893,16 +1893,19 @@ fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
     let local_id = self.body.new_local(bind_ty, mutable, name_sym, 1)
     self.bind_local(name_sym, local_id)
 
-    self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(node))
+    // d1 = 0 for normal storage, bind_ty for zero-init (no initializer)
+    let storage_d1 = if rhs_expr == 0: bind_ty else: 0
+    self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, storage_d1, self.ast.get_start(node))
     if self.sema.is_copy(bind_ty) == 0:
         self.schedule_drop(local_id, DropKind.DK_VALUE)
 
-    let saved_expected = self.expected_type
-    self.expected_type = bind_ty
-    let rhs_op = self.lower_expr(rhs_expr)
-    self.expected_type = saved_expected
-    let place = self.place_for_local(local_id)
-    self.assign_operand_to_place(place, rhs_op, self.ast.get_start(node))
+    if rhs_expr != 0:
+        let place = self.place_for_local(local_id)
+        let saved_expected = self.expected_type
+        self.expected_type = bind_ty
+        let rhs_op = self.lower_expr(rhs_expr)
+        self.expected_type = saved_expected
+        self.assign_operand_to_place(place, rhs_op, self.ast.get_start(node))
 
 fn MirBuilder.lower_tuple_destructure(self: MirBuilder, node: i32):
     let extra_start = self.ast.get_data0(node)

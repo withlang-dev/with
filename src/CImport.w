@@ -4091,20 +4091,12 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                     if init.len() > 0:
                         result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ init
                     else:
-                        // Can't translate initializer — emit with default value
-                        let default_val = ci_default_for_type(vty_str)
-                        if default_val.len() > 0:
-                            result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ default_val
-                        else:
-                            result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = 0"
+                        // Can't translate initializer — use zero-init
+                        result = result ++ "var " ++ vname ++ ": " ++ vty_str
                 else:
                     if result.len() > 0:
                         result = result ++ "\n" ++ ci_indent_str(indent)
-                    let default_val = ci_default_for_type(vty_str)
-                    if default_val.len() > 0:
-                        result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ default_val
-                    else:
-                        result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = 0"
+                    result = result ++ "var " ++ vname ++ ": " ++ vty_str
             i = i + 1
         return result
 
@@ -4585,19 +4577,15 @@ fn ci_trans_decl_stmt_scoped(session: i64, cursor: i32, indent: i32, scope: str)
                 if init.len() > 0:
                     result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ init
                 else:
-                    // Initializer failed to translate — emit declaration with default
-                    let default_val = ci_default_for_type(vty_str)
-                    if default_val.len() > 0:
-                        result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ default_val
-                    else:
-                        result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = 0"
+                    // Initializer failed to translate — use zero-init
+                    result = result ++ "var " ++ mangled ++ ": " ++ vty_str
             else:
-                // No initializer — C zero-initializes statics, locals are undefined
+                // No initializer — zero-initialized by With semantics
                 let default_val = ci_default_for_type(vty_str)
                 if default_val.len() > 0:
                     result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ default_val
                 else:
-                    result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = 0"
+                    result = result ++ "var " ++ mangled ++ ": " ++ vty_str
         i = i + 1
     if new_scope != scope:
         return "SCOPE:" ++ new_scope ++ "\n" ++ result
@@ -5906,7 +5894,8 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
         if default_val.len() > 0:
             output = output ++ ci_indent_str(indent) ++ "var " ++ vname ++ ": " ++ vtype ++ " = " ++ default_val ++ "\n"
         else:
-            output = output ++ ci_indent_str(indent) ++ "var " ++ vname ++ ": " ++ vtype ++ " = 0\n"
+            // Zero-init: var x: T (no initializer — With zero-initializes)
+            output = output ++ ci_indent_str(indent) ++ "var " ++ vname ++ ": " ++ vtype ++ "\n"
 
         vi = name_end + 1
         if vi < var_names.len() as i32 and var_names.byte_at(vi as i64) == 124:
