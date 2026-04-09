@@ -2438,6 +2438,17 @@ fn ci_has_stringify(body: str, params: str) -> bool:
         i = i + 1
     false
 
+// Parse [N]T and return the byte offset of T (after the ']').
+// Returns 0 if not an array type.
+fn ci_find_array_elem_start(ty: str) -> i32:
+    if ty.len() == 0 or ty.byte_at(0) != 91: return 0
+    var i = 1
+    while i as i64 < ty.len() and ty.byte_at(i as i64) != 93:
+        i = i + 1
+    if i as i64 < ty.len():
+        return i + 1  // skip past ']'
+    0
+
 fn ci_is_ident_start(c: i32) -> bool:
     (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95
 
@@ -3569,6 +3580,16 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                     let log_op = if op == BO_LAND: "and" else: "or"
                     return "(if " ++ bool_lhs ++ " " ++ log_op ++ " " ++ bool_rhs ++ ": 1 else: 0)"
 
+                // Chained assignment: a = (b = c) → decompose to (b = c)\n(a = b)
+                if op == BO_ASSIGN:
+                    let rhs_kind = with_ci_cursor_kind(session, rhs_cursor)
+                    if rhs_kind == CXK_BINARY_OP and with_ci_binary_op(session, rhs_cursor) == BO_ASSIGN:
+                        // rhs is itself an assignment — flatten the chain
+                        let inner_lhs = ci_trans_expr(session, with_ci_child(session, rhs_cursor, 0), scope)
+                        let inner_assign = ci_trans_expr(session, rhs_cursor, scope)
+                        return inner_assign ++ "\n" ++ "(" ++ lhs ++ " = " ++ inner_lhs ++ ")"
+                    return "(" ++ lhs ++ " = " ++ rhs ++ ")"
+
                 let op_str = ci_bo_to_str_typed(op, is_unsigned)
                 if op_str.len() > 0:
                     // C comparisons return int, not bool.
@@ -3675,6 +3696,14 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                             arg = expanded_arg
                     if arg.len() == 0:
                         return ""
+                    // Array-to-pointer decay: if arg is array type, cast to pointer
+                    let arg_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, arg_cursor))
+                    if arg_ty_str.len() > 0 and arg_ty_str.byte_at(0) == 91:
+                        // [N]T → (&arg[0] as *mut T)
+                        let elem_start = ci_find_array_elem_start(arg_ty_str)
+                        if elem_start > 0:
+                            let elem_ty = arg_ty_str.slice(elem_start as i64, arg_ty_str.len())
+                            arg = "(&" ++ arg ++ "[0] as *mut " ++ elem_ty ++ ")"
                     args = args ++ arg
                     ai = ai + 1
                 // Map libc functions to With equivalents (pure With, no c_import)
