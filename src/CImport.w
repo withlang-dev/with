@@ -2426,6 +2426,9 @@ fn ci_has_stringify(body: str, params: str) -> bool:
         i = i + 1
     false
 
+fn ci_is_ident_start(c: i32) -> bool:
+    (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95
+
 fn ci_is_ident_char(c: i32) -> bool:
     (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or (c >= 48 and c <= 57) or c == 95
 
@@ -5000,6 +5003,92 @@ fn ci_lookup_macro_value(session: i64, name: str) -> str:
         return g_migrate_macro_values.slice(start as i64, end as i64)
     ""
 
+// Check if a fn-like macro is a stringify macro (has # in body) or
+// calls another fn-like macro that stringifies (e.g. XSTRING -> STRING -> #a).
+fn ci_is_stringify_macro(session: i64, name: str, depth: i32) -> bool:
+    if depth > 5: return false
+    let count = with_cimport_macro_count(session)
+    var i = 0
+    while i < count:
+        if with_cimport_macro_is_fn_like(session, i) != 0:
+            if with_cimport_macro_name(session, i) == name:
+                let value = with_cimport_macro_value(session, i)
+                // Direct stringify: body contains #param
+                var j = 0
+                while j < value.len() as i32 - 1:
+                    if value.byte_at(j as i64) == 35 and value.byte_at((j + 1) as i64) != 35:
+                        return true
+                    j = j + 1
+                // Indirect: body calls another fn-like macro, e.g. STRING(s)
+                var k = 0
+                while k < value.len() as i32:
+                    if ci_is_ident_start(value.byte_at(k as i64)):
+                        var ke = k + 1
+                        while ke < value.len() as i32 and ci_is_ident_char(value.byte_at(ke as i64)):
+                            ke = ke + 1
+                        if ke < value.len() as i32 and value.byte_at(ke as i64) == 40:
+                            let callee = value.slice(k as i64, ke as i64)
+                            if ci_is_stringify_macro(session, callee, depth + 1):
+                                return true
+                        k = ke
+                    else:
+                        k = k + 1
+                return false
+        i = i + 1
+    false
+
+// Expand inner macro references in a stringify argument.
+// For each identifier token, if it's a non-fn macro, substitute its value.
+fn ci_expand_stringify_args(session: i64, args: str) -> str:
+    var result = ""
+    var pos = 0
+    let alen = args.len() as i32
+    while pos < alen:
+        if ci_is_ident_start(args.byte_at(pos as i64)):
+            var end = pos + 1
+            while end < alen and ci_is_ident_char(args.byte_at(end as i64)):
+                end = end + 1
+            let ident = args.slice(pos as i64, end as i64)
+            let val = ci_lookup_macro_value(session, ident)
+            if val.len() > 0:
+                result = result ++ val
+            else:
+                result = result ++ ident
+            pos = end
+        else:
+            result = result ++ args.slice(pos as i64, (pos + 1) as i64)
+            pos = pos + 1
+    result
+
+// Try to expand a stringify macro call like XSTRING(MAJOR.MINOR DATE)
+// into a string literal. Returns "" if not a stringify macro call.
+fn ci_try_expand_stringify_call(session: i64, s: str) -> str:
+    let slen = s.len() as i32
+    // Find the macro name (identifier before '(')
+    var ne = 0
+    while ne < slen and ci_is_ident_char(s.byte_at(ne as i64)):
+        ne = ne + 1
+    if ne == 0 or ne >= slen or s.byte_at(ne as i64) != 40:
+        return ""
+    let name = s.slice(0, ne as i64)
+    if not ci_is_stringify_macro(session, name, 0):
+        return ""
+    // Extract argument (everything between outer parens)
+    let arg_start = ne + 1
+    var paren_depth = 1
+    var arg_end = arg_start
+    while arg_end < slen and paren_depth > 0:
+        let c = s.byte_at(arg_end as i64)
+        if c == 40: paren_depth = paren_depth + 1
+        if c == 41: paren_depth = paren_depth - 1
+        if paren_depth > 0: arg_end = arg_end + 1
+    if paren_depth != 0:
+        return ""
+    let args = s.slice(arg_start as i64, arg_end as i64)
+    // Expand inner macros in the argument, then stringify
+    let expanded = ci_expand_stringify_args(session, args)
+    "\"" ++ expanded ++ "\""
+
 fn ci_expand_string_macro_sequence(session: i64, s: str) -> str:
     var segments = ""
     var pos = 0
@@ -5025,13 +5114,29 @@ fn ci_expand_string_macro_sequence(session: i64, s: str) -> str:
                 end = end + 1
             token = s.slice(pos as i64, end as i64)
         else:
-            while end < slen and not ci_is_space(s.byte_at(end as i64)):
+            // Scan a token, respecting parentheses (for MACRO(args))
+            var paren_depth = 0
+            while end < slen:
+                let c = s.byte_at(end as i64)
+                if c == 40: paren_depth = paren_depth + 1
+                if c == 41:
+                    paren_depth = paren_depth - 1
+                    if paren_depth == 0:
+                        end = end + 1
+                        break
+                if paren_depth == 0 and ci_is_space(c):
+                    break
                 end = end + 1
             token = s.slice(pos as i64, end as i64)
-            let macro_value = ci_lookup_macro_value(session, token)
-            if macro_value.len() == 0:
-                return ""
-            token = macro_value
+            // Try stringify macro call first (e.g. XSTRING(MAJOR.MINOR))
+            let stringify_result = ci_try_expand_stringify_call(session, token)
+            if stringify_result.len() > 0:
+                token = stringify_result
+            else:
+                let macro_value = ci_lookup_macro_value(session, token)
+                if macro_value.len() == 0:
+                    return ""
+                token = macro_value
         if ci_is_concatenated_string(token):
             token = ci_concat_strings(token)
         if not ci_is_string_literal(token):
