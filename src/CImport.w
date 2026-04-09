@@ -1185,9 +1185,10 @@ fn ci_default_for_type(ty: str) -> str:
     // Check: if the type resolves to a primitive int alias, use 0.
     // Otherwise leave empty (no default) for struct/union/opaque types.
     if ci_starts_with(ty, "Vector("): return ""
-    // Array types [N]T → require explicit init
-    if ty.len() > 0 and ty.byte_at(0) == 91: return ""
-    ""
+    // Array types [N]T → use unsafe_zeroed
+    if ty.len() > 0 and ty.byte_at(0) == 91: return "unsafe_zeroed()"
+    // Struct/union/opaque types → use unsafe_zeroed
+    "unsafe_zeroed()"
 
 // ── Enum translation ────────────────────────────────────────
 
@@ -3418,6 +3419,11 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     if kind == CXK_STRING_LITERAL:
         if ci_is_concatenated_string(src):
             return ci_concat_strings(src)
+        // Source text may be a stringify macro like XSTRING(...)
+        if src.len() > 0 and src.byte_at(0) != 34:
+            let stringify_val = ci_try_expand_stringify_call(session, src)
+            if stringify_val.len() > 0:
+                return stringify_val
         return src
 
     // Character literal
@@ -3578,6 +3584,9 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
             if operand.len() > 0:
                 let op = with_ci_unary_op(session, cursor)
                 if op == UO_MINUS:
+                    // If operand is a plain integer literal, emit -N directly
+                    if ci_is_integer_string(operand):
+                        return "-" ++ operand
                     if with_ci_type_is_unsigned(session, cursor) != 0:
                         return "(0 -% " ++ operand ++ ")"
                     return "(0 - " ++ operand ++ ")"
@@ -3900,9 +3909,10 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
         if nc >= 2:
             let cond = ci_trans_bool_expr(session, with_ci_child(session, cursor, 0), scope)
             if cond.len() > 0:
-                let body = ci_trans_stmt(session, with_ci_child(session, cursor, 1), indent + 1, scope)
+                let body = ci_trans_stmt(session, with_ci_child(session, cursor, 1), 0, scope)
                 if body.len() > 0:
-                    return "while " ++ cond ++ ":\n" ++ body
+                    let body_text = ci_indent_block(body, indent + 1)
+                    return "while " ++ cond ++ ":\n" ++ body_text
         return ""
 
     // For statement — translate to init + while + inc
@@ -3917,9 +3927,10 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
             //   - The body is always CompoundStmt (or another stmt)
             let body_idx = nc - 1
             let body_cursor = with_ci_child(session, cursor, body_idx)
-            let body = ci_trans_stmt(session, body_cursor, indent + 1, scope)
-            if body.len() == 0:
+            let body_raw = ci_trans_stmt(session, body_cursor, 0, scope)
+            if body_raw.len() == 0:
                 return ""
+            let body = ci_indent_block(body_raw, indent + 1)
 
             // Simple approach: try to translate each child before body
             var init_str = ""
@@ -3967,10 +3978,11 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     if kind == CXK_DO_STMT:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
-            let body = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent + 1, scope)
+            let body_raw = ci_trans_stmt(session, with_ci_child(session, cursor, 0), 0, scope)
             let cond = ci_trans_bool_expr(session, with_ci_child(session, cursor, 1), scope)
-            if body.len() > 0 and cond.len() > 0:
-                return "while true:\n" ++ body ++ ci_indent_str(indent + 1) ++ "if not (" ++ cond ++ "):\n" ++ ci_indent_str(indent + 2) ++ "break\n"
+            if body_raw.len() > 0 and cond.len() > 0:
+                let body_text = ci_indent_block(body_raw, indent + 1)
+                return "while true:\n" ++ body_text ++ ci_indent_str(indent + 1) ++ "if not (" ++ cond ++ "):\n" ++ ci_indent_str(indent + 2) ++ "break\n"
         return ""
 
     // Break
@@ -4892,6 +4904,22 @@ fn ci_strip_float_suffix(s: str) -> str:
         else:
             break
     s.slice(0, end as i64)
+
+fn ci_is_integer_string(s: str) -> bool:
+    if s.len() == 0: return false
+    var i = 0
+    // Allow hex prefix
+    if s.len() as i32 > 2 and s.byte_at(0) == 48 and (s.byte_at(1) == 120 or s.byte_at(1) == 88):
+        i = 2
+    while i as i64 < s.len():
+        let c = s.byte_at(i as i64)
+        if c < 48 or c > 57:
+            if c >= 97 and c <= 102: i = i + 1  // a-f for hex
+            else if c >= 65 and c <= 70: i = i + 1  // A-F for hex
+            else: return false
+        else:
+            i = i + 1
+    true
 
 fn ci_is_string_literal(s: str) -> bool:
     let t = ci_trim(s)
