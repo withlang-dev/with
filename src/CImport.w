@@ -3378,6 +3378,10 @@ fn ci_escape_reserved(name: str) -> str:
 
 fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     let kind = with_ci_cursor_kind(session, cursor)
+    let src = with_ci_cursor_source_text(session, cursor)
+    let expanded_src = ci_expand_string_macro_sequence(session, src)
+    if expanded_src.len() > 0:
+        return expanded_src
 
     // Integer literal
     if kind == CXK_INT_LITERAL:
@@ -3387,7 +3391,6 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
 
     // Float literal
     if kind == CXK_FLOAT_LITERAL:
-        let src = with_ci_cursor_source_text(session, cursor)
         // Strip C float suffixes (f, F, l, L)
         if src.len() > 0:
             let last = src.byte_at(src.len() - 1)
@@ -3397,10 +3400,6 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
 
     // String literal
     if kind == CXK_STRING_LITERAL:
-        let src = with_ci_cursor_source_text(session, cursor)
-        let expanded = ci_expand_string_macro_sequence(session, src)
-        if expanded.len() > 0:
-            return expanded
         if ci_is_concatenated_string(src):
             return ci_concat_strings(src)
         return src
@@ -3619,7 +3618,16 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                 while ai < nc:
                     if ai > 1:
                         args = args ++ ", "
-                    let arg = ci_trans_expr(session, with_ci_child(session, cursor, ai), scope)
+                    let arg_cursor = with_ci_child(session, cursor, ai)
+                    var arg = ci_trans_expr(session, arg_cursor, scope)
+                    let arg_src = with_ci_cursor_source_text(session, arg_cursor)
+                    let expanded_arg_src = ci_expand_string_macro_sequence(session, arg_src)
+                    if expanded_arg_src.len() > 0:
+                        arg = expanded_arg_src
+                    else:
+                        let expanded_arg = ci_expand_string_macro_sequence(session, arg)
+                        if expanded_arg.len() > 0:
+                            arg = expanded_arg
                     if arg.len() == 0:
                         return ""
                     args = args ++ arg
@@ -3653,7 +3661,6 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
 
     // sizeof expression (CXK_UNARY_EXPR = 136 covers sizeof)
     if kind == CXK_UNARY_EXPR:
-        let src = with_ci_cursor_source_text(session, cursor)
         if ci_starts_with(src, "sizeof"):
             let nc = with_ci_num_children(session, cursor)
             if nc > 0:
@@ -3717,7 +3724,6 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
 
     // Offsetof expression
     if kind == 152:  // CXCursor_OffsetOfExpr  (approximate cursor kind)
-        let src = with_ci_cursor_source_text(session, cursor)
         if ci_starts_with(src, "offsetof") or ci_starts_with(src, "__builtin_offsetof"):
             // Can't translate generically — return source text as fallback
             return ""
@@ -3745,10 +3751,6 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
             return ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
-        let src = with_ci_cursor_source_text(session, cursor)
-        let expanded = ci_expand_string_macro_sequence(session, src)
-        if expanded.len() > 0:
-            return expanded
         return ""
 
     // Fallback: try to use source text for simple expressions
@@ -4241,6 +4243,151 @@ fn ci_trans_switch_prong_forward(session: i64, body_cursor: i32, start_idx: i32,
             output = output ++ ci_indent_block(s, indent)
         j = j + 1
     output
+
+fn ci_trans_switch_body_goto(session: i64, body_cursor: i32, cond: str, indent: i32, scope: str, label_map: str, loop_depth: i32) -> str:
+    let nc = with_ci_num_children(session, body_cursor)
+
+    var has_fallthrough = false
+    var case_count = 0
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, body_cursor, i)
+        let ck = with_ci_cursor_kind(session, child)
+        if ck == CXK_CASE_STMT or ck == CXK_DEFAULT_STMT:
+            case_count = case_count + 1
+            let case_nc = with_ci_num_children(session, child)
+            if case_nc >= 2 and ck == CXK_CASE_STMT:
+                let body_child = with_ci_child(session, child, 1)
+                if not ci_stmt_ends_with_break(session, body_child):
+                    has_fallthrough = true
+            else if case_nc >= 1 and ck == CXK_DEFAULT_STMT:
+                let body_child = with_ci_child(session, child, 0)
+                if not ci_stmt_ends_with_break(session, body_child):
+                    has_fallthrough = true
+        i = i + 1
+
+    if not has_fallthrough and case_count > 0:
+        var result = "match " ++ cond ++ "\n"
+        var default_body = ""
+        i = 0
+        while i < nc:
+            let child = with_ci_child(session, body_cursor, i)
+            let ck = with_ci_cursor_kind(session, child)
+            if ck == CXK_CASE_STMT:
+                let case_nc = with_ci_num_children(session, child)
+                if case_nc >= 2:
+                    let case_val = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
+                    let case_body = ci_trans_stmt_strip_break_goto(session, with_ci_child(session, child, 1), indent + 2, scope, label_map, loop_depth)
+                    if case_val.len() > 0 and case_body.len() > 0:
+                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " =>\n" ++ case_body
+            else if ck == CXK_DEFAULT_STMT:
+                let case_nc = with_ci_num_children(session, child)
+                if case_nc >= 1:
+                    let case_body = ci_trans_stmt_strip_break_goto(session, with_ci_child(session, child, 0), indent + 2, scope, label_map, loop_depth)
+                    if case_body.len() > 0:
+                        default_body = ci_indent_str(indent + 1) ++ "_ =>\n" ++ case_body
+            i = i + 1
+        if default_body.len() > 0:
+            result = result ++ default_body
+        return result
+
+    var result = "match " ++ cond ++ "\n"
+    var has_default = false
+    var default_prong = ""
+    i = 0
+    while i < nc:
+        let child = with_ci_child(session, body_cursor, i)
+        let ck = with_ci_cursor_kind(session, child)
+        if ck == CXK_CASE_STMT:
+            let case_nc = with_ci_num_children(session, child)
+            if case_nc >= 1:
+                let case_val = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
+                if case_val.len() > 0:
+                    let prong_body = ci_trans_switch_prong_forward_goto(session, body_cursor, i, nc, indent + 2, scope, label_map, loop_depth)
+                    if prong_body.len() > 0:
+                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " =>\n" ++ prong_body
+                    else:
+                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " => 0\n"
+        else if ck == CXK_DEFAULT_STMT:
+            has_default = true
+            let prong_body = ci_trans_switch_prong_forward_goto(session, body_cursor, i, nc, indent + 2, scope, label_map, loop_depth)
+            if prong_body.len() > 0:
+                default_prong = ci_indent_str(indent + 1) ++ "_ =>\n" ++ prong_body
+            else:
+                default_prong = ci_indent_str(indent + 1) ++ "_ => 0\n"
+        i = i + 1
+    if has_default:
+        result = result ++ default_prong
+    else:
+        result = result ++ ci_indent_str(indent + 1) ++ "_ => 0\n"
+    result
+
+fn ci_trans_switch_prong_forward_goto(session: i64, body_cursor: i32, start_idx: i32, total: i32, indent: i32, scope: str, label_map: str, loop_depth: i32) -> str:
+    var output = ""
+
+    let start_child = with_ci_child(session, body_cursor, start_idx)
+    let start_kind = with_ci_cursor_kind(session, start_child)
+    if start_kind == CXK_CASE_STMT:
+        let cnc = with_ci_num_children(session, start_child)
+        if cnc >= 2:
+            let body_child = with_ci_child(session, start_child, 1)
+            let bk = with_ci_cursor_kind(session, body_child)
+            if bk == CXK_BREAK_STMT:
+                return output
+            if bk == CXK_RETURN_STMT:
+                let s = ci_trans_stmt_goto(session, body_child, 0, scope, label_map, loop_depth)
+                if s.len() > 0:
+                    output = output ++ ci_indent_block(s, indent)
+                return output
+            if bk != CXK_CASE_STMT and bk != CXK_DEFAULT_STMT:
+                let s = ci_trans_stmt_goto(session, body_child, 0, scope, label_map, loop_depth)
+                if s.len() > 0:
+                    output = output ++ ci_indent_block(s, indent)
+    else if start_kind == CXK_DEFAULT_STMT:
+        let cnc = with_ci_num_children(session, start_child)
+        if cnc >= 1:
+            let body_child = with_ci_child(session, start_child, 0)
+            let bk = with_ci_cursor_kind(session, body_child)
+            if bk == CXK_BREAK_STMT:
+                return output
+            if bk == CXK_RETURN_STMT:
+                let s = ci_trans_stmt_goto(session, body_child, 0, scope, label_map, loop_depth)
+                if s.len() > 0:
+                    output = output ++ ci_indent_block(s, indent)
+                return output
+            if bk != CXK_CASE_STMT and bk != CXK_DEFAULT_STMT:
+                let s = ci_trans_stmt_goto(session, body_child, 0, scope, label_map, loop_depth)
+                if s.len() > 0:
+                    output = output ++ ci_indent_block(s, indent)
+
+    var j = start_idx + 1
+    while j < total:
+        let next_child = with_ci_child(session, body_cursor, j)
+        let next_kind = with_ci_cursor_kind(session, next_child)
+        if next_kind == CXK_BREAK_STMT:
+            return output
+        if next_kind == CXK_RETURN_STMT:
+            let s = ci_trans_stmt_goto(session, next_child, 0, scope, label_map, loop_depth)
+            if s.len() > 0:
+                output = output ++ ci_indent_block(s, indent)
+            return output
+        if next_kind == CXK_CASE_STMT or next_kind == CXK_DEFAULT_STMT:
+            output = output ++ ci_trans_switch_prong_forward_goto(session, body_cursor, j, total, indent, scope, label_map, loop_depth)
+            return output
+        let s = ci_trans_stmt_goto(session, next_child, 0, scope, label_map, loop_depth)
+        if s.len() > 0:
+            output = output ++ ci_indent_block(s, indent)
+        j = j + 1
+    output
+
+fn ci_trans_stmt_strip_break_goto(session: i64, cursor: i32, indent: i32, scope: str, label_map: str, loop_depth: i32) -> str:
+    let result = ci_trans_stmt_goto(session, cursor, indent, scope, label_map, loop_depth)
+    if result.len() == 0:
+        return ""
+    let break_needle = ci_indent_str(indent) ++ "break\n"
+    if ci_ends_with(result, break_needle):
+        return result.slice(0, result.len() - break_needle.len())
+    result
 
 fn ci_trans_stmt_strip_break(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     // Translate stmt, then remove trailing "break\n" line
@@ -4830,6 +4977,14 @@ fn ci_lookup_macro_value(session: i64, name: str) -> str:
             if with_cimport_macro_name(session, i) == name:
                 return with_cimport_macro_value(session, i)
         i = i + 1
+    let needle = "|" ++ name ++ "="
+    let pos = ci_find_str(g_migrate_macro_values, needle)
+    if pos >= 0:
+        let start = pos + needle.len() as i32
+        var end = start
+        while end < g_migrate_macro_values.len() as i32 and g_migrate_macro_values.byte_at(end as i64) != 124:
+            end = end + 1
+        return g_migrate_macro_values.slice(start as i64, end as i64)
     ""
 
 fn ci_expand_string_macro_sequence(session: i64, s: str) -> str:
@@ -4891,6 +5046,7 @@ fn ci_expand_string_macro_sequence(session: i64, s: str) -> str:
 // Module-level defines to prepend to migrated C source.
 // Set via migrate_add_define() before calling migrate_c_file().
 var g_migrate_defines: str = ""
+var g_migrate_macro_values: str = ""
 
 pub fn migrate_add_define(define: str):
     // define is "NAME=VALUE" or just "NAME"
@@ -4902,6 +5058,18 @@ pub fn migrate_add_define(define: str):
             g_migrate_defines = g_migrate_defines ++ "#define " ++ name ++ " " ++ value ++ "\n"
     else:
         g_migrate_defines = g_migrate_defines ++ "#define " ++ define ++ "\n"
+
+fn ci_capture_macro_values(session: i64):
+    g_migrate_macro_values = ""
+    let count = with_cimport_macro_count(session)
+    var i = 0
+    while i < count:
+        if with_cimport_macro_is_fn_like(session, i) == 0:
+            let name = with_cimport_macro_name(session, i)
+            let value = with_cimport_macro_value(session, i)
+            if name.len() > 0 and value.len() > 0:
+                g_migrate_macro_values = g_migrate_macro_values ++ "|" ++ name ++ "=" ++ value ++ "|"
+        i = i + 1
 
 pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
     if with_cimport_available() == 0:
@@ -4939,6 +5107,15 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
         eprint("migrate: parse error: " ++ err_msg)
         with_cimport_dispose(session)
         return 1
+
+    g_migrate_macro_values = ""
+    let macro_include = if g_migrate_defines.len() > 0:
+        g_migrate_defines ++ "#include \"" ++ input_path ++ "\"\n"
+    else:
+        "#include \"" ++ input_path ++ "\"\n"
+    let macro_session = with_cimport_parse_macros(macro_include)
+    if macro_session != 0:
+        ci_capture_macro_values(macro_session)
 
     var output = "// Generated by: with migrate " ++ input_path ++ "\n\n"
 
@@ -5087,16 +5264,16 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
     with_cimport_dispose(session)
 
     // Macro translation via separate preprocessor pass
-    let macro_include = "#include \"" ++ input_path ++ "\"\n"
-    let macro_session = with_cimport_parse_macros(macro_include)
     if macro_session != 0:
         output = output ++ ci_translate_macros(macro_session, extern_vars)
         with_cimport_dispose_macros(macro_session)
+    g_migrate_macro_values = ""
 
     // Write output
     let write_result = with_fs_write_file(output_path, output)
     if write_result != 0:
         eprint("migrate: failed to write " ++ output_path)
+        g_migrate_macro_values = ""
         return 1
 
     // Print stats
@@ -5656,12 +5833,89 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
         if nc >= 2:
             let cond = ci_trans_bool_expr(session, with_ci_child(session, cursor, 0), scope)
             if cond.len() > 0:
-                let body = ci_trans_stmt_goto(session, with_ci_child(session, cursor, 1), indent + 1, scope, label_map, loop_depth + 1)
+                let body = ci_trans_stmt_goto(session, with_ci_child(session, cursor, 1), 0, scope, label_map, loop_depth + 1)
                 if body.len() > 0:
-                    var result = "while " ++ cond ++ ":\n" ++ body
+                    let body_text = ci_indent_block(body, indent + 1)
+                    var result = "while " ++ cond ++ ":\n" ++ body_text
                     result = result ++ ci_indent_str(indent + 1) ++ "if (if __goto_pending != 0: 1 else: 0) != 0:\n"
                     result = result ++ ci_indent_str(indent + 2) ++ "break\n"
                     return result
+        return ""
+
+    // For statement — translate to init + while + inc
+    if kind == CXK_FOR_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 1:
+            let body_idx = nc - 1
+            let body_cursor = with_ci_child(session, cursor, body_idx)
+            let body = ci_trans_stmt_goto(session, body_cursor, 0, scope, label_map, loop_depth + 1)
+            if body.len() == 0:
+                return ""
+
+            var init_str = ""
+            var cond_str = "true"
+            var inc_str = ""
+            if nc == 4:
+                init_str = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent, scope)
+                let cond_e = ci_trans_bool_expr(session, with_ci_child(session, cursor, 1), scope)
+                if cond_e.len() > 0:
+                    cond_str = cond_e
+                inc_str = ci_trans_expr(session, with_ci_child(session, cursor, 2), scope)
+            else if nc == 3:
+                let first = with_ci_child(session, cursor, 0)
+                let second = with_ci_child(session, cursor, 1)
+                let first_kind = with_ci_cursor_kind(session, first)
+                if first_kind == CXK_DECL_STMT:
+                    init_str = ci_trans_stmt(session, first, indent, scope)
+                    let cond_e = ci_trans_bool_expr(session, second, scope)
+                    if cond_e.len() > 0:
+                        cond_str = cond_e
+                else:
+                    let cond_e = ci_trans_bool_expr(session, first, scope)
+                    if cond_e.len() > 0:
+                        cond_str = cond_e
+                    inc_str = ci_trans_expr(session, second, scope)
+            else if nc == 2:
+                let cond_e = ci_trans_bool_expr(session, with_ci_child(session, cursor, 0), scope)
+                if cond_e.len() > 0:
+                    cond_str = cond_e
+
+            let body_text = ci_indent_block(body, indent + 1)
+            var result = ""
+            if init_str.len() > 0:
+                result = result ++ init_str ++ "\n" ++ ci_indent_str(indent)
+            result = result ++ "while " ++ cond_str ++ ":\n" ++ body_text
+            if inc_str.len() > 0:
+                result = result ++ ci_indent_str(indent + 1) ++ inc_str ++ "\n"
+            result = result ++ ci_indent_str(indent + 1) ++ "if (if __goto_pending != 0: 1 else: 0) != 0:\n"
+            result = result ++ ci_indent_str(indent + 2) ++ "break\n"
+            return result
+        return ""
+
+    // Do-while — recurse with goto awareness
+    if kind == CXK_DO_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 2:
+            let body = ci_trans_stmt_goto(session, with_ci_child(session, cursor, 0), 0, scope, label_map, loop_depth + 1)
+            let cond = ci_trans_bool_expr(session, with_ci_child(session, cursor, 1), scope)
+            if body.len() > 0 and cond.len() > 0:
+                let body_text = ci_indent_block(body, indent + 1)
+                var result = "while true:\n" ++ body_text
+                result = result ++ ci_indent_str(indent + 1) ++ "if (if __goto_pending != 0: 1 else: 0) != 0:\n"
+                result = result ++ ci_indent_str(indent + 2) ++ "break\n"
+                result = result ++ ci_indent_str(indent + 1) ++ "if not (" ++ cond ++ "):\n"
+                result = result ++ ci_indent_str(indent + 2) ++ "break\n"
+                return result
+        return ""
+
+    // Switch statement — recurse into case/default prongs with goto awareness
+    if kind == CXK_SWITCH_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 2:
+            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+            if cond.len() > 0:
+                let body_cursor = with_ci_child(session, cursor, 1)
+                return ci_trans_switch_body_goto(session, body_cursor, cond, indent, scope, label_map, loop_depth)
         return ""
 
     // Everything else: use the normal translator (break, continue, return, etc.)
@@ -5877,7 +6131,7 @@ fn ci_map_libc_call(callee: str, args: str) -> str:
     if callee == "strcmp":
         return "string_cmp(" ++ args ++ ")"
     if callee == "strncmp":
-        return "string_cmp(" ++ args ++ ")"  // TODO: strncmp needs length param
+        return "strncmp(" ++ args ++ ")"
     if callee == "strchr":
         return "string_find_char(" ++ args ++ ")"
 
