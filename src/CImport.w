@@ -4894,9 +4894,26 @@ fn ci_strip_float_suffix(s: str) -> str:
     s.slice(0, end as i64)
 
 fn ci_is_string_literal(s: str) -> bool:
-    if s.len() < 2:
+    let t = ci_trim(s)
+    if t.len() < 2:
         return false
-    s.byte_at(0) == 34 and s.byte_at(s.len() - 1) == 34
+    var i = 0
+    if ci_starts_with(t, "u8\""):
+        i = 2
+    else if t.byte_at(0) == 76 or t.byte_at(0) == 85 or t.byte_at(0) == 117:  // L, U, u
+        i = 1
+    if i as i64 >= t.len() or t.byte_at(i as i64) != 34:
+        return false
+    i = i + 1
+    while i as i64 < t.len():
+        let c = t.byte_at(i as i64)
+        if c == 92:
+            i = i + 2
+            continue
+        if c == 34:
+            return i as i64 == t.len() - 1
+        i = i + 1
+    false
 
 // ── Character literal support ───────────────────────────────
 
