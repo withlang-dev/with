@@ -61,6 +61,19 @@ prepare_generated_tree() {
     {
         printf '%s\n' '// std.re.defs — shared type aliases for migrated PCRE2'
         sed -n "2,${preamble_end}p" "$generated_dir/pcre2_tables.w"
+        # Forward-declare opaque PCRE2 internal struct types
+        printf '\n// Opaque PCRE2 internal types (forward declarations)\n'
+        printf '%s\n' 'type pcre2_real_general_context_8 = opaque'
+        printf '%s\n' 'type pcre2_real_compile_context_8 = opaque'
+        printf '%s\n' 'type pcre2_real_match_context_8 = opaque'
+        printf '%s\n' 'type pcre2_real_convert_context_8 = opaque'
+        printf '%s\n' 'type pcre2_real_code_8 = opaque'
+        printf '%s\n' 'type pcre2_real_match_data_8 = opaque'
+        printf '%s\n' 'type pcre2_real_jit_stack_8 = opaque'
+        # Cross-module extern declarations
+        printf '\n// Cross-module extern symbols\n'
+        printf '%s\n' 'extern let _pcre2_OP_lengths_8: [186]u8'
+        printf '%s\n' 'extern let _pcre2_default_tables_8: *const u8'
     } > "$generated_dir/defs.w"
 
     local dst line
@@ -100,7 +113,12 @@ count_generated_errors() {
 
     local mod errs size
     for mod in $(ls "$generated_dir"/*.w | sed "s|$generated_dir/||;s|\.w||" | sort); do
+        [ "$mod" = "defs" ] && continue
         head -48 "$raw_dir/pcre2_tables.w" > "$tf"
+        # Append shared defs (opaque types, extern symbols)
+        if [ -f "$generated_dir/defs.w" ]; then
+            tail -n +2 "$generated_dir/defs.w" >> "$tf"
+        fi
         tail -n +3 "$generated_dir/$mod.w" >> "$tf"
         printf '\nfn main: print("ok")\n' >> "$tf"
         errs="$("$with_bin" check "$tf" 2>&1 | grep -c 'error:' || true)"
