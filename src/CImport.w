@@ -3553,10 +3553,24 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                 let rhs_is_ptr = with_ci_type_is_pointer(session, rhs_cursor) != 0
 
                 // Pointer arithmetic: ptr + idx, idx + ptr
-                if op == BO_ADD and (lhs_is_ptr or rhs_is_ptr):
-                    let ptr_e = if lhs_is_ptr: lhs else: rhs
-                    let idx_cursor = if lhs_is_ptr: rhs_cursor else: lhs_cursor
-                    let idx_e = if lhs_is_ptr: rhs else: lhs
+                // Also handle array + idx (array decays to pointer)
+                let lhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
+                let rhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_cursor))
+                let lhs_is_array = lhs_ty_str.len() > 0 and lhs_ty_str.byte_at(0) == 91
+                let rhs_is_array = rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91
+                if op == BO_ADD and (lhs_is_ptr or rhs_is_ptr or lhs_is_array or rhs_is_array):
+                    var ptr_e = if lhs_is_ptr or lhs_is_array: lhs else: rhs
+                    let ptr_cursor = if lhs_is_ptr or lhs_is_array: lhs_cursor else: rhs_cursor
+                    let is_array = if lhs_is_ptr or lhs_is_array: lhs_is_array else: rhs_is_array
+                    let idx_cursor = if lhs_is_ptr or lhs_is_array: rhs_cursor else: lhs_cursor
+                    let idx_e = if lhs_is_ptr or lhs_is_array: rhs else: lhs
+                    // Array decay: &arr[0]
+                    if is_array:
+                        let arr_ty = with_ci_type_translated(session, with_ci_cursor_type(session, ptr_cursor))
+                        let elem_start = ci_find_array_elem_start(arr_ty)
+                        if elem_start > 0:
+                            let elem_ty = arr_ty.slice(elem_start as i64, arr_ty.len())
+                            ptr_e = "(&" ++ ptr_e ++ "[0] as *mut " ++ elem_ty ++ ")"
                     if with_ci_type_is_unsigned(session, idx_cursor) == 0:
                         return "(" ++ ptr_e ++ " + (" ++ idx_e ++ " as isize as usize))"
                     return "(" ++ ptr_e ++ " + " ++ idx_e ++ ")"
@@ -3579,6 +3593,14 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                     let bool_rhs = ci_trans_bool_expr(session, rhs_cursor, scope)
                     let log_op = if op == BO_LAND: "and" else: "or"
                     return "(if " ++ bool_lhs ++ " " ++ log_op ++ " " ++ bool_rhs ++ ": 1 else: 0)"
+
+                // Array-to-pointer decay in assignment RHS
+                if op == BO_ASSIGN:
+                    if rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91:
+                        let elem_start = ci_find_array_elem_start(rhs_ty_str)
+                        if elem_start > 0:
+                            let elem_ty = rhs_ty_str.slice(elem_start as i64, rhs_ty_str.len())
+                            return "(" ++ lhs ++ " = (&" ++ rhs ++ "[0] as *mut " ++ elem_ty ++ "))"
 
                 let op_str = ci_bo_to_str_typed(op, is_unsigned)
                 if op_str.len() > 0:
@@ -3921,8 +3943,16 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
         let nc = with_ci_num_children(session, cursor)
         if nc == 0:
             return "return"
-        let expr = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+        let ret_child = with_ci_child(session, cursor, 0)
+        var expr = ci_trans_expr(session, ret_child, scope)
         if expr.len() > 0:
+            // Array-to-pointer decay in return
+            let ret_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, ret_child))
+            if ret_ty_str.len() > 0 and ret_ty_str.byte_at(0) == 91:
+                let elem_start = ci_find_array_elem_start(ret_ty_str)
+                if elem_start > 0:
+                    let elem_ty = ret_ty_str.slice(elem_start as i64, ret_ty_str.len())
+                    expr = "(&" ++ expr ++ "[0] as *mut " ++ elem_ty ++ ")"
             return "return " ++ expr
         return ""
 
@@ -6084,7 +6114,8 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
             var cond_str = "true"
             var inc_str = ""
             if nc == 4:
-                init_str = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent, scope)
+                // Use goto-aware handler so DeclStmt becomes assignment (var was hoisted)
+                init_str = ci_trans_stmt_goto(session, with_ci_child(session, cursor, 0), indent, scope, label_map, loop_depth)
                 let cond_e = ci_trans_bool_expr(session, with_ci_child(session, cursor, 1), scope)
                 if cond_e.len() > 0:
                     cond_str = cond_e
@@ -6094,7 +6125,7 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
                 let second = with_ci_child(session, cursor, 1)
                 let first_kind = with_ci_cursor_kind(session, first)
                 if first_kind == CXK_DECL_STMT:
-                    init_str = ci_trans_stmt(session, first, indent, scope)
+                    init_str = ci_trans_stmt_goto(session, first, indent, scope, label_map, loop_depth)
                     let cond_e = ci_trans_bool_expr(session, second, scope)
                     if cond_e.len() > 0:
                         cond_str = cond_e
