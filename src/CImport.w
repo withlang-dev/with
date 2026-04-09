@@ -4148,20 +4148,37 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
             i = i + 1
         return result
 
-    // Chained assignment: a = (b = c) → decompose into sequential statements
+    // Chained assignment decomposition
     if kind == CXK_BINARY_OP:
         let bo = with_ci_binary_op(session, cursor)
         if bo == BO_ASSIGN:
             let nc = with_ci_num_children(session, cursor)
             if nc >= 2:
+                let lhs_cursor = with_ci_child(session, cursor, 0)
                 let rhs_cursor = with_ci_child(session, cursor, 1)
+                // a = (b = c) → decompose RHS chain
                 if with_ci_cursor_kind(session, rhs_cursor) == CXK_BINARY_OP and with_ci_binary_op(session, rhs_cursor) == BO_ASSIGN:
-                    // Decompose: emit inner assignment as statement first, then outer
                     let inner_stmt = ci_trans_stmt(session, rhs_cursor, indent, scope)
                     let inner_lhs = ci_trans_expr(session, with_ci_child(session, rhs_cursor, 0), scope)
-                    let outer_lhs = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+                    let outer_lhs = ci_trans_expr(session, lhs_cursor, scope)
                     if inner_stmt.len() > 0 and outer_lhs.len() > 0 and inner_lhs.len() > 0:
                         return inner_stmt ++ "\n" ++ ci_indent_str(indent) ++ "(" ++ outer_lhs ++ " = " ++ inner_lhs ++ ")"
+                // *(ptr = ptr + 1) = value → decompose LHS deref-of-assign
+                if with_ci_cursor_kind(session, lhs_cursor) == CXK_UNARY_OP and with_ci_unary_op(session, lhs_cursor) == UO_DEREF:
+                    let deref_child = with_ci_child(session, lhs_cursor, 0)
+                    // Skip implicit cast wrappers (kind 100)
+                    var inner_assign_cursor = deref_child
+                    if with_ci_cursor_kind(session, deref_child) == 100:
+                        let icc = with_ci_num_children(session, deref_child)
+                        if icc == 1:
+                            inner_assign_cursor = with_ci_child(session, deref_child, 0)
+                    if with_ci_cursor_kind(session, inner_assign_cursor) == CXK_BINARY_OP and with_ci_binary_op(session, inner_assign_cursor) == BO_ASSIGN:
+                        // *(ptr_assign) = rhs → decompose to: (ptr_assign), then (unsafe: *ptr = rhs)
+                        let ptr_stmt = ci_trans_stmt(session, inner_assign_cursor, indent, scope)
+                        let ptr_lhs = ci_trans_expr(session, with_ci_child(session, inner_assign_cursor, 0), scope)
+                        let rhs_val = ci_trans_expr(session, rhs_cursor, scope)
+                        if ptr_stmt.len() > 0 and ptr_lhs.len() > 0 and rhs_val.len() > 0:
+                            return ptr_stmt ++ "\n" ++ ci_indent_str(indent) ++ "(unsafe: *" ++ ptr_lhs ++ " = " ++ rhs_val ++ ")"
 
     // Expression statement — translate as expression
     let expr = ci_trans_expr(session, cursor, scope)
