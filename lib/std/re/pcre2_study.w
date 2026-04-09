@@ -3,11 +3,7 @@ use std.re.defs
 
 type BOOL = c_int
 type PCRE2_UCHAR8 = u8
-type PCRE2_UCHAR16 = c_ushort
-type PCRE2_UCHAR32 = c_uint
 type PCRE2_SPTR8 = *const u8
-type PCRE2_SPTR16 = *const c_ushort
-type PCRE2_SPTR32 = *const c_uint
 type pcre2_general_context_8 = pcre2_real_general_context_8
 type pcre2_compile_context_8 = pcre2_real_compile_context_8
 type pcre2_match_context_8 = pcre2_real_match_context_8
