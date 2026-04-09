@@ -1448,6 +1448,15 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
         ann_type_node = self.ast.get_extra(ann_extra)
         ann_type = self.resolve_type_expr(ann_type_node)
 
+    // var x: T (no initializer) — zero-initialized
+    if value == 0:
+        if ann_type == 0:
+            self.emit_error("var without initializer requires type annotation", node)
+            return self.ty_void as i32
+        self.scope_put_at(name, ann_type as i32, is_mut, node)
+        self.typed_binding_types.insert(node, ann_type as i32)
+        return self.ty_void as i32
+
     // Let binding value is expression position — match inside must be exhaustive.
     let saved_match_stmt = self.match_in_stmt_pos
     self.match_in_stmt_pos = 0

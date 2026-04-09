@@ -1755,8 +1755,23 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> NodeId:
         self.advance()
         type_ann = self.parse_type_expr()
 
-    if self.expect(TokenKind.TK_EQ) == 0:
+    // var x: T (no initializer) — zero-initialized
+    if self.peek() != TokenKind.TK_EQ:
+        if is_mut and type_ann != 0:
+            var flags = 1  // mut
+            if is_pub == Visibility.Public:
+                flags = flags + 2
+            let type_extra = self.pool.extra_len()
+            self.pool.add_extra(type_ann)
+            flags = flags + (type_extra + 1) * 4
+            return self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, 0, flags)
+        if not is_mut:
+            self.emit_error("let binding requires initializer")
+            return self.poisoned_expr()
+        self.emit_error("var without initializer requires type annotation")
         return self.poisoned_expr()
+
+    self.advance()  // consume '='
     self.skip_newlines()
     let value = self.parse_expr()
     if value == 0:
@@ -4863,8 +4878,21 @@ fn Parser.parse_let_binding(self: Parser) -> NodeId:
         self.advance()
         type_ann = self.parse_type_expr()
 
-    if self.expect(TokenKind.TK_EQ) == 0:
+    // var x: T (no initializer) — zero-initialized if mutable with type annotation
+    if self.peek() != TokenKind.TK_EQ:
+        if is_mut and type_ann != 0:
+            var flags = 1  // mut
+            let type_extra = self.pool.extra_len()
+            self.pool.add_extra(type_ann)
+            flags = flags + (type_extra + 1) * 2
+            return self.pool.add_node(NodeKind.NK_LET_BINDING, start, self.prev_end(), name_sym, 0, flags)
+        if not is_mut:
+            self.emit_error("let binding requires initializer")
+            return self.poisoned_expr()
+        self.emit_error("var without initializer requires type annotation")
         return self.poisoned_expr()
+
+    self.advance()  // consume '='
     self.skip_newlines()
     let value = self.parse_expr()
     var flags = 0

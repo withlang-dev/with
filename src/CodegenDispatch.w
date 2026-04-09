@@ -2282,7 +2282,16 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
         return true
 
     if sk == StmtKind.StorageLive:
-        // Storage markers do not require dedicated IR in this backend.
+        // d1 != 0 signals zero-init: create alloca and store zeroinitializer
+        if d1 != 0:
+            let local_id = d0
+            let sema_ty = d1
+            let llvm_ty = self.sema_type_to_llvm(sema_ty)
+            if llvm_ty != 0:
+                let ptr = self.mir_get_or_create_local_ptr(local_id, llvm_ty)
+                self.mir_local_types.insert(local_id, llvm_ty)
+                let zero = wl_const_null(llvm_ty)
+                wl_build_store(self.builder, zero, ptr)
         return true
 
     if sk == StmtKind.StorageDead:

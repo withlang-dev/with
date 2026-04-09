@@ -2449,6 +2449,11 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             self.type_binding_types = saved_types
             return mono_ty
         return 0
+    if tk == TypeKind.TY_FLOAT:
+        let width = self.sema.get_type_d0(resolved_tid)
+        if width == 32: return wl_f32_type(self.context)
+        if width == 64: return wl_f64_type(self.context)
+        return wl_f64_type(self.context)
     if tk == TypeKind.TY_INT:
         let bits = self.sema.get_type_d0(resolved_tid)
         if bits == 1:
