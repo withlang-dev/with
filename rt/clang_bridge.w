@@ -492,6 +492,29 @@ fn buf_append_str(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
         i = i + 1
     *((buf as i64 + *pos) as *mut u8) = 0
 
+// Append a string to a buffer, replacing each ' with '\'' for shell safety.
+fn buf_append_shell_escaped(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
+    if s as i64 == 0: return
+    let len = c_strlen(s)
+    var i: i64 = 0
+    while i < len and *pos < cap - 5:
+        let ch = *((s as i64 + i) as *const u8)
+        if ch == 39:  // single quote
+            // Write '\'' (4 chars)
+            *((buf as i64 + *pos) as *mut u8) = 39       // '
+            *pos = *pos + 1
+            *((buf as i64 + *pos) as *mut u8) = 92       // backslash
+            *pos = *pos + 1
+            *((buf as i64 + *pos) as *mut u8) = 39       // '
+            *pos = *pos + 1
+            *((buf as i64 + *pos) as *mut u8) = 39       // '
+            *pos = *pos + 1
+        else:
+            *((buf as i64 + *pos) as *mut u8) = ch
+            *pos = *pos + 1
+        i = i + 1
+    *((buf as i64 + *pos) as *mut u8) = 0
+
 fn buf_append_i64(buf: *mut u8, pos: *mut i64, cap: i64, val: i64):
     var tmp: [32]u8 = [0 as u8; 32]
     var v = val
@@ -1572,14 +1595,14 @@ pub fn cimport_parse_macros(header_code: str) -> i64:
     let sysroot = get_sdk_path()
     if sysroot as i64 != 0:
         buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "cc -isysroot '\0" as *const u8)
-        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, sysroot)
+        buf_append_shell_escaped(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, sysroot)
         buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "'\0" as *const u8)
     else:
         buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "cc\0" as *const u8)
     var ip: i32 = 0
     while ip < g_cimport_include_count:
         buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, " -I '\0" as *const u8)
-        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, g_cimport_include_paths[ip as i64] as *const u8)
+        buf_append_shell_escaped(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, g_cimport_include_paths[ip as i64] as *const u8)
         buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "'\0" as *const u8)
         ip = ip + 1
     buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, " -E -dM '\0" as *const u8)
