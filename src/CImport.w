@@ -5333,6 +5333,10 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str) -> i32:
                     files_migrated = files_migrated + 1
         pos = line_end + 1
 
+    let files_failed = files_scanned - files_migrated
+    if files_failed > 0:
+        eprint(f"migrate: {files_migrated}/{files_scanned} files migrated ({files_failed} failed) from {input_dir} -> {output_dir}")
+        return 1
     eprint(f"migrate: {files_migrated}/{files_scanned} files migrated from {input_dir} -> {output_dir}")
     if files_migrated == 0: 1 else: 0
 
