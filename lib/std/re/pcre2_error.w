@@ -94,7 +94,6 @@ extern fn pcre2_jit_free_unused_memory_8(p0: *mut pcre2_real_general_context_8) 
 extern fn pcre2_jit_stack_create_8(p0: c_ulong, p1: c_ulong, p2: *mut pcre2_real_general_context_8) -> *mut pcre2_real_jit_stack_8
 extern fn pcre2_jit_stack_assign_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, p2: *mut c_void) -> void
 extern fn pcre2_jit_stack_free_8(p0: *mut pcre2_real_jit_stack_8) -> void
-// Static const arrays (not auto-migrated - defined in C source)
 extern let compile_error_texts: *const u8
 extern let match_error_texts: *const u8
 

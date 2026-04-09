@@ -54,12 +54,57 @@ extern fn pcre2_set_match_limit_8(p0: *mut pcre2_real_match_context_8, p1: c_uin
 extern fn pcre2_set_offset_limit_8(p0: *mut pcre2_real_match_context_8, p1: c_ulong) -> c_int
 extern fn pcre2_set_recursion_limit_8(p0: *mut pcre2_real_match_context_8, p1: c_uint) -> c_int
 extern fn pcre2_set_recursion_memory_management_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(c_ulong, *mut c_void) -> *mut c_void, p2: *const fn(*mut c_void, *mut c_void) -> void, p3: *mut c_void) -> c_int
+extern let _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern let _pcre2_default_tables_8: u8
+// Restored from the original C source; the migration dropped this static table.
+type pso { name: *const u8 = null, length: c_ushort = 0, type_: c_ushort = 0, value: c_uint = 0 }
+type pso_list_array = [23]pso
+let GROUPINFO_DEFAULT_SIZE: c_uint = 256
+let NAMED_GROUP_LIST_SIZE: c_uint = 20
+let PARSED_PATTERN_DEFAULT_SIZE: c_uint = 1024
+let COMPILE_WORK_SIZE: c_ulong = 6000
+let PSO_OPT: c_ushort = 0
+let PSO_XOPT: c_ushort = 1
+let PSO_FLG: c_ushort = 2
+let PSO_NL: c_ushort = 3
+let PSO_BSR: c_ushort = 4
+let PSO_LIMH: c_ushort = 5
+let PSO_LIMM: c_ushort = 6
+let PSO_LIMD: c_ushort = 7
+let PSO_OPTMZ: c_ushort = 8
+let pso_list: pso_list_array = [
+    pso { name: "UTF8)", length: 5, type_: PSO_OPT, value: 524288 },
+    pso { name: "UTF)", length: 4, type_: PSO_OPT, value: 524288 },
+    pso { name: "UCP)", length: 4, type_: PSO_OPT, value: 131072 },
+    pso { name: "NOTEMPTY)", length: 9, type_: PSO_FLG, value: 65536 },
+    pso { name: "NOTEMPTY_ATSTART)", length: 17, type_: PSO_FLG, value: 131072 },
+    pso { name: "NO_AUTO_POSSESS)", length: 16, type_: PSO_OPTMZ, value: 1 },
+    pso { name: "NO_DOTSTAR_ANCHOR)", length: 18, type_: PSO_OPTMZ, value: 2 },
+    pso { name: "NO_JIT)", length: 7, type_: PSO_FLG, value: 524288 },
+    pso { name: "NO_START_OPT)", length: 13, type_: PSO_OPTMZ, value: 4 },
+    pso { name: "CASELESS_RESTRICT)", length: 18, type_: PSO_XOPT, value: 128 },
+    pso { name: "TURKISH_CASING)", length: 15, type_: PSO_XOPT, value: 65536 },
+    pso { name: "LIMIT_HEAP=", length: 11, type_: PSO_LIMH, value: 0 },
+    pso { name: "LIMIT_MATCH=", length: 12, type_: PSO_LIMM, value: 0 },
+    pso { name: "LIMIT_DEPTH=", length: 12, type_: PSO_LIMD, value: 0 },
+    pso { name: "LIMIT_RECURSION=", length: 16, type_: PSO_LIMD, value: 0 },
+    pso { name: "CR)", length: 3, type_: PSO_NL, value: 1 },
+    pso { name: "LF)", length: 3, type_: PSO_NL, value: 2 },
+    pso { name: "CRLF)", length: 5, type_: PSO_NL, value: 3 },
+    pso { name: "ANY)", length: 4, type_: PSO_NL, value: 4 },
+    pso { name: "NUL)", length: 4, type_: PSO_NL, value: 6 },
+    pso { name: "ANYCRLF)", length: 8, type_: PSO_NL, value: 5 },
+    pso { name: "BSR_ANYCRLF)", length: 12, type_: PSO_BSR, value: 2 },
+    pso { name: "BSR_UNICODE)", length: 12, type_: PSO_BSR, value: 1 },
+]
+let PSO_LIST_COUNT: c_uint = (sizeof[pso_list_array]() / sizeof[pso]()) as c_uint
 @[c_export("pcre2_compile_8")]
 fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_options: c_uint, errorptr: *mut c_int, erroroffset: *mut c_ulong, __param_ccontext: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_code_8:
     var pattern = __param_pattern
     var patlen = __param_patlen
     var options = __param_options
     var ccontext = __param_ccontext
+    var null_str: *const u8 = "" as *const u8
     var utf: c_int = 0
     var ucp: c_int = 0
     var has_lookbehind: c_int = 0
@@ -81,17 +126,22 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
     var setflags: c_uint = 0
     var xoptions: c_uint = 0
     var skipatstart: c_uint = 0
-    var limit_heap: c_uint = 0
-    var limit_match: c_uint = 0
-    var limit_depth: c_uint = 0
+    var limit_heap: c_uint = 4294967295
+    var limit_match: c_uint = 4294967295
+    var limit_depth: c_uint = 4294967295
     var newline: c_int = 0
     var bsr: c_int = 0
     var errorcode: c_int = 0
     var regexrc: c_int = 0
     var i: c_uint = 0
-    var optim_flags: c_uint = 0
-    var cworkspace: *mut u8 = null
-    var p: *const pso = null
+    var optim_flags: c_uint = 7
+    var cb: compile_block_8 = compile_block_8 {}
+    var stack_groupinfo: [256]c_uint = [0 as c_uint; 256]
+    var stack_parsed_pattern: [1024]c_uint = [0 as c_uint; 1024]
+    var named_groups: [20]named_group_8 = [named_group_8 {}; 20]
+    var c16workspace: [3000]c_uint = [0 as c_uint; 3000]
+    var cworkspace: *mut u8 = &c16workspace[0] as *mut c_uint as *mut u8
+    var pso_entry: *const pso = null
     var c: c_uint = 0
     var pp: c_uint = 0
     var heap_parsed_pattern: *mut c_uint = null
@@ -141,11 +191,18 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         (unsafe: *errorptr = ERR16)
                         return null
 
+                if (if ccontext == null: 1 else: 0) != 0:
+                    (ccontext = ((&_pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8) as *mut pcre2_real_compile_context_8))
+
+                (optim_flags = ccontext.optimization_flags)
 
                 if (if ((options & 67108864)) != 0: 1 else: 0) != 0:
                     options = options | 524288
 
-                zero_terminated
+                (zero_terminated = (if patlen == 18446744073709551615: 1 else: 0))
+                if (if zero_terminated != 0: 1 else: 0) != 0:
+                    (patlen = _pcre2_strlen_8(pattern))
+
                 if (if patlen > ccontext.max_pattern_length: 1 else: 0) != 0:
                     (unsafe: *errorptr = ERR88)
                     return null
@@ -159,10 +216,11 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 if (if ((options & 65536)) != 0: 1 else: 0) != 0:
                     optim_flags = optim_flags & (0 - 4 - 1)
 
-                (tables = (if ((if ccontext.tables != null: 1 else: 0)) != 0: ccontext.tables else: _pcre2_default_tables_8))
+                (tables = (if ((if ccontext.tables != null: 1 else: 0)) != 0: ccontext.tables else: (&_pcre2_default_tables_8 as *const u8)))
                 (cb.lcc = (tables + (0 as isize as usize)))
                 (cb.fcc = (tables + (256 as isize as usize)))
                 (cb.cbits = (tables + (512 as isize as usize)))
+                (cb.ctypes = (tables + (832 as isize as usize)))
                 (cb.assert_depth = 0)
                 (cb.bracount = 0)
                 (cb.cx = ccontext)
@@ -171,73 +229,115 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 (cb.erroroffset = 0)
                 (cb.external_flags = 0)
                 (cb.external_options = options)
-                (cb.groupinfo = stack_groupinfo)
+                (cb.groupinfo = (&stack_groupinfo[0] as *mut c_uint))
                 (cb.had_recurse = 0)
                 (cb.lastcapture = 0)
                 (cb.max_lookbehind = 0)
                 (cb.max_varlookbehind = ccontext.max_varlookbehind)
                 (cb.name_entry_size = 0)
                 (cb.name_table = null)
-                (cb.named_groups = named_groups)
-                (cb.named_group_list_size = 20)
+                (cb.named_groups = (&named_groups[0] as *mut named_group_8))
+                (cb.named_group_list_size = NAMED_GROUP_LIST_SIZE)
                 (cb.names_found = 0)
                 (cb.parens_depth = 0)
-                (cb.parsed_pattern = stack_parsed_pattern)
+                (cb.parsed_pattern = (&stack_parsed_pattern[0] as *mut c_uint))
                 (cb.req_varyopt = 0)
                 (cb.start_code = cworkspace)
                 (cb.start_pattern = pattern)
                 (cb.start_workspace = cworkspace)
-                (cb.workspace_size = 6000)
+                (cb.workspace_size = COMPILE_WORK_SIZE)
                 (cb.first_data = null)
                 (cb.last_data = null)
                 (cb.top_backref = 0)
                 (cb.backref_map = 0)
+                (i = 0)
+                while (if i < 10: 1 else: 0) != 0:
+                    (cb.small_ref_offset[i] = 18446744073709551615)
+                    (i = i + 1)
+
                 (xoptions = ccontext.extra_options)
                 (ptr = pattern)
                 (skipatstart = 0)
                 if (if ((options & 33554432)) == 0: 1 else: 0) != 0:
                     while (if (if (if (patlen -% skipatstart) >= 2: 1 else: 0) != 0 and (if ptr[skipatstart] == 40: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[(skipatstart +% 1)] == 42: 1 else: 0) != 0: 1 else: 0) != 0:
                         (i = 0)
-                        while (if i < (sizeof[[23]pso]() / sizeof[pso]()): 1 else: 0) != 0:
-                            var p: *const pso = null // init: untranslatable
-                            if (if (if ((patlen -% skipatstart) -% 2) >= p.length: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(((ptr + skipatstart) + (2 as isize as usize)), p.name, p.length) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                var c: c_uint = 0 // init: untranslatable
-                                var pp: c_uint = 0 // init: untranslatable
-                                skipatstart = skipatstart + (p.length + 2)
-                                match p.type_
+                        while (if i < PSO_LIST_COUNT: 1 else: 0) != 0:
+                            (pso_entry = ((&pso_list[0] as *const pso) + (i as isize as usize)))
+                            if (if (if ((patlen -% skipatstart) -% 2) >= pso_entry.length: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(((ptr + skipatstart) + (2 as isize as usize)), pso_entry.name, pso_entry.length) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                skipatstart = skipatstart + (pso_entry.length + 2)
+                                match pso_entry.type_
                                     PSO_OPT =>
-                                        cb.external_options = cb.external_options | p.value
+                                        cb.external_options = cb.external_options | pso_entry.value
                                     PSO_XOPT =>
-                                        xoptions = xoptions | p.value
+                                        xoptions = xoptions | pso_entry.value
                                     PSO_FLG =>
-                                        setflags = setflags | p.value
+                                        setflags = setflags | pso_entry.value
                                     PSO_NL =>
-                                        (newline = p.value)
+                                        (newline = pso_entry.value)
                                         setflags = setflags | 32768
                                     PSO_BSR =>
-                                        (bsr = p.value)
+                                        (bsr = pso_entry.value)
                                         setflags = setflags | 16384
-                                    PSO_LIMM =>
+                                    PSO_LIMH =>
+                                        (c = 0)
                                         (pp = skipatstart)
+                                        while (if (if (if pp < patlen: 1 else: 0) != 0 and (if ptr[pp] >= 48: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[pp] <= 57: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if c > 429496728: 1 else: 0) != 0:
+                                                break
+
+                                            (c = ((c * 10) + ((ptr[pp] as c_uint) - 48)))
+                                            (pp = pp + 1)
+
                                         if (if (if (if pp >= patlen: 1 else: 0) != 0 or (if pp == skipatstart: 1 else: 0) != 0: 1 else: 0) != 0 or (if ptr[pp] != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                             (errorcode = ERR60)
                                             ptr = ptr + pp
                                             (utf = 0)
                                             comptime_error("goto not supported")
 
-                                        if (if p.type_ == PSO_LIMH: 1 else: 0) != 0:
-                                            (limit_heap = c)
-                                        else:
-                                            if (if p.type_ == PSO_LIMM: 1 else: 0) != 0:
-                                                (limit_match = c)
-                                            else:
-                                                (limit_depth = c)
+                                        (limit_heap = c)
+                                        (pp = pp + 1)
+                                        (skipatstart = pp)
+                                    PSO_LIMM =>
+                                        (c = 0)
+                                        (pp = skipatstart)
+                                        while (if (if (if pp < patlen: 1 else: 0) != 0 and (if ptr[pp] >= 48: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[pp] <= 57: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if c > 429496728: 1 else: 0) != 0:
+                                                break
 
+                                            (c = ((c * 10) + ((ptr[pp] as c_uint) - 48)))
+                                            (pp = pp + 1)
 
-                                        (skipatstart = (pp = pp + 1))
+                                        if (if (if (if pp >= patlen: 1 else: 0) != 0 or (if pp == skipatstart: 1 else: 0) != 0: 1 else: 0) != 0 or (if ptr[pp] != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (errorcode = ERR60)
+                                            ptr = ptr + pp
+                                            (utf = 0)
+                                            comptime_error("goto not supported")
+
+                                        (limit_match = c)
+                                        (pp = pp + 1)
+                                        (skipatstart = pp)
+                                    PSO_LIMD =>
+                                        (c = 0)
+                                        (pp = skipatstart)
+                                        while (if (if (if pp < patlen: 1 else: 0) != 0 and (if ptr[pp] >= 48: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[pp] <= 57: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if c > 429496728: 1 else: 0) != 0:
+                                                break
+
+                                            (c = ((c * 10) + ((ptr[pp] as c_uint) - 48)))
+                                            (pp = pp + 1)
+
+                                        if (if (if (if pp >= patlen: 1 else: 0) != 0 or (if pp == skipatstart: 1 else: 0) != 0: 1 else: 0) != 0 or (if ptr[pp] != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (errorcode = ERR60)
+                                            ptr = ptr + pp
+                                            (utf = 0)
+                                            comptime_error("goto not supported")
+
+                                        (limit_depth = c)
+                                        (pp = pp + 1)
+                                        (skipatstart = pp)
                                     PSO_OPTMZ =>
-                                        optim_flags = optim_flags & (0 - (p.value) - 1)
-                                        match p.value
+                                        optim_flags = optim_flags & (0 - (pso_entry.value) - 1)
+                                        match pso_entry.value
                                             1 =>
                                                 cb.external_options = cb.external_options | 16384
                                             2 =>
@@ -252,7 +352,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
 
                             (i = i + 1)
 
-                        if (if i >= (sizeof[[23]pso]() / sizeof[pso]()): 1 else: 0) != 0:
+                        if (if i >= PSO_LIST_COUNT: 1 else: 0) != 0:
                             break
 
 
@@ -261,41 +361,41 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 if (if ((cb.external_options & ((524288 | 131072)))) != 0: 1 else: 0) != 0:
                     (errorcode = ERR32)
                     __pc = 3
-            continue
+                    continue
 
                 (utf = (if ((cb.external_options & 524288)) != 0: 1 else: 0))
                 if utf != 0:
                     if (if ((options & 4096)) != 0: 1 else: 0) != 0:
                         (errorcode = ERR74)
                         __pc = 3
-            continue
+                        continue
 
                     if (if (if ((options & 1073741824)) == 0: 1 else: 0) != 0 and (if ((errorcode = _pcre2_valid_utf_8(pattern, patlen, erroroffset))) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                         __pc = 4
-            continue
+                        continue
 
 
                 (ucp = (if ((cb.external_options & 131072)) != 0: 1 else: 0))
                 if (if ucp != 0 and (if ((cb.external_options & 2048)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                     (errorcode = ERR75)
                     __pc = 3
-            continue
+                    continue
 
                 if (if ((xoptions & 65536)) != 0: 1 else: 0) != 0:
                     if (if (not utf) != 0 and (not ucp) != 0: 1 else: 0) != 0:
                         (errorcode = ERR104)
                         __pc = 3
-            continue
+                        continue
 
                     if (not utf) != 0:
                         (errorcode = ERR105)
                         __pc = 3
-            continue
+                        continue
 
                     if (if ((xoptions & 128)) != 0: 1 else: 0) != 0:
                         (errorcode = ERR106)
                         __pc = 3
-            continue
+                        continue
 
 
                 if (if bsr == 0: 1 else: 0) != 0:
@@ -336,11 +436,11 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
 
                 parsed_size_needed = parsed_size_needed + 1
                 if (if parsed_size_needed > 1024: 1 else: 0) != 0:
-                    var heap_parsed_pattern: *mut c_uint = null // init failed
+                    (heap_parsed_pattern = (ccontext.memctl.malloc((parsed_size_needed *% sizeof[c_uint]()), ccontext.memctl.memory_data) as *mut c_uint))
                     if (if heap_parsed_pattern == null: 1 else: 0) != 0:
                         (unsafe: *errorptr = ERR21)
                         __pc = 1
-            continue
+                        continue
 
                     (cb.parsed_pattern = heap_parsed_pattern)
 
@@ -348,24 +448,24 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 (errorcode = parse_regex(ptr, cb.external_options, xoptions, &has_lookbehind, &cb))
                 if (if errorcode != 0: 1 else: 0) != 0:
                     __pc = 2
-            continue
+                    continue
 
                 if has_lookbehind != 0:
-                    var loopcount: c_int = 0
+                    (loopcount = 0)
                     if (if cb.bracount >= 128: 1 else: 0) != 0:
                         (cb.groupinfo = ccontext.memctl.malloc((((2 *% ((cb.bracount +% 1)))) *% sizeof[c_uint]()), ccontext.memctl.memory_data))
                         if (if cb.groupinfo == null: 1 else: 0) != 0:
                             (errorcode = ERR21)
                             (cb.erroroffset = 0)
                             __pc = 2
-            continue
+                            continue
 
 
                     with_memset(cb.groupinfo as *i8, 0, ((((2 *% cb.bracount) +% 1)) *% sizeof[c_uint]()) as i64)
                     (errorcode = check_lookbehinds(cb.parsed_pattern, null, null, &cb, &loopcount))
                     if (if errorcode != 0: 1 else: 0) != 0:
                         __pc = 2
-            continue
+                        continue
 
 
                 (cb.erroroffset = patlen)
@@ -375,26 +475,26 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 compile_regex(cb.external_options, xoptions, &code, &pptr, &errorcode, 0, &firstcu, &firstcuflags, &reqcu, &reqcuflags, null, null, &cb, &length)
                 if (if errorcode != 0: 1 else: 0) != 0:
                     __pc = 2
-            continue
+                    continue
 
                 if (if length > 65536: 1 else: 0) != 0:
                     (errorcode = ERR20)
                     (cb.erroroffset = 0)
                     __pc = 2
-            continue
+                    continue
 
                 if (if re_blocksize > ccontext.max_pattern_compiled_length: 1 else: 0) != 0:
                     (errorcode = ERR101)
                     (cb.erroroffset = 0)
                     __pc = 2
-            continue
+                    continue
 
                 re_blocksize = re_blocksize + sizeof[pcre2_real_code_8]()
                 if (if re == null: 1 else: 0) != 0:
                     (errorcode = ERR21)
                     (cb.erroroffset = 0)
                     __pc = 2
-            continue
+                    continue
 
                 with_memset((((re as *mut i8) + sizeof[pcre2_real_code_8]()) - (8 as isize as usize)) as *i8, 0, 8 as i64)
                 (re.memctl = ccontext.memctl)
@@ -429,12 +529,14 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 (cb.had_accept = 0)
                 (cb.had_pruneorskip = 0)
                 if (if cb.names_found > 0: 1 else: 0) != 0:
-                    var ng: *mut named_group_8 = null // init failed
-                    var tablecount: c_uint = 0 // init failed
+                    (ng = cb.named_groups)
+                    (tablecount = 0)
                     (i = 0)
                     while (if i < cb.names_found: 1 else: 0) != 0:
-if (if ng.length > 0: 1 else: 0) != 0:
-                            (tablecount = _pcre2_compile_add_name_to_table8(&cb, ng, tablecount))
+                        if (if ng.length > 0: 1 else: 0) != 0:
+                            (tablecount = _pcre2_compile_add_name_to_table8((&cb as *mut compile_block_8), ng, tablecount))
+                        (i = i + 1)
+                        (ng = ng + (1 as isize as usize))
 
 
                 (pptr = cb.parsed_pattern)
@@ -457,22 +559,22 @@ if (if ng.length > 0: 1 else: 0) != 0:
                     (errorcode = ERR23)
                     (cb.erroroffset = 0)
                     __pc = 2
-            continue
+                    continue
 
                 if (if (if errorcode == 0: 1 else: 0) != 0 and cb.had_recurse != 0: 1 else: 0) != 0:
-                    var rcode: *mut u8 = null // init failed
-                    var rgroup: *const u8 = null // init failed
-                    var ccount: c_uint = 0
-                    var start: c_int = 8
+                    (rcode = null)
+                    (rgroup = null)
+                    (ccount = 0)
+                    (start = 8)
                     var rc = 0 // init failed: [8]recurse_cache
                     (rcode = find_recurse(codestart, utf))
                     while (if rcode != null: 1 else: 0) != 0:
-                        var p: c_int = 0
-                        var groupnumber: c_int = 0
+                        (p = null)
+                        (groupnumber = 0)
                         if (if groupnumber == 0: 1 else: 0) != 0:
                             (rgroup = codestart)
                         else:
-                            var search_from: *const u8 = null // init: untranslatable
+                            (search_from = null)
                             (rgroup = null)
                             while (if i < ccount: 1 else: 0) != 0:
                                 if (if groupnumber == rc[p].groupnumber: 1 else: 0) != 0:
@@ -503,8 +605,8 @@ if (if ng.length > 0: 1 else: 0) != 0:
 
 
                 if (if (if errorcode == 0: 1 else: 0) != 0 and (if ((optim_flags & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                    var temp: *mut u8 = null // init failed
-                    var possessify_rc: c_int = _pcre2_auto_possessify_8(temp, &cb)
+                    (temp = null)
+                    (possessify_rc = _pcre2_auto_possessify_8(temp, (&cb as *const compile_block_8)))
                     if (if possessify_rc != 0: 1 else: 0) != 0:
                         (errorcode = ERR80)
                         (cb.erroroffset = 0)
@@ -512,20 +614,20 @@ if (if ng.length > 0: 1 else: 0) != 0:
 
                 if (if errorcode != 0: 1 else: 0) != 0:
                     __pc = 2
-            continue
+                    continue
 
                 if (if ((re.overall_options & 2147483648)) == 0: 1 else: 0) != 0:
-                    var dotstar_anchor: c_int = 0 // init failed
+                    (dotstar_anchor = 0)
                     if is_anchored(codestart, 0, &cb, 0, 0, dotstar_anchor) != 0:
                         re.overall_options = re.overall_options | 2147483648
 
 
                 if (if ((optim_flags & 4)) != 0: 1 else: 0) != 0:
-                    var minminlength: c_int = 0
-                    var study_rc: c_int = 0
+                    (minminlength = 0)
+                    (study_rc = 0)
                     if (if firstcuflags >= 4294967294: 1 else: 0) != 0:
-                        var assertedcuflags: c_uint = 0 // init failed
-                        var assertedcu: c_uint = 0 // init failed
+                        (assertedcuflags = 0)
+                        (assertedcu = 0)
                         if (if (if assertedcuflags < 4294967294: 1 else: 0) != 0 and (if assertedcu != reqcu: 1 else: 0) != 0: 1 else: 0) != 0:
                             (firstcu = assertedcu)
                             (firstcuflags = assertedcuflags)
@@ -544,7 +646,7 @@ if (if ng.length > 0: 1 else: 0) != 0:
 
                     else:
                         if (if ((re.overall_options & 2147483648)) == 0: 1 else: 0) != 0:
-                            var dotstar_anchor: c_int = 0 // init failed
+                            (dotstar_anchor = 0)
                             if is_startline(codestart, 0, &cb, 0, 0, dotstar_anchor) != 0:
                                 re.flags = re.flags | 512
 
@@ -568,7 +670,7 @@ if (if ng.length > 0: 1 else: 0) != 0:
                         (errorcode = ERR31)
                         (cb.erroroffset = 0)
                         __pc = 2
-            continue
+                        continue
 
                     if (if (if ((re.flags & 64)) != 0: 1 else: 0) != 0 and (if minminlength == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                         (minminlength = 1)
@@ -590,8 +692,6 @@ if (if ng.length > 0: 1 else: 0) != 0:
                     ccontext.memctl.free((cb.groupinfo as *mut c_void), ccontext.memctl.memory_data)
 
                 return re
-                __pc = 2
-                continue
             2 =>  // HAD_CB_ERROR
                 (ptr = (pattern + cb.erroroffset))
                 __pc = 3
@@ -605,9 +705,9 @@ if (if ng.length > 0: 1 else: 0) != 0:
                 pcre2_code_free_8(re)
                 (re = null)
                 if (if cb.first_data != null: 1 else: 0) != 0:
-                    var current_data: *mut compile_data = null // init failed
+                    var current_data: *mut compile_data = cb.first_data
                     while true:
-                        var next_data: *mut compile_data = null // init: untranslatable
+                        let next_data: *mut compile_data = current_data.next
                         cb.cx.memctl.free(current_data, cb.cx.memctl.memory_data)
                         (current_data = next_data)
                         if not ((if current_data != null: 1 else: 0) != 0):
