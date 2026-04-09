@@ -536,6 +536,9 @@ var g_cimport_include_count: i32 = 0
 var sdk_path_buf: [1024]u8 = [0 as u8; 1024]
 var sdk_path_resolved: i32 = 0
 
+var resource_dir_buf: [1024]u8 = [0 as u8; 1024]
+var resource_dir_resolved: i32 = 0
+
 // ── SDK path detection ──────────────────────────────────────────
 
 fn get_sdk_path() -> *const u8:
@@ -551,6 +554,22 @@ fn get_sdk_path() -> *const u8:
             let _ = pclose(p)
     if sdk_path_buf[0] != 0:
         return &sdk_path_buf as *const [1024]u8 as *const u8
+    0 as *const u8
+
+fn get_clang_resource_dir() -> *const u8:
+    if resource_dir_resolved == 0:
+        resource_dir_resolved = 1
+        // Try LLVM_PREFIX/lib/clang/<version> by listing the directory
+        let p = popen("ls -1d /usr/local/llvm/lib/clang/[0-9]* 2>/dev/null | head -1\0" as *const u8, "r\0" as *const u8)
+        if p as i64 != 0:
+            let r = fgets(&mut resource_dir_buf as *mut [1024]u8 as *mut u8, 1024, p)
+            if r as i64 != 0:
+                let len = c_strlen(&resource_dir_buf as *const [1024]u8 as *const u8)
+                if len > 0 and resource_dir_buf[(len - 1) as i64] == 10:
+                    resource_dir_buf[(len - 1) as i64] = 0
+            let _ = pclose(p)
+    if resource_dir_buf[0] != 0:
+        return &resource_dir_buf as *const [1024]u8 as *const u8
     0 as *const u8
 
 // ── Name deduplication ──────────────────────────────────────────
@@ -1015,6 +1034,12 @@ pub fn cimport_parse(header_code: str) -> i64:
         args[nargs as i64] = "-isysroot\0" as *const u8
         nargs = nargs + 1
         args[nargs as i64] = sysroot
+        nargs = nargs + 1
+    let resdir = get_clang_resource_dir()
+    if resdir as i64 != 0:
+        args[nargs as i64] = "-resource-dir\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = resdir
         nargs = nargs + 1
     var ip: i32 = 0
     while ip < g_cimport_include_count and nargs < 62:
