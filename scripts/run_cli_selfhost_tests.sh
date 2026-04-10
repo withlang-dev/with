@@ -416,6 +416,68 @@ EOF
   echo "PASS(cli-selfhost-regex) shared_externs"
 }
 
+expect_migrate_initializer_regressions() {
+  local case_dir="$tmpdir/migrate_initializer_regressions_case"
+  local src="$case_dir/initializer_regressions.c"
+  local out_w="$case_dir/initializer_regressions.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+#define STR_A "A"
+#define STR_B "B"
+#define STR_p "p"
+#define STR_l "l"
+#define STR_b "b"
+#define STR_EXCLAMATION_MARK "!"
+#define STR_QUESTION_MARK "?"
+#define STRING_AB0 STR_A STR_B "\0"
+#define STRING_plb0 STR_p STR_l STR_b "\0"
+
+static const char names[] = "\0" /* comment between fragments */ STRING_AB0;
+static const char alias_names[] = STRING_plb0;
+static const char *punct = STR_EXCLAMATION_MARK STR_QUESTION_MARK;
+
+int f(int x) {
+label:
+  unsigned char temp[6];
+  unsigned char null_str[1] = { 0xcd };
+  if (x) goto label;
+  return temp[0] + null_str[0];
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) initializer_regressions"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'names:' "$out_w" \
+    || ! grep -Fq '"\0AB\0"' "$out_w" \
+    || ! grep -Fq 'alias_names:' "$out_w" \
+    || ! grep -Fq '"plb\0"' "$out_w" \
+    || ! grep -Fq 'var punct: *const i8 = "!?"' "$out_w" \
+    || ! grep -Fq 'var temp: [6]u8' "$out_w" \
+    || ! grep -Fq 'null_str = [205]' "$out_w" \
+    || grep -Fq 'temp = 6' "$out_w" \
+    || grep -Fq '/*' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) initializer_regressions"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) initializer_regressions"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) initializer_regressions"
+}
+
 expect_init_in_cwd() {
   local case_dir="$tmpdir/init_in_cwd_case"
   local expected_name
@@ -525,6 +587,7 @@ expect_migrate_host_header_compat
 expect_migrate_pcre2_config_template
 expect_migrate_assignment_compat
 expect_pcre2_prepare_shared_externs
+expect_migrate_initializer_regressions
 
 if [[ "$failures" -ne 0 ]]; then
   echo "cli selfhost tests: $failures failure(s)"
