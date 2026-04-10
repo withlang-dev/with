@@ -702,6 +702,15 @@ fn Codegen.sync_decl_context(self: Codegen, decl_index: i32):
     self.current_decl_source_file = self.decl_source_path(decl_index)
     self.sema.update_decl_source_context(decl_index)
 
+fn Codegen.current_decl_is_imported_module_symbol(self: Codegen) -> bool:
+    if self.module_object_mode == 0:
+        return false
+    if self.current_decl_source_file.len() == 0 or self.current_decl_source_file == "<unknown>":
+        return false
+    if self.source_file.len() == 0 or self.source_file == "<unknown>":
+        return false
+    self.current_decl_source_file != self.source_file
+
 fn Codegen.find_module_let_decl_index(self: Codegen, sym: i32) -> i32:
     for di in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(di)
@@ -859,20 +868,39 @@ fn Codegen.finalize_module_binding_global(self: Codegen, global: i64, is_mut: i3
         wl_set_global_constant(global, 1)
         wl_set_linkage(global, wl_internal_linkage())
         return
-    // For multi-module libraries, duplicated preamble vars need internal linkage.
-    // Only _default_ vars keep external linkage (set up by C init code).
-    if self.current_decl_source_file.contains("lib/std/re/"):
-        wl_set_linkage(global, wl_internal_linkage())
-        return
     wl_set_linkage(global, 0)
 
-fn Codegen.record_module_binding_global(self: Codegen, name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
+fn Codegen.declare_module_binding_global(self: Codegen, name_sym: i32, global_ty: i64, is_mut: i32) -> i64:
     let name_str = self.intern.resolve(name_sym)
-    let global = wl_add_global(self.llmod, global_ty, name_str)
+    let existing = wl_get_named_global(self.llmod, name_str)
+    let global =
+        if existing != 0:
+            existing
+        else:
+            wl_add_global(self.llmod, global_ty, name_str)
+    if is_mut == 0:
+        wl_set_global_constant(global, 1)
+    wl_set_linkage(global, 0)
+    self.module_constants.insert(name_sym, global)
+    global
+
+fn Codegen.define_module_binding_global(self: Codegen, name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
+    let name_str = self.intern.resolve(name_sym)
+    let existing = wl_get_named_global(self.llmod, name_str)
+    let global =
+        if existing != 0:
+            existing
+        else:
+            wl_add_global(self.llmod, global_ty, name_str)
     wl_set_initializer(global, init)
     self.finalize_module_binding_global(global, is_mut)
     self.module_constants.insert(name_sym, global)
     global
+
+fn Codegen.record_module_binding_global(self: Codegen, name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
+    if is_mut != 0 and self.current_decl_is_imported_module_symbol():
+        return self.declare_module_binding_global(name_sym, global_ty, is_mut)
+    self.define_module_binding_global(name_sym, global_ty, init, is_mut)
 
 fn Codegen.queue_module_runtime_init(self: Codegen, name_sym: i32, value_node: i32, result_tid: i32, is_mut: i32) -> bool:
     let global_ty = self.sema_type_to_llvm(result_tid)
@@ -1509,10 +1537,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         fields.push(wl_const_int(wl_i64_type(self.context), str_value.text.len(), 1))
         let str_init = wl_const_named_struct(str_ty, vec_data_i64(&fields), 2)
 
-        let global = wl_add_global(self.llmod, str_ty, name_str)
-        wl_set_initializer(global, str_init)
-        self.finalize_module_binding_global(global, is_mut)
-        self.module_constants.insert(name_sym, global)
+        let _ = self.define_module_binding_global(name_sym, str_ty, str_init, is_mut)
         return
 
     let vec_tid = self.try_resolve_vec_new_global_type(value_node, flags)

@@ -212,7 +212,7 @@ fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_
     compilation_debug_pool_flow("build_binary_to_path:after_codegen", self.zcu.pool, active_pool, self.zcu.last_sema)
     compilation_debug_init("build_binary_to_path:compile_to_object_backend")
     let t_backend = profile_now()
-    let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info)
+    let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, false)
     if backend_rc != 0:
         compilation_debug_init(f"build_binary_to_path:backend FAILED rc={backend_rc}")
         compilation_cleanup_build_products(obj_path, "")
@@ -248,7 +248,7 @@ fn Compilation.emit_object_to_path(self: Compilation, source_path: str, obj_path
         return ""
     let active_pool: AstPool = self.active_pool(pool)
     let opt_level = self.config.opt_level
-    let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info)
+    let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, true)
     if backend_rc != 0:
         let _ = ("rm -f " ++ obj_path) |> with_system
         return ""
