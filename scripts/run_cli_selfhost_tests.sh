@@ -145,6 +145,37 @@ EOF
   echo "PASS(cli-selfhost-emit-obj) emit_obj_imported_symbols"
 }
 
+expect_migrate_global_init_list() {
+  local case_dir="$tmpdir/migrate_global_init_list_case"
+  local src="$case_dir/initlist.c"
+  local out_w="$case_dir/initlist.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+typedef int (*callback_t)(int);
+typedef struct inner { callback_t cb; void *data; } inner;
+typedef struct outer { inner in; int limit; } outer;
+int add1(int x) { return x + 1; }
+outer g = { { add1, 0 }, 7 };
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) global_init_list"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'var g: outer = outer { in_: inner { cb: add1, data: null }, limit: 7 }' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) global_init_list"
+    sed -n '1,200p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) global_init_list"
+}
+
 expect_init_in_cwd() {
   local case_dir="$tmpdir/init_in_cwd_case"
   local expected_name
@@ -249,6 +280,7 @@ expect_init_in_cwd
 expect_init_named_dir
 expect_emit_obj_global_symbols
 expect_emit_obj_imported_symbols
+expect_migrate_global_init_list
 
 if [[ "$failures" -ne 0 ]]; then
   echo "cli selfhost tests: $failures failure(s)"
