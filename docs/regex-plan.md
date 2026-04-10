@@ -19,17 +19,15 @@ with migrate .reference/pcre2/src/ -o out/pcre2_migrate_raw/ \
     --no-c-export \
     -I .reference/pcre2/src \
     -D PCRE2_CODE_UNIT_WIDTH=8 \
-    -D HAVE_CONFIG_H=1 \
-    -D SUPPORT_PCRE2_8=1
+    -D HAVE_CONFIG_H=1
 ```
 
-Produces 38 `.w` files. 1 file fails (`pcre2test.c` — needs
-`isatty`, tracked as #93). 8 files excluded from library subset
-(test harnesses, JIT compiler, fuzzer).
+Produces 39 `.w` files. 8 files are excluded from the library
+subset (test harnesses, JIT compiler, fuzzer).
 
 **Prerequisites** (handled automatically by Makefile):
 - `pcre2.h` generated from `pcre2.h.generic`
-- `config.h` generated from `config.h.generic`
+- `config.h` generated as an 8-bit wrapper over `config.h.generic`
 - `pcre2_chartables.c` generated from `pcre2_chartables.c.dist`
 
 ### Step 2: Fix compilation errors -- DONE

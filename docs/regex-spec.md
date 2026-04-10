@@ -239,13 +239,11 @@ with migrate .reference/pcre2/src/ \
     --no-c-export \
     -I .reference/pcre2/src \
     -D PCRE2_CODE_UNIT_WIDTH=8 \
-    -D HAVE_CONFIG_H=1 \
-    -D SUPPORT_PCRE2_8=1
+    -D HAVE_CONFIG_H=1
 ```
 
-Produces 38 `.w` files from 39 `.c` files. 1 failure
-(`pcre2test.c` — missing `isatty` declaration, tracked as #93).
-8 files excluded from library subset (test harnesses, JIT
+Produces 39 `.w` files from 39 `.c` files. 8 files are
+excluded from the library subset (test harnesses, JIT
 compiler, fuzzer, dftables).
 
 After prepare + check: **OK=31, TOTAL_ERRORS=0**.
