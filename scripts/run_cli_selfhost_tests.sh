@@ -222,6 +222,80 @@ EOF
   echo "PASS(cli-selfhost-migrate) host_header_compat"
 }
 
+expect_migrate_pcre2_config_template() {
+  local case_dir="$tmpdir/migrate_pcre2_config_template_case"
+  local src_dir="$case_dir/src"
+  local src="$src_dir/pcre2test_min.c"
+  local out_w="$case_dir/pcre2test_min.w"
+  mkdir -p "$src_dir"
+
+  cat >"$src_dir/config.h.generic" <<'EOF'
+/* Template config.h, not a configured build. */
+/* #undef HAVE_UNISTD_H */
+/* #undef SUPPORT_PCRE2_8 */
+EOF
+
+  cat >"$src_dir/pcre2.h.generic" <<'EOF'
+/* stub */
+EOF
+
+  cat >"$src_dir/pcre2_chartables.c.dist" <<'EOF'
+/* stub */
+EOF
+
+  cat >"$src" <<'EOF'
+#if defined HAVE_CONFIG_H && !defined PCRE2_CONFIG_H_IDEMPOTENT_GUARD
+#define PCRE2_CONFIG_H_IDEMPOTENT_GUARD
+#include "config.h"
+#endif
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
+#ifdef SUPPORT_PCRE2_8
+typedef struct pcre2_real_compile_context_8 {
+  int dummy;
+} pcre2_real_compile_context_8;
+#define PCRE2_REAL_COMPILE_CONTEXT pcre2_real_compile_context_8
+#endif
+
+int tty_status(int fd) { return isatty(fd); }
+int size_of_ctx(void) { return sizeof(PCRE2_REAL_COMPILE_CONTEXT); }
+EOF
+
+  if ! bash "$ROOT_DIR/scripts/prepare_pcre2_reference.sh" "$src_dir" >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-regex-prepare) config_template"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq '#define SUPPORT_PCRE2_8 1' "$src_dir/config.h" \
+    || ! grep -Fq '#define HAVE_UNISTD_H 1' "$src_dir/config.h"; then
+    echo "FAIL(cli-selfhost-regex-output) config_template_prepare"
+    sed -n '1,80p' "$src_dir/config.h" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" -o "$out_w" -I "$src_dir" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1; then
+    echo "FAIL(cli-selfhost-migrate) pcre2_config_template"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'fn tty_status' "$out_w" || ! grep -Fq 'fn size_of_ctx' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) pcre2_config_template"
+    sed -n '1,200p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) pcre2_config_template"
+}
+
 expect_migrate_assignment_compat() {
   local case_dir="$tmpdir/migrate_assignment_compat_case"
   local src="$case_dir/assignments.c"
@@ -437,6 +511,7 @@ expect_emit_obj_global_symbols
 expect_emit_obj_imported_symbols
 expect_migrate_global_init_list
 expect_migrate_host_header_compat
+expect_migrate_pcre2_config_template
 expect_migrate_assignment_compat
 expect_pcre2_prepare_shared_externs
 

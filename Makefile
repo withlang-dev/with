@@ -343,7 +343,7 @@ $(EMBEDDED_STDLIB_RUNTIME_SRC): scripts/generate_embedded_stdlib.py $(EMBED_STD_
 	done
 	@python3 "$(ROOT_DIR)/scripts/generate_embedded_stdlib.py" "$(ROOT_DIR)" "$@"
 
-$(REGEX_RAW_STAMP): $(CANONICAL_BIN) $(REGEX_REF_SOURCES) | $(OUT_GEN_DIR)
+$(REGEX_RAW_STAMP): $(CANONICAL_BIN) $(REGEX_REF_SOURCES) scripts/prepare_pcre2_reference.sh | $(OUT_GEN_DIR)
 	@set -euo pipefail; \
 	src="$(ROOT_DIR)/$(REGEX_PCRE2_SRC)"; \
 	out="$(ROOT_DIR)/$(REGEX_RAW_DIR)"; \
@@ -351,21 +351,10 @@ $(REGEX_RAW_STAMP): $(CANONICAL_BIN) $(REGEX_REF_SOURCES) | $(OUT_GEN_DIR)
 		echo "error: missing PCRE2 source tree at $$src" >&2; \
 		exit 1; \
 	fi; \
-	if [ ! -f "$$src/pcre2.h" ]; then \
-		cp "$$src/pcre2.h.generic" "$$src/pcre2.h"; \
-		echo "generated $$src/pcre2.h"; \
-	fi; \
-	if [ ! -f "$$src/config.h" ]; then \
-		cp "$$src/config.h.generic" "$$src/config.h"; \
-		echo "generated $$src/config.h"; \
-	fi; \
-	if [ ! -f "$$src/pcre2_chartables.c" ]; then \
-		cp "$$src/pcre2_chartables.c.dist" "$$src/pcre2_chartables.c"; \
-		echo "generated $$src/pcre2_chartables.c"; \
-	fi; \
+	bash "$(ROOT_DIR)/scripts/prepare_pcre2_reference.sh" "$$src"; \
 	rm -rf "$$out"; \
 	mkdir -p "$$out"; \
-	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$out/" --no-c-export -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1 -D SUPPORT_PCRE2_8=1 || true; \
+	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$out/" --no-c-export -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1 || true; \
 	count=$$(ls "$$out"/*.w 2>/dev/null | wc -l); \
 	if [ "$$count" -lt 30 ]; then \
 		echo "error: only $$count files migrated — expected at least 30" >&2; \

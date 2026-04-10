@@ -4,7 +4,7 @@
 # Prerequisites:
 #   - .reference/pcre2/ must contain PCRE2 source
 #   - .reference/pcre2/src/pcre2.h generated from pcre2.h.generic
-#   - .reference/pcre2/src/config.h generated from config.h.generic
+#   - .reference/pcre2/src/config.h prepared for the 8-bit build
 #   - .reference/pcre2/src/pcre2_chartables.c from pcre2_chartables.c.dist
 #   - out/bin/with must be built
 #
@@ -19,26 +19,14 @@ PATCH="scripts/pcre2_migrate.patch"
 WITH="./out/bin/with"
 
 echo "=== Step 1: Ensure PCRE2 headers are set up ==="
-if [ ! -f "$PCRE2_SRC/pcre2.h" ]; then
-    cp "$PCRE2_SRC/pcre2.h.generic" "$PCRE2_SRC/pcre2.h"
-    echo "  Generated pcre2.h from pcre2.h.generic"
-fi
-if [ ! -f "$PCRE2_SRC/config.h" ]; then
-    cp "$PCRE2_SRC/config.h.generic" "$PCRE2_SRC/config.h"
-    echo "  Generated config.h from config.h.generic"
-fi
-if [ ! -f "$PCRE2_SRC/pcre2_chartables.c" ]; then
-    cp "$PCRE2_SRC/pcre2_chartables.c.dist" "$PCRE2_SRC/pcre2_chartables.c"
-    echo "  Generated pcre2_chartables.c from pcre2_chartables.c.dist"
-fi
+bash "./scripts/prepare_pcre2_reference.sh" "$PCRE2_SRC"
 
 echo "=== Step 2: Run with migrate ==="
 rm -rf "$MIGRATE_OUT" && mkdir -p "$MIGRATE_OUT"
 $WITH migrate "$PCRE2_SRC/" -o "$MIGRATE_OUT/" \
     -I "$PCRE2_SRC" \
     -D PCRE2_CODE_UNIT_WIDTH=8 \
-    -D HAVE_CONFIG_H=1 \
-    -D SUPPORT_PCRE2_8=1
+    -D HAVE_CONFIG_H=1
 
 echo "=== Step 3: Deploy to lib/std/re/ ==="
 rm -rf "$LIB_RE" && mkdir -p "$LIB_RE"
