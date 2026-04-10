@@ -3608,6 +3608,10 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                         return "(" ++ lhs ++ " - (" ++ rhs ++ " as isize as usize))"
                     return "(" ++ lhs ++ " - " ++ rhs ++ ")"
 
+                // Pointer-type mismatch in assignment: cast RHS to LHS type
+                if op == BO_ASSIGN and lhs_is_ptr and rhs_is_ptr and lhs_ty_str != rhs_ty_str:
+                    return "(" ++ lhs ++ " = (" ++ rhs ++ " as " ++ lhs_ty_str ++ "))"
+
                 let is_unsigned = with_ci_type_is_unsigned(session, cursor)
                 // C logical ops (&&, ||) need bool operands in With
                 if op == BO_LAND or op == BO_LOR:
@@ -3869,11 +3873,8 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                     let pointee = with_ci_cursor_pointee_type(session, cursor)
                     if pointee.len() > 0:
                         return "(&" ++ inner ++ "[0] as *mut " ++ pointee ++ ")"
-            // Pointer-to-pointer cast — only for concrete→concrete or concrete→void
-            // Skip void→anything (With function signatures already handle this)
-            // Skip anything→void in general (causes memchr arg type issues)
+            // Pointer-to-pointer cast: emit when types differ
             if with_ci_type_is_pointer(session, cursor) != 0 and with_ci_type_is_pointer(session, child_0) != 0 and outer_ty_str != inner_ty_str:
-                if not ci_str_contains(inner_ty_str, "c_void") and not ci_str_contains(outer_ty_str, "c_void"):
                     let inner = ci_trans_expr(session, child_0, scope)
                     if inner.len() > 0:
                         return "(" ++ inner ++ " as " ++ outer_ty_str ++ ")"
@@ -5495,7 +5496,7 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
     output = output ++ "extern fn strlen(s: *const i8) -> i64\n"
     output = output ++ "extern fn strcmp(a: *const i8, b: *const i8) -> i32\n"
     output = output ++ "extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32\n"
-    output = output ++ "extern fn memchr(s: *const i8, c: i32, n: i64) -> *i8\n"
+    output = output ++ "extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void\n"
     output = output ++ "fn string_len(s: *const i8) -> i64: strlen(s)\n"
     output = output ++ "fn string_cmp(a: *const i8, b: *const i8) -> i32: strcmp(a, b)\n"
     output = output ++ "\n"
