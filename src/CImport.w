@@ -5458,6 +5458,13 @@ pub fn migrate_add_define(define: str):
     else:
         g_migrate_defines = g_migrate_defines ++ "#define " ++ define ++ "\n"
 
+fn migrate_host_compat_preamble() -> str:
+    // Migrate often sees config.h templates instead of configured headers.
+    // Provide a minimal host parse environment before the original source.
+    "#if !defined(_POSIX_C_SOURCE)\n#define _POSIX_C_SOURCE 200809L\n#endif\n" ++
+    "#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)\n#define _DARWIN_C_SOURCE 1\n#endif\n" ++
+    "#if !defined(HAVE_UNISTD_H)\n#ifdef __has_include\n#if __has_include(<unistd.h>)\n#define HAVE_UNISTD_H 1\n#endif\n#endif\n#endif\n"
+
 fn ci_capture_macro_values(session: i64):
     g_migrate_macro_values = ""
     let count = with_cimport_macro_count(session)
@@ -5494,8 +5501,10 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
     if raw_source.len() == 0:
         eprint("migrate: cannot read " ++ input_path)
         return 1
+    let compat_preamble = migrate_host_compat_preamble()
+    let source_prefix = if g_migrate_defines.len() > 0: g_migrate_defines ++ compat_preamble else: compat_preamble
     let line_directive = "#line 1 \"" ++ input_path ++ "\"\n"
-    let source = if g_migrate_defines.len() > 0: g_migrate_defines ++ line_directive ++ raw_source else: line_directive ++ raw_source
+    let source = source_prefix ++ line_directive ++ raw_source
 
     // Pass to libclang via cimport_parse
     let session = with_cimport_parse(source)
@@ -5510,10 +5519,7 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
         return 1
 
     g_migrate_macro_values = ""
-    let macro_include = if g_migrate_defines.len() > 0:
-        g_migrate_defines ++ "#include \"" ++ input_path ++ "\"\n"
-    else:
-        "#include \"" ++ input_path ++ "\"\n"
+    let macro_include = source_prefix ++ "#include \"" ++ input_path ++ "\"\n"
     let macro_session = with_cimport_parse_macros(macro_include)
     if macro_session != 0:
         ci_capture_macro_values(macro_session)

@@ -176,6 +176,52 @@ EOF
   echo "PASS(cli-selfhost-migrate) global_init_list"
 }
 
+expect_migrate_host_header_compat() {
+  local case_dir="$tmpdir/migrate_host_header_compat_case"
+  local src="$case_dir/uses_isatty.c"
+  local config_h="$case_dir/config.h"
+  local out_w="$case_dir/uses_isatty.w"
+  mkdir -p "$case_dir"
+
+  cat >"$config_h" <<'EOF'
+/* Simulate an unconfigured config.h template. */
+EOF
+
+  cat >"$src" <<'EOF'
+#if defined HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#ifndef HAVE_UNISTD_H
+#error "missing HAVE_UNISTD_H"
+#endif
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
+#include <stdio.h>
+
+int tty_status(FILE *f) { return isatty(fileno(f)); }
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" -I "$case_dir" -D HAVE_CONFIG_H=1 -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) host_header_compat"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'tty_status' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) host_header_compat"
+    sed -n '1,200p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) host_header_compat"
+}
+
 expect_pcre2_prepare_shared_externs() {
   local case_dir="$tmpdir/pcre2_prepare_case"
   local raw_dir="$case_dir/raw"
@@ -337,6 +383,7 @@ expect_init_named_dir
 expect_emit_obj_global_symbols
 expect_emit_obj_imported_symbols
 expect_migrate_global_init_list
+expect_migrate_host_header_compat
 expect_pcre2_prepare_shared_externs
 
 if [[ "$failures" -ne 0 ]]; then
