@@ -4198,15 +4198,20 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                     let outer_lhs = ci_trans_expr(session, lhs_cursor, scope)
                     if inner_stmt.len() > 0 and outer_lhs.len() > 0 and inner_lhs.len() > 0:
                         return inner_stmt ++ "\n" ++ ci_indent_str(indent) ++ "(" ++ outer_lhs ++ " = " ++ inner_lhs ++ ")"
-                // a = ++b → decompose pre-increment RHS
+                // a = ++b / a = b++ → decompose increment/decrement RHS
                 if inner_rhs_kind == CXK_UNARY_OP:
                     let rhs_uop = with_ci_unary_op(session, inner_rhs)
-                    if rhs_uop == UO_PRE_INC or rhs_uop == UO_PRE_DEC:
+                    if rhs_uop == UO_PRE_INC or rhs_uop == UO_PRE_DEC or rhs_uop == UO_POST_INC or rhs_uop == UO_POST_DEC:
                         let inc_operand = ci_trans_expr(session, with_ci_child(session, inner_rhs, 0), scope)
                         let outer_lhs = ci_trans_expr(session, lhs_cursor, scope)
                         if inc_operand.len() > 0 and outer_lhs.len() > 0:
-                            let delta = if rhs_uop == UO_PRE_INC: " + 1" else: " - 1"
-                            return "(" ++ inc_operand ++ " = " ++ inc_operand ++ delta ++ ")\n" ++ ci_indent_str(indent) ++ "(" ++ outer_lhs ++ " = " ++ inc_operand ++ ")"
+                            let delta = if rhs_uop == UO_PRE_INC or rhs_uop == UO_POST_INC: " + 1" else: " - 1"
+                            if rhs_uop == UO_PRE_INC or rhs_uop == UO_PRE_DEC:
+                                // a = ++b → increment first, then assign new value
+                                return "(" ++ inc_operand ++ " = " ++ inc_operand ++ delta ++ ")\n" ++ ci_indent_str(indent) ++ "(" ++ outer_lhs ++ " = " ++ inc_operand ++ ")"
+                            else:
+                                // a = b++ → assign old value, then increment
+                                return "(" ++ outer_lhs ++ " = " ++ inc_operand ++ ")\n" ++ ci_indent_str(indent) ++ "(" ++ inc_operand ++ " = " ++ inc_operand ++ delta ++ ")"
                 // *(ptr = ptr + 1) = value → decompose LHS deref-of-assign
                 // Skip wrappers to find the deref
                 var deref_cursor = lhs_cursor
