@@ -1640,6 +1640,8 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         self.scope_set_is_scoped_task(target_sym, self.expr_is_scoped_task_value(value))
         self.scope_set_is_ephemeral_task(target_sym, self.expr_is_ephemeral_task(value))
 
+    if target_type != 0:
+        return target_type as i32
     self.ty_void as i32
 
 fn Sema.preferred_compatible_type(self: Sema, lhs: TypeId, rhs: TypeId) -> TypeId:

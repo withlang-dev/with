@@ -1523,6 +1523,8 @@ fn mir_validate_indexed_element_type(mir_mod: MirModule, collection_tid: i32) ->
         return mir_mod.mir_get_type_d0(resolved)
     if tk == TypeKind.TY_STR:
         return mir_validate_find_int_type(mir_mod, 32, 1)
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        return mir_mod.mir_get_type_d0(resolved)
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = mir_mod.mir_get_type_d0(resolved)
         if base_sym != 0 and mir_validate_get_generic_inst_arg_count(mir_mod, resolved) > 0:
@@ -1862,6 +1864,8 @@ fn validate_typed_mir_module(mir_mod: MirModule) -> MirValidationError:
         return mir_validation_fail(0, 0, shape_err)
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = mir_mod.bodies.get(bi as i64)
+        if body.lowering_failed != 0:
+            continue
         let err = validate_typed_mir_body(mir_mod, body)
         if mir_validation_has_error(err):
             return err

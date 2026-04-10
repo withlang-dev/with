@@ -9152,7 +9152,7 @@ fn get_grouplength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, isinline: c_in
                         (groupminlength = branchminlength)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if unsafe: *unsafe: *pptrptr == 2149384192: 1 else: 0) != 0:
+                    if (if unsafe: (*unsafe: *pptrptr) == 2149384192: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break

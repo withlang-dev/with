@@ -628,6 +628,8 @@ fn MirBuilder.indexed_element_type(self: MirBuilder, collection_tid: i32) -> i32
         return self.sema.get_type_d0(resolved)
     if tk == TypeKind.TY_STR:
         return self.sema.ty_i32 as i32
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        return self.sema.get_type_d0(resolved)
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.sema.get_generic_inst_base(resolved)
         if self.pool.resolve_symbol(base_sym) == "Vec" and self.sema.get_generic_inst_arg_count(resolved) > 0:
@@ -734,6 +736,11 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         return self.sema.ty_void as i32
     if kind == NodeKind.NK_CALL:
         return self.call_return_type(self.ast.get_data0(node))
+    if kind == NodeKind.NK_ASSIGN:
+        let target_ty = self.expr_type(self.ast.get_data0(node))
+        if target_ty != 0:
+            return target_ty
+        return self.sema.ty_void as i32
     if kind == NodeKind.NK_STRUCT_LIT:
         let st_name = self.ast.get_data0(node)
         if self.sema.named_types.contains(st_name):
@@ -1622,9 +1629,15 @@ fn MirBuilder.lower_cast(self: MirBuilder, expr: i32, target_type_id: i32, node:
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
     self.body.new_operand(OperandKind.OK_COPY, place)
 
-fn MirBuilder.lower_field_access(self: MirBuilder, base_expr: i32, field_idx: i32) -> i32:
+fn MirBuilder.lower_field_access(self: MirBuilder, node: i32) -> i32:
+    let base_expr = self.ast.get_data0(node)
+    let field_idx = self.ast.get_data1(node)
+    let field_ty = self.expr_type(node)
+    if field_ty == 0 or field_ty == self.sema.ty_void as i32:
+        self.mark_unsupported()
+        return self.place_for_local(0)
     let base = self.lower_field_base_place(base_expr)
-    self.body.new_field_place(base, field_idx, 0)
+    self.body.new_field_place(base, field_idx, field_ty)
 
 fn MirBuilder.lower_field_base_place(self: MirBuilder, base_expr: i32) -> i32:
     var base = self.lower_expr_place(base_expr)
@@ -1649,12 +1662,13 @@ fn MirBuilder.lower_index(self: MirBuilder, base_expr: i32, index_expr: i32) -> 
             break
         base = self.body.new_deref_place(base)
         base_ty = self.sema.get_type_d0(resolved)
+    let elem_ty = self.indexed_element_type(base_ty)
     let idx_op = self.lower_expr(index_expr)
     let idx_ty = self.expr_type(index_expr)
     let idx_local = self.new_temp(idx_ty)
     let idx_place = self.place_for_local(idx_local)
     self.assign_operand_to_place(idx_place, idx_op, self.ast.get_start(index_expr))
-    self.body.new_index_place(base, idx_local, 0)
+    self.body.new_index_place(base, idx_local, elem_ty)
 
 fn MirBuilder.lower_call_place(self: MirBuilder, node: i32) -> i32:
     if node == 0 or self.ast.kind(node) != NodeKind.NK_CALL:
@@ -1814,8 +1828,12 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_FIELD_ACCESS:
         let base = self.lower_field_base_place(self.ast.get_data0(node))
         let field_sym = self.ast.get_data1(node)
+        let field_ty = self.expr_type(node)
+        if field_ty == 0 or field_ty == self.sema.ty_void as i32:
+            self.mark_unsupported()
+            return self.place_for_local(0)
         // Field symbol is mapped deterministically to a projection index by symbol value.
-        return self.body.new_field_place(base, field_sym, self.expr_type(node))
+        return self.body.new_field_place(base, field_sym, field_ty)
 
     if kind == NodeKind.NK_INDEX:
         if self.vec_literal_type(node) != 0:
@@ -1858,6 +1876,11 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
         self.terminate(TermKind.TK_CALL, self.unit_operand(), mi_args_id, mi_result_place, mi_next_bb)
         self.switch_to(mi_next_bb)
         return mi_result_place
+
+    if kind == NodeKind.NK_ASSIGN:
+        let target = self.ast.get_data0(node)
+        self.lower_assign(target, self.ast.get_data1(node))
+        return self.lower_expr_place(target)
 
     if kind == NodeKind.NK_CALL:
         let call_place = self.lower_call_place(node)
@@ -4114,7 +4137,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, fa_place2, fa_rv2, self.ast.get_start(node))
                                 return self.body.new_operand(OperandKind.OK_COPY, fa_place2)
                             return self.int_const_operand(fa_disc_tag2 as i64, fa_base_ty)
-        let place = self.lower_field_access(fa_base, fa_field)
+        let place = self.lower_field_access(node)
         return self.body.new_operand(OperandKind.OK_COPY, place)
 
     if kind == NodeKind.NK_INDEX:
@@ -4152,8 +4175,13 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.unit_operand()
 
     if kind == NodeKind.NK_ASSIGN:
-        self.lower_assign(self.ast.get_data0(node), self.ast.get_data1(node))
-        return self.unit_operand()
+        let target = self.ast.get_data0(node)
+        self.lower_assign(target, self.ast.get_data1(node))
+        let target_place = self.lower_expr_place(target)
+        let target_ty = self.expr_type(target)
+        if self.sema.is_copy(target_ty) != 0:
+            return self.body.new_operand(OperandKind.OK_COPY, target_place)
+        return self.body.new_operand(OperandKind.OK_MOVE, target_place)
 
     if kind == NodeKind.NK_IF_EXPR:
         return self.lower_if(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node)
