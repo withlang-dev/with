@@ -452,7 +452,7 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                             else:
                                 if startline != 0:
                                     if (if start_match > (mb.start_subject + start_offset): 1 else: 0) != 0:
-                                        if (if (if (if (if start_match[-1] == 13: 1 else: 0) != 0 and ((if (if mb.nltype == 1: 1 else: 0) != 0 or (if mb.nltype == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and (if start_match < end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *start_match == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if (if (if start_match[-1] == 13: 1 else: 0) != 0 and ((if (if mb.nltype == 1: 1 else: 0) != 0 or (if mb.nltype == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and (if start_match < end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *start_match) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                             (start_match = start_match + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -553,7 +553,7 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if (if (if (if start_match[-1] == 13: 1 else: 0) != 0 and (if start_match < end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *start_match == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((re.flags & 2048)) == 0: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (if mb.nltype == 1: 1 else: 0) != 0 or (if mb.nltype == 2: 1 else: 0) != 0: 1 else: 0) != 0 or (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                    if (if (if (if (if (if start_match[-1] == 13: 1 else: 0) != 0 and (if start_match < end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *start_match) == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((re.flags & 2048)) == 0: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (if mb.nltype == 1: 1 else: 0) != 0 or (if mb.nltype == 2: 1 else: 0) != 0: 1 else: 0) != 0 or (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                         (start_match = start_match + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
@@ -1163,9 +1163,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -1283,7 +1283,7 @@ fn do_callout_dfa(code: *const u8, offsets: *mut c_ulong, current_subject: *cons
     else:
         (cb.callout_number = 0)
         (cb.callout_string = ((code + ((9 +% extracode))) + (1 as isize as usize)))
-        (cb.callout_string_length = ((unsafe: *lengthptr -% 9) -% 2))
+        (cb.callout_string_length = (((unsafe: *lengthptr) -% 9) -% 2))
 
     return (mb.callout)(cb, mb.callout_data)
 
@@ -1300,7 +1300,7 @@ fn more_workspace(rwsptr: *mut *mut RWS_anchor, ovecsize: c_uint, mb: *mut dfa_m
         (new.size = newsize)
         (rws.next = new)
 
-    (unsafe: *rwsptr = new)
+    ((unsafe: *rwsptr) = new)
     return 0
 
 fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __param_current_subject: *const u8, start_offset: c_ulong, offsets: *mut c_ulong, __param_offsetcount: c_uint, workspace: *mut c_int, __param_wscount: c_int, __param_rlevel: c_uint, __param_RWS: *mut c_int) -> c_int:
@@ -1403,7 +1403,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                 (new_count = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if (if unsafe: *this_start_code == OP_ASSERTBACK: 1 else: 0) != 0 or (if unsafe: *this_start_code == OP_ASSERTBACK_NOT: 1 else: 0) != 0: 1 else: 0) != 0:
+                if (if (if (unsafe: *this_start_code) == OP_ASSERTBACK: 1 else: 0) != 0 or (if (unsafe: *this_start_code) == OP_ASSERTBACK_NOT: 1 else: 0) != 0: 1 else: 0) != 0:
                     (end_code = this_start_code)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
@@ -1414,7 +1414,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if not ((if unsafe: *end_code == OP_ALT: 1 else: 0) != 0):
+                        if not ((if (unsafe: *end_code) == OP_ALT: 1 else: 0) != 0):
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
@@ -1442,7 +1442,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if not ((if unsafe: *end_code == OP_ALT: 1 else: 0) != 0):
+                        if not ((if (unsafe: *end_code) == OP_ALT: 1 else: 0) != 0):
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
@@ -1455,7 +1455,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     else:
-                        length = ((1 + 2) + ((if ((if (if (if (if unsafe: *this_start_code == OP_CBRA: 1 else: 0) != 0 or (if unsafe: *this_start_code == OP_SCBRA: 1 else: 0) != 0: 1 else: 0) != 0 or (if unsafe: *this_start_code == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0 or (if unsafe: *this_start_code == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
+                        length = ((1 + 2) + ((if ((if (if (if (if (unsafe: *this_start_code) == OP_CBRA: 1 else: 0) != 0 or (if (unsafe: *this_start_code) == OP_SCBRA: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *this_start_code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *this_start_code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         while true:
@@ -1464,7 +1464,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if not ((if unsafe: *end_code == OP_ALT: 1 else: 0) != 0):
+                            if not ((if (unsafe: *end_code) == OP_ALT: 1 else: 0) != 0):
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
@@ -1517,7 +1517,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (clen = 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (c = unsafe: *ptr)
+                        (c = (unsafe: *ptr))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     else:
@@ -1567,7 +1567,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (code = (start_code + (state_offset as isize as usize)))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (codevalue = unsafe: *code)
+                        (codevalue = (unsafe: *code))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         if (if (if clen == 0: 1 else: 0) != 0 and (if (&poptable[0] as *mut u8)[codevalue] != 0: 1 else: 0) != 0: 1 else: 0) != 0:

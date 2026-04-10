@@ -630,9 +630,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -710,14 +710,14 @@ extern fn _pcre2_find_bracket_8(p0: *const u8, p1: c_int, p2: c_int) -> *const u
 fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr: *mut c_uint, utf: c_int) -> c_int:
     var c: c_uint
     utf
-    (c = unsafe: *ptr)
+    (c = (unsafe: *ptr))
     if (if type_ == 2: 1 else: 0) != 0:
         match c
             10 =>
-                (unsafe: *lenptr = 1)
+                ((unsafe: *lenptr) = 1)
                 return 1
             13 =>
-                (unsafe: *lenptr = (if ((if (if ptr < (endptr - (1 as isize as usize)): 1 else: 0) != 0 and (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 1))
+                ((unsafe: *lenptr) = (if ((if (if ptr < (endptr - (1 as isize as usize)): 1 else: 0) != 0 and (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 1))
                 return 1
             _ =>
                 return 0
@@ -726,10 +726,10 @@ fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr:
             10 =>
                 return 1
             13 =>
-                (unsafe: *lenptr = (if ((if (if ptr < (endptr - (1 as isize as usize)): 1 else: 0) != 0 and (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 1))
+                ((unsafe: *lenptr) = (if ((if (if ptr < (endptr - (1 as isize as usize)): 1 else: 0) != 0 and (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 1))
                 return 1
             133 =>
-                (unsafe: *lenptr = (if utf != 0: 2 else: 1))
+                ((unsafe: *lenptr) = (if utf != 0: 2 else: 1))
                 return 1
             8232 =>
                 return 1
@@ -757,26 +757,26 @@ fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const 
     var c: c_uint
     (ptr = ptr - 1)
     utf
-    (c = unsafe: *ptr)
+    (c = (unsafe: *ptr))
     if (if type_ == 2: 1 else: 0) != 0:
         match c
             10 =>
-                (unsafe: *lenptr = (if ((if (if ptr > startptr: 1 else: 0) != 0 and (if ptr[-1] == 13: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 1))
+                ((unsafe: *lenptr) = (if ((if (if ptr > startptr: 1 else: 0) != 0 and (if ptr[-1] == 13: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 1))
                 return 1
             13 =>
-                (unsafe: *lenptr = 1)
+                ((unsafe: *lenptr) = 1)
                 return 1
             _ =>
                 return 0
     else:
         match c
             10 =>
-                (unsafe: *lenptr = (if ((if (if ptr > startptr: 1 else: 0) != 0 and (if ptr[-1] == 13: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 1))
+                ((unsafe: *lenptr) = (if ((if (if ptr > startptr: 1 else: 0) != 0 and (if ptr[-1] == 13: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 1))
                 return 1
             11 =>
                 return 1
             133 =>
-                (unsafe: *lenptr = (if utf != 0: 2 else: 1))
+                ((unsafe: *lenptr) = (if utf != 0: 2 else: 1))
                 return 1
             8232 =>
                 return 1

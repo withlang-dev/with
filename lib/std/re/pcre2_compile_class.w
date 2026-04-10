@@ -630,9 +630,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -898,15 +898,15 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                         cb.external_flags = cb.external_flags | 2048
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if unsafe: *pptr == 2149777408: 1 else: 0) != 0 or (if unsafe: *pptr == 2149711872: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (if (if (unsafe: *pptr) == 2149777408: 1 else: 0) != 0 or (if (unsafe: *pptr) == 2149711872: 1 else: 0) != 0: 1 else: 0) != 0:
                         (pptr = pptr + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (d = unsafe: *((pptr = pptr + 1)))
+                        (d = (unsafe: *((pptr = pptr + 1))))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         if (if d == 2147811328: 1 else: 0) != 0:
-                            (d = unsafe: *((pptr = pptr + 1)))
+                            (d = (unsafe: *((pptr = pptr + 1))))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         if (if (if d == 13: 1 else: 0) != 0 or (if d == 10: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -957,7 +957,7 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                 continue
             2 =>  // DONE
                 (__goto_pending = 0)
-                (unsafe: *pcode = code)
+                ((unsafe: *pcode) = code)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return (pptr - (1 as isize as usize))
@@ -987,7 +987,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
         return 0
 
     if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-        unsafe: *lengthptr = unsafe: *lengthptr + ((code as usize -% previous as usize) / sizeof[u8]())
+        (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((code as usize -% previous as usize) / sizeof[u8]())
         (code = previous)
 
     var i: c_int = 0
@@ -1000,7 +1000,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
         (code = previous)
     if (if (if op_info.op_single_type == 6: 1 else: 0) != 0 and allbitsone != 0: 1 else: 0) != 0:
         if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-            unsafe: *lengthptr = unsafe: *lengthptr - 1
+            (unsafe: *lengthptr) = (unsafe: *lengthptr) - 1
         
         (unsafe: *code = 13)
         (code = code + 1)
@@ -1008,12 +1008,12 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
         if (if (if op_info.op_single_type == 6: 1 else: 0) != 0 or (if op_info.op_single_type == 7: 1 else: 0) != 0: 1 else: 0) != 0:
             var required_len: c_ulong
             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                if (if required_len > ((unsafe: *lengthptr -% previous_length)): 1 else: 0) != 0:
-                    (unsafe: *lengthptr = (previous_length +% required_len))
+                if (if required_len > (((unsafe: *lengthptr) -% previous_length)): 1 else: 0) != 0:
+                    ((unsafe: *lengthptr) = (previous_length +% required_len))
                 
             
             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                unsafe: *lengthptr = unsafe: *lengthptr - required_len
+                (unsafe: *lengthptr) = (unsafe: *lengthptr) - required_len
             
             (unsafe: *code = (if ((if op_info.op_single_type == 6: 1 else: 0)) != 0: OP_NCLASS else: OP_CLASS))
             (code = code + 1)
@@ -1021,7 +1021,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
             code = code + (32 / sizeof[u8]())
 
 
-    (unsafe: *pcode = code)
+    ((unsafe: *pcode) = code)
     return 1
 
 extern fn _pcre2_compile_get_hash_from_name8(name: *const u8, length: c_uint) -> c_ushort
@@ -1079,7 +1079,7 @@ fn add_not_list_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_blo
 fn fold_negation(pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong, preserve_classbits: c_int):
     if (if pop_info.op_single_type == 0: 1 else: 0) != 0:
         if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-            unsafe: *lengthptr = unsafe: *lengthptr + 1
+            (unsafe: *lengthptr) = (unsafe: *lengthptr) + 1
         else:
             (pop_info.code_start[pop_info.length] = 4)
         
@@ -1088,7 +1088,7 @@ fn fold_negation(pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong, preserv
         if (if (if pop_info.op_single_type == 6: 1 else: 0) != 0 or (if pop_info.op_single_type == 7: 1 else: 0) != 0: 1 else: 0) != 0:
             (pop_info.op_single_type = (if ((if pop_info.op_single_type == 7: 1 else: 0)) != 0: 6 else: 7))
             if (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0:
-                (unsafe: *(pop_info.code_start) = pop_info.op_single_type)
+                ((unsafe: *(pop_info.code_start)) = pop_info.op_single_type)
             
         else:
             if (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0:
@@ -1126,10 +1126,10 @@ fn fold_binary(op: c_int, lhs_op_info: *mut eclass_op_info, rhs_op_info: *mut ec
 fn compile_eclass_nested(context: *mut eclass_context, __param_negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int:
     var negated = __param_negated
     var ptr: *mut c_uint
-    if (if unsafe: *(ptr = ptr + 1) == (((2148401152 as c_uint) | 1)): 1 else: 0) != 0:
+    if (if (unsafe: *(ptr = ptr + 1)) == (((2148401152 as c_uint) | 1)): 1 else: 0) != 0:
         (negated = (if negated != 0: 0 else: 1))
 
-    ((unsafe: *pptr) = (unsafe: *pptr) + 1)
+    (((unsafe: *pptr)) = ((unsafe: *pptr)) + 1)
     if (if compile_class_binary_loose(context, negated, pptr, pcode, pop_info, lengthptr) != 0: 0 else: 1) != 0:
         return 0
 
@@ -1156,7 +1156,7 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                         (pop_info.length = 1)
                         if (if ((if meta == 2148204544: 1 else: 0)) == negated: 1 else: 0) != 0:
                             (pop_info.op_single_type = 6)
-                            (unsafe: *(code = code + 1) = pop_info.op_single_type)
+                            ((unsafe: *(code = code + 1)) = pop_info.op_single_type)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                             with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, 255, 32 as i64)
@@ -1164,7 +1164,7 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                                 continue
                         else:
                             (pop_info.op_single_type = 7)
-                            (unsafe: *(code = code + 1) = pop_info.op_single_type)
+                            ((unsafe: *(code = code + 1)) = pop_info.op_single_type)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                             with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, 0, 32 as i64)
@@ -1184,38 +1184,38 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                             (ptr = ptr + 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
-                        (extra_length = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: (unsafe: *lengthptr -% prev_length) else: 0))
-                        if (if unsafe: *code_start == OP_ALLANY: 1 else: 0) != 0:
+                        (extra_length = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: ((unsafe: *lengthptr) -% prev_length) else: 0))
+                        if (if (unsafe: *code_start) == OP_ALLANY: 1 else: 0) != 0:
                             (pop_info.length = 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                             (pop_info.op_single_type = 6)
-                            (unsafe: *code_start = pop_info.op_single_type)
+                            ((unsafe: *code_start) = pop_info.op_single_type)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                             with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, 255, 32 as i64)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                         else:
-                            if (if (if unsafe: *code_start == OP_CLASS: 1 else: 0) != 0 or (if unsafe: *code_start == OP_NCLASS: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if (unsafe: *code_start) == OP_CLASS: 1 else: 0) != 0 or (if (unsafe: *code_start) == OP_NCLASS: 1 else: 0) != 0: 1 else: 0) != 0:
                                 (pop_info.length = 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
-                                (pop_info.op_single_type = (if ((if unsafe: *code_start == OP_CLASS: 1 else: 0)) != 0: 7 else: 6))
-                                (unsafe: *code_start = pop_info.op_single_type)
+                                (pop_info.op_single_type = (if ((if (unsafe: *code_start) == OP_CLASS: 1 else: 0)) != 0: 7 else: 6))
+                                ((unsafe: *code_start) = pop_info.op_single_type)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
                                 with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, ((code_start + (1 as isize as usize)) as *const c_void) as *i8, 32 as i64)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
                                 if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                    unsafe: *lengthptr = unsafe: *lengthptr + ((code as usize -% ((code_start + (1 as isize as usize))) as usize) / sizeof[u8]())
+                                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((code as usize -% ((code_start + (1 as isize as usize))) as usize) / sizeof[u8]())
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
                                 (code = (code_start + (1 as isize as usize)))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
-                                if (if (if context.needs_bitmap != 0: 0 else: 1) != 0 and (if unsafe: *code_start == 7: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if (if context.needs_bitmap != 0: 0 else: 1) != 0 and (if (unsafe: *code_start) == 7: 1 else: 0) != 0: 1 else: 0) != 0:
                                     i = 0
                                     while (if i < 8: 1 else: 0) != 0:
                                         if (if classwords[i] != 0: 1 else: 0) != 0:
@@ -1236,7 +1236,7 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                                     continue
                             else:
                                 (pop_info.op_single_type = 5)
-                                (unsafe: *code_start = pop_info.op_single_type)
+                                ((unsafe: *code_start) = pop_info.op_single_type)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
                                 with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, ((&context.cb.classbits.classbits[0] as *mut u8) as *const c_void) as *i8, 32 as i64)
@@ -1258,38 +1258,38 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                             (ptr = ptr + 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
-                        (extra_length = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: (unsafe: *lengthptr -% prev_length) else: 0))
-                        if (if unsafe: *code_start == OP_ALLANY: 1 else: 0) != 0:
+                        (extra_length = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: ((unsafe: *lengthptr) -% prev_length) else: 0))
+                        if (if (unsafe: *code_start) == OP_ALLANY: 1 else: 0) != 0:
                             (pop_info.length = 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                             (pop_info.op_single_type = 6)
-                            (unsafe: *code_start = pop_info.op_single_type)
+                            ((unsafe: *code_start) = pop_info.op_single_type)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                             with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, 255, 32 as i64)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                         else:
-                            if (if (if unsafe: *code_start == OP_CLASS: 1 else: 0) != 0 or (if unsafe: *code_start == OP_NCLASS: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if (unsafe: *code_start) == OP_CLASS: 1 else: 0) != 0 or (if (unsafe: *code_start) == OP_NCLASS: 1 else: 0) != 0: 1 else: 0) != 0:
                                 (pop_info.length = 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
-                                (pop_info.op_single_type = (if ((if unsafe: *code_start == OP_CLASS: 1 else: 0)) != 0: 7 else: 6))
-                                (unsafe: *code_start = pop_info.op_single_type)
+                                (pop_info.op_single_type = (if ((if (unsafe: *code_start) == OP_CLASS: 1 else: 0)) != 0: 7 else: 6))
+                                ((unsafe: *code_start) = pop_info.op_single_type)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
                                 with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, ((code_start + (1 as isize as usize)) as *const c_void) as *i8, 32 as i64)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
                                 if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                    unsafe: *lengthptr = unsafe: *lengthptr + ((code as usize -% ((code_start + (1 as isize as usize))) as usize) / sizeof[u8]())
+                                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((code as usize -% ((code_start + (1 as isize as usize))) as usize) / sizeof[u8]())
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
                                 (code = (code_start + (1 as isize as usize)))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
-                                if (if (if context.needs_bitmap != 0: 0 else: 1) != 0 and (if unsafe: *code_start == 7: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if (if context.needs_bitmap != 0: 0 else: 1) != 0 and (if (unsafe: *code_start) == 7: 1 else: 0) != 0: 1 else: 0) != 0:
                                     i = 0
                                     while (if i < 8: 1 else: 0) != 0:
                                         if (if classwords[i] != 0: 1 else: 0) != 0:
@@ -1310,7 +1310,7 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                                     continue
                             else:
                                 (pop_info.op_single_type = 5)
-                                (unsafe: *code_start = pop_info.op_single_type)
+                                ((unsafe: *code_start) = pop_info.op_single_type)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
                                 with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, ((&context.cb.classbits.classbits[0] as *mut u8) as *const c_void) as *i8, 32 as i64)
@@ -1325,7 +1325,7 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                    unsafe: *lengthptr = unsafe: *lengthptr + ((code as usize -% code_start as usize) / sizeof[u8]())
+                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((code as usize -% code_start as usize) / sizeof[u8]())
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     (code = code_start)
@@ -1337,10 +1337,10 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                 continue
             1 =>  // DONE
                 (__goto_pending = 0)
-                (unsafe: *pptr = ptr)
+                ((unsafe: *pptr) = ptr)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *pcode = code)
+                ((unsafe: *pcode) = code)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return 1
@@ -1354,7 +1354,7 @@ fn compile_class_juxtaposition(context: *mut eclass_context, negated: c_int, ppt
     if (if compile_class_operand(context, negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), pop_info, lengthptr) != 0: 0 else: 1) != 0:
         return 0
 
-    while (if (if unsafe: *ptr != 2148335616: 1 else: 0) != 0 and (if ((if (if unsafe: *ptr >= 2151940096: 1 else: 0) != 0 and (if unsafe: *ptr <= 2152202240: 1 else: 0) != 0: 1 else: 0)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+    while (if (if (unsafe: *ptr) != 2148335616: 1 else: 0) != 0 and (if ((if (if (unsafe: *ptr) >= 2151940096: 1 else: 0) != 0 and (if (unsafe: *ptr) <= 2152202240: 1 else: 0) != 0: 1 else: 0)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
         var op: c_uint
         var rhs_negated: c_int
         var rhs_op_info: eclass_op_info
@@ -1373,18 +1373,18 @@ fn compile_class_juxtaposition(context: *mut eclass_context, negated: c_int, ppt
             (code = (pop_info.code_start + pop_info.length))
         
 
-    (unsafe: *pptr = ptr)
-    (unsafe: *pcode = code)
+    ((unsafe: *pptr) = ptr)
+    ((unsafe: *pcode) = code)
     return 1
 
 fn compile_class_unary(context: *mut eclass_context, __param_negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int:
     var negated = __param_negated
     var ptr: *mut c_uint
-    while (if unsafe: *ptr == 2152202240: 1 else: 0) != 0:
+    while (if (unsafe: *ptr) == 2152202240: 1 else: 0) != 0:
         (ptr = ptr + 1)
         (negated = (if negated != 0: 0 else: 1))
 
-    (unsafe: *pptr = ptr)
+    ((unsafe: *pptr) = ptr)
     if (if compile_class_juxtaposition(context, negated, pptr, pcode, pop_info, lengthptr) != 0: 0 else: 1) != 0:
         return 0
 
@@ -1396,7 +1396,7 @@ fn compile_class_binary_tight(context: *mut eclass_context, negated: c_int, pptr
     if (if compile_class_unary(context, negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), pop_info, lengthptr) != 0: 0 else: 1) != 0:
         return 0
 
-    while (if unsafe: *ptr == 2151940096: 1 else: 0) != 0:
+    while (if (unsafe: *ptr) == 2151940096: 1 else: 0) != 0:
         var op: c_uint
         var rhs_negated: c_int
         var rhs_op_info: eclass_op_info
@@ -1416,8 +1416,8 @@ fn compile_class_binary_tight(context: *mut eclass_context, negated: c_int, pptr
             (code = (pop_info.code_start + pop_info.length))
         
 
-    (unsafe: *pptr = ptr)
-    (unsafe: *pcode = code)
+    ((unsafe: *pptr) = ptr)
+    ((unsafe: *pcode) = code)
     return 1
 
 fn compile_class_binary_loose(context: *mut eclass_context, negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int:
@@ -1426,19 +1426,19 @@ fn compile_class_binary_loose(context: *mut eclass_context, negated: c_int, pptr
     if (if compile_class_binary_tight(context, negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), pop_info, lengthptr) != 0: 0 else: 1) != 0:
         return 0
 
-    while (if (if unsafe: *ptr >= 2152005632: 1 else: 0) != 0 and (if unsafe: *ptr <= 2152136704: 1 else: 0) != 0: 1 else: 0) != 0:
+    while (if (if (unsafe: *ptr) >= 2152005632: 1 else: 0) != 0 and (if (unsafe: *ptr) <= 2152136704: 1 else: 0) != 0: 1 else: 0) != 0:
         var op: c_uint
         var op_neg: c_int
         var rhs_negated: c_int
         var rhs_op_info: eclass_op_info
         if negated != 0:
-            (op = (if ((if unsafe: *ptr == 2152005632: 1 else: 0)) != 0: 1 else: (if ((if unsafe: *ptr == 2152071168: 1 else: 0)) != 0: 2 else: 3)))
-            (op_neg = ((if unsafe: *ptr == 2152136704: 1 else: 0)))
-            (rhs_negated = (if unsafe: *ptr != 2152071168: 1 else: 0))
+            (op = (if ((if (unsafe: *ptr) == 2152005632: 1 else: 0)) != 0: 1 else: (if ((if (unsafe: *ptr) == 2152071168: 1 else: 0)) != 0: 2 else: 3)))
+            (op_neg = ((if (unsafe: *ptr) == 2152136704: 1 else: 0)))
+            (rhs_negated = (if (unsafe: *ptr) != 2152071168: 1 else: 0))
         else:
-            (op = (if ((if unsafe: *ptr == 2152005632: 1 else: 0)) != 0: 2 else: (if ((if unsafe: *ptr == 2152071168: 1 else: 0)) != 0: 1 else: 3)))
+            (op = (if ((if (unsafe: *ptr) == 2152005632: 1 else: 0)) != 0: 2 else: (if ((if (unsafe: *ptr) == 2152071168: 1 else: 0)) != 0: 1 else: 3)))
             (op_neg = 0)
-            (rhs_negated = (if unsafe: *ptr == 2152071168: 1 else: 0))
+            (rhs_negated = (if (unsafe: *ptr) == 2152071168: 1 else: 0))
         
         (ptr = ptr + 1)
         if (if compile_class_binary_tight(context, rhs_negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), (&mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0: 0 else: 1) != 0:
@@ -1452,8 +1452,8 @@ fn compile_class_binary_loose(context: *mut eclass_context, negated: c_int, pptr
             (code = (pop_info.code_start + pop_info.length))
         
 
-    (unsafe: *pptr = ptr)
-    (unsafe: *pcode = code)
+    ((unsafe: *pptr) = ptr)
+    ((unsafe: *pcode) = code)
     return 1
 
 let ARG_MAX: c_int = 1048576

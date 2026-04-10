@@ -630,9 +630,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -736,7 +736,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
     var value: c_uint
     var next_char: *const u8
     (utf = 1)
-    if (if ((unsafe: *(data = data + 1) & 2)) != 0: 1 else: 0) != 0:
+    if (if (((unsafe: *(data = data + 1)) & 2)) != 0: 1 else: 0) != 0:
         data = data + (32 / sizeof[u8]())
 
     utf
@@ -794,12 +794,12 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
     var flags: u8
     var stack: c_uint
     var stack_depth: c_int = 0
-    (flags = unsafe: *(ptr = ptr + 1))
+    (flags = (unsafe: *(ptr = ptr + 1)))
     if (if ((flags & 1)) != 0: 1 else: 0) != 0:
         ptr = ptr + (32 / sizeof[u8]())
 
     while (if ptr < data_end: 1 else: 0) != 0:
-        match unsafe: *ptr
+        match (unsafe: *ptr)
             1 =>
                 (ptr = ptr + 1)
                 (stack_depth = stack_depth - 1)

@@ -630,9 +630,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -922,11 +922,11 @@ fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexpt
         (i = i + 1)
 
     if (if i >= cb.names_found: 1 else: 0) != 0:
-        (unsafe: *errorcodeptr = ERR53)
+        ((unsafe: *errorcodeptr) = ERR53)
         (cb.erroroffset = ((name as usize -% cb.start_pattern as usize) / sizeof[u8]()))
         return 0
 
-    (unsafe: *indexptr = i)
+    ((unsafe: *indexptr) = i)
     (count = 0)
     while true:
         (count = count + 1)
@@ -942,7 +942,7 @@ fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexpt
             break
         
 
-    (unsafe: *countptr = count)
+    ((unsafe: *countptr) = count)
     return 1
 
 fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint:
@@ -960,7 +960,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
 
     (size = ((((cb.bracount +% 1) +% 7)) >> 3))
     if (if captures == (null as *mut u8): 1 else: 0) != 0:
-        (unsafe: *errorcodeptr = ERR21)
+        ((unsafe: *errorcodeptr) = ERR21)
         0
         return (null as *mut c_uint)
 
@@ -989,7 +989,7 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
 
     (args = (cb.cx.memctl.malloc((sizeof[recurse_arguments]() +% (size *% sizeof[c_ushort]())), cb.cx.memctl.memory_data) as *mut recurse_arguments))
     if (if args == (null as *mut recurse_arguments): 1 else: 0) != 0:
-        (unsafe: *errorcodeptr = ERR21)
+        ((unsafe: *errorcodeptr) = ERR21)
         (cb.erroroffset = offset)
         return 0
 
@@ -1025,11 +1025,11 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
         (i = i - 1)
 
     (captures_end = (captures + size))
-    (tmp = unsafe: *(captures = captures + 1))
+    (tmp = (unsafe: *(captures = captures + 1)))
     (current = captures)
     while (if current < captures_end: 1 else: 0) != 0:
-        if (if unsafe: *current != tmp: 1 else: 0) != 0:
-            (tmp = unsafe: *current)
+        if (if (unsafe: *current) != tmp: 1 else: 0) != 0:
+            (tmp = (unsafe: *current))
             (unsafe: *captures = tmp)
             (captures = captures + 1)
         

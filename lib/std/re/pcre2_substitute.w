@@ -176,7 +176,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                 (buff_offset = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (buff_length = unsafe: *blength)
+                (buff_length = (unsafe: *blength))
                 (lengthleft = buff_length)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
@@ -414,13 +414,13 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if (if unsafe: *ptr == 36: 1 else: 0) != 0:
+                            if (if (unsafe: *ptr) == 36: 1 else: 0) != 0:
                                 if (if (ptr = ptr + 1) >= repend: 1 else: 0) != 0:
                                     __pc = 10
                                     __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if ((next = unsafe: *ptr)) == 36: 1 else: 0) != 0:
+                                if (if ((next = (unsafe: *ptr))) == 36: 1 else: 0) != 0:
                                     __pc = 5
                                     __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -585,7 +585,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (next = unsafe: *ptr)
+                                    (next = (unsafe: *ptr))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     (inparens = 1)
@@ -598,7 +598,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (next = unsafe: *ptr)
+                                        (next = (unsafe: *ptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         (inangle = 1)
@@ -612,7 +612,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (next = unsafe: *ptr)
+                                    (next = (unsafe: *ptr))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     (star = 1)
@@ -625,7 +625,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     while (if (ptr = ptr + 1) < repend: 1 else: 0) != 0:
-                                        (next = unsafe: *ptr)
+                                        (next = (unsafe: *ptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if next < 48: 1 else: 0) != 0 or (if next > 57: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -637,7 +637,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             break
                                         if (if group > code.top_bracket: 1 else: 0) != 0:
                                             if (if ((suboptions & 2048)) != 0: 1 else: 0) != 0:
-                                                while (if (if (if (ptr = ptr + 1) < repend: 1 else: 0) != 0 and (if unsafe: *ptr >= 48: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *ptr <= 57: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                while (if (if (if (ptr = ptr + 1) < repend: 1 else: 0) != 0 and (if (unsafe: *ptr) >= 48: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) <= 57: 1 else: 0) != 0: 1 else: 0) != 0:
                                                     0
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
@@ -675,8 +675,8 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if inparens != 0:
-                                    if (if (if (if (if ((suboptions & 512)) != 0: 1 else: 0) != 0 and (if star != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if ptr < (repend - (2 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *ptr == 58: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (special = unsafe: *((ptr = ptr + 1)))
+                                    if (if (if (if (if ((suboptions & 512)) != 0: 1 else: 0) != 0 and (if star != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if ptr < (repend - (2 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 58: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (special = (unsafe: *((ptr = ptr + 1))))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if special != 43: 1 else: 0) != 0 and (if special != 45: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -701,7 +701,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                         (text1_end = ptr)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if special == 43: 1 else: 0) != 0 and (if unsafe: *ptr == 58: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if special == 43: 1 else: 0) != 0 and (if (unsafe: *ptr) == 58: 1 else: 0) != 0: 1 else: 0) != 0:
                                             (ptr = ptr + 1)
                                             (text2_start = ptr)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -720,7 +720,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 125: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 125: 1 else: 0) != 0: 1 else: 0) != 0:
                                             __pc = 12
                                             __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -735,7 +735,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if inangle != 0:
-                                    if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 62: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 10
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -900,7 +900,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if (if (if ((suboptions & 512)) != 0: 1 else: 0) != 0 and (if unsafe: *ptr == 92: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if (if ((suboptions & 512)) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 92: 1 else: 0) != 0: 1 else: 0) != 0:
                                     if (if ptr < (repend - (1 as isize as usize)): 1 else: 0) != 0:
                                         match ptr[1]
                                             76 =>
@@ -1012,7 +1012,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                     if not (0 != 0):
                                                         break
                                             continue
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 60: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 60: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1026,7 +1026,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 62: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1101,7 +1101,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                     if not (0 != 0):
                                                         break
                                             continue
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 60: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 60: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1115,7 +1115,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 62: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1188,7 +1188,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                     if not (0 != 0):
                                                         break
                                             continue
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 60: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 60: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1202,7 +1202,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 62: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1237,7 +1237,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             __pc = 11
                                             __goto_pending = 1
                                         ESC_g =>
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 60: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 60: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1251,7 +1251,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if unsafe: *ptr != 62: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1446,14 +1446,14 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if overflowed != 0:
-                    (unsafe: *blength = (buff_length +% extra_needed))
+                    ((unsafe: *blength) = (buff_length +% extra_needed))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 else:
                     (rc = subs)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (unsafe: *blength = (buff_offset -% 1))
+                    ((unsafe: *blength) = (buff_offset -% 1))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2050,9 +2050,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -2174,7 +2174,7 @@ fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend:
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     else:
-                        if (if unsafe: *ptr == 125: 1 else: 0) != 0:
+                        if (if (unsafe: *ptr) == 125: 1 else: 0) != 0:
                             if (if nestlevel == 0: 1 else: 0) != 0:
                                 __pc = 1
                                 __goto_pending = 1
@@ -2184,11 +2184,11 @@ fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend:
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         else:
-                            if (if (if (if unsafe: *ptr == 58: 1 else: 0) != 0 and (if last != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if nestlevel == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if (if (unsafe: *ptr) == 58: 1 else: 0) != 0 and (if last != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if nestlevel == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                 __pc = 1
                                 __goto_pending = 1
                             else:
-                                if (if unsafe: *ptr == 36: 1 else: 0) != 0:
+                                if (if (unsafe: *ptr) == 36: 1 else: 0) != 0:
                                     if (if (if ptr < (ptrend - (1 as isize as usize)): 1 else: 0) != 0 and (if ptr[1] == 123: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (nestlevel = nestlevel + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2199,7 +2199,7 @@ fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend:
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if unsafe: *ptr == 92: 1 else: 0) != 0:
+                                    if (if (unsafe: *ptr) == 92: 1 else: 0) != 0:
                                         if (if ptr < (ptrend - (1 as isize as usize)): 1 else: 0) != 0:
                                             match ptr[1]
                                                 76 =>
@@ -2251,7 +2251,7 @@ fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend:
                 continue
             1 =>  // EXIT
                 (__goto_pending = 0)
-                (unsafe: *ptrptr = ptr)
+                ((unsafe: *ptrptr) = ptr)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return rc
@@ -2276,7 +2276,7 @@ fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes
                 utf
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (if (if (if ptr < ptrend: 1 else: 0) != 0 and 1 != 0: 1 else: 0) != 0 and (if ((ctypes[unsafe: *ptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                while (if (if (if ptr < ptrend: 1 else: 0) != 0 and 1 != 0: 1 else: 0) != 0 and (if ((ctypes[(unsafe: *ptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                     (ptr = ptr + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
@@ -2296,7 +2296,7 @@ fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes
                     __goto_pending = 1
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *ptrptr = ptr)
+                ((unsafe: *ptrptr) = ptr)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return 1
@@ -2306,7 +2306,7 @@ fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes
                 continue
             1 =>  // FAILED
                 (__goto_pending = 0)
-                (unsafe: *ptrptr = ptr)
+                ((unsafe: *ptrptr) = ptr)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return 0

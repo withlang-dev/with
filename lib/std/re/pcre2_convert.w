@@ -56,16 +56,16 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
 
     if (if (if pattern == (null as *const u8): 1 else: 0) != 0 or (if bufflenptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
         if (if bufflenptr != (null as *mut c_ulong): 1 else: 0) != 0:
-            (unsafe: *bufflenptr = 0)
+            ((unsafe: *bufflenptr) = 0)
         
 
     if utf != 0:
-        (unsafe: *bufflenptr = 0)
+        ((unsafe: *bufflenptr) = 0)
         return 132
 
-    if (if (if buffptr != (null as *mut *mut u8): 1 else: 0) != 0 and (if unsafe: *buffptr != (null as *mut u8): 1 else: 0) != 0: 1 else: 0) != 0:
-        (use_buffer = unsafe: *buffptr)
-        (use_length = unsafe: *bufflenptr)
+    if (if (if buffptr != (null as *mut *mut u8): 1 else: 0) != 0 and (if (unsafe: *buffptr) != (null as *mut u8): 1 else: 0) != 0: 1 else: 0) != 0:
+        (use_buffer = (unsafe: *buffptr))
+        (use_length = (unsafe: *bufflenptr))
 
     var i: c_int = 0
     while (if i < 2: 1 else: 0) != 0:
@@ -76,16 +76,16 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
                 (rc = convert_glob((options & (0 - 16 - 1)), pattern, plength, utf, use_buffer, use_length, bufflenptr, dummyrun, ccontext))
             4 => 0
             _ =>
-                (unsafe: *bufflenptr = 0)
+                ((unsafe: *bufflenptr) = 0)
         
         if (if allocated == (null as *mut u8): 1 else: 0) != 0:
-            (unsafe: *bufflenptr = 0)
+            ((unsafe: *bufflenptr) = 0)
         
-        (use_buffer = unsafe: *buffptr)
-        (use_length = (unsafe: *bufflenptr +% 1))
+        (use_buffer = (unsafe: *buffptr))
+        (use_length = ((unsafe: *bufflenptr) +% 1))
         (i = i + 1)
 
-    (unsafe: *bufflenptr = 0)
+    ((unsafe: *bufflenptr) = 0)
 
 fn pcre2_converted_pattern_free_8(converted: *mut u8):
     if (if converted != (null as *mut u8): 1 else: 0) != 0:
@@ -681,9 +681,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -814,7 +814,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                 ccontext
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *bufflenptr = plength)
+                ((unsafe: *bufflenptr) = plength)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 0
@@ -834,7 +834,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                     (pp = p)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (c = unsafe: *posix)
+                    (c = (unsafe: *posix))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     posix = posix + clength
@@ -861,7 +861,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                             match posix_state
                                 5 =>
                                     (posix_state = 3)
-                                    if (if (if (if c == 58: 1 else: 0) != 0 and (if plength > 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *posix == 93: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (if c == 58: 1 else: 0) != 0 and (if plength > 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *posix) == 93: 1 else: 0) != 0: 1 else: 0) != 0:
                                         0
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -899,7 +899,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                                 0
                                 (posix_state = 3)
                                 if (if plength > 0: 1 else: 0) != 0:
-                                    if (if unsafe: *posix == 94: 1 else: 0) != 0:
+                                    if (if (unsafe: *posix) == 94: 1 else: 0) != 0:
                                         (posix = posix + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -911,7 +911,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if plength > 0: 1 else: 0) != 0 and (if unsafe: *posix == 93: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if plength > 0: 1 else: 0) != 0 and (if (unsafe: *posix) == 93: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (posix = posix + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -929,13 +929,13 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                                 if extended != 0:
                                     (nextisliteral = 1)
                                 else:
-                                    if (if (if unsafe: *posix < 255: 1 else: 0) != 0 and (if string_find_char(posix_meta_escapes, unsafe: *posix) != (null as *mut i8): 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (unsafe: *posix) < 255: 1 else: 0) != 0 and (if string_find_char(posix_meta_escapes, (unsafe: *posix)) != (null as *mut i8): 1 else: 0) != 0: 1 else: 0) != 0:
                                         0
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *p = unsafe: *(posix = posix + 1))
+                                        (unsafe: *p = (unsafe: *(posix = posix + 1)))
                                         (p = p + 1)
-                                        (lastspecial = unsafe: *(p = p + 1))
+                                        (lastspecial = (unsafe: *(p = p + 1)))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         (plength = plength - 1)
@@ -1020,7 +1020,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                 convlength = convlength + ((p as usize -% pp as usize) / sizeof[u8]())
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *bufflenptr = convlength)
+                ((unsafe: *bufflenptr) = convlength)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 (unsafe: *p = 0)
@@ -1050,7 +1050,7 @@ fn convert_glob_write_str(out: *mut pcre2_output_context, __param_length: c_ulon
     while true:
         (output_size = output_size + 1)
         if (if output < (output_end as *mut u8): 1 else: 0) != 0:
-            (unsafe: *output = unsafe: *(out_str = out_str + 1))
+            (unsafe: *output = (unsafe: *(out_str = out_str + 1)))
             (output = output + 1)
         
         if not ((if (length = length - 1) != 0: 1 else: 0) != 0):
@@ -1082,22 +1082,22 @@ fn convert_glob_parse_class(from: *mut *const u8, pattern_end: *const u8, out: *
         if (if pattern >= pattern_end: 1 else: 0) != 0:
             return 0
         
-        (c = unsafe: *(pattern = pattern + 1))
+        (c = (unsafe: *(pattern = pattern + 1)))
         if (if (if c < 97: 1 else: 0) != 0 or (if c > 122: 1 else: 0) != 0: 1 else: 0) != 0:
             break
         
 
-    if (if (if (if c != 58: 1 else: 0) != 0 or (if pattern >= pattern_end: 1 else: 0) != 0: 1 else: 0) != 0 or (if unsafe: *pattern != 93: 1 else: 0) != 0: 1 else: 0) != 0:
+    if (if (if (if c != 58: 1 else: 0) != 0 or (if pattern >= pattern_end: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *pattern) != 93: 1 else: 0) != 0: 1 else: 0) != 0:
         return 0
 
     (class_ptr = posix_classes)
     (class_index = 1)
     while 1 != 0:
-        if (if unsafe: *class_ptr == 0: 1 else: 0) != 0:
+        if (if (unsafe: *class_ptr) == 0: 1 else: 0) != 0:
             return 0
         
         (pattern = start)
-        while (if unsafe: *class_ptr != 58: 1 else: 0) != 0:
+        while (if (unsafe: *class_ptr) != 58: 1 else: 0) != 0:
             (class_ptr = class_ptr + 1)
         
         (class_ptr = class_ptr + 1)
@@ -1163,13 +1163,13 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
     var class_index: c_int
     utf
     if (if pattern >= pattern_end: 1 else: 0) != 0:
-        (unsafe: *from = pattern)
+        ((unsafe: *from) = pattern)
         return 106
 
-    if (if (if unsafe: *pattern == 33: 1 else: 0) != 0 or (if unsafe: *pattern == 94: 1 else: 0) != 0: 1 else: 0) != 0:
+    if (if (if (unsafe: *pattern) == 33: 1 else: 0) != 0 or (if (unsafe: *pattern) == 94: 1 else: 0) != 0: 1 else: 0) != 0:
         (pattern = pattern + 1)
         if (if pattern >= pattern_end: 1 else: 0) != 0:
-            (unsafe: *from = pattern)
+            ((unsafe: *from) = pattern)
             return 106
         
         (is_negative = 1)
@@ -1188,7 +1188,7 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
 
     (has_prev_c = 0)
     (prev_c = 0)
-    if (if unsafe: *pattern == 93: 1 else: 0) != 0:
+    if (if (unsafe: *pattern) == 93: 1 else: 0) != 0:
         ((&out.out_str[0] as *mut u8)[0] = 92)
         ((&out.out_str[0] as *mut u8)[1] = 93)
         convert_glob_write_str(out, 2)
@@ -1210,17 +1210,17 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
                 convert_glob_print_separator(out, separator, with_escape)
                 convert_glob_write(out, 41)
             
-            (unsafe: *from = pattern)
+            ((unsafe: *from) = pattern)
             return 0
         
         if (if pattern >= pattern_end: 1 else: 0) != 0:
             break
         
-        if (if (if c == 91: 1 else: 0) != 0 and (if unsafe: *pattern == 58: 1 else: 0) != 0: 1 else: 0) != 0:
-            (unsafe: *from = pattern)
+        if (if (if c == 91: 1 else: 0) != 0 and (if (unsafe: *pattern) == 58: 1 else: 0) != 0: 1 else: 0) != 0:
+            ((unsafe: *from) = pattern)
             (class_index = convert_glob_parse_class(from, pattern_end, out))
             if (if class_index != 0: 1 else: 0) != 0:
-                (pattern = unsafe: *from)
+                (pattern = (unsafe: *from))
                 (has_prev_c = 0)
                 (prev_c = 0)
                 if (if (if is_negative != 0: 0 else: 1) != 0 and convert_glob_char_in_class(class_index, separator) != 0: 1 else: 0) != 0:
@@ -1229,7 +1229,7 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
                 continue
             
         else:
-            if (if (if (if c == 45: 1 else: 0) != 0 and has_prev_c != 0: 1 else: 0) != 0 and (if unsafe: *pattern != 93: 1 else: 0) != 0: 1 else: 0) != 0:
+            if (if (if (if c == 45: 1 else: 0) != 0 and has_prev_c != 0: 1 else: 0) != 0 and (if (unsafe: *pattern) != 93: 1 else: 0) != 0: 1 else: 0) != 0:
                 convert_glob_write(out, 45)
                 (char_start = pattern)
                 0
@@ -1240,11 +1240,11 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
                     (char_start = pattern)
                     0
                 else:
-                    if (if (if c == 91: 1 else: 0) != 0 and (if unsafe: *pattern == 58: 1 else: 0) != 0: 1 else: 0) != 0:
-                        (unsafe: *from = pattern)
+                    if (if (if c == 91: 1 else: 0) != 0 and (if (unsafe: *pattern) == 58: 1 else: 0) != 0: 1 else: 0) != 0:
+                        ((unsafe: *from) = pattern)
                 
                 if (if prev_c > c: 1 else: 0) != 0:
-                    (unsafe: *from = pattern)
+                    ((unsafe: *from) = pattern)
                 
                 if (if (if prev_c < separator: 1 else: 0) != 0 and (if separator < c: 1 else: 0) != 0: 1 else: 0) != 0:
                     (separator_seen = 1)
@@ -1269,12 +1269,12 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
             (separator_seen = 1)
         
         while true:
-            convert_glob_write(out, unsafe: *(char_start = char_start + 1))
+            convert_glob_write(out, (unsafe: *(char_start = char_start + 1)))
             if not ((if char_start < pattern: 1 else: 0) != 0):
                 break
         
 
-    (unsafe: *from = pattern)
+    ((unsafe: *from) = pattern)
     return 106
 
 fn convert_glob_print_commit(out: *mut pcre2_output_context):
@@ -1331,18 +1331,18 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
         convert_glob_write_str((&mut out as *mut pcre2_output_context), 2)
 
     while (if pattern < pattern_end: 1 else: 0) != 0:
-        (c = unsafe: *(pattern = pattern + 1))
+        (c = (unsafe: *(pattern = pattern + 1)))
         if (if c == 42: 1 else: 0) != 0:
             (is_start = (if pattern == (pattern_start + (1 as isize as usize)): 1 else: 0))
             if in_atomic != 0:
                 convert_glob_write((&mut out as *mut pcre2_output_context), 41)
                 (in_atomic = 0)
             
-            if (if (if (if no_starstar != 0: 0 else: 1) != 0 and (if pattern < pattern_end: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *pattern == 42: 1 else: 0) != 0: 1 else: 0) != 0:
+            if (if (if (if no_starstar != 0: 0 else: 1) != 0 and (if pattern < pattern_end: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *pattern) == 42: 1 else: 0) != 0: 1 else: 0) != 0:
                 (after_separator = (if is_start != 0 or ((if pattern[-2] == separator: 1 else: 0)) != 0: 1 else: 0))
                 while true:
                     (pattern = pattern + 1)
-                    if not ((if (if pattern < pattern_end: 1 else: 0) != 0 and (if unsafe: *pattern == 42: 1 else: 0) != 0: 1 else: 0) != 0):
+                    if not ((if (if pattern < pattern_end: 1 else: 0) != 0 and (if (unsafe: *pattern) == 42: 1 else: 0) != 0: 1 else: 0) != 0):
                         break
                 
                 if (if pattern >= pattern_end: 1 else: 0) != 0:
@@ -1350,11 +1350,11 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
                     break
                 
                 (after_starstar = 1)
-                if (if (if (if (if after_separator != 0 and (if escape != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *pattern == escape: 1 else: 0) != 0: 1 else: 0) != 0 and (if (pattern + (1 as isize as usize)) < pattern_end: 1 else: 0) != 0: 1 else: 0) != 0 and (if pattern[1] == separator: 1 else: 0) != 0: 1 else: 0) != 0:
+                if (if (if (if (if after_separator != 0 and (if escape != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *pattern) == escape: 1 else: 0) != 0: 1 else: 0) != 0 and (if (pattern + (1 as isize as usize)) < pattern_end: 1 else: 0) != 0: 1 else: 0) != 0 and (if pattern[1] == separator: 1 else: 0) != 0: 1 else: 0) != 0:
                     (pattern = pattern + 1)
                 
                 if is_start != 0:
-                    if (if unsafe: *pattern != separator: 1 else: 0) != 0:
+                    if (if (unsafe: *pattern) != separator: 1 else: 0) != 0:
                         continue
                     
                     ((&out.out_str[0] as *mut u8)[0] = 40)
@@ -1370,7 +1370,7 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
                     continue
                 
                 convert_glob_print_commit((&mut out as *mut pcre2_output_context))
-                if (if (if after_separator != 0: 0 else: 1) != 0 or (if unsafe: *pattern != separator: 1 else: 0) != 0: 1 else: 0) != 0:
+                if (if (if after_separator != 0: 0 else: 1) != 0 or (if (unsafe: *pattern) != separator: 1 else: 0) != 0: 1 else: 0) != 0:
                     ((&out.out_str[0] as *mut u8)[0] = 46)
                     ((&out.out_str[0] as *mut u8)[1] = 42)
                     ((&out.out_str[0] as *mut u8)[2] = 63)
@@ -1392,10 +1392,10 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
                 (pattern = pattern + 1)
                 continue
             
-            if (if (if pattern < pattern_end: 1 else: 0) != 0 and (if unsafe: *pattern == 42: 1 else: 0) != 0: 1 else: 0) != 0:
+            if (if (if pattern < pattern_end: 1 else: 0) != 0 and (if (unsafe: *pattern) == 42: 1 else: 0) != 0: 1 else: 0) != 0:
                 while true:
                     (pattern = pattern + 1)
-                    if not ((if (if pattern < pattern_end: 1 else: 0) != 0 and (if unsafe: *pattern == 42: 1 else: 0) != 0: 1 else: 0) != 0):
+                    if not ((if (if pattern < pattern_end: 1 else: 0) != 0 and (if (unsafe: *pattern) == 42: 1 else: 0) != 0: 1 else: 0) != 0):
                         break
                 
             
@@ -1451,7 +1451,7 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
             if (if pattern >= pattern_end: 1 else: 0) != 0:
                 break
             
-            (c = unsafe: *(pattern = pattern + 1))
+            (c = (unsafe: *(pattern = pattern + 1)))
         
         if (if (if c < 255: 1 else: 0) != 0 and (if string_find_char(pcre2_escaped_literals, c) != (null as *mut i8): 1 else: 0) != 0: 1 else: 0) != 0:
             convert_glob_write((&mut out as *mut pcre2_output_context), 92)
@@ -1470,10 +1470,10 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
         convert_glob_write((&mut out as *mut pcre2_output_context), 0)
 
     if (if result != 0: 1 else: 0) != 0:
-        (unsafe: *bufflenptr = ((pattern as usize -% pattern_start as usize) / sizeof[u8]()))
+        ((unsafe: *bufflenptr) = ((pattern as usize -% pattern_start as usize) / sizeof[u8]()))
         return result
 
-    (unsafe: *bufflenptr = (out.output_size -% 1))
+    ((unsafe: *bufflenptr) = (out.output_size -% 1))
     return 0
 
 let ARG_MAX: c_int = 1048576

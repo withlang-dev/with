@@ -97,7 +97,7 @@ fn pcre2_substring_copy_bynumber_8(match_data: *mut pcre2_real_match_data_8, str
         return rc
 
     (buffer[size] = 0)
-    (unsafe: *sizeptr = size)
+    ((unsafe: *sizeptr) = size)
     return 0
 
 fn pcre2_substring_free_8(string: *mut u8):
@@ -132,8 +132,8 @@ fn pcre2_substring_get_bynumber_8(match_data: *mut pcre2_real_match_data_8, stri
         return rc
 
     (yield_[size] = 0)
-    (unsafe: *stringptr = yield_)
-    (unsafe: *sizeptr = size)
+    ((unsafe: *stringptr) = yield_)
+    ((unsafe: *sizeptr) = size)
     return 0
 
 fn pcre2_substring_length_byname_8(match_data: *mut pcre2_real_match_data_8, stringname: *const u8, sizeptr: *mut c_ulong) -> c_int:
@@ -160,7 +160,7 @@ fn pcre2_substring_length_bynumber_8(match_data: *mut pcre2_real_match_data_8, s
     (left = (&match_data.ovector[0] as *mut c_ulong)[(stringnumber *% 2)])
     (right = (&match_data.ovector[0] as *mut c_ulong)[((stringnumber *% 2) +% 1)])
     if (if sizeptr != (null as *mut c_ulong): 1 else: 0) != 0:
-        (unsafe: *sizeptr = (if ((if left > right: 1 else: 0)) != 0: 0 else: (right -% left)))
+        ((unsafe: *sizeptr) = (if ((if left > right: 1 else: 0)) != 0: 0 else: (right -% left)))
 
     return 0
 
@@ -192,8 +192,8 @@ fn pcre2_substring_nametable_scan_8(code: *const pcre2_real_code_8, stringname: 
                 
                 last = last + entrysize
             
-            (unsafe: *firstptr = first)
-            (unsafe: *lastptr = last)
+            ((unsafe: *firstptr) = first)
+            ((unsafe: *lastptr) = last)
             return entrysize
         
         if (if c > 0: 1 else: 0) != 0:
@@ -242,7 +242,7 @@ fn pcre2_substring_list_get_8(match_data: *mut pcre2_real_match_data_8, listptr:
     if (if lengthsptr == (null as *mut *mut c_ulong): 1 else: 0) != 0:
         (lensp = (null as *mut c_ulong))
     else:
-        (unsafe: *lengthsptr = lensp)
+        ((unsafe: *lengthsptr) = lensp)
 
     (i = 0)
     while (if i < count2: 1 else: 0) != 0:
@@ -258,7 +258,7 @@ fn pcre2_substring_list_get_8(match_data: *mut pcre2_real_match_data_8, listptr:
         (sp = sp + 1)
         i = i + 2
 
-    (unsafe: *listp = (null as *mut u8))
+    ((unsafe: *listp) = (null as *mut u8))
     return 0
 
 extern fn pcre2_serialize_encode_8(p0: *mut *const pcre2_real_code_8, p1: c_int, p2: *mut *mut u8, p3: *mut c_ulong, p4: *mut pcre2_real_general_context_8) -> c_int
@@ -808,9 +808,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint

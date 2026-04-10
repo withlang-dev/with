@@ -431,7 +431,7 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                             else:
                                 if startline != 0:
                                     if (if start_match > (mb.start_subject + start_offset): 1 else: 0) != 0:
-                                        if (if (if (if (if start_match[-1] == 13: 1 else: 0) != 0 and ((if (if mb.nltype == 1: 1 else: 0) != 0 or (if mb.nltype == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and (if start_match < end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *start_match == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if (if (if start_match[-1] == 13: 1 else: 0) != 0 and ((if (if mb.nltype == 1: 1 else: 0) != 0 or (if mb.nltype == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and (if start_match < end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *start_match) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                             (start_match = start_match + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -586,7 +586,7 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if (if (if (if (if start_match > (subject + start_offset): 1 else: 0) != 0 and (if start_match[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0 and (if start_match < end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *start_match == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((re.flags & 2048)) == 0: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (if mb.nltype == 1: 1 else: 0) != 0 or (if mb.nltype == 2: 1 else: 0) != 0: 1 else: 0) != 0 or (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                    if (if (if (if (if (if (if start_match > (subject + start_offset): 1 else: 0) != 0 and (if start_match[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0 and (if start_match < end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *start_match) == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((re.flags & 2048)) == 0: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (if mb.nltype == 1: 1 else: 0) != 0 or (if mb.nltype == 2: 1 else: 0) != 0: 1 else: 0) != 0 or (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                         (start_match = start_match + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
@@ -1218,9 +1218,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -1372,7 +1372,7 @@ fn do_callout(F: *mut heapframe, mb: *mut match_block_8, lengthptr: *mut c_ulong
     (cb.capture_last = F.capture_last)
     (cb.offset_vector = callout_ovector)
     (cb.mark = mb.nomatch_mark)
-    if (if unsafe: *F.ecode == OP_CALLOUT: 1 else: 0) != 0:
+    if (if (unsafe: *F.ecode) == OP_CALLOUT: 1 else: 0) != 0:
         (cb.callout_number = F.ecode[(1 + (2 * 2))])
         (cb.callout_string_offset = 0)
         (cb.callout_string = (null as *const u8))
@@ -1380,7 +1380,7 @@ fn do_callout(F: *mut heapframe, mb: *mut match_block_8, lengthptr: *mut c_ulong
     else:
         (cb.callout_number = 0)
         (cb.callout_string = ((F.ecode + (((1 + (4 * 2))) as isize as usize)) + (1 as isize as usize)))
-        (cb.callout_string_length = ((unsafe: *lengthptr -% 9) -% 2))
+        (cb.callout_string_length = (((unsafe: *lengthptr) -% 9) -% 2))
 
     (save0 = callout_ovector[0])
     (save1 = callout_ovector[1])
@@ -1407,8 +1407,8 @@ fn match_ref(offset: c_ulong, caseless: c_int, caseopts: c_int, F: *mut heapfram
             if (if eptr >= mb.end_subject: 1 else: 0) != 0:
                 return 1
             
-            (cc = unsafe: *eptr)
-            (cp = unsafe: *p)
+            (cc = (unsafe: *eptr))
+            (cp = (unsafe: *p))
             if (if ((mb.lcc)[cp]) != ((mb.lcc)[cc]): 1 else: 0) != 0:
                 return -1
             
@@ -1423,7 +1423,7 @@ fn match_ref(offset: c_ulong, caseless: c_int, caseopts: c_int, F: *mut heapfram
                 if (if eptr >= mb.end_subject: 1 else: 0) != 0:
                     return 1
                 
-                if (if unsafe: *(p = p + 1) != unsafe: *(eptr = eptr + 1): 1 else: 0) != 0:
+                if (if (unsafe: *(p = p + 1)) != (unsafe: *(eptr = eptr + 1)): 1 else: 0) != 0:
                     return -1
                 
                 (length = length - 1)
@@ -1432,7 +1432,7 @@ fn match_ref(offset: c_ulong, caseless: c_int, caseopts: c_int, F: *mut heapfram
             eptr = eptr + length
         
 
-    (unsafe: *lengthptr = ((eptr as usize -% eptr_start as usize) / sizeof[u8]()))
+    ((unsafe: *lengthptr) = ((eptr as usize -% eptr_start as usize) / sizeof[u8]()))
     return 0
 
 fn recurse_update_offsets(F: *mut heapframe, P: *mut heapframe):
@@ -1445,7 +1445,7 @@ fn recurse_update_offsets(F: *mut heapframe, P: *mut heapframe):
     while true:
         ecode = ecode + (1 + 2)
         if (if (offset +% diff) >= offset_top: 1 else: 0) != 0:
-            while (if unsafe: *ecode == OP_CREF: 1 else: 0) != 0:
+            while (if (unsafe: *ecode) == OP_CREF: 1 else: 0) != 0:
                 ecode = ecode + (1 + 2)
             
             break
@@ -1461,7 +1461,7 @@ fn recurse_update_offsets(F: *mut heapframe, P: *mut heapframe):
         offset = offset + diff
         dst = dst + diff
         src = src + diff
-        if not ((if unsafe: *ecode == OP_CREF: 1 else: 0) != 0):
+        if not ((if (unsafe: *ecode) == OP_CREF: 1 else: 0) != 0):
             break
 
     (diff = (offset_top -% offset))
@@ -1624,7 +1624,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     (F.offset_top = (offset +% 2))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            F.ecode = F.ecode + _pcre2_OP_lengths_8[unsafe: *F.ecode]
+                            F.ecode = F.ecode + _pcre2_OP_lengths_8[(unsafe: *F.ecode)]
                         OP_ASSERT_ACCEPT =>
                             if (if F.eptr > mb.last_used_ptr: 1 else: 0) != 0:
                                 (mb.last_used_ptr = F.eptr)
@@ -1821,7 +1821,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             with_memcpy((((&match_data.ovector[0] as *mut c_ulong) + (2 as isize as usize)) as *mut c_void) as *i8, ((&F.ovector[0] as *mut c_ulong) as *const c_void) as *i8, (((i -% 2)) *% sizeof[c_ulong]()) as i64)
                             return 1
                         OP_ANY =>
-                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if F.eptr == (mb.end_subject - (1 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if F.eptr == (mb.end_subject - (1 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
                                 (mb.hitend = 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -1884,7 +1884,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if (if F.ecode[1] != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                            if (if F.ecode[1] != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                 while true:
                                     __pc = 57
                                     __goto_pending = 1
@@ -1912,7 +1912,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if ((mb.lcc)[F.ecode[1]]) != ((mb.lcc)[unsafe: *F.eptr]): 1 else: 0) != 0:
+                            if (if ((mb.lcc)[F.ecode[1]]) != ((mb.lcc)[(unsafe: *F.eptr)]): 1 else: 0) != 0:
                                 while true:
                                     __pc = 57
                                     __goto_pending = 1
@@ -1931,7 +1931,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         OP_NOT =>
-                            (fc = unsafe: *(F.eptr = F.eptr + 1))
+                            (fc = (unsafe: *(F.eptr = F.eptr + 1)))
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             if (if (if ch == fc: 1 else: 0) != 0 or ((if (if F.op == OP_NOTI: 1 else: 0) != 0 and (if ((mb.fcc)[ch]) == fc: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
@@ -1983,7 +1983,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.char_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.char_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.char_repeat.c = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.op >= OP_STARI: 1 else: 0) != 0:
                                 (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2004,7 +2004,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (cc = unsafe: *F.eptr)
+                                    (cc = (unsafe: *F.eptr))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -2085,7 +2085,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -2119,7 +2119,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -2192,7 +2192,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -2267,7 +2267,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -2295,7 +2295,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -2379,7 +2379,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.char_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.char_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.char_repeat.c = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.op >= OP_STARI: 1 else: 0) != 0:
                                 (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2400,7 +2400,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (cc = unsafe: *F.eptr)
+                                    (cc = (unsafe: *F.eptr))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -2481,7 +2481,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -2515,7 +2515,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -2588,7 +2588,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -2663,7 +2663,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -2691,7 +2691,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -2771,7 +2771,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.char_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.char_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.char_repeat.c = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.op >= OP_STARI: 1 else: 0) != 0:
                                 (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2792,7 +2792,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (cc = unsafe: *F.eptr)
+                                    (cc = (unsafe: *F.eptr))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -2873,7 +2873,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -2907,7 +2907,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -2980,7 +2980,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -3055,7 +3055,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -3083,7 +3083,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -3159,7 +3159,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.char_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.char_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.char_repeat.c = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.op >= OP_STARI: 1 else: 0) != 0:
                                 (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -3180,7 +3180,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (cc = unsafe: *F.eptr)
+                                    (cc = (unsafe: *F.eptr))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -3261,7 +3261,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -3295,7 +3295,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -3368,7 +3368,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -3443,7 +3443,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -3471,7 +3471,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -3543,7 +3543,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.char_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.char_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.char_repeat.c = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.op >= OP_STARI: 1 else: 0) != 0:
                                 (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -3564,7 +3564,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (cc = unsafe: *F.eptr)
+                                    (cc = (unsafe: *F.eptr))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -3645,7 +3645,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -3679,7 +3679,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -3752,7 +3752,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -3827,7 +3827,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -3855,7 +3855,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -3922,7 +3922,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.char_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.char_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.char_repeat.c = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.op >= OP_STARI: 1 else: 0) != 0:
                                 (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -3943,7 +3943,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (cc = unsafe: *F.eptr)
+                                    (cc = (unsafe: *F.eptr))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -4024,7 +4024,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -4058,7 +4058,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -4131,7 +4131,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -4206,7 +4206,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -4234,7 +4234,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -4296,7 +4296,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.char_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.char_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.char_repeat.c = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.op >= OP_STARI: 1 else: 0) != 0:
                                 (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -4317,7 +4317,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (cc = unsafe: *F.eptr)
+                                    (cc = (unsafe: *F.eptr))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -4398,7 +4398,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -4432,7 +4432,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -4505,7 +4505,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -4580,7 +4580,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -4608,7 +4608,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -4665,7 +4665,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.char_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.char_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.char_repeat.c = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.char_repeat.c = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.op >= OP_STARI: 1 else: 0) != 0:
                                 (F.fields.char_repeat.oc.oc = mb.fcc[F.fields.char_repeat.c])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -4686,7 +4686,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (cc = unsafe: *F.eptr)
+                                    (cc = (unsafe: *F.eptr))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -4767,7 +4767,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -4801,7 +4801,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cc = unsafe: *F.eptr)
+                                        (cc = (unsafe: *F.eptr))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (if F.fields.char_repeat.c != cc: 1 else: 0) != 0 and (if F.fields.char_repeat.oc.oc != cc: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -4874,7 +4874,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -4949,7 +4949,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -4977,7 +4977,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.char_repeat.c != unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.char_repeat.c != (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -5085,7 +5085,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -5165,7 +5165,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -5198,7 +5198,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -5270,7 +5270,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -5347,7 +5347,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -5377,7 +5377,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -5484,7 +5484,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -5564,7 +5564,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -5597,7 +5597,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -5669,7 +5669,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -5746,7 +5746,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -5776,7 +5776,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -5879,7 +5879,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -5959,7 +5959,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -5992,7 +5992,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -6064,7 +6064,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -6141,7 +6141,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -6171,7 +6171,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -6270,7 +6270,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -6350,7 +6350,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -6383,7 +6383,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -6455,7 +6455,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -6532,7 +6532,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -6562,7 +6562,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -6656,7 +6656,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -6736,7 +6736,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -6769,7 +6769,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -6841,7 +6841,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -6918,7 +6918,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -6948,7 +6948,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -7037,7 +7037,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -7117,7 +7117,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -7150,7 +7150,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -7222,7 +7222,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -7299,7 +7299,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -7329,7 +7329,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -7413,7 +7413,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -7493,7 +7493,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -7526,7 +7526,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -7598,7 +7598,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -7675,7 +7675,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -7705,7 +7705,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -7785,7 +7785,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -7865,7 +7865,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -7898,7 +7898,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == unsafe: *F.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0 or (if F.fields.charnot_repeat.oc == (unsafe: *F.eptr): 1 else: 0) != 0: 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -7970,7 +7970,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                    if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -8047,7 +8047,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *(F.eptr = F.eptr + 1): 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *(F.eptr = F.eptr + 1)): 1 else: 0) != 0:
                                             while true:
                                                 __pc = 57
                                                 __goto_pending = 1
@@ -8077,7 +8077,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if F.fields.charnot_repeat.c == unsafe: *F.eptr: 1 else: 0) != 0:
+                                        if (if F.fields.charnot_repeat.c == (unsafe: *F.eptr): 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -8448,7 +8448,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             F.ecode = F.ecode + (1 + 2)
                             __pc = 15
                             __goto_pending = 1
-                            (reptype = (if ((if unsafe: *F.ecode == OP_TYPEMINUPTO: 1 else: 0)) != 0: REPTYPE_MIN else: REPTYPE_MAX))
+                            (reptype = (if ((if (unsafe: *F.ecode) == OP_TYPEMINUPTO: 1 else: 0)) != 0: REPTYPE_MIN else: REPTYPE_MAX))
                             F.ecode = F.ecode + (1 + 2)
                             __pc = 15
                             __goto_pending = 1
@@ -8478,7 +8478,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.type_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.type_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.type_repeat.ctype = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
                                 match F.fields.type_repeat.ctype
                                     12 =>
@@ -8498,7 +8498,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -8541,9 +8541,9 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -8557,7 +8557,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -8581,7 +8581,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -8606,7 +8606,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ =>
                                                     while true:
@@ -8640,7 +8640,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -8665,7 +8665,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ =>
                                                     while true:
@@ -8699,7 +8699,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -8734,7 +8734,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -8769,7 +8769,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -8804,7 +8804,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -8839,7 +8839,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -8874,7 +8874,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -8951,7 +8951,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    (fc = (unsafe: *(F.eptr = F.eptr + 1)))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     match F.fields.type_repeat.ctype
@@ -8959,7 +8959,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         13 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -8973,12 +8973,12 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         17 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -8992,7 +8992,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         18 =>
                                             match fc
@@ -9133,7 +9133,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (fc = unsafe: *F.eptr)
+                                            (fc = (unsafe: *F.eptr))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             if (if fc == 13: 1 else: 0) != 0:
@@ -9141,7 +9141,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                if (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0:
                                                     (F.eptr = F.eptr + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -9167,7 +9167,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -9185,7 +9185,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -9204,7 +9204,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -9222,7 +9222,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -9241,7 +9241,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -9260,7 +9260,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -9279,7 +9279,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -9297,7 +9297,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -9316,7 +9316,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -9335,7 +9335,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -9353,7 +9353,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -9372,7 +9372,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -9391,7 +9391,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -9410,7 +9410,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -9429,7 +9429,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -9448,7 +9448,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -9467,7 +9467,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -9486,7 +9486,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -9505,7 +9505,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -9524,7 +9524,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -9575,7 +9575,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -9586,7 +9586,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         OP_TYPEUPTO =>
-                            (reptype = (if ((if unsafe: *F.ecode == OP_TYPEMINUPTO: 1 else: 0)) != 0: REPTYPE_MIN else: REPTYPE_MAX))
+                            (reptype = (if ((if (unsafe: *F.ecode) == OP_TYPEMINUPTO: 1 else: 0)) != 0: REPTYPE_MIN else: REPTYPE_MAX))
                             F.ecode = F.ecode + (1 + 2)
                             __pc = 15
                             __goto_pending = 1
@@ -9616,7 +9616,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.type_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.type_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.type_repeat.ctype = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
                                 match F.fields.type_repeat.ctype
                                     12 =>
@@ -9636,7 +9636,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -9679,9 +9679,9 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -9695,7 +9695,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -9719,7 +9719,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -9744,7 +9744,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ =>
                                                     while true:
@@ -9778,7 +9778,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -9803,7 +9803,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ =>
                                                     while true:
@@ -9837,7 +9837,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -9872,7 +9872,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -9907,7 +9907,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -9942,7 +9942,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -9977,7 +9977,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -10012,7 +10012,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -10089,7 +10089,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    (fc = (unsafe: *(F.eptr = F.eptr + 1)))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     match F.fields.type_repeat.ctype
@@ -10097,7 +10097,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         13 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -10111,12 +10111,12 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         17 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -10130,7 +10130,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         18 =>
                                             match fc
@@ -10271,7 +10271,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (fc = unsafe: *F.eptr)
+                                            (fc = (unsafe: *F.eptr))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             if (if fc == 13: 1 else: 0) != 0:
@@ -10279,7 +10279,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                if (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0:
                                                     (F.eptr = F.eptr + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -10305,7 +10305,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -10323,7 +10323,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -10342,7 +10342,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -10360,7 +10360,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -10379,7 +10379,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -10398,7 +10398,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -10417,7 +10417,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -10435,7 +10435,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -10454,7 +10454,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -10473,7 +10473,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -10491,7 +10491,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -10510,7 +10510,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -10529,7 +10529,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -10548,7 +10548,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -10567,7 +10567,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -10586,7 +10586,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -10605,7 +10605,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -10624,7 +10624,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -10643,7 +10643,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -10662,7 +10662,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -10713,7 +10713,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -10750,7 +10750,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.type_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.type_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.type_repeat.ctype = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
                                 match F.fields.type_repeat.ctype
                                     12 =>
@@ -10770,7 +10770,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -10813,9 +10813,9 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -10829,7 +10829,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -10853,7 +10853,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -10878,7 +10878,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ =>
                                                     while true:
@@ -10912,7 +10912,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -10937,7 +10937,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ =>
                                                     while true:
@@ -10971,7 +10971,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -11006,7 +11006,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -11041,7 +11041,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -11076,7 +11076,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -11111,7 +11111,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -11146,7 +11146,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -11223,7 +11223,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    (fc = (unsafe: *(F.eptr = F.eptr + 1)))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     match F.fields.type_repeat.ctype
@@ -11231,7 +11231,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         13 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -11245,12 +11245,12 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         17 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -11264,7 +11264,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         18 =>
                                             match fc
@@ -11405,7 +11405,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (fc = unsafe: *F.eptr)
+                                            (fc = (unsafe: *F.eptr))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             if (if fc == 13: 1 else: 0) != 0:
@@ -11413,7 +11413,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                if (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0:
                                                     (F.eptr = F.eptr + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -11439,7 +11439,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -11457,7 +11457,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -11476,7 +11476,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -11494,7 +11494,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -11513,7 +11513,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -11532,7 +11532,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -11551,7 +11551,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -11569,7 +11569,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -11588,7 +11588,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -11607,7 +11607,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -11625,7 +11625,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -11644,7 +11644,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -11663,7 +11663,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -11682,7 +11682,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -11701,7 +11701,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -11720,7 +11720,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -11739,7 +11739,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -11758,7 +11758,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -11777,7 +11777,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -11796,7 +11796,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -11847,7 +11847,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -11878,7 +11878,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.type_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.type_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.type_repeat.ctype = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
                                 match F.fields.type_repeat.ctype
                                     12 =>
@@ -11898,7 +11898,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -11941,9 +11941,9 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -11957,7 +11957,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -11981,7 +11981,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -12006,7 +12006,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ =>
                                                     while true:
@@ -12040,7 +12040,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -12065,7 +12065,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ =>
                                                     while true:
@@ -12099,7 +12099,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -12134,7 +12134,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -12169,7 +12169,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -12204,7 +12204,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -12239,7 +12239,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -12274,7 +12274,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -12351,7 +12351,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    (fc = (unsafe: *(F.eptr = F.eptr + 1)))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     match F.fields.type_repeat.ctype
@@ -12359,7 +12359,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         13 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -12373,12 +12373,12 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         17 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -12392,7 +12392,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         18 =>
                                             match fc
@@ -12533,7 +12533,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (fc = unsafe: *F.eptr)
+                                            (fc = (unsafe: *F.eptr))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             if (if fc == 13: 1 else: 0) != 0:
@@ -12541,7 +12541,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                if (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0:
                                                     (F.eptr = F.eptr + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -12567,7 +12567,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -12585,7 +12585,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -12604,7 +12604,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -12622,7 +12622,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -12641,7 +12641,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -12660,7 +12660,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -12679,7 +12679,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -12697,7 +12697,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -12716,7 +12716,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -12735,7 +12735,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -12753,7 +12753,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -12772,7 +12772,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -12791,7 +12791,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -12810,7 +12810,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -12829,7 +12829,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -12848,7 +12848,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -12867,7 +12867,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -12886,7 +12886,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -12905,7 +12905,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -12924,7 +12924,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -12975,7 +12975,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -13000,7 +13000,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.type_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.type_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.type_repeat.ctype = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
                                 match F.fields.type_repeat.ctype
                                     12 =>
@@ -13020,7 +13020,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -13063,9 +13063,9 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -13079,7 +13079,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -13103,7 +13103,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -13128,7 +13128,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ =>
                                                     while true:
@@ -13162,7 +13162,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -13187,7 +13187,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ =>
                                                     while true:
@@ -13221,7 +13221,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -13256,7 +13256,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -13291,7 +13291,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -13326,7 +13326,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -13361,7 +13361,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -13396,7 +13396,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -13473,7 +13473,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    (fc = (unsafe: *(F.eptr = F.eptr + 1)))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     match F.fields.type_repeat.ctype
@@ -13481,7 +13481,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         13 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -13495,12 +13495,12 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         17 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -13514,7 +13514,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         18 =>
                                             match fc
@@ -13655,7 +13655,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (fc = unsafe: *F.eptr)
+                                            (fc = (unsafe: *F.eptr))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             if (if fc == 13: 1 else: 0) != 0:
@@ -13663,7 +13663,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                if (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0:
                                                     (F.eptr = F.eptr + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -13689,7 +13689,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -13707,7 +13707,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -13726,7 +13726,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -13744,7 +13744,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -13763,7 +13763,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -13782,7 +13782,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -13801,7 +13801,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -13819,7 +13819,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -13838,7 +13838,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -13857,7 +13857,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -13875,7 +13875,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -13894,7 +13894,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -13913,7 +13913,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -13932,7 +13932,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -13951,7 +13951,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -13970,7 +13970,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -13989,7 +13989,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -14008,7 +14008,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -14027,7 +14027,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -14046,7 +14046,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -14097,7 +14097,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -14116,7 +14116,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.type_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.type_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.type_repeat.ctype = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
                                 match F.fields.type_repeat.ctype
                                     12 =>
@@ -14136,7 +14136,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -14179,9 +14179,9 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -14195,7 +14195,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -14219,7 +14219,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -14244,7 +14244,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ =>
                                                     while true:
@@ -14278,7 +14278,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -14303,7 +14303,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ =>
                                                     while true:
@@ -14337,7 +14337,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -14372,7 +14372,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -14407,7 +14407,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -14442,7 +14442,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -14477,7 +14477,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -14512,7 +14512,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -14589,7 +14589,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    (fc = (unsafe: *(F.eptr = F.eptr + 1)))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     match F.fields.type_repeat.ctype
@@ -14597,7 +14597,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         13 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -14611,12 +14611,12 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         17 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -14630,7 +14630,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         18 =>
                                             match fc
@@ -14771,7 +14771,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (fc = unsafe: *F.eptr)
+                                            (fc = (unsafe: *F.eptr))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             if (if fc == 13: 1 else: 0) != 0:
@@ -14779,7 +14779,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                if (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0:
                                                     (F.eptr = F.eptr + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -14805,7 +14805,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -14823,7 +14823,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -14842,7 +14842,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -14860,7 +14860,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -14879,7 +14879,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -14898,7 +14898,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -14917,7 +14917,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -14935,7 +14935,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -14954,7 +14954,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -14973,7 +14973,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -14991,7 +14991,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -15010,7 +15010,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -15029,7 +15029,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -15048,7 +15048,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -15067,7 +15067,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -15086,7 +15086,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -15105,7 +15105,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -15124,7 +15124,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -15143,7 +15143,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -15162,7 +15162,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -15213,7 +15213,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -15227,7 +15227,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (F.fields.type_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                             (F.fields.type_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                             (reptype = (&rep_typ[0] as *mut c_uint)[fc])
-                            (F.fields.type_repeat.ctype = unsafe: *(F.ecode = F.ecode + 1))
+                            (F.fields.type_repeat.ctype = (unsafe: *(F.ecode = F.ecode + 1)))
                             if (if F.fields.type_repeat.min > 0: 1 else: 0) != 0:
                                 match F.fields.type_repeat.ctype
                                     12 =>
@@ -15247,7 +15247,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if (F.eptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -15290,9 +15290,9 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -15306,7 +15306,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -15330,7 +15330,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -15355,7 +15355,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 9 => 0
                                                 _ =>
                                                     while true:
@@ -15389,7 +15389,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ => 0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -15414,7 +15414,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *(F.eptr = F.eptr + 1)
+                                            match (unsafe: *(F.eptr = F.eptr + 1))
                                                 10 => 0
                                                 _ =>
                                                     while true:
@@ -15448,7 +15448,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -15483,7 +15483,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -15518,7 +15518,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -15553,7 +15553,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -15588,7 +15588,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -15623,7 +15623,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
                                                     __pc = 57
                                                     __goto_pending = 1
@@ -15700,7 +15700,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (fc = unsafe: *(F.eptr = F.eptr + 1))
+                                    (fc = (unsafe: *(F.eptr = F.eptr + 1)))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     match F.fields.type_repeat.ctype
@@ -15708,7 +15708,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         13 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -15722,12 +15722,12 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         17 =>
                                             match fc
                                                 13 =>
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                                 10 => 0
                                                 11 => 0
@@ -15741,7 +15741,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                             break
                                                         if not (0 != 0):
                                                             break
-                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if F.eptr < mb.end_subject: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (F.eptr = F.eptr + 1)
                                         18 =>
                                             match fc
@@ -15882,7 +15882,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (fc = unsafe: *F.eptr)
+                                            (fc = (unsafe: *F.eptr))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             if (if fc == 13: 1 else: 0) != 0:
@@ -15890,7 +15890,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if unsafe: *F.eptr == 10: 1 else: 0) != 0:
+                                                if (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0:
                                                     (F.eptr = F.eptr + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -15916,7 +15916,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -15934,7 +15934,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -15953,7 +15953,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -15971,7 +15971,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -15990,7 +15990,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -16009,7 +16009,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 9 => 0
                                                 _ =>
                                                     __pc = 18
@@ -16028,7 +16028,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -16046,7 +16046,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -16065,7 +16065,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -16084,7 +16084,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     (F.eptr = F.eptr + 1)
@@ -16102,7 +16102,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -16121,7 +16121,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -16140,7 +16140,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match unsafe: *F.eptr
+                                            match (unsafe: *F.eptr)
                                                 10 => 0
                                                 _ =>
                                                     __pc = 20
@@ -16159,7 +16159,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -16178,7 +16178,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -16197,7 +16197,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -16216,7 +16216,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -16235,7 +16235,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -16254,7 +16254,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if 1 != 0 and (if ((mb.ctypes[unsafe: *F.eptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if 1 != 0 and (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -16273,7 +16273,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[unsafe: *F.eptr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if 1 != 0: 0 else: 1) != 0 or (if ((mb.ctypes[(unsafe: *F.eptr)] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -16324,7 +16324,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *F.eptr == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (if (if F.fields.type_repeat.ctype == 17: 1 else: 0) != 0 and (if F.eptr > F.fields.type_repeat.start_eptr: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F.eptr) == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr[-1] == 13: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (F.eptr = F.eptr - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -16350,13 +16350,13 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             __goto_pending = 1
                             (F.byte2 = (if ((if F.op == OP_REFI: 1 else: 0)) != 0: F.ecode[(1 + 2)] else: 0))
                             F.ecode = F.ecode + ((1 + 2) + ((if (if F.op == OP_REFI: 1 else: 0) != 0: 1 else: 0)))
-                            match unsafe: *F.ecode
+                            match (unsafe: *F.ecode)
                                 OP_CRSTAR =>
                                     (F.fields.ref_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                                     (F.fields.ref_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                                     (reptype = (&rep_typ[0] as *mut c_uint)[fc])
                                 OP_CRRANGE =>
-                                    (reptype = (&rep_typ[0] as *mut c_uint)[(unsafe: *F.ecode - OP_CRSTAR)])
+                                    (reptype = (&rep_typ[0] as *mut c_uint)[((unsafe: *F.ecode) - OP_CRSTAR)])
                                     if (if F.fields.ref_repeat.max == 0: 1 else: 0) != 0:
                                         (F.fields.ref_repeat.max = (4294967295 as c_uint))
                                     F.ecode = F.ecode + (1 + (2 * 2))
@@ -16667,13 +16667,13 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         OP_REF =>
                             (F.byte2 = (if ((if F.op == OP_REFI: 1 else: 0)) != 0: F.ecode[(1 + 2)] else: 0))
                             F.ecode = F.ecode + ((1 + 2) + ((if (if F.op == OP_REFI: 1 else: 0) != 0: 1 else: 0)))
-                            match unsafe: *F.ecode
+                            match (unsafe: *F.ecode)
                                 OP_CRSTAR =>
                                     (F.fields.ref_repeat.min = (&rep_min[0] as *mut c_uint)[fc])
                                     (F.fields.ref_repeat.max = (&rep_max[0] as *mut c_uint)[fc])
                                     (reptype = (&rep_typ[0] as *mut c_uint)[fc])
                                 OP_CRRANGE =>
-                                    (reptype = (&rep_typ[0] as *mut c_uint)[(unsafe: *F.ecode - OP_CRSTAR)])
+                                    (reptype = (&rep_typ[0] as *mut c_uint)[((unsafe: *F.ecode) - OP_CRSTAR)])
                                     if (if F.fields.ref_repeat.max == 0: 1 else: 0) != 0:
                                         (F.fields.ref_repeat.max = (4294967295 as c_uint))
                                     F.ecode = F.ecode + (1 + (2 * 2))
@@ -17057,7 +17057,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         OP_BRAPOSZERO =>
                             (F.byte2 = 1)
                             F.ecode = F.ecode + 1
-                            if (if (if unsafe: *F.ecode == OP_CBRAPOS: 1 else: 0) != 0 or (if unsafe: *F.ecode == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if (unsafe: *F.ecode) == OP_CBRAPOS: 1 else: 0) != 0 or (if (unsafe: *F.ecode) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0:
                                 __pc = 29
                                 __goto_pending = 1
                             __pc = 28
@@ -17101,7 +17101,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if unsafe: *F.ecode != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *F.ecode) != OP_ALT: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17132,7 +17132,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             while true:
-                                if (if unsafe: *next_branch != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *next_branch) != OP_ALT: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17208,7 +17208,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if unsafe: *F.ecode != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *F.ecode) != OP_ALT: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17239,7 +17239,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             while true:
-                                if (if unsafe: *next_branch != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *next_branch) != OP_ALT: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17312,7 +17312,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if unsafe: *F.ecode != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *F.ecode) != OP_ALT: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17343,7 +17343,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             while true:
-                                if (if unsafe: *next_branch != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *next_branch) != OP_ALT: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17389,7 +17389,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             while true:
-                                if (if unsafe: *next_branch != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *next_branch) != OP_ALT: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17458,7 +17458,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if unsafe: *F.ecode != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *F.ecode) != OP_ALT: 1 else: 0) != 0:
                                     while true:
                                         __pc = 57
                                         __goto_pending = 1
@@ -17512,7 +17512,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 (F.fields.op_recurse.start_branch = next_ecode)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if unsafe: *F.fields.op_recurse.start_branch != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *F.fields.op_recurse.start_branch) != OP_ALT: 1 else: 0) != 0:
                                     while true:
                                         __pc = 57
                                         __goto_pending = 1
@@ -17558,7 +17558,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if unsafe: *F.ecode != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *F.ecode) != OP_ALT: 1 else: 0) != 0:
                                     while true:
                                         __pc = 57
                                         __goto_pending = 1
@@ -17612,7 +17612,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 (F.fields.op_recurse.start_branch = next_ecode)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if unsafe: *F.fields.op_recurse.start_branch != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *F.fields.op_recurse.start_branch) != OP_ALT: 1 else: 0) != 0:
                                     while true:
                                         __pc = 57
                                         __goto_pending = 1
@@ -17668,7 +17668,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 (F.fields.op_recurse.start_branch = next_ecode)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if unsafe: *F.fields.op_recurse.start_branch != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *F.fields.op_recurse.start_branch) != OP_ALT: 1 else: 0) != 0:
                                     while true:
                                         __pc = 57
                                         __goto_pending = 1
@@ -17696,7 +17696,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             while true:
-                                if (if unsafe: *ecode == OP_CREF: 1 else: 0) != 0:
+                                if (if (unsafe: *ecode) == OP_CREF: 1 else: 0) != 0:
                                     length = length + 3
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -17708,7 +17708,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if unsafe: *ecode != OP_DNCREF: 1 else: 0) != 0:
+                                if (if (unsafe: *ecode) != OP_DNCREF: 1 else: 0) != 0:
                                     while true:
                                         __pc = 57
                                         __goto_pending = 1
@@ -17742,7 +17742,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             while true:
-                                if (if unsafe: *ecode == OP_CREF: 1 else: 0) != 0:
+                                if (if (unsafe: *ecode) == OP_CREF: 1 else: 0) != 0:
                                     length = length + 3
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -17750,7 +17750,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if unsafe: *ecode == OP_DNCREF: 1 else: 0) != 0:
+                                    if (if (unsafe: *ecode) == OP_DNCREF: 1 else: 0) != 0:
                                         length = length + 5
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -17791,7 +17791,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if unsafe: *F.ecode != OP_ALT: 1 else: 0) != 0:
+                                if (if (unsafe: *F.ecode) != OP_ALT: 1 else: 0) != 0:
                                     (mb.end_subject = F.fields.op_assert_scs.saved_end_subject)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -17847,7 +17847,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             if (if F.ecode[F.fields.op_cond.length] != OP_ALT: 1 else: 0) != 0:
                                 F.fields.op_cond.length = F.fields.op_cond.length - 3
                             F.ecode = F.ecode + (1 + 2)
-                            if (if (if unsafe: *F.ecode == OP_CALLOUT: 1 else: 0) != 0 or (if unsafe: *F.ecode == OP_CALLOUT_STR: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if (unsafe: *F.ecode) == OP_CALLOUT: 1 else: 0) != 0 or (if (unsafe: *F.ecode) == OP_CALLOUT_STR: 1 else: 0) != 0: 1 else: 0) != 0:
                                 (rrc = do_callout(F, mb, (&mut length as *mut c_ulong)))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17882,7 +17882,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             (condition = 0)
-                            match unsafe: *F.ecode
+                            match (unsafe: *F.ecode)
                                 OP_RREF =>
                                     if (if F.current_recurse != 4294967295: 1 else: 0) != 0:
                                         (condition = ((if (if number == 65535: 1 else: 0) != 0 or (if number == F.current_recurse: 1 else: 0) != 0: 1 else: 0)))
@@ -17947,7 +17947,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             1 =>
                                                 (condition = F.byte1)
                                             0 =>
-                                                if (if unsafe: *F.fields.op_cond.start_branch == OP_ALT: 1 else: 0) != 0:
+                                                if (if (unsafe: *F.fields.op_cond.start_branch) == OP_ALT: 1 else: 0) != 0:
                                                     continue
                                                 (condition = (if F.byte1 != 0: 0 else: 1))
                                             _ =>
@@ -17967,7 +17967,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                            F.ecode = F.ecode + (if condition != 0: _pcre2_OP_lengths_8[unsafe: *F.ecode] else: F.fields.op_cond.length)
+                            F.ecode = F.ecode + (if condition != 0: _pcre2_OP_lengths_8[(unsafe: *F.ecode)] else: F.fields.op_cond.length)
                             if (if F.op == OP_SCOND: 1 else: 0) != 0:
                                 (group_frame_type = 131072)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -18076,12 +18076,12 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 (branch_end = F.ecode)
                             (branch_start = bracode)
                             (branch_end = (null as *const u8))
-                            if (if (if unsafe: *bracode != OP_BRA: 1 else: 0) != 0 and (if unsafe: *bracode != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if (unsafe: *bracode) != OP_BRA: 1 else: 0) != 0 and (if (unsafe: *bracode) != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0:
                                 (F.last_group_offset = P.last_group_offset)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if N.group_frame_type == 196608: 1 else: 0) != 0:
-                                    if (if (if ((if (if unsafe: *bracode == OP_ASSERTBACK: 1 else: 0) != 0 or (if unsafe: *bracode == OP_ASSERTBACK_NOT: 1 else: 0) != 0: 1 else: 0)) != 0 and (if branch_start[(1 + 2)] == OP_VREVERSE: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr != P.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ((if (if (unsafe: *bracode) == OP_ASSERTBACK: 1 else: 0) != 0 or (if (unsafe: *bracode) == OP_ASSERTBACK_NOT: 1 else: 0) != 0: 1 else: 0)) != 0 and (if branch_start[(1 + 2)] == OP_VREVERSE: 1 else: 0) != 0: 1 else: 0) != 0 and (if F.eptr != P.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
                                             __pc = 57
                                             __goto_pending = 1
@@ -18117,14 +18117,14 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                             else:
                                 (P = (null as *mut heapframe))
-                            match unsafe: *bracode
+                            match (unsafe: *bracode)
                                 OP_BRA =>
                                     if (if (if F.current_recurse != 0: 1 else: 0) != 0 or (if F.ecode[(1 + 2)] != OP_END: 1 else: 0) != 0: 1 else: 0) != 0:
                                         break
                                     (offset = F.last_group_offset)
                                     (F.last_group_offset = P.last_group_offset)
                                     (F.ecode = ((P.ecode + (1 as isize as usize)) + (2 as isize as usize)))
-                                    if (if unsafe: *F.ecode != OP_CREF: 1 else: 0) != 0:
+                                    if (if (unsafe: *F.ecode) != OP_CREF: 1 else: 0) != 0:
                                         (F.offset_top = P.offset_top)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -18358,7 +18358,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         (F.ecode = ((P.ecode + (1 as isize as usize)) + (2 as isize as usize)))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if unsafe: *F.ecode != OP_CREF: 1 else: 0) != 0:
+                                        if (if (unsafe: *F.ecode) != OP_CREF: 1 else: 0) != 0:
                                             (F.offset_top = P.offset_top)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -18382,7 +18382,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     if (if offset >= F.offset_top: 1 else: 0) != 0:
                                         (F.offset_top = (offset +% 2))
                                 _ => 0
-                            if (if unsafe: *F.ecode == OP_KETRPOS: 1 else: 0) != 0:
+                            if (if (unsafe: *F.ecode) == OP_KETRPOS: 1 else: 0) != 0:
                                 with_memcpy((((P as *mut i8) + 64) as *mut c_void) as *i8, (((F as *mut i8) + 64) as *const c_void) as *i8, frame_copy_size as i64)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -18567,7 +18567,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (fc = unsafe: *F.eptr)
+                                (fc = (unsafe: *F.eptr))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if nextptr > mb.last_used_ptr: 1 else: 0) != 0:
@@ -18577,7 +18577,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 (cur_is_word = (if 1 != 0 and (if ((mb.ctypes[fc] & 16)) != 0: 1 else: 0) != 0: 1 else: 0))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if ((if (if unsafe: *(F.ecode = F.ecode + 1) == OP_WORD_BOUNDARY: 1 else: 0) != 0 or (if F.op == OP_UCP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0)) != 0: (if cur_is_word == prev_is_word: 1 else: 0) else: (if cur_is_word != prev_is_word: 1 else: 0)) != 0:
+                            if (if ((if (if (unsafe: *(F.ecode = F.ecode + 1)) == OP_WORD_BOUNDARY: 1 else: 0) != 0 or (if F.op == OP_UCP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0)) != 0: (if cur_is_word == prev_is_word: 1 else: 0) else: (if cur_is_word != prev_is_word: 1 else: 0)) != 0:
                                 while true:
                                     __pc = 57
                                     __goto_pending = 1
@@ -18787,7 +18787,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                             (mb.skip_arg_count = mb.skip_arg_count + 1)
                             if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
-                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[(unsafe: *F.ecode)] + F.ecode[1])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
@@ -19071,7 +19071,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                             (mb.skip_arg_count = mb.skip_arg_count + 1)
                             if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
-                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[(unsafe: *F.ecode)] + F.ecode[1])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
@@ -19346,7 +19346,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                             (mb.skip_arg_count = mb.skip_arg_count + 1)
                             if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
-                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[(unsafe: *F.ecode)] + F.ecode[1])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
@@ -19589,7 +19589,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                             (mb.skip_arg_count = mb.skip_arg_count + 1)
                             if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
-                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[(unsafe: *F.ecode)] + F.ecode[1])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
@@ -19798,7 +19798,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                             (mb.skip_arg_count = mb.skip_arg_count + 1)
                             if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
-                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[(unsafe: *F.ecode)] + F.ecode[1])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
@@ -19975,7 +19975,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                             (mb.skip_arg_count = mb.skip_arg_count + 1)
                             if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
-                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[(unsafe: *F.ecode)] + F.ecode[1])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
@@ -20118,7 +20118,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                             (mb.skip_arg_count = mb.skip_arg_count + 1)
                             if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
-                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[(unsafe: *F.ecode)] + F.ecode[1])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
@@ -20228,7 +20228,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         OP_SKIP_ARG =>
                             (mb.skip_arg_count = mb.skip_arg_count + 1)
                             if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
-                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[unsafe: *F.ecode] + F.ecode[1])
+                                F.ecode = F.ecode + (_pcre2_OP_lengths_8[(unsafe: *F.ecode)] + F.ecode[1])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
