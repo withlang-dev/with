@@ -3426,9 +3426,6 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     if kind == CXK_INT_LITERAL:
         if with_ci_eval_int_valid(session, cursor) != 0:
             let ival = with_ci_eval_int_value(session, cursor)
-            // Values > i32 max that fit in u32: emit as hex
-            if ival > 2147483647 and ival <= 4294967295:
-                return ci_i64_to_hex(ival)
             return f"{ival}"
         return with_ci_cursor_source_text(session, cursor)
 
@@ -3831,11 +3828,7 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     if kind == 100:  // CXCursor_UnexposedExpr — often an ImplicitCastExpr
         // Try to evaluate as constant
         if with_ci_eval_int_valid(session, cursor) != 0:
-            let ival = with_ci_eval_int_value(session, cursor)
-            if ival > 2147483647 and ival <= 4294967295:
-                // In expression context (not match pattern), cast for type safety
-                return "(" ++ ci_i64_to_hex(ival) ++ " as c_uint)"
-            return f"{ival}"
+            return f"{with_ci_eval_int_value(session, cursor)}"
         // Check for implicit cast semantics using safe type-string comparison
         let nc = with_ci_num_children(session, cursor)
         if nc == 1:
