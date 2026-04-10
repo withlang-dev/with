@@ -2440,6 +2440,28 @@ fn ci_has_stringify(body: str, params: str) -> bool:
 
 // Parse [N]T and return the byte offset of T (after the ']').
 // Returns 0 if not an array type.
+// Check if a string is a decimal integer > 2147483647 (i32 max)
+fn ci_is_large_decimal(s: str) -> bool:
+    if s.len() == 0: return false
+    var i = 0
+    while i as i64 < s.len():
+        let c = s.byte_at(i as i64)
+        if c < 48 or c > 57: return false
+        i = i + 1
+    // 11+ digits is always > i32 max; <10 digits is always <= i32 max
+    if s.len() as i32 > 10: return true
+    if s.len() as i32 < 10: return false
+    // Exactly 10 digits — compare char by char against "2147483647"
+    let threshold = "2147483647"
+    i = 0
+    while i < 10:
+        let sc = s.byte_at(i as i64)
+        let tc = threshold.byte_at(i as i64)
+        if sc > tc: return true
+        if sc < tc: return false
+        i = i + 1
+    false  // equal = not large
+
 fn ci_find_array_elem_start(ty: str) -> i32:
     if ty.len() == 0 or ty.byte_at(0) != 91: return 0
     var i = 1
@@ -3600,6 +3622,11 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                     // Wrap in (if cond: 1 else: 0) to match C semantics.
                     if op == BO_EQ or op == BO_NE or op == BO_LT or op == BO_GT or op == BO_LE or op == BO_GE:
                         return "(if " ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ": 1 else: 0)"
+                    // For ops with large u32 literals, cast to c_uint
+                    if ci_is_large_decimal(lhs):
+                        return "((" ++ lhs ++ " as c_uint) " ++ op_str ++ " " ++ rhs ++ ")"
+                    if ci_is_large_decimal(rhs):
+                        return "(" ++ lhs ++ " " ++ op_str ++ " (" ++ rhs ++ " as c_uint))"
                     return "(" ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ")"
         return ""
 
@@ -6263,6 +6290,11 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
             let dchild = with_ci_child(session, cursor, di)
             if with_ci_cursor_kind(session, dchild) == CXK_VAR_DECL:
                 let vname = ci_escape_reserved(with_ci_cursor_spelling(session, dchild))
+                // Skip array re-declarations (dimension expression is not a valid assignment)
+                let vdecl_ty = with_ci_type_translated(session, with_ci_cursor_type(session, dchild))
+                if vdecl_ty.len() > 0 and vdecl_ty.byte_at(0) == 91:
+                    di = di + 1
+                    continue
                 let init_nc = with_ci_num_children(session, dchild)
                 if init_nc > 0:
                     let init_expr = ci_trans_expr(session, with_ci_child(session, dchild, 0), scope)
