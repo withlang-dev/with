@@ -4197,17 +4197,11 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                 let vname = ci_escape_reserved(with_ci_cursor_spelling(session, child))
                 let vty = with_ci_cursor_type(session, child)
                 let vty_str = with_ci_type_translated(session, vty)
-                let child_nc = with_ci_num_children(session, child)
-                if child_nc > 0:
-                    let init_cursor = ci_find_var_init_cursor(session, child)
-                    let init = if init_cursor >= 0: ci_trans_expr(session, init_cursor, scope) else: ""
+                let init = ci_var_init_expr(session, child, scope)
+                if init.len() > 0:
                     if result.len() > 0:
                         result = result ++ "\n" ++ ci_indent_str(indent)
-                    // For array types, reject non-array initializers (e.g., dimension expression)
-                    if init.len() > 0 and not (vty_str.len() > 0 and vty_str.byte_at(0) == 91 and init.byte_at(0) != 91):
-                        result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ init
-                    else:
-                        result = result ++ "var " ++ vname ++ ": " ++ vty_str
+                    result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ init
                 else:
                     if result.len() > 0:
                         result = result ++ "\n" ++ ci_indent_str(indent)
@@ -4318,7 +4312,7 @@ fn ci_try_eval_var_init(session: i64, idx: i32) -> str:
         if init_cursor >= 0:
             if with_ci_eval_int_valid(session, init_cursor) != 0:
                 return f"{with_ci_eval_int_value(session, init_cursor)}"
-            let expr = ci_trans_expr(session, init_cursor, "")
+            let expr = ci_var_init_expr(session, var_cursor, "")
             if expr.len() > 0:
                 return expr
     ""
@@ -4739,22 +4733,15 @@ fn ci_trans_decl_stmt_scoped(session: i64, cursor: i32, indent: i32, scope: str)
             let mangled = ci_scope_mangle(new_scope, escaped)
             let vty = with_ci_cursor_type(session, child)
             let vty_str = with_ci_type_translated(session, vty)
-            let child_nc = with_ci_num_children(session, child)
             if mangled != escaped:
                 new_scope = ci_scope_add_mangled(new_scope, escaped, mangled)
             else:
                 new_scope = ci_scope_add(new_scope, escaped)
             if result.len() > 0:
                 result = result ++ "\n" ++ ci_indent_str(indent)
-            if child_nc > 0:
-                let init_cursor = ci_find_var_init_cursor(session, child)
-                let init = if init_cursor >= 0: ci_trans_expr(session, init_cursor, new_scope) else: ""
-                // For array types, reject non-array initializers (e.g., dimension expression)
-                if init.len() > 0 and not (vty_str.len() > 0 and vty_str.byte_at(0) == 91 and init.byte_at(0) != 91):
-                    result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ init
-                else:
-                    // Zero-init (failed/invalid initializer or array with scalar)
-                    result = result ++ "var " ++ mangled ++ ": " ++ vty_str
+            let init = ci_var_init_expr(session, child, new_scope)
+            if init.len() > 0:
+                result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ init
             else:
                 // No initializer — zero-initialized by With semantics
                 result = result ++ "var " ++ mangled ++ ": " ++ vty_str
@@ -5206,6 +5193,70 @@ fn ci_char_to_int(s: str) -> str:
 
 // ── String concatenation support ────────────────────────────
 
+fn ci_strip_c_comments(s: str) -> str:
+    var result = ""
+    var i = 0
+    let slen = s.len() as i32
+    while i < slen:
+        let c = s.byte_at(i as i64)
+        if c == 47 and i + 1 < slen:
+            let next = s.byte_at((i + 1) as i64)
+            if next == 42:
+                result = result ++ " "
+                i = i + 2
+                while i + 1 < slen:
+                    if s.byte_at(i as i64) == 42 and s.byte_at((i + 1) as i64) == 47:
+                        i = i + 2
+                        break
+                    i = i + 1
+                continue
+            if next == 47:
+                result = result ++ " "
+                i = i + 2
+                while i < slen and s.byte_at(i as i64) != 10:
+                    i = i + 1
+                continue
+        if c == 34 or c == 39:
+            let quote = c
+            let start = i
+            i = i + 1
+            while i < slen:
+                let inner = s.byte_at(i as i64)
+                if inner == 92:
+                    i = i + 2
+                    continue
+                if inner == quote:
+                    i = i + 1
+                    break
+                i = i + 1
+            result = result ++ s.slice(start as i64, i as i64)
+            continue
+        result = result ++ s.slice(i as i64, (i + 1) as i64)
+        i = i + 1
+    result
+
+fn ci_find_string_literal_end(s: str, start: i32) -> i32:
+    let slen = s.len() as i32
+    var i = start
+    if i + 2 < slen and s.byte_at(i as i64) == 117 and s.byte_at((i + 1) as i64) == 56 and s.byte_at((i + 2) as i64) == 34:
+        i = i + 2
+    else if i + 1 < slen:
+        let c = s.byte_at(i as i64)
+        if (c == 76 or c == 85 or c == 117) and s.byte_at((i + 1) as i64) == 34:
+            i = i + 1
+    if i >= slen or s.byte_at(i as i64) != 34:
+        return 0 - 1
+    i = i + 1
+    while i < slen:
+        let c = s.byte_at(i as i64)
+        if c == 92:
+            i = i + 2
+            continue
+        if c == 34:
+            return i + 1
+        i = i + 1
+    0 - 1
+
 fn ci_is_concatenated_string(s: str) -> bool:
     // Detect adjacent string literals: "foo" "bar"
     if s.len() < 5:
@@ -5362,35 +5413,57 @@ fn ci_try_expand_stringify_call(session: i64, s: str) -> str:
     let expanded = ci_expand_stringify_args(session, args)
     "\"" ++ expanded ++ "\""
 
+fn ci_expand_string_macro_token(session: i64, token: str, depth: i32) -> str:
+    if depth > 12:
+        return ""
+    let stripped = ci_strip_parens(ci_trim(ci_strip_c_comments(token)))
+    if stripped.len() == 0:
+        return ""
+    if ci_is_concatenated_string(stripped):
+        return ci_concat_strings(stripped)
+    if ci_is_string_literal(stripped):
+        return stripped
+    let stringify_result = ci_try_expand_stringify_call(session, stripped)
+    if stringify_result.len() > 0:
+        return stringify_result
+    let macro_value = ci_lookup_macro_value(session, stripped)
+    if macro_value.len() > 0 and macro_value != stripped:
+        return ci_expand_string_macro_sequence_depth(session, macro_value, depth + 1)
+    ""
+
 fn ci_expand_string_macro_sequence(session: i64, s: str) -> str:
+    ci_expand_string_macro_sequence_depth(session, s, 0)
+
+fn ci_expand_string_macro_sequence_depth(session: i64, s: str, depth: i32) -> str:
+    if depth > 12:
+        return ""
+    let cleaned = ci_strip_parens(ci_trim(ci_strip_c_comments(s)))
+    if cleaned.len() == 0:
+        return ""
+    if ci_is_concatenated_string(cleaned):
+        return ci_concat_strings(cleaned)
+    if ci_is_string_literal(cleaned):
+        return cleaned
     var segments = ""
     var pos = 0
-    let slen = s.len() as i32
+    let slen = cleaned.len() as i32
     var found_any = false
     while pos < slen:
-        while pos < slen and ci_is_space(s.byte_at(pos as i64)):
+        while pos < slen and ci_is_space(cleaned.byte_at(pos as i64)):
             pos = pos + 1
         if pos >= slen:
             break
         var end = pos
         var token = ""
-        if s.byte_at(pos as i64) == 34:
-            end = pos + 1
-            while end < slen:
-                let c = s.byte_at(end as i64)
-                if c == 92:
-                    end = end + 2
-                    continue
-                if c == 34:
-                    end = end + 1
-                    break
-                end = end + 1
-            token = s.slice(pos as i64, end as i64)
+        let string_end = ci_find_string_literal_end(cleaned, pos)
+        if string_end > pos:
+            end = string_end
+            token = cleaned.slice(pos as i64, end as i64)
         else:
             // Scan a token, respecting parentheses (for MACRO(args))
             var paren_depth = 0
             while end < slen:
-                let c = s.byte_at(end as i64)
+                let c = cleaned.byte_at(end as i64)
                 if c == 40: paren_depth = paren_depth + 1
                 if c == 41:
                     paren_depth = paren_depth - 1
@@ -5400,16 +5473,9 @@ fn ci_expand_string_macro_sequence(session: i64, s: str) -> str:
                 if paren_depth == 0 and ci_is_space(c):
                     break
                 end = end + 1
-            token = s.slice(pos as i64, end as i64)
-            // Try stringify macro call first (e.g. XSTRING(MAJOR.MINOR))
-            let stringify_result = ci_try_expand_stringify_call(session, token)
-            if stringify_result.len() > 0:
-                token = stringify_result
-            else:
-                let macro_value = ci_lookup_macro_value(session, token)
-                if macro_value.len() == 0:
-                    return ""
-                token = macro_value
+            token = ci_expand_string_macro_token(session, cleaned.slice(pos as i64, end as i64), depth)
+            if token.len() == 0:
+                return ""
         if ci_is_concatenated_string(token):
             token = ci_concat_strings(token)
         if not ci_is_string_literal(token):
@@ -5426,6 +5492,80 @@ fn ci_expand_string_macro_sequence(session: i64, s: str) -> str:
     if ci_is_string_literal(segments):
         return segments
     ""
+
+fn ci_var_decl_has_initializer_text(s: str) -> bool:
+    let text = ci_strip_c_comments(s)
+    let slen = text.len() as i32
+    var paren_depth = 0
+    var bracket_depth = 0
+    var brace_depth = 0
+    var i = 0
+    while i < slen:
+        let c = text.byte_at(i as i64)
+        if c == 34 or c == 39:
+            let quote = c
+            i = i + 1
+            while i < slen:
+                let inner = text.byte_at(i as i64)
+                if inner == 92:
+                    i = i + 2
+                    continue
+                if inner == quote:
+                    break
+                i = i + 1
+            i = i + 1
+            continue
+        if c == 40: paren_depth = paren_depth + 1
+        if c == 41 and paren_depth > 0: paren_depth = paren_depth - 1
+        if c == 91: bracket_depth = bracket_depth + 1
+        if c == 93 and bracket_depth > 0: bracket_depth = bracket_depth - 1
+        if c == 123: brace_depth = brace_depth + 1
+        if c == 125 and brace_depth > 0: brace_depth = brace_depth - 1
+        if c == 61 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
+            let prev = if i > 0: text.byte_at((i - 1) as i64) else: 0
+            let next = if i + 1 < slen: text.byte_at((i + 1) as i64) else: 0
+            if prev != 61 and prev != 33 and prev != 60 and prev != 62 and next != 61:
+                return true
+        i = i + 1
+    false
+
+fn ci_expr_has_unresolved_string_macro(s: str) -> bool:
+    var i = 0
+    let slen = s.len() as i32
+    while i < slen:
+        if ci_is_ident_start(s.byte_at(i as i64)):
+            var end = i + 1
+            while end < slen and ci_is_ident_char(s.byte_at(end as i64)):
+                end = end + 1
+            let ident = s.slice(i as i64, end as i64)
+            if ci_starts_with(ident, "STR_") or ci_starts_with(ident, "STRING_"):
+                return true
+            i = end
+            continue
+        i = i + 1
+    false
+
+fn ci_var_init_translation_is_valid(vty_str: str, init_expr: str) -> bool:
+    let trimmed = ci_trim(init_expr)
+    if trimmed.len() == 0:
+        return false
+    if ci_str_contains(trimmed, "/*") or ci_str_contains(trimmed, "*/") or ci_str_contains(trimmed, "//"):
+        return false
+    if ci_expr_has_unresolved_string_macro(trimmed):
+        return false
+    if vty_str.len() > 0 and vty_str.byte_at(0) == 91 and not ci_is_string_literal(trimmed) and trimmed.byte_at(0) != 91:
+        return false
+    true
+
+fn ci_var_init_expr(session: i64, var_cursor: i32, scope: str) -> str:
+    let init_cursor = ci_find_var_init_cursor(session, var_cursor)
+    if init_cursor < 0:
+        return ""
+    let init_expr = ci_trans_expr(session, init_cursor, scope)
+    let vty_str = with_ci_type_translated(session, with_ci_cursor_type(session, var_cursor))
+    if not ci_var_init_translation_is_valid(vty_str, init_expr):
+        return ""
+    init_expr
 
 // ── Migrate: C-to-With source translator ────────────────────
 // Translates a .c file into a .w file. Unlike c_import (which
@@ -6160,13 +6300,10 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
                 let dchild = with_ci_child(session, child, di)
                 if with_ci_cursor_kind(session, dchild) == 9:  // VarDecl
                     let vname = ci_escape_reserved(with_ci_cursor_spelling(session, dchild))
-                    let init_nc = with_ci_num_children(session, dchild)
-                    if init_nc > 0:
-                        let init_cursor = ci_find_var_init_cursor(session, dchild)
-                        let init_expr = if init_cursor >= 0: ci_trans_expr(session, init_cursor, scope) else: ""
-                        if init_expr.len() > 0:
-                            output = output ++ ci_indent_str(indent + 3) ++ vname ++ " = " ++ init_expr ++ "\n"
-                            arm_has_content = true
+                    let init_expr = ci_var_init_expr(session, dchild, scope)
+                    if init_expr.len() > 0:
+                        output = output ++ ci_indent_str(indent + 3) ++ vname ++ " = " ++ init_expr ++ "\n"
+                        arm_has_content = true
                 di = di + 1
 
         else:
@@ -6356,14 +6493,11 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
                 if vdecl_ty.len() > 0 and vdecl_ty.byte_at(0) == 91:
                     di = di + 1
                     continue
-                let init_nc = with_ci_num_children(session, dchild)
-                if init_nc > 0:
-                    let init_cursor = ci_find_var_init_cursor(session, dchild)
-                    let init_expr = if init_cursor >= 0: ci_trans_expr(session, init_cursor, scope) else: ""
-                    if init_expr.len() > 0:
-                        if result.len() > 0:
-                            result = result ++ "\n"
-                        result = result ++ vname ++ " = " ++ init_expr
+                let init_expr = ci_var_init_expr(session, dchild, scope)
+                if init_expr.len() > 0:
+                    if result.len() > 0:
+                        result = result ++ "\n"
+                    result = result ++ vname ++ " = " ++ init_expr
             di = di + 1
         return result
 
@@ -6392,6 +6526,8 @@ fn ci_cursor_kind_is_expr(kind: i32) -> bool:
     kind >= 100 and kind < 200
 
 fn ci_find_var_init_cursor(session: i64, var_cursor: i32) -> i32:
+    if not ci_var_decl_has_initializer_text(with_ci_cursor_source_text(session, var_cursor)):
+        return -1
     let nc = with_ci_num_children(session, var_cursor)
     var i = nc - 1
     while i >= 0:
