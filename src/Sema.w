@@ -146,6 +146,8 @@ type Sema {
     named_types: HashMap[i32, i32],
     // Type declaration AST nodes: sym → node (for cycle diagnostics)
     type_decl_nodes: HashMap[i32, i32],
+    // Exact type binding for each declaration node.
+    type_decl_tids: HashMap[i32, i32],
     // Temporary accumulators for cycle detection (accessed through self)
     cycle_dep_syms: Vec[i32],
     cycle_dep_nodes: Vec[i32],
@@ -563,6 +565,7 @@ fn sema_visibility_cache_key(from_path: str, to_path: str) -> str:
 fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     let named_types = sema_new_map_i32_i32()
     let type_decl_nodes = sema_new_map_i32_i32()
+    let type_decl_tids = sema_new_map_i32_i32()
     let pretty_symbol_names = sema_new_map_i32_str()
     let sig_lookup = sema_new_map_i32_i32()
     let extern_fn_names = sema_new_map_i32_i32()
@@ -614,6 +617,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         type_extra: Vec.new(),
         named_types,
         type_decl_nodes,
+        type_decl_tids,
         cycle_dep_syms: Vec.new(),
         cycle_dep_nodes: Vec.new(),
         pretty_symbol_names,
