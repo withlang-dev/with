@@ -3833,7 +3833,8 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
         if with_ci_eval_int_valid(session, cursor) != 0:
             let ival = with_ci_eval_int_value(session, cursor)
             if ival > 2147483647 and ival <= 4294967295:
-                return ci_i64_to_hex(ival)
+                // In expression context (not match pattern), cast for type safety
+                return "(" ++ ci_i64_to_hex(ival) ++ " as c_uint)"
             return f"{ival}"
         // Check for implicit cast semantics using safe type-string comparison
         let nc = with_ci_num_children(session, cursor)
