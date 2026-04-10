@@ -952,9 +952,11 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     if name.len() == 0:
         return ""
 
-    // Skip internal names
-    if name.byte_at(0) == 95:
-        return ""
+    // Skip reserved C internal names (__foo or _Uppercase), keep _lowercase (e.g., _pcre2_*)
+    if name.len() >= 2 and name.byte_at(0) == 95:
+        let second = name.byte_at(1)
+        if second == 95 or (second >= 65 and second <= 90):
+            return ""
 
     // Skip already-emitted names
     // Note: structs shadowed by typedefs (typedef struct Foo {} Foo;) are NOT skipped.
@@ -1253,9 +1255,11 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
     if name.len() == 0:
         return ""
 
-    // Skip internal names
-    if name.byte_at(0) == 95:
-        return ""
+    // Skip reserved C internal names (__foo or _Uppercase), keep _lowercase (e.g., _pcre2_*)
+    if name.len() >= 2 and name.byte_at(0) == 95:
+        let second = name.byte_at(1)
+        if second == 95 or (second >= 65 and second <= 90):
+            return ""
 
     // Skip already-emitted names
     if with_cimport_is_name_emitted(name) != 0:
@@ -1326,9 +1330,11 @@ fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
     if name.len() == 0:
         return ""
 
-    // Skip internal names
-    if name.byte_at(0) == 95:
-        return ""
+    // Skip reserved C internal names (__foo or _Uppercase), keep _lowercase (e.g., _pcre2_*)
+    if name.len() >= 2 and name.byte_at(0) == 95:
+        let second = name.byte_at(1)
+        if second == 95 or (second >= 65 and second <= 90):
+            return ""
 
     // Skip already-emitted names
     if with_cimport_is_name_emitted(name) != 0:
