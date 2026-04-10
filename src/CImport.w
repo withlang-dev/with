@@ -4153,12 +4153,32 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                 let lhs_cursor = with_ci_child(session, cursor, 0)
                 let rhs_cursor = with_ci_child(session, cursor, 1)
                 // a = (b = c) → decompose RHS chain
-                if with_ci_cursor_kind(session, rhs_cursor) == CXK_BINARY_OP and with_ci_binary_op(session, rhs_cursor) == BO_ASSIGN:
-                    let inner_stmt = ci_trans_stmt(session, rhs_cursor, indent, scope)
-                    let inner_lhs = ci_trans_expr(session, with_ci_child(session, rhs_cursor, 0), scope)
+                // Skip implicit cast / paren wrappers on RHS
+                var inner_rhs = rhs_cursor
+                var rsk = 0
+                while rsk < 3:
+                    let rck = with_ci_cursor_kind(session, inner_rhs)
+                    if (rck == 100 or rck == CXK_PAREN_EXPR or rck == CXK_CSTYLE_CAST) and with_ci_num_children(session, inner_rhs) == 1:
+                        inner_rhs = with_ci_child(session, inner_rhs, 0)
+                        rsk = rsk + 1
+                    else:
+                        break
+                let inner_rhs_kind = with_ci_cursor_kind(session, inner_rhs)
+                if inner_rhs_kind == CXK_BINARY_OP and with_ci_binary_op(session, inner_rhs) == BO_ASSIGN:
+                    let inner_stmt = ci_trans_stmt(session, inner_rhs, indent, scope)
+                    let inner_lhs = ci_trans_expr(session, with_ci_child(session, inner_rhs, 0), scope)
                     let outer_lhs = ci_trans_expr(session, lhs_cursor, scope)
                     if inner_stmt.len() > 0 and outer_lhs.len() > 0 and inner_lhs.len() > 0:
                         return inner_stmt ++ "\n" ++ ci_indent_str(indent) ++ "(" ++ outer_lhs ++ " = " ++ inner_lhs ++ ")"
+                // a = ++b → decompose pre-increment RHS
+                if inner_rhs_kind == CXK_UNARY_OP:
+                    let rhs_uop = with_ci_unary_op(session, inner_rhs)
+                    if rhs_uop == UO_PRE_INC or rhs_uop == UO_PRE_DEC:
+                        let inc_operand = ci_trans_expr(session, with_ci_child(session, inner_rhs, 0), scope)
+                        let outer_lhs = ci_trans_expr(session, lhs_cursor, scope)
+                        if inc_operand.len() > 0 and outer_lhs.len() > 0:
+                            let delta = if rhs_uop == UO_PRE_INC: " + 1" else: " - 1"
+                            return "(" ++ inc_operand ++ " = " ++ inc_operand ++ delta ++ ")\n" ++ ci_indent_str(indent) ++ "(" ++ outer_lhs ++ " = " ++ inc_operand ++ ")"
                 // *(ptr = ptr + 1) = value → decompose LHS deref-of-assign
                 // Skip wrappers to find the deref
                 var deref_cursor = lhs_cursor
