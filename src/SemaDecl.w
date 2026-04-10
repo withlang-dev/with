@@ -131,7 +131,7 @@ fn Sema.resolve_deferred_non_generic_type_decls(self: Sema):
 
 fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
     let name = self.ast.get_data0(decl)
-    let tid = self.lookup_named_type_visible(name)
+    let tid = if self.type_decl_tids.contains(decl): self.type_decl_tids.get(decl).unwrap() else: self.lookup_named_type_visible(name)
     if tid == 0:
         return
 
@@ -436,6 +436,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             self.type_extra.push(self.ast.get_extra(align_base + fi))
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
         self.record_named_type(name, tid as i32)
+        self.type_decl_tids.insert(node, tid as i32)
         if type_decl_is_bitpacked(packed_kind) != 0:
             self.bitpacked_types.insert(tid as i32, 1)
 
@@ -461,6 +462,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             self.variant_lookup.insert(v_name, vi)
         let tid = self.add_type(TypeKind.TY_ENUM, name, te_start, variant_count)
         self.record_named_type(name, tid as i32)
+        self.type_decl_tids.insert(node, tid as i32)
         // Re-register variants with actual enum TypeId (bare + qualified names)
         let plain_type_name_str = self.pool_resolve(name)
         var vpos = te_start
@@ -514,6 +516,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             self.variant_lookup.insert(v_name, vi)
         let tid = self.add_type(TypeKind.TY_ENUM, name, te_start, variant_count)
         self.record_named_type(name, tid as i32)
+        self.type_decl_tids.insert(node, tid as i32)
         self.disc_repr_types.insert(tid as i32, repr_type_tid as i32)
         // Check if any variant has payloads
         var any_payload = 0
@@ -552,6 +555,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         let target = self.resolve_type_expr(aliased_node)
         let tid = self.add_type(TypeKind.TY_ALIAS, target as i32, 0, 0)
         self.record_named_type(name, tid as i32)
+        self.type_decl_tids.insert(node, tid as i32)
 
     if sub_kind == TypeDeclKind.Distinct:
         let inner_node = self.ast.get_extra(extra_start)
@@ -566,6 +570,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         self.type_extra.push(0)
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, 1)
         self.record_named_type(name, tid as i32)
+        self.type_decl_tids.insert(node, tid as i32)
         self.distinct_type_names.insert(name, tid as i32)
 
     if sub_kind == TypeDeclKind.Opaque:
@@ -573,6 +578,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         let te_start = self.type_extra.len() as i32
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, 0)
         self.record_named_type(name, tid as i32)
+        self.type_decl_tids.insert(node, tid as i32)
 
     if sub_kind == TypeDeclKind.Union:
         // Union type: register fields like a struct (codegen handles layout)
@@ -602,6 +608,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             self.type_extra.push(self.ast.get_extra(align_base + fi))
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
         self.record_named_type(name, tid as i32)
+        self.type_decl_tids.insert(node, tid as i32)
 
     if is_ephemeral != 0:
         self.ephemeral_types.insert(name, 1)

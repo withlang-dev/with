@@ -156,6 +156,87 @@ EOF
   echo "PASS(cli-selfhost-emit-obj) emit_obj_imported_symbols"
 }
 
+expect_imported_module_dependency_order() {
+  local case_dir="$tmpdir/imported_module_dependency_order_case"
+  local defs_src="$case_dir/defs.w"
+  local module_src="$case_dir/m.w"
+  local user_src="$case_dir/user.w"
+  mkdir -p "$case_dir"
+
+  cat >"$defs_src" <<'EOF'
+type T = opaque
+EOF
+
+  cat >"$module_src" <<'EOF'
+use defs
+extern var gv: T
+type T { x: i32 = 0 }
+EOF
+
+  cat >"$user_src" <<'EOF'
+use m
+fn main: let _ = 0
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$user_src"; then
+    echo "FAIL(cli-selfhost-import-order-check) imported_module_dependency_order"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-import-order) imported_module_dependency_order"
+}
+
+expect_emit_obj_imported_pcre2_symbol() {
+  local case_dir="$tmpdir/imported_pcre2_symbol_case"
+  local src="$case_dir/test106.w"
+  local obj="$case_dir/test106.o"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+use std.re.pcre2_compile
+
+@[c_export("call_compile")]
+fn call_compile() -> *mut pcre2_real_code_8:
+    pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8))
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$src" --emit-obj -O0 -o "$obj"; then
+    echo "FAIL(cli-selfhost-emit-obj-build) imported_pcre2_symbol"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! /usr/bin/nm "$obj" | awk '
+    {
+      type = (NF >= 2 ? $(NF - 1) : "")
+      name = $NF
+      sub(/^_/, "", name)
+      if (name == "call_compile") {
+        if (type == "U") bad = 1
+        seen["call_compile"] = 1
+      } else if (name ~ /^__with_mod_.*__pcre2_compile_8$/) {
+        if (type != "U") bad = 1
+        seen["pcre2_compile_8"] = 1
+      } else if (name ~ /pcre2_compile_8$/) {
+        bad = 1
+      }
+    }
+    END {
+      exit !(seen["call_compile"] && seen["pcre2_compile_8"]) || bad
+    }
+  '; then
+    echo "FAIL(cli-selfhost-emit-obj-symbols) imported_pcre2_symbol"
+    /usr/bin/nm "$obj" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-emit-obj) imported_pcre2_symbol"
+}
+
 expect_migrate_global_init_list() {
   local case_dir="$tmpdir/migrate_global_init_list_case"
   local src="$case_dir/initlist.c"
@@ -666,6 +747,8 @@ expect_init_in_cwd
 expect_init_named_dir
 expect_emit_obj_global_symbols
 expect_emit_obj_imported_symbols
+expect_imported_module_dependency_order
+expect_emit_obj_imported_pcre2_symbol
 expect_migrate_global_init_list
 expect_migrate_host_header_compat
 expect_migrate_pcre2_config_template
