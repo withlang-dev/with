@@ -113,8 +113,10 @@ prepare_generated_tree() {
     done
 
     # Concatenate adjacent string literals: "foo" "bar" → "foobar"
+    # Cast with_alloc to *mut c_void (returns *i8 but often assigned to void*)
     for dst in "$generated_dir"/*.w; do
         perl -pi -e 's/"([^"]*)" "([^"]*)"/"$1$2"/g' "$dst"
+        perl -pi -e 's/(?<!fn )with_alloc\(([^)]+)\)/(with_alloc($1) as *mut c_void)/g' "$dst"
     done
 }
 
