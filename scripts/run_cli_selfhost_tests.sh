@@ -176,6 +176,62 @@ EOF
   echo "PASS(cli-selfhost-migrate) global_init_list"
 }
 
+expect_pcre2_prepare_shared_externs() {
+  local case_dir="$tmpdir/pcre2_prepare_case"
+  local raw_dir="$case_dir/raw"
+  local generated_dir="$case_dir/generated"
+  mkdir -p "$raw_dir"
+
+  cat >"$raw_dir/pcre2_tables.w" <<'EOF'
+// raw tables
+extern fn preamble_helper() -> void
+type BOOL = c_int
+var _pcre2_utf8_table1: *c_int
+var _pcre2_OP_lengths_8: *u8
+EOF
+
+  cat >"$raw_dir/pcre2_compile.w" <<'EOF'
+// raw compile
+extern fn preamble_helper() -> void
+type BOOL = c_int
+var _pcre2_utf8_table1: *c_int
+var _pcre2_posix_class_maps8: *c_int
+EOF
+
+  cat >"$raw_dir/pcre2_compile_class.w" <<'EOF'
+// raw compile_class
+extern fn preamble_helper() -> void
+type BOOL = c_int
+var _pcre2_utf8_table1: *c_int
+var _pcre2_posix_class_maps8: *c_int
+EOF
+
+  if ! bash "$ROOT_DIR/scripts/pcre2_generated_workflow.sh" prepare "$raw_dir" "$generated_dir" >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-regex-prepare) shared_externs"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'var _pcre2_utf8_table1: *c_int' "$generated_dir/pcre2_tables.w" \
+    || ! grep -Fq 'var _pcre2_OP_lengths_8: *u8' "$generated_dir/pcre2_tables.w" \
+    || grep -Fq '_pcre2_utf8_table1' "$generated_dir/defs.w" \
+    || ! grep -Fq 'extern var _pcre2_utf8_table1: *c_int' "$generated_dir/pcre2_compile.w" \
+    || ! grep -Fq 'var _pcre2_posix_class_maps8: *c_int' "$generated_dir/pcre2_compile.w" \
+    || ! grep -Fq 'extern var _pcre2_utf8_table1: *c_int' "$generated_dir/pcre2_compile_class.w" \
+    || ! grep -Fq 'extern var _pcre2_posix_class_maps8: *c_int' "$generated_dir/pcre2_compile_class.w"; then
+    echo "FAIL(cli-selfhost-regex-output) shared_externs"
+    find "$generated_dir" -maxdepth 1 -type f -print | sort | while read -r f; do
+      echo "--- $f"
+      sed -n '1,80p' "$f"
+    done
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-regex) shared_externs"
+}
+
 expect_init_in_cwd() {
   local case_dir="$tmpdir/init_in_cwd_case"
   local expected_name
@@ -281,6 +337,7 @@ expect_init_named_dir
 expect_emit_obj_global_symbols
 expect_emit_obj_imported_symbols
 expect_migrate_global_init_list
+expect_pcre2_prepare_shared_externs
 
 if [[ "$failures" -ne 0 ]]; then
   echo "cli selfhost tests: $failures failure(s)"
