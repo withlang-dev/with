@@ -71,9 +71,7 @@ prepare_generated_tree() {
         printf '%s\n' 'type pcre2_real_match_data_8 = opaque'
         printf '%s\n' 'type pcre2_real_jit_stack_8 = opaque'
         # Cross-module extern declarations
-        printf '\n// Cross-module extern symbols\n'
-        printf '%s\n' 'extern let _pcre2_OP_lengths_8: [186]u8'
-        printf '%s\n' 'extern let _pcre2_default_tables_8: *const u8'
+        printf '\n// Cross-module extern symbols (only those not emitted by migrator)\n'
         # STRING_* constants from pcre2_internal.h
         printf '\n// PCRE2 string constants (from pcre2_internal.h macros)\n'
         printf '%s\n' 'let STRING_MARK: *const u8 = "MARK"'
