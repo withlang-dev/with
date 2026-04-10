@@ -14,6 +14,7 @@ use MirLower
 use Sema
 use Diagnostic
 use Source
+use Resolve
 
 extern fn exit(code: i32) -> void
 extern fn with_fs_read_file(path: str) -> str
@@ -21,6 +22,7 @@ extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_parse_float(s: str) -> f64
 extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
+extern fn with_str_hash(s: str) -> i64
 extern fn with_str_clone(s: str) -> str
 extern fn str_from_byte(b: i32) -> str
 extern fn with_codegen_loop_set_break(idx: i32, bb: i64) -> void
@@ -3005,6 +3007,34 @@ fn Codegen.function_symbol_name(self: Codegen, sym: i32) -> str:
         return name
     f"__fn_{sym}"
 
+fn codegen_hash_name_component(value: i64) -> str:
+    if value < 0:
+        return "n" ++ f"{0 - value}"
+    f"{value}"
+
+fn codegen_canonical_module_path(path: str) -> str:
+    if path.len() == 0 or path == "<unknown>":
+        return path
+    if path.byte_at(0) == 60:
+        return path
+    if path.byte_at(0) == 47:
+        return resolve_normalize_path(path)
+    let cwd = with_getenv_str("PWD")
+    if cwd.len() == 0:
+        return resolve_normalize_path(path)
+    resolve_join(cwd, path)
+
+fn Codegen.module_link_name_for_path(self: Codegen, source_path: str, base_name: str) -> str:
+    if self.module_object_mode == 0:
+        return base_name
+    let canonical_path = codegen_canonical_module_path(source_path)
+    if canonical_path.len() == 0 or canonical_path == "<unknown>":
+        return base_name
+    "__with_mod_" ++ codegen_hash_name_component(with_str_hash(canonical_path)) ++ "__" ++ base_name
+
+fn Codegen.current_decl_module_link_name(self: Codegen, base_name: str) -> str:
+    self.module_link_name_for_path(self.current_decl_source_file, base_name)
+
 fn Codegen.ident_text_from_node(self: Codegen, node: i32) -> str:
     if node == 0:
         return ""
@@ -3280,22 +3310,22 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         effective_name = parsed_name
     if (flags / FnFlags.ENTRY) % 2 == 1:
         effective_name = "main"
+    else if self.module_object_mode != 0:
+        if not (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:"):
+            effective_name = self.current_decl_module_link_name(effective_name)
 
     let function = wl_add_function(self.llmod, effective_name, fn_type)
     if has_sret != 0:
         wl_add_sret_attr(self.context, function, 0, sret_ty)
     self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret != 0: 1 else: 0)
 
-    // Prelude functions keep external linkage so they survive LLVM inlining.
-    // For multi-module libraries (lib/std/re/), only the library's public API
-    // functions get external linkage. Preamble helpers (GETCHARINC, snprintf,
-    // etc.) get internal linkage to avoid duplicate symbols when linking.
-    let is_prelude = self.current_decl_source_file.contains("lib/std/")
-    let is_multi_module_lib = self.current_decl_source_file.contains("lib/std/re/")
-    if effective_name != "main" and not is_prelude:
-        wl_set_linkage(function, wl_internal_linkage())
-    else if is_multi_module_lib and not effective_name.contains("pcre2"):
-        wl_set_linkage(function, wl_internal_linkage())
+    // Whole-program codegen internalizes non-prelude functions because imported
+    // modules are duplicated into the current AST. In module-object mode we must
+    // keep owner definitions externally linkable and let importers reference them.
+    if self.module_object_mode == 0:
+        let is_prelude = self.current_decl_source_file.contains("lib/std/")
+        if effective_name != "main" and not is_prelude:
+            wl_set_linkage(function, wl_internal_linkage())
 
     // @[weak] — set weak linkage (LLVMWeakAnyLinkage = 5)
     // Must be checked before c_export which also sets linkage.
@@ -4393,6 +4423,8 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
         if kind == NodeKind.NK_FN_DECL:
+            if self.current_decl_is_imported_module_symbol():
+                continue
             let name_sym = self.pool.get_data0(decl)
             if name_sym == 0:
                 continue

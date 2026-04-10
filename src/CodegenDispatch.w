@@ -787,7 +787,7 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
                 let fn_name = self.function_symbol_name(translated_sym)
                 with_eprint(f"[ck-fn] sym={fn_sym} -> {fn_name}")
             return fv_opt.unwrap() as i64
-        let fn_name = self.function_symbol_name(translated_sym)
+        let fn_name = self.function_link_name_for_sym(translated_sym)
         let found = wl_get_named_function(self.llmod, fn_name)
         if found != 0:
             if self.debug_mir_codegen_enabled():
@@ -7609,6 +7609,7 @@ fn Codegen.declare_async_function(self: Codegen, fn_node: i32):
     // Resolve return type (default to i32 when no annotation, matching non-async functions)
     let ret_ty = if ret_type_node != 0: self.resolve_type(ret_type_node) else: i32_ty
     self.async_fn_ret_types.insert(name_sym, ret_ty)
+    let cc_name = self.fn_callconv_name(meta)
 
     // Resolve param types
     let param_types: Vec[i64] = Vec.new()
@@ -7619,10 +7620,28 @@ fn Codegen.declare_async_function(self: Codegen, fn_node: i32):
             p_ty = i32_ty
         param_types.push(p_ty)
 
+    let spawn_fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, 0)
+    var effective_name = self.function_symbol_name(name_sym)
+    if self.module_object_mode != 0:
+        if not (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:"):
+            effective_name = self.current_decl_module_link_name(effective_name)
+    let existing_spawn = wl_get_named_function(self.llmod, effective_name)
+    let spawn_fn =
+        if existing_spawn != 0:
+            existing_spawn
+        else:
+            wl_add_function(self.llmod, effective_name, spawn_fn_type)
+    self.apply_noalias_param_attrs(spawn_fn, param_start, param_count)
+    self.fn_values.insert(name_sym, spawn_fn)
+    self.fn_fn_types.insert(name_sym, spawn_fn_type)
+    if self.current_decl_is_imported_module_symbol():
+        return
+
     // 1. Declare implementation function: name_async(params) -> ret_type
     let impl_fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, 0)
-    let impl_name = name_str ++ "_async"
+    let impl_name = self.current_decl_module_link_name(name_str ++ "_async")
     let impl_fn = wl_add_function(self.llmod, impl_name, impl_fn_type)
+    wl_set_linkage(impl_fn, wl_internal_linkage())
     self.apply_noalias_param_attrs(impl_fn, param_start, param_count)
     let impl_sym = self.intern.intern(impl_name)
     self.fn_values.insert(impl_sym, impl_fn)
@@ -7636,18 +7655,9 @@ fn Codegen.declare_async_function(self: Codegen, fn_node: i32):
     let tramp_params: Vec[i64] = Vec.new()
     tramp_params.push(ptr_ty)
     let tramp_fn_type = wl_function_type(void_ty, vec_data_i64(&tramp_params), 1, 0)
-    let tramp_name = name_str ++ "_fiber"
-    wl_add_function(self.llmod, tramp_name, tramp_fn_type)
-
-    // 4. Declare the function with its actual return type. The MIR body
-    // computes the real return value. The trampoline calls this function
-    // and stores the result into the result buffer.
-    let spawn_fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, 0)
-    let effective_name = self.function_symbol_name(name_sym)
-    let spawn_fn = wl_add_function(self.llmod, effective_name, spawn_fn_type)
-    self.apply_noalias_param_attrs(spawn_fn, param_start, param_count)
-    self.fn_values.insert(name_sym, spawn_fn)
-    self.fn_fn_types.insert(name_sym, spawn_fn_type)
+    let tramp_name = self.current_decl_module_link_name(name_str ++ "_fiber")
+    let tramp_fn = wl_add_function(self.llmod, tramp_name, tramp_fn_type)
+    wl_set_linkage(tramp_fn, wl_internal_linkage())
 
 // ── Async expressions ─────────────────────────────────────────────
 

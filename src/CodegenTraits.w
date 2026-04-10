@@ -702,6 +702,35 @@ fn Codegen.sync_decl_context(self: Codegen, decl_index: i32):
     self.current_decl_source_file = self.decl_source_path(decl_index)
     self.sema.update_decl_source_context(decl_index)
 
+fn Codegen.find_module_fn_decl_index(self: Codegen, sym: i32) -> i32:
+    for di in 0..self.pool.decl_count():
+        let decl = self.pool.get_decl(di)
+        if self.pool.kind(decl) != NodeKind.NK_FN_DECL:
+            continue
+        if self.pool.get_data0(decl) == sym:
+            return di
+    0 - 1
+
+fn Codegen.function_link_name_for_sym(self: Codegen, sym: i32) -> str:
+    let name = self.function_symbol_name(sym)
+    if self.module_object_mode == 0:
+        return name
+    let decl_index = self.find_module_fn_decl_index(sym)
+    if decl_index < 0:
+        return name
+    let fn_node = self.pool.get_decl(decl_index)
+    let flags = self.pool.get_data2(fn_node)
+    if (flags / FnFlags.ENTRY) % 2 == 1:
+        return "main"
+    let meta = self.pool.find_fn_meta(fn_node)
+    if meta >= 0:
+        let cc_name = self.fn_callconv_name(meta)
+        if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
+            let export_name = cc_name.slice(9, cc_name.len() as i64)
+            if export_name.len() > 0:
+                return export_name
+    self.module_link_name_for_path(self.decl_source_path(decl_index), name)
+
 fn Codegen.current_decl_is_imported_module_symbol(self: Codegen) -> bool:
     if self.module_object_mode == 0:
         return false
@@ -864,6 +893,11 @@ fn Codegen.emit_vec_new_global(self: Codegen, name_sym: i32, vec_tid: i32, is_mu
     true
 
 fn Codegen.finalize_module_binding_global(self: Codegen, global: i64, is_mut: i32):
+    if self.module_object_mode != 0:
+        if is_mut == 0:
+            wl_set_global_constant(global, 1)
+        wl_set_linkage(global, 0)
+        return
     if is_mut == 0:
         wl_set_global_constant(global, 1)
         wl_set_linkage(global, wl_internal_linkage())
@@ -871,7 +905,7 @@ fn Codegen.finalize_module_binding_global(self: Codegen, global: i64, is_mut: i3
     wl_set_linkage(global, 0)
 
 fn Codegen.declare_module_binding_global(self: Codegen, name_sym: i32, global_ty: i64, is_mut: i32) -> i64:
-    let name_str = self.intern.resolve(name_sym)
+    let name_str = self.current_decl_module_link_name(self.intern.resolve(name_sym))
     let existing = wl_get_named_global(self.llmod, name_str)
     let global =
         if existing != 0:
@@ -885,7 +919,7 @@ fn Codegen.declare_module_binding_global(self: Codegen, name_sym: i32, global_ty
     global
 
 fn Codegen.define_module_binding_global(self: Codegen, name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
-    let name_str = self.intern.resolve(name_sym)
+    let name_str = self.current_decl_module_link_name(self.intern.resolve(name_sym))
     let existing = wl_get_named_global(self.llmod, name_str)
     let global =
         if existing != 0:
@@ -898,7 +932,7 @@ fn Codegen.define_module_binding_global(self: Codegen, name_sym: i32, global_ty:
     global
 
 fn Codegen.record_module_binding_global(self: Codegen, name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
-    if is_mut != 0 and self.current_decl_is_imported_module_symbol():
+    if self.current_decl_is_imported_module_symbol():
         return self.declare_module_binding_global(name_sym, global_ty, is_mut)
     self.define_module_binding_global(name_sym, global_ty, init, is_mut)
 
@@ -907,6 +941,8 @@ fn Codegen.queue_module_runtime_init(self: Codegen, name_sym: i32, value_node: i
     if global_ty == 0:
         return false
     let _ = self.record_module_binding_global(name_sym, global_ty, self.build_default_value(global_ty), is_mut)
+    if self.current_decl_is_imported_module_symbol():
+        return true
     self.module_runtime_init_syms.push(name_sym)
     self.module_runtime_init_nodes.push(value_node)
     self.module_runtime_init_type_ids.push(result_tid)
@@ -1524,6 +1560,9 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
             with_eprint("warning: [string-global] str struct type not found")
             return
         let str_ty = self.struct_llvm_types.get(st_opt.unwrap() as i64)
+        if self.current_decl_is_imported_module_symbol():
+            let _ = self.declare_module_binding_global(name_sym, str_ty, is_mut)
+            return
         let name_str = self.intern.resolve(name_sym)
         let bytes_name = name_str ++ ".__bytes"
         let bytes_ty = wl_array_type(wl_i8_type(self.context), str_value.text.len() + 1)

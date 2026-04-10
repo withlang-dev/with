@@ -49,9 +49,10 @@ EOF
     {
       name = $NF
       sub(/^_/, "", name)
-      if (name == "explicit_global" || name == "zero_global") {
+      if (name ~ /explicit_global$/ || name ~ /zero_global$/) {
         if ($2 == "U") bad = 1
-        seen[name] = 1
+        if (name ~ /explicit_global$/) seen["explicit_global"] = 1
+        if (name ~ /zero_global$/) seen["zero_global"] = 1
       }
     }
     END {
@@ -77,12 +78,18 @@ expect_emit_obj_imported_symbols() {
 
   cat >"$shared_src" <<'EOF'
 var shared_var: i32 = 42
+let shared_let: i32 = 7
+fn shared_fn() -> i32: shared_var + shared_let
 EOF
 
   cat >"$user_src" <<'EOF'
 use shared
 @[c_export("use_shared")]
-fn use_shared() -> i32: shared_var
+fn use_shared() -> i32: shared_fn()
+@[c_export("shared_let_addr")]
+fn shared_let_addr() -> *const i32: &shared_let
+@[c_export("shared_var_addr")]
+fn shared_var_addr() -> *const i32: &shared_var
 EOF
 
   if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$shared_src" --emit-obj -O0 -o "$shared_obj"; then
@@ -99,45 +106,49 @@ EOF
     return
   fi
 
-  if ! /usr/bin/nm -g "$shared_obj" | awk '
+  if ! /usr/bin/nm "$shared_obj" | awk '
     {
       type = (NF >= 2 ? $(NF - 1) : "")
       name = $NF
       sub(/^_/, "", name)
-      if (name == "shared_var") {
+      if (name ~ /shared_var$/ || name ~ /shared_let$/ || name ~ /shared_fn$/) {
         if (type == "U") bad = 1
-        seen[name] = 1
+        if (name ~ /shared_var$/) seen["shared_var"] = 1
+        if (name ~ /shared_let$/) seen["shared_let"] = 1
+        if (name ~ /shared_fn$/) seen["shared_fn"] = 1
       }
     }
     END {
-      exit !(seen["shared_var"]) || bad
+      exit !(seen["shared_var"] && seen["shared_let"] && seen["shared_fn"]) || bad
     }
   '; then
     echo "FAIL(cli-selfhost-emit-obj-symbols) emit_obj_import_owner"
-    /usr/bin/nm -g "$shared_obj" || true
+    /usr/bin/nm "$shared_obj" || true
     failures=$((failures + 1))
     return
   fi
 
-  if ! /usr/bin/nm -g "$user_obj" | awk '
+  if ! /usr/bin/nm "$user_obj" | awk '
     {
       type = (NF >= 2 ? $(NF - 1) : "")
       name = $NF
       sub(/^_/, "", name)
-      if (name == "use_shared") {
+      if (name == "use_shared" || name == "shared_let_addr" || name == "shared_var_addr") {
         if (type == "U") bad = 1
         seen[name] = 1
-      } else if (name == "shared_var") {
+      } else if (name ~ /shared_var$/ || name ~ /shared_let$/ || name ~ /shared_fn$/) {
         if (type != "U") bad = 1
-        seen[name] = 1
+        if (name ~ /shared_var$/) seen["shared_var"] = 1
+        if (name ~ /shared_let$/) seen["shared_let"] = 1
+        if (name ~ /shared_fn$/) seen["shared_fn"] = 1
       }
     }
     END {
-      exit !(seen["use_shared"] && seen["shared_var"]) || bad
+      exit !(seen["use_shared"] && seen["shared_let_addr"] && seen["shared_var_addr"] && seen["shared_var"] && seen["shared_let"] && seen["shared_fn"]) || bad
     }
   '; then
     echo "FAIL(cli-selfhost-emit-obj-symbols) emit_obj_import_user"
-    /usr/bin/nm -g "$user_obj" || true
+    /usr/bin/nm "$user_obj" || true
     failures=$((failures + 1))
     return
   fi
