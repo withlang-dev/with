@@ -622,38 +622,38 @@ type ucd_record { script: u8 = 0, chartype: u8 = 0, gbprop: u8 = 0, caseset: u8 
 type struct_ucd_record = ucd_record
 type pcre2_serialized_data { magic: c_uint = 0, version: c_uint = 0, config: c_uint = 0, number_of_codes: c_int = 0 }
 type struct_pcre2_serialized_data = pcre2_serialized_data
-extern var _pcre2_utf8_table1: *c_int
+var _pcre2_utf8_table1: *c_int
 extern let _pcre2_utf8_table1_size: c_uint
-extern var _pcre2_utf8_table2: *c_int
-extern var _pcre2_utf8_table3: *c_int
-extern var _pcre2_utf8_table4: *u8
-extern var _pcre2_OP_lengths_8: *u8
-extern var _pcre2_callout_end_delims_8: *c_uint
-extern var _pcre2_callout_start_delims_8: *c_uint
-extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
-extern var _pcre2_default_tables_8: *u8
-extern var _pcre2_hspace_list_8: *c_uint
-extern var _pcre2_vspace_list_8: *c_uint
-extern var _pcre2_ucd_boolprop_sets_8: *c_uint
-extern var _pcre2_ucd_caseless_sets_8: *c_uint
+var _pcre2_utf8_table2: *c_int
+var _pcre2_utf8_table3: *c_int
+var _pcre2_utf8_table4: *u8
+var _pcre2_OP_lengths_8: *u8
+var _pcre2_callout_end_delims_8: *c_uint
+var _pcre2_callout_start_delims_8: *c_uint
+var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+var _pcre2_default_match_context_8: pcre2_real_match_context_8
+var _pcre2_default_tables_8: *u8
+var _pcre2_hspace_list_8: *c_uint
+var _pcre2_vspace_list_8: *c_uint
+var _pcre2_ucd_boolprop_sets_8: *c_uint
+var _pcre2_ucd_caseless_sets_8: *c_uint
 extern let _pcre2_ucd_turkish_dotted_i_caseset_8: c_uint
-extern var _pcre2_ucd_nocase_ranges_8: *c_uint
+var _pcre2_ucd_nocase_ranges_8: *c_uint
 extern let _pcre2_ucd_nocase_ranges_size_8: c_uint
-extern var _pcre2_ucd_digit_sets_8: *c_uint
-extern var _pcre2_ucd_script_sets_8: *c_uint
-extern var _pcre2_ucd_records_8: *ucd_record
-extern var _pcre2_ucd_stage1_8: *c_ushort
-extern var _pcre2_ucd_stage2_8: *c_ushort
-extern var _pcre2_ucp_gbtable_8: *c_uint
-extern var _pcre2_ucp_gentype_8: *c_uint
-extern var _pcre2_unicode_version_8: *const i8
-extern var _pcre2_utt_8: *ucp_type_table
-extern var _pcre2_utt_names_8: *c_char
+var _pcre2_ucd_digit_sets_8: *c_uint
+var _pcre2_ucd_script_sets_8: *c_uint
+var _pcre2_ucd_records_8: *ucd_record
+var _pcre2_ucd_stage1_8: *c_ushort
+var _pcre2_ucd_stage2_8: *c_ushort
+var _pcre2_ucp_gbtable_8: *c_uint
+var _pcre2_ucp_gentype_8: *c_uint
+var _pcre2_unicode_version_8: *const i8
+var _pcre2_utt_8: *ucp_type_table
+var _pcre2_utt_names_8: *c_char
 extern let _pcre2_utt_size_8: c_ulong
-extern var _pcre2_ebcdic_1047_to_ascii_8: *u8
-extern var _pcre2_ascii_to_ebcdic_1047_8: *u8
+var _pcre2_ebcdic_1047_to_ascii_8: *u8
+var _pcre2_ascii_to_ebcdic_1047_8: *u8
 type pcre2_real_general_context_8 { memctl: pcre2_memctl }
 type struct_pcre2_real_general_context_8 = pcre2_real_general_context_8
 type pcre2_real_compile_context_8 { memctl: pcre2_memctl, stack_guard: *const fn(c_uint, *mut c_void) -> c_int = null, stack_guard_data: *mut c_void = null, tables: *const u8 = null, max_pattern_length: c_ulong = 0, max_pattern_compiled_length: c_ulong = 0, bsr_convention: c_ushort = 0, newline_convention: c_ushort = 0, parens_nest_limit: c_uint = 0, extra_options: c_uint = 0, max_varlookbehind: c_uint = 0, optimization_flags: c_uint = 0 }
@@ -849,23 +849,20 @@ let ERR119: c_uint = 219
 let ERR120: c_uint = 220
 type eclass_op_info { code_start: *mut u8 = null, length: c_ulong = 0, op_single_type: u8 = 0, bits: class_bits_storage }
 type struct_eclass_op_info = eclass_op_info
-extern var _pcre2_posix_class_maps8: *c_int
+var _pcre2_posix_class_maps8: *c_int
 extern fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, classbits: *mut u8) -> void
 extern fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_ptr: *mut c_uint, pcode: *mut *mut u8, negate_class: c_int, has_bitmap: *mut c_int, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint
 extern fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *mut c_uint, pcode: *mut *mut u8, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> c_int
-@[c_export("_pcre2_compile_get_hash_from_name8")]
 fn _pcre2_compile_get_hash_from_name8(name: *const u8, length: c_uint) -> c_ushort:
     var hash: c_ushort
     return hash
 
-@[c_export("_pcre2_compile_find_named_group8")]
 fn _pcre2_compile_find_named_group8(name: *const u8, length: c_uint, cb: *mut compile_block_8) -> *mut named_group_8:
     var hash: c_ushort
     var ng: *mut named_group_8
     var end: *mut named_group_8
     return (null as *mut named_group_8)
 
-@[c_export("_pcre2_compile_add_name_to_table8")]
 fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut named_group_8, __param_tablecount: c_uint) -> c_uint:
     var ng = __param_ng
     var tablecount = __param_tablecount
@@ -911,7 +908,6 @@ fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut 
 
     return tablecount
 
-@[c_export("_pcre2_compile_find_dupname_details8")]
 fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexptr: *mut c_int, countptr: *mut c_int, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_int:
     var i: c_uint
     var groupnumber: c_uint
@@ -949,7 +945,6 @@ fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexpt
     (unsafe: *countptr = count)
     return 1
 
-@[c_export("_pcre2_compile_parse_scan_substr_args8")]
 fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint:
     var pptr = __param_pptr
     var captures: *mut u8
@@ -976,7 +971,6 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
     cb.cx.memctl.free((captures as *mut c_void), cb.cx.memctl.memory_data)
     return (pptr - (1 as isize as usize))
 
-@[c_export("_pcre2_compile_parse_recurse_args8")]
 fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_int:
     var pptr: *mut c_uint
     var i: c_ulong

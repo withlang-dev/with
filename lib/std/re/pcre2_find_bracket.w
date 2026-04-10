@@ -622,38 +622,38 @@ type ucd_record { script: u8 = 0, chartype: u8 = 0, gbprop: u8 = 0, caseset: u8 
 type struct_ucd_record = ucd_record
 type pcre2_serialized_data { magic: c_uint = 0, version: c_uint = 0, config: c_uint = 0, number_of_codes: c_int = 0 }
 type struct_pcre2_serialized_data = pcre2_serialized_data
-extern var _pcre2_utf8_table1: *c_int
+var _pcre2_utf8_table1: *c_int
 extern let _pcre2_utf8_table1_size: c_uint
-extern var _pcre2_utf8_table2: *c_int
-extern var _pcre2_utf8_table3: *c_int
-extern var _pcre2_utf8_table4: *u8
-extern var _pcre2_OP_lengths_8: *u8
-extern var _pcre2_callout_end_delims_8: *c_uint
-extern var _pcre2_callout_start_delims_8: *c_uint
-extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
-extern var _pcre2_default_tables_8: *u8
-extern var _pcre2_hspace_list_8: *c_uint
-extern var _pcre2_vspace_list_8: *c_uint
-extern var _pcre2_ucd_boolprop_sets_8: *c_uint
-extern var _pcre2_ucd_caseless_sets_8: *c_uint
+var _pcre2_utf8_table2: *c_int
+var _pcre2_utf8_table3: *c_int
+var _pcre2_utf8_table4: *u8
+var _pcre2_OP_lengths_8: *u8
+var _pcre2_callout_end_delims_8: *c_uint
+var _pcre2_callout_start_delims_8: *c_uint
+var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+var _pcre2_default_match_context_8: pcre2_real_match_context_8
+var _pcre2_default_tables_8: *u8
+var _pcre2_hspace_list_8: *c_uint
+var _pcre2_vspace_list_8: *c_uint
+var _pcre2_ucd_boolprop_sets_8: *c_uint
+var _pcre2_ucd_caseless_sets_8: *c_uint
 extern let _pcre2_ucd_turkish_dotted_i_caseset_8: c_uint
-extern var _pcre2_ucd_nocase_ranges_8: *c_uint
+var _pcre2_ucd_nocase_ranges_8: *c_uint
 extern let _pcre2_ucd_nocase_ranges_size_8: c_uint
-extern var _pcre2_ucd_digit_sets_8: *c_uint
-extern var _pcre2_ucd_script_sets_8: *c_uint
-extern var _pcre2_ucd_records_8: *ucd_record
-extern var _pcre2_ucd_stage1_8: *c_ushort
-extern var _pcre2_ucd_stage2_8: *c_ushort
-extern var _pcre2_ucp_gbtable_8: *c_uint
-extern var _pcre2_ucp_gentype_8: *c_uint
-extern var _pcre2_unicode_version_8: *const i8
-extern var _pcre2_utt_8: *ucp_type_table
-extern var _pcre2_utt_names_8: *c_char
+var _pcre2_ucd_digit_sets_8: *c_uint
+var _pcre2_ucd_script_sets_8: *c_uint
+var _pcre2_ucd_records_8: *ucd_record
+var _pcre2_ucd_stage1_8: *c_ushort
+var _pcre2_ucd_stage2_8: *c_ushort
+var _pcre2_ucp_gbtable_8: *c_uint
+var _pcre2_ucp_gentype_8: *c_uint
+var _pcre2_unicode_version_8: *const i8
+var _pcre2_utt_8: *ucp_type_table
+var _pcre2_utt_names_8: *c_char
 extern let _pcre2_utt_size_8: c_ulong
-extern var _pcre2_ebcdic_1047_to_ascii_8: *u8
-extern var _pcre2_ascii_to_ebcdic_1047_8: *u8
+var _pcre2_ebcdic_1047_to_ascii_8: *u8
+var _pcre2_ascii_to_ebcdic_1047_8: *u8
 type pcre2_real_general_context_8 { memctl: pcre2_memctl }
 type struct_pcre2_real_general_context_8 = pcre2_real_general_context_8
 type pcre2_real_compile_context_8 { memctl: pcre2_memctl, stack_guard: *const fn(c_uint, *mut c_void) -> c_int = null, stack_guard_data: *mut c_void = null, tables: *const u8 = null, max_pattern_length: c_ulong = 0, max_pattern_compiled_length: c_ulong = 0, bsr_convention: c_ushort = 0, newline_convention: c_ushort = 0, parens_nest_limit: c_uint = 0, extra_options: c_uint = 0, max_varlookbehind: c_uint = 0, optimization_flags: c_uint = 0 }
@@ -706,7 +706,6 @@ extern fn _pcre2_auto_possessify_8(p0: *mut u8, p1: *const compile_block_8) -> c
 extern fn _pcre2_check_escape_8(p0: *mut *const u8, p1: *const u8, p2: *mut c_uint, p3: *mut c_int, p4: c_uint, p5: c_uint, p6: c_uint, p7: c_int, p8: *mut compile_block_8) -> c_int
 extern fn _pcre2_ckd_smul_8(p0: *mut c_ulong, p1: c_int, p2: c_int) -> c_int
 extern fn _pcre2_extuni_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int, p5: *mut c_int) -> *const u8
-@[c_export("_pcre2_find_bracket_8")]
 fn _pcre2_find_bracket_8(__param_code: *const u8, utf: c_int, number: c_int) -> *const u8:
     var code = __param_code
     while true:
