@@ -40,7 +40,6 @@ extern fn pcre2_convert_context_create_8(p0: *mut pcre2_real_general_context_8) 
 extern fn pcre2_convert_context_free_8(p0: *mut pcre2_real_convert_context_8) -> void
 extern fn pcre2_set_glob_escape_8(p0: *mut pcre2_real_convert_context_8, p1: c_uint) -> c_int
 extern fn pcre2_set_glob_separator_8(p0: *mut pcre2_real_convert_context_8, p1: c_uint) -> c_int
-@[c_export("pcre2_pattern_convert_8")]
 fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong, options: c_uint, buffptr: *mut *mut u8, bufflenptr: *mut c_ulong, __param_ccontext: *mut pcre2_real_convert_context_8) -> c_int:
     var pattern = __param_pattern
     var plength = __param_plength
@@ -88,7 +87,6 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
 
     (unsafe: *bufflenptr = 0)
 
-@[c_export("pcre2_converted_pattern_free_8")]
 fn pcre2_converted_pattern_free_8(converted: *mut u8):
     if (if converted != (null as *mut u8): 1 else: 0) != 0:
         var memctl: *mut pcre2_memctl
@@ -675,38 +673,38 @@ type ucd_record { script: u8 = 0, chartype: u8 = 0, gbprop: u8 = 0, caseset: u8 
 type struct_ucd_record = ucd_record
 type pcre2_serialized_data { magic: c_uint = 0, version: c_uint = 0, config: c_uint = 0, number_of_codes: c_int = 0 }
 type struct_pcre2_serialized_data = pcre2_serialized_data
-extern var _pcre2_utf8_table1: *c_int
+var _pcre2_utf8_table1: *c_int
 extern let _pcre2_utf8_table1_size: c_uint
-extern var _pcre2_utf8_table2: *c_int
-extern var _pcre2_utf8_table3: *c_int
-extern var _pcre2_utf8_table4: *u8
-extern var _pcre2_OP_lengths_8: *u8
-extern var _pcre2_callout_end_delims_8: *c_uint
-extern var _pcre2_callout_start_delims_8: *c_uint
-extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
-extern var _pcre2_default_tables_8: *u8
-extern var _pcre2_hspace_list_8: *c_uint
-extern var _pcre2_vspace_list_8: *c_uint
-extern var _pcre2_ucd_boolprop_sets_8: *c_uint
-extern var _pcre2_ucd_caseless_sets_8: *c_uint
+var _pcre2_utf8_table2: *c_int
+var _pcre2_utf8_table3: *c_int
+var _pcre2_utf8_table4: *u8
+var _pcre2_OP_lengths_8: *u8
+var _pcre2_callout_end_delims_8: *c_uint
+var _pcre2_callout_start_delims_8: *c_uint
+var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+var _pcre2_default_match_context_8: pcre2_real_match_context_8
+var _pcre2_default_tables_8: *u8
+var _pcre2_hspace_list_8: *c_uint
+var _pcre2_vspace_list_8: *c_uint
+var _pcre2_ucd_boolprop_sets_8: *c_uint
+var _pcre2_ucd_caseless_sets_8: *c_uint
 extern let _pcre2_ucd_turkish_dotted_i_caseset_8: c_uint
-extern var _pcre2_ucd_nocase_ranges_8: *c_uint
+var _pcre2_ucd_nocase_ranges_8: *c_uint
 extern let _pcre2_ucd_nocase_ranges_size_8: c_uint
-extern var _pcre2_ucd_digit_sets_8: *c_uint
-extern var _pcre2_ucd_script_sets_8: *c_uint
-extern var _pcre2_ucd_records_8: *ucd_record
-extern var _pcre2_ucd_stage1_8: *c_ushort
-extern var _pcre2_ucd_stage2_8: *c_ushort
-extern var _pcre2_ucp_gbtable_8: *c_uint
-extern var _pcre2_ucp_gentype_8: *c_uint
-extern var _pcre2_unicode_version_8: *const i8
-extern var _pcre2_utt_8: *ucp_type_table
-extern var _pcre2_utt_names_8: *c_char
+var _pcre2_ucd_digit_sets_8: *c_uint
+var _pcre2_ucd_script_sets_8: *c_uint
+var _pcre2_ucd_records_8: *ucd_record
+var _pcre2_ucd_stage1_8: *c_ushort
+var _pcre2_ucd_stage2_8: *c_ushort
+var _pcre2_ucp_gbtable_8: *c_uint
+var _pcre2_ucp_gentype_8: *c_uint
+var _pcre2_unicode_version_8: *const i8
+var _pcre2_utt_8: *ucp_type_table
+var _pcre2_utt_names_8: *c_char
 extern let _pcre2_utt_size_8: c_ulong
-extern var _pcre2_ebcdic_1047_to_ascii_8: *u8
-extern var _pcre2_ascii_to_ebcdic_1047_8: *u8
+var _pcre2_ebcdic_1047_to_ascii_8: *u8
+var _pcre2_ascii_to_ebcdic_1047_8: *u8
 type pcre2_real_general_context_8 { memctl: pcre2_memctl }
 type struct_pcre2_real_general_context_8 = pcre2_real_general_context_8
 type pcre2_real_compile_context_8 { memctl: pcre2_memctl, stack_guard: *const fn(c_uint, *mut c_void) -> c_int = null, stack_guard_data: *mut c_void = null, tables: *const u8 = null, max_pattern_length: c_ulong = 0, max_pattern_compiled_length: c_ulong = 0, bsr_convention: c_ushort = 0, newline_convention: c_ushort = 0, parens_nest_limit: c_uint = 0, extra_options: c_uint = 0, max_varlookbehind: c_uint = 0, optimization_flags: c_uint = 0 }
@@ -785,9 +783,9 @@ let POSIX_NOT_BRACKET: c_uint = 2
 let POSIX_CLASS_NOT_STARTED: c_uint = 3
 let POSIX_CLASS_STARTING: c_uint = 4
 let POSIX_CLASS_STARTED: c_uint = 5
-extern var pcre2_escaped_literals: *const i8
-extern var posix_meta_escapes: *const i8
-extern var posix_classes: *const i8
+var pcre2_escaped_literals: *const i8
+var posix_meta_escapes: *const i8
+var posix_classes: *const i8
 fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, utf: c_int, use_buffer: *mut u8, use_length: c_ulong, bufflenptr: *mut c_ulong, dummyrun: c_int, ccontext: *mut pcre2_real_convert_context_8) -> c_int:
     var plength = __param_plength
     var posix: *const u8 = null

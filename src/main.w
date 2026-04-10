@@ -952,6 +952,10 @@ fn run_migrate_command(argc: i32) -> i32:
         if arg == "--check" or arg == "--diff" or arg == "--stats":
             ai = ai + 1
             continue  // TODO: implement modes
+        if arg == "--no-c-export":
+            migrate_set_no_c_export(1)
+            ai = ai + 1
+            continue
         if arg.len() > 0 and arg.byte_at(0) != 45:  // not a flag
             source_path = arg
         ai = ai + 1

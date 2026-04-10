@@ -118,7 +118,6 @@ type struct_regex_t = regex_t
 type regoff_t = c_int
 type regmatch_t { rm_so: c_int = 0, rm_eo: c_int = 0 }
 type struct_regmatch_t = regmatch_t
-@[c_export("pcre2_regcomp")]
 fn pcre2_regcomp(preg: *mut regex_t, pattern: *const i8, cflags: c_int) -> c_int:
     var erroffset: c_ulong
     var patlen: c_ulong
@@ -172,7 +171,6 @@ fn pcre2_regcomp(preg: *mut regex_t, pattern: *const i8, cflags: c_int) -> c_int
 
     return 0
 
-@[c_export("pcre2_regexec")]
 fn pcre2_regexec(preg: *const regex_t, string: *const i8, __param_nmatch: c_ulong, pmatch: *mut regmatch_t, eflags: c_int) -> c_int:
     var nmatch = __param_nmatch
     var rc: c_int
@@ -220,7 +218,6 @@ fn pcre2_regexec(preg: *const regex_t, string: *const i8, __param_nmatch: c_ulon
             return REG_ASSERT
 
 
-@[c_export("pcre2_regerror")]
 fn pcre2_regerror(errcode: c_int, preg: *const regex_t, errbuf: *mut i8, errbuf_size: c_ulong) -> c_ulong:
     var message: *const i8
     var offset_buf: [23]c_char
@@ -245,14 +242,13 @@ fn pcre2_regerror(errcode: c_int, preg: *const regex_t, errbuf: *mut i8, errbuf_
     (i = i + 1)
     return (i as c_int)
 
-@[c_export("pcre2_regfree")]
 fn pcre2_regfree(preg: *mut regex_t):
     pcre2_match_data_free_8((preg.re_match_data as *mut pcre2_real_match_data_8))
     pcre2_code_free_8((preg.re_pcre2_code as *mut pcre2_real_code_8))
 
-extern var eint1: [24]c_int
-extern var eint2: [16]c_int
-extern var pstring: [18]*const i8
+var eint1: [24]c_int
+var eint2: [16]c_int
+var pstring: [18]*const i8
 let ARG_MAX: c_int = 1048576
 // untranslatable fn-like macro
 fn ARR_SIZE() -> Never:

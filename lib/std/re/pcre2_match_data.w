@@ -60,7 +60,6 @@ extern fn pcre2_code_copy_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_cod
 extern fn pcre2_code_copy_with_tables_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8
 extern fn pcre2_pattern_info_8(p0: *const pcre2_real_code_8, p1: c_uint, p2: *mut c_void) -> c_int
 extern fn pcre2_callout_enumerate_8(p0: *const pcre2_real_code_8, p1: *const fn(*mut pcre2_callout_enumerate_block_8, *mut c_void) -> c_int, p2: *mut c_void) -> c_int
-@[c_export("pcre2_match_data_create_8")]
 fn pcre2_match_data_create_8(__param_oveccount: c_uint, gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8:
     var oveccount = __param_oveccount
     var yield_: *mut pcre2_real_match_data_8
@@ -79,14 +78,12 @@ fn pcre2_match_data_create_8(__param_oveccount: c_uint, gcontext: *mut pcre2_rea
     (yield_.heapframes_size = 0)
     return yield_
 
-@[c_export("pcre2_match_data_create_from_pattern_8")]
 fn pcre2_match_data_create_from_pattern_8(code: *const pcre2_real_code_8, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8:
     var gcontext = __param_gcontext
     if (if code == (null as *const pcre2_real_code_8): 1 else: 0) != 0:
         return (null as *mut pcre2_real_match_data_8)
 
 
-@[c_export("pcre2_match_data_free_8")]
 fn pcre2_match_data_free_8(match_data: *mut pcre2_real_match_data_8):
     if (if match_data != (null as *mut pcre2_real_match_data_8): 1 else: 0) != 0:
         if (if match_data.heapframes != (null as *mut heapframe): 1 else: 0) != 0:
@@ -100,27 +97,21 @@ fn pcre2_match_data_free_8(match_data: *mut pcre2_real_match_data_8):
 
 extern fn pcre2_dfa_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8, p7: *mut c_int, p8: c_ulong) -> c_int
 extern fn pcre2_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8) -> c_int
-@[c_export("pcre2_get_mark_8")]
 fn pcre2_get_mark_8(match_data: *mut pcre2_real_match_data_8) -> *const u8:
     return match_data.mark
 
-@[c_export("pcre2_get_match_data_size_8")]
 fn pcre2_get_match_data_size_8(match_data: *mut pcre2_real_match_data_8) -> c_ulong:
     return (120 +% ((2 * (match_data.oveccount)) *% sizeof[c_ulong]()))
 
-@[c_export("pcre2_get_match_data_heapframes_size_8")]
 fn pcre2_get_match_data_heapframes_size_8(match_data: *mut pcre2_real_match_data_8) -> c_ulong:
     return match_data.heapframes_size
 
-@[c_export("pcre2_get_ovector_count_8")]
 fn pcre2_get_ovector_count_8(match_data: *mut pcre2_real_match_data_8) -> c_uint:
     return match_data.oveccount
 
-@[c_export("pcre2_get_ovector_pointer_8")]
 fn pcre2_get_ovector_pointer_8(match_data: *mut pcre2_real_match_data_8) -> *mut c_ulong:
     return (&match_data.ovector[0] as *mut c_ulong)
 
-@[c_export("pcre2_get_startchar_8")]
 fn pcre2_get_startchar_8(match_data: *mut pcre2_real_match_data_8) -> c_ulong:
     return match_data.startchar
 
@@ -675,38 +666,38 @@ type ucd_record { script: u8 = 0, chartype: u8 = 0, gbprop: u8 = 0, caseset: u8 
 type struct_ucd_record = ucd_record
 type pcre2_serialized_data { magic: c_uint = 0, version: c_uint = 0, config: c_uint = 0, number_of_codes: c_int = 0 }
 type struct_pcre2_serialized_data = pcre2_serialized_data
-extern var _pcre2_utf8_table1: *c_int
+var _pcre2_utf8_table1: *c_int
 extern let _pcre2_utf8_table1_size: c_uint
-extern var _pcre2_utf8_table2: *c_int
-extern var _pcre2_utf8_table3: *c_int
-extern var _pcre2_utf8_table4: *u8
-extern var _pcre2_OP_lengths_8: *u8
-extern var _pcre2_callout_end_delims_8: *c_uint
-extern var _pcre2_callout_start_delims_8: *c_uint
-extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
-extern var _pcre2_default_tables_8: *u8
-extern var _pcre2_hspace_list_8: *c_uint
-extern var _pcre2_vspace_list_8: *c_uint
-extern var _pcre2_ucd_boolprop_sets_8: *c_uint
-extern var _pcre2_ucd_caseless_sets_8: *c_uint
+var _pcre2_utf8_table2: *c_int
+var _pcre2_utf8_table3: *c_int
+var _pcre2_utf8_table4: *u8
+var _pcre2_OP_lengths_8: *u8
+var _pcre2_callout_end_delims_8: *c_uint
+var _pcre2_callout_start_delims_8: *c_uint
+var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+var _pcre2_default_match_context_8: pcre2_real_match_context_8
+var _pcre2_default_tables_8: *u8
+var _pcre2_hspace_list_8: *c_uint
+var _pcre2_vspace_list_8: *c_uint
+var _pcre2_ucd_boolprop_sets_8: *c_uint
+var _pcre2_ucd_caseless_sets_8: *c_uint
 extern let _pcre2_ucd_turkish_dotted_i_caseset_8: c_uint
-extern var _pcre2_ucd_nocase_ranges_8: *c_uint
+var _pcre2_ucd_nocase_ranges_8: *c_uint
 extern let _pcre2_ucd_nocase_ranges_size_8: c_uint
-extern var _pcre2_ucd_digit_sets_8: *c_uint
-extern var _pcre2_ucd_script_sets_8: *c_uint
-extern var _pcre2_ucd_records_8: *ucd_record
-extern var _pcre2_ucd_stage1_8: *c_ushort
-extern var _pcre2_ucd_stage2_8: *c_ushort
-extern var _pcre2_ucp_gbtable_8: *c_uint
-extern var _pcre2_ucp_gentype_8: *c_uint
-extern var _pcre2_unicode_version_8: *const i8
-extern var _pcre2_utt_8: *ucp_type_table
-extern var _pcre2_utt_names_8: *c_char
+var _pcre2_ucd_digit_sets_8: *c_uint
+var _pcre2_ucd_script_sets_8: *c_uint
+var _pcre2_ucd_records_8: *ucd_record
+var _pcre2_ucd_stage1_8: *c_ushort
+var _pcre2_ucd_stage2_8: *c_ushort
+var _pcre2_ucp_gbtable_8: *c_uint
+var _pcre2_ucp_gentype_8: *c_uint
+var _pcre2_unicode_version_8: *const i8
+var _pcre2_utt_8: *ucp_type_table
+var _pcre2_utt_names_8: *c_char
 extern let _pcre2_utt_size_8: c_ulong
-extern var _pcre2_ebcdic_1047_to_ascii_8: *u8
-extern var _pcre2_ascii_to_ebcdic_1047_8: *u8
+var _pcre2_ebcdic_1047_to_ascii_8: *u8
+var _pcre2_ascii_to_ebcdic_1047_8: *u8
 type pcre2_real_general_context_8 { memctl: pcre2_memctl }
 type struct_pcre2_real_general_context_8 = pcre2_real_general_context_8
 type pcre2_real_compile_context_8 { memctl: pcre2_memctl, stack_guard: *const fn(c_uint, *mut c_void) -> c_int = null, stack_guard_data: *mut c_void = null, tables: *const u8 = null, max_pattern_length: c_ulong = 0, max_pattern_compiled_length: c_ulong = 0, bsr_convention: c_ushort = 0, newline_convention: c_ushort = 0, parens_nest_limit: c_uint = 0, extra_options: c_uint = 0, max_varlookbehind: c_uint = 0, optimization_flags: c_uint = 0 }

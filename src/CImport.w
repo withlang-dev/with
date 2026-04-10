@@ -1293,9 +1293,12 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
         let init_val = ci_try_eval_var_init(session, idx)
         if init_val.len() > 0:
             return tl_attr ++ "let " ++ safe_name ++ ": " ++ actual_type ++ " = " ++ init_val ++ "\n"
+        // const without initializer is always extern (defined elsewhere)
         tl_attr ++ "extern let " ++ safe_name ++ ": " ++ actual_type ++ "\n"
     else:
-        tl_attr ++ "extern var " ++ safe_name ++ ": " ++ actual_type ++ "\n"
+        // --no-c-export: mutable vars are module-local (no extern)
+        let var_kw = if g_migrate_no_c_export != 0: "var " else: "extern var "
+        tl_attr ++ var_kw ++ safe_name ++ ": " ++ actual_type ++ "\n"
 
 // ── Typedef translation ─────────────────────────────────────
 
@@ -5413,6 +5416,14 @@ fn ci_expand_string_macro_sequence(session: i64, s: str) -> str:
 var g_migrate_defines: str = ""
 var g_migrate_macro_values: str = ""
 
+// When true, skip @[c_export] attributes and extern fn declarations
+// for functions defined in the same translation unit.
+// Set via migrate_set_no_c_export().
+var g_migrate_no_c_export: i32 = 0
+
+pub fn migrate_set_no_c_export(val: i32):
+    g_migrate_no_c_export = val
+
 pub fn migrate_add_define(define: str):
     // define is "NAME=VALUE" or just "NAME"
     if ci_str_contains(define, "="):
@@ -5815,7 +5826,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
         return "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")\n\n"
 
     // @[c_export] for non-static functions (preserves C ABI)
-    let export_prefix = if storage != CX_SC_STATIC: "@[c_export(\"" ++ name ++ "\")]\n" else: ""
+    let export_prefix = if g_migrate_no_c_export != 0 or storage == CX_SC_STATIC: "" else: "@[c_export(\"" ++ name ++ "\")]\n"
 
     // Try to translate the function body
     let body = ci_try_translate_fn_body(session, idx)
@@ -5824,8 +5835,15 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
         return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body ++ "\n"
 
     // Body translation failed — emit as extern fn (system header function
-    // or function with untranslatable body). This is the graceful demotion
-    // pattern from Zig's translate-c.
+    // or function with untranslatable body).
+    // In --no-c-export mode, skip extern fn for locally-defined functions
+    // (they'll be in the same module or don't need C linkage).
+    if g_migrate_no_c_export != 0:
+        let is_definition = with_ci_cursor_is_definition(session, ci_find_fn_cursor(session, name))
+        if is_definition != 0:
+            // Locally defined but untranslatable — emit stub
+            let ret_suffix = if ret == "void": "" else: " -> " ++ ret
+            return "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n    comptime_error(\"untranslatable function body\")\n\n"
     let cc = with_cimport_fn_calling_conv(session, idx)
     let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
     cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
