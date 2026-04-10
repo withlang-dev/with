@@ -83,7 +83,7 @@ prepare_generated_tree() {
         printf '%s\n' 'let STRING_WEIRD_ENDWORD: *const u8 = "[:>:]]"'
         # Helper function for strchr mapping
         printf '\n// strchr mapping (migrator emits string_find_char for strchr)\n'
-        printf '%s\n' 'fn string_find_char(s: *const i8, c: i32) -> *const i8: memchr(s, c, strlen(s))'
+        printf '%s\n' 'fn string_find_char(s: *const i8, c: i32) -> *const i8: (memchr((s as *const c_void), c, strlen(s)) as *const i8)'
     } > "$generated_dir/defs.w"
 
     local dst line
