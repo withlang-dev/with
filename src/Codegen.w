@@ -3285,9 +3285,14 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret != 0: 1 else: 0)
 
     // Prelude functions keep external linkage so they survive LLVM inlining.
-    // The declaration pass already tracks each decl's source file context.
+    // For multi-module libraries (lib/std/re/), only the library's public API
+    // functions get external linkage. Preamble helpers (GETCHARINC, snprintf,
+    // etc.) get internal linkage to avoid duplicate symbols when linking.
     let is_prelude = self.current_decl_source_file.contains("lib/std/")
+    let is_multi_module_lib = self.current_decl_source_file.contains("lib/std/re/")
     if effective_name != "main" and not is_prelude:
+        wl_set_linkage(function, wl_internal_linkage())
+    else if is_multi_module_lib and not effective_name.contains("pcre2"):
         wl_set_linkage(function, wl_internal_linkage())
 
     // @[weak] — set weak linkage (LLVMWeakAnyLinkage = 5)
