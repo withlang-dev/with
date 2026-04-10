@@ -3677,7 +3677,7 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                     return "(not " ++ operand ++ ")"
                 if op == UO_NOT: return "(0 - " ++ operand ++ " - 1)"
                 if op == UO_PLUS: return operand
-                if op == UO_DEREF: return "unsafe: *" ++ operand
+                if op == UO_DEREF: return "(unsafe: *" ++ operand ++ ")"
                 if op == UO_ADDR:
                     // C &var produces a raw pointer; translate to &mut var as *mut T
                     let addr_ty = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))

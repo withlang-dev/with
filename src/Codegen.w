@@ -487,6 +487,7 @@ type Codegen {
     mono_struct_tp_counts: HashMap[i32, i32],
     mono_struct_tp_flat_syms: Vec[i32],
     mono_struct_tp_flat_types: Vec[i64],
+    mono_struct_tp_flat_sema_types: Vec[i32],
 
     // Monomorphization cache: mangled_hash → value/type
     mono_values: HashMap[i64, i64],
@@ -829,6 +830,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         mono_struct_tp_counts: HashMap.new(),
         mono_struct_tp_flat_syms: Vec.new(),
         mono_struct_tp_flat_types: Vec.new(),
+        mono_struct_tp_flat_sema_types: Vec.new(),
         mono_values: HashMap.new(),
         mono_types: HashMap.new(),
         type_aliases: HashMap.new(),
@@ -2511,9 +2513,37 @@ fn Codegen.llvm_type_to_sema_type(self: Codegen, ty: i64) -> i32:
     if ty == wl_i16_type(self.context): return self.sema.ty_i16 as i32
     if ty == wl_f64_type(self.context): return self.sema.ty_f64 as i32
     if ty == wl_f32_type(self.context): return self.sema.ty_f32 as i32
+    if self.is_str_type(ty): return self.sema.ty_str as i32
     if ty == wl_ptr_type(self.context):
         // Could be str, ptr, or struct-by-ref — default to str
         return self.sema.ty_str as i32
+    if wl_get_type_kind(ty) == wl_struct_type_kind():
+        let st_sym = self.find_struct_type_by_llvm(ty)
+        if st_sym == self.sym_str:
+            return self.sema.ty_str as i32
+        if st_sym != 0:
+            if self.sema.named_types.contains(st_sym):
+                return self.sema.named_types.get(st_sym).unwrap() as i32
+            let mono_base_opt = self.mono_struct_base.get(st_sym)
+            let tp_start_opt = self.mono_struct_tp_starts.get(st_sym)
+            let tp_count_opt = self.mono_struct_tp_counts.get(st_sym)
+            if mono_base_opt.is_some() and tp_start_opt.is_some() and tp_count_opt.is_some():
+                let tp_flat_start = tp_start_opt.unwrap()
+                let tp_count = tp_count_opt.unwrap()
+                let sema_args: Vec[i32] = Vec.new()
+                for ti in 0..tp_count:
+                    var arg_sema = 0
+                    if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
+                        arg_sema = self.mono_struct_tp_flat_sema_types.get((tp_flat_start + ti) as i64)
+                    if arg_sema == 0 and tp_flat_start + ti < self.mono_struct_tp_flat_types.len() as i32:
+                        let arg_llvm = self.mono_struct_tp_flat_types.get((tp_flat_start + ti) as i64)
+                        arg_sema = self.llvm_type_to_sema_type(arg_llvm)
+                    if arg_sema == 0:
+                        return 0
+                    sema_args.push(arg_sema)
+                let found = self.sema.ensure_generic_inst_type(mono_base_opt.unwrap(), sema_args, tp_count)
+                if found != 0:
+                    return found as i32
     0
 
 // ── Builtin str type ──────────────────────────────────────────────
@@ -3774,14 +3804,20 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
         tp_pos = tp_pos + 2 + bound_count
 
     let arg_types: Vec[i64] = Vec.new()
+    let arg_sema_types: Vec[i32] = Vec.new()
     if arg_count > 0:
         for ai in 0..arg_count:
             let arg_node = self.pool.get_extra(extra_start + ai)
+            let arg_sema = self.sema.resolve_type_expr(arg_node) as i32
             let arg_ty = self.resolve_type(arg_node)
             if arg_ty != 0:
                 arg_types.push(arg_ty)
             else:
                 arg_types.push(wl_i32_type(self.context))
+            if arg_sema != 0:
+                arg_sema_types.push(arg_sema)
+            else:
+                arg_sema_types.push(self.llvm_type_to_sema_type(arg_types.get(ai as i64)))
     else:
         for ti in 0..tp_count:
             let tp_sym = tp_syms.get(ti as i64)
@@ -3793,8 +3829,11 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
             if bound_ty == 0:
                 bound_ty = self.type_fallback()
             arg_types.push(bound_ty)
+            arg_sema_types.push(self.llvm_type_to_sema_type(bound_ty))
     while arg_types.len() as i32 < tp_count:
-        arg_types.push(self.type_fallback())
+        let fallback_ty = self.type_fallback()
+        arg_types.push(fallback_ty)
+        arg_sema_types.push(self.llvm_type_to_sema_type(fallback_ty))
 
     let base_name = self.intern.resolve(name_sym)
     var mangled = base_name
@@ -3813,6 +3852,7 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
     for ti in 0..tp_count:
         self.mono_struct_tp_flat_syms.push(tp_syms.get(ti as i64))
         self.mono_struct_tp_flat_types.push(arg_types.get(ti as i64))
+        self.mono_struct_tp_flat_sema_types.push(arg_sema_types.get(ti as i64))
     self.mono_struct_tp_starts.insert(mono_sym, tp_flat_start)
     self.mono_struct_tp_counts.insert(mono_sym, tp_count)
     let mono_idx = self.struct_type_map.get(mono_sym).unwrap()
@@ -3968,9 +4008,14 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
     let sm_tp_sema_tys: Vec[i32] = Vec.new()
     for ti in 0..tp_count:
         let tp_sym = self.mono_struct_tp_flat_syms.get((tp_flat_start + ti) as i64)
-        let tp_llvm = self.mono_struct_tp_flat_types.get((tp_flat_start + ti) as i64)
         sm_tp_syms.push(tp_sym)
-        sm_tp_sema_tys.push(self.llvm_type_to_sema_type(tp_llvm))
+        var tp_sema = 0
+        if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
+            tp_sema = self.mono_struct_tp_flat_sema_types.get((tp_flat_start + ti) as i64)
+        if tp_sema == 0:
+            let tp_llvm = self.mono_struct_tp_flat_types.get((tp_flat_start + ti) as i64)
+            tp_sema = self.llvm_type_to_sema_type(tp_llvm)
+        sm_tp_sema_tys.push(tp_sema)
 
     // 1. Type-check body with concrete types
     let sig_idx = self.sema.check_fn_body_concrete(decl, sm_tp_syms, sm_tp_sema_tys, mono_sym)
@@ -4060,9 +4105,14 @@ fn Codegen.monomorphize_struct_static_method_core(self: Codegen, mono_type_sym: 
     let sm_tp_sema_tys: Vec[i32] = Vec.new()
     for ti in 0..tp_count:
         let tp_sym = self.mono_struct_tp_flat_syms.get((tp_flat_start + ti) as i64)
-        let tp_llvm = self.mono_struct_tp_flat_types.get((tp_flat_start + ti) as i64)
         sm_tp_syms.push(tp_sym)
-        sm_tp_sema_tys.push(self.llvm_type_to_sema_type(tp_llvm))
+        var tp_sema = 0
+        if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
+            tp_sema = self.mono_struct_tp_flat_sema_types.get((tp_flat_start + ti) as i64)
+        if tp_sema == 0:
+            let tp_llvm = self.mono_struct_tp_flat_types.get((tp_flat_start + ti) as i64)
+            tp_sema = self.llvm_type_to_sema_type(tp_llvm)
+        sm_tp_sema_tys.push(tp_sema)
 
     let sig_idx = self.sema.check_fn_body_concrete(decl, sm_tp_syms, sm_tp_sema_tys, mono_sym)
     var mir_builder = MirBuilder.init(self.sema, self.pool, self.intern, mono_sym)
