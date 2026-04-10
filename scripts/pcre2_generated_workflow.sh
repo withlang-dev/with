@@ -21,6 +21,18 @@ EOF
     exit 1
 }
 
+externize_shared_vars_except_owner() {
+    local generated_dir="$1"
+    local owner_file="$2"
+    local pattern="$3"
+    local dst
+
+    for dst in "$generated_dir"/*.w; do
+        [ "$(basename "$dst")" = "$owner_file" ] && continue
+        perl -pi -e 's/^var ('"$pattern"': )/extern var $1/' "$dst"
+    done
+}
+
 is_excluded() {
     case "$1" in
         pcre2test.w|pcre2demo.w|pcre2grep.w|pcre2posix_test.w|\
@@ -114,6 +126,18 @@ prepare_generated_tree() {
     for dst in "$generated_dir"/*.w; do
         perl -pi -e 's/^var (_pcre2_default_\w+_context_8:)/extern var $1/' "$dst"
     done
+
+    # The migrator re-emits PCRE2 header globals into every translation unit.
+    # Keep one real definition per shared symbol and make all other modules
+    # reference it with extern var.
+    externize_shared_vars_except_owner \
+        "$generated_dir" \
+        "pcre2_tables.w" \
+        '_pcre2_(?!posix_class_maps8)\w+'
+    externize_shared_vars_except_owner \
+        "$generated_dir" \
+        "pcre2_compile.w" \
+        '_pcre2_posix_class_maps8'
 
     # Concatenate adjacent string literals: "foo" "bar" → "foobar"
     # Cast with_alloc to *mut c_void (returns *i8 but often assigned to void*)
