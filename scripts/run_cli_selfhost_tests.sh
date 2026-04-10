@@ -416,6 +416,90 @@ EOF
   echo "PASS(cli-selfhost-regex) shared_externs"
 }
 
+expect_pcre2_prepare_shared_lets() {
+  local case_dir="$tmpdir/pcre2_prepare_shared_lets_case"
+  local raw_dir="$case_dir/raw"
+  local generated_dir="$case_dir/generated"
+  mkdir -p "$raw_dir"
+
+  cat >"$raw_dir/pcre2_tables.w" <<'EOF'
+// raw tables
+extern fn preamble_helper() -> void
+type BOOL = c_int
+let ucp_C: c_uint = 0
+let ucp_L: c_uint = 1
+let LOCAL_TABLE_ONLY: c_uint = 99
+EOF
+
+  cat >"$raw_dir/pcre2_compile.w" <<'EOF'
+// raw compile
+extern fn preamble_helper() -> void
+type BOOL = c_int
+let ucp_C: c_uint = 0
+let ucp_L: c_uint = 1
+let COMPILE_ONLY: c_uint = 7
+EOF
+
+  cat >"$raw_dir/pcre2_match.w" <<'EOF'
+// raw match
+extern fn preamble_helper() -> void
+type BOOL = c_int
+let ucp_C: c_uint = 0
+let ucp_L: c_uint = 1
+let MATCH_ONLY: c_uint = 8
+EOF
+
+  if ! bash "$ROOT_DIR/scripts/pcre2_generated_workflow.sh" prepare "$raw_dir" "$generated_dir" >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-regex-prepare) shared_lets"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'let ucp_C: c_uint = 0' "$generated_dir/defs.w" \
+    || ! grep -Fq 'let ucp_L: c_uint = 1' "$generated_dir/defs.w" \
+    || grep -Fq 'let ucp_C: c_uint = 0' "$generated_dir/pcre2_tables.w" \
+    || grep -Fq 'let ucp_C: c_uint = 0' "$generated_dir/pcre2_compile.w" \
+    || grep -Fq 'let ucp_C: c_uint = 0' "$generated_dir/pcre2_match.w" \
+    || ! grep -Fq 'let LOCAL_TABLE_ONLY: c_uint = 99' "$generated_dir/pcre2_tables.w" \
+    || ! grep -Fq 'let COMPILE_ONLY: c_uint = 7' "$generated_dir/pcre2_compile.w" \
+    || ! grep -Fq 'let MATCH_ONLY: c_uint = 8' "$generated_dir/pcre2_match.w"; then
+    echo "FAIL(cli-selfhost-regex-output) shared_lets"
+    find "$generated_dir" -maxdepth 1 -type f -print | sort | while read -r f; do
+      echo "--- $f"
+      sed -n '1,80p' "$f"
+    done
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-regex) shared_lets"
+}
+
+expect_std_re_shared_dependency_imports() {
+  local case_dir="$tmpdir/std_re_shared_dependency_case"
+  local src="$case_dir/main.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+use std.re.defs
+use std.re.pcre2_compile
+use std.re.pcre2_match
+
+fn main:
+    print("ok")
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$src"; then
+    echo "FAIL(cli-selfhost-check) std_re_shared_dependency_imports"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-check) std_re_shared_dependency_imports"
+}
+
 expect_migrate_initializer_regressions() {
   local case_dir="$tmpdir/migrate_initializer_regressions_case"
   local src="$case_dir/initializer_regressions.c"
@@ -587,6 +671,8 @@ expect_migrate_host_header_compat
 expect_migrate_pcre2_config_template
 expect_migrate_assignment_compat
 expect_pcre2_prepare_shared_externs
+expect_pcre2_prepare_shared_lets
+expect_std_re_shared_dependency_imports
 expect_migrate_initializer_regressions
 
 if [[ "$failures" -ne 0 ]]; then

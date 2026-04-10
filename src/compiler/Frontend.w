@@ -11,6 +11,7 @@ use Resolve
 use Span
 use Diagnostic
 use CImport
+use render
 use compiler.EmbeddedStdlib
 use compiler.ProjectConfig
 use compiler.Zcu
@@ -1197,6 +1198,8 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                     let sname = self.pool.resolve(shadowed_name)
                     self.diagnostics.emit(Diagnostic.err(f"extern fn '{sname}' shadows prelude function '{sname}'", Span { file: 0, start: merged_pool.get_start(id), end: merged_pool.get_end(id) }))
             continue
+        if ik == NodeKind.NK_EXTERN_VAR and frontend_extern_var_shadowed_in_tier(prelude_ordered, merged_pool, self.pool, oi):
+            continue
         merged_pool.add_decl(id)
         rebuilt_paths.push(prelude_paths.get(oi as i64))
         rebuilt_file_ids.push(prelude_file_ids.get(oi as i64))
@@ -1204,6 +1207,8 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let id = user_import_ordered.get(oi as i64)
         let ik = merged_pool.kind(id)
         if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(user_import_ordered, merged_pool, oi, root_fn_names):
+            continue
+        if ik == NodeKind.NK_EXTERN_VAR and frontend_extern_var_shadowed_in_tier(user_import_ordered, merged_pool, self.pool, oi):
             continue
         merged_pool.add_decl(id)
         rebuilt_paths.push(user_import_paths.get(oi as i64))
@@ -1235,6 +1240,22 @@ fn frontend_fn_shadowed_in_tier(tier: Vec[i32], pool: AstPool, idx: i32, higher_
         let jk = pool.kind(jd)
         if (jk == NodeKind.NK_FN_DECL or jk == NodeKind.NK_EXTERN_FN) and pool.get_data0(jd) == iname:
             return true
+        j = j + 1
+    false
+
+fn frontend_extern_var_shadowed_in_tier(tier: Vec[i32], pool: AstPool, intern: InternPool, idx: i32) -> bool:
+    let decl = tier.get(idx as i64)
+    let decl_name = intern.resolve(pool.get_data0(decl))
+    let decl_mut = pool.get_data2(decl)
+    let decl_type = render_type_expr(pool, intern, (pool.get_data1(decl)) as NodeId)
+    var j = idx + 1
+    while j < tier.len() as i32:
+        let jd = tier.get(j as i64)
+        if pool.kind(jd) == NodeKind.NK_EXTERN_VAR and pool.get_data2(jd) == decl_mut:
+            if intern.resolve(pool.get_data0(jd)) == decl_name:
+                let other_type = render_type_expr(pool, intern, (pool.get_data1(jd)) as NodeId)
+                if other_type == decl_type:
+                    return true
         j = j + 1
     false
 
