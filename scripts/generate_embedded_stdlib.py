@@ -22,7 +22,14 @@ def main() -> int:
     root = Path(sys.argv[1]).resolve()
     out_path = Path(sys.argv[2]).resolve()
     std_root = root / "lib" / "std"
-    files = sorted(std_root.rglob("*.w"))
+    # Exclude std/re/ and std/re.raw/ — PCRE2 migrated library is too
+    # large to embed and is compiled separately as object files.
+    re_dir = std_root / "re"
+    re_raw_dir = std_root / "re.raw"
+    files = sorted(
+        f for f in std_root.rglob("*.w")
+        if not f.is_relative_to(re_dir) and not f.is_relative_to(re_raw_dir)
+    )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
 

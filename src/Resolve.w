@@ -881,6 +881,10 @@ fn ResolveState.resolve_use_file(self: ResolveState, module_id: i32, pool: AstPo
         rel_primary = rel_primary ++ self.pool.resolve(seg)
     rel_primary = rel_primary ++ ".w"
 
+    // Try embedded stdlib first (fast path for built-in modules).
+    // If not found, fall through to normal filesystem resolution.
+    // This decouples the std/ namespace from the embedded storage —
+    // modules like std.re can live on the filesystem without embedding.
     if rel_primary.starts_with("std/"):
         let embedded_primary = embedded_std_resolve_path(rel_primary)
         if embedded_primary.len() > 0:
@@ -896,7 +900,7 @@ fn ResolveState.resolve_use_file(self: ResolveState, module_id: i32, pool: AstPo
             let embedded_fallback = embedded_std_resolve_path(rel_fallback_embedded)
             if embedded_fallback.len() > 0:
                 return embedded_fallback
-        return ""
+        // Not embedded — fall through to filesystem resolution
 
     let path1 = self.resolve_module_rel(module_dir, rel_primary)
     if path1.len() > 0:

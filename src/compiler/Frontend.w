@@ -1298,7 +1298,7 @@ fn Zcu.resolve_module_path_frontend(self: Zcu, module_name: str, source_dir_raw:
             let embedded_fallback = embedded_std_resolve_path(rel_fallback)
             if embedded_fallback.len() > 0:
                 return embedded_fallback
-        return ""
+        // Not embedded — fall through to filesystem resolution
 
     let source_dir = if source_dir_raw.len() > 0: source_dir_raw else: self.source_dir
     let has_root_fallback = source_dir != self.source_dir
