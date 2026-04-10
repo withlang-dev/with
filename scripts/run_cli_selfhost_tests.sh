@@ -67,6 +67,84 @@ EOF
   echo "PASS(cli-selfhost-emit-obj) emit_obj_globals"
 }
 
+expect_emit_obj_imported_symbols() {
+  local case_dir="$tmpdir/emit_obj_imports_case"
+  local shared_src="$case_dir/shared.w"
+  local user_src="$case_dir/user.w"
+  local shared_obj="$case_dir/shared.o"
+  local user_obj="$case_dir/user.o"
+  mkdir -p "$case_dir"
+
+  cat >"$shared_src" <<'EOF'
+var shared_var: i32 = 42
+EOF
+
+  cat >"$user_src" <<'EOF'
+use shared
+@[c_export("use_shared")]
+fn use_shared() -> i32: shared_var
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$shared_src" --emit-obj -O0 -o "$shared_obj"; then
+    echo "FAIL(cli-selfhost-emit-obj-build) emit_obj_import_owner"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$user_src" --emit-obj -O0 -o "$user_obj"; then
+    echo "FAIL(cli-selfhost-emit-obj-build) emit_obj_import_user"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! /usr/bin/nm -g "$shared_obj" | awk '
+    {
+      type = (NF >= 2 ? $(NF - 1) : "")
+      name = $NF
+      sub(/^_/, "", name)
+      if (name == "shared_var") {
+        if (type == "U") bad = 1
+        seen[name] = 1
+      }
+    }
+    END {
+      exit !(seen["shared_var"]) || bad
+    }
+  '; then
+    echo "FAIL(cli-selfhost-emit-obj-symbols) emit_obj_import_owner"
+    /usr/bin/nm -g "$shared_obj" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! /usr/bin/nm -g "$user_obj" | awk '
+    {
+      type = (NF >= 2 ? $(NF - 1) : "")
+      name = $NF
+      sub(/^_/, "", name)
+      if (name == "use_shared") {
+        if (type == "U") bad = 1
+        seen[name] = 1
+      } else if (name == "shared_var") {
+        if (type != "U") bad = 1
+        seen[name] = 1
+      }
+    }
+    END {
+      exit !(seen["use_shared"] && seen["shared_var"]) || bad
+    }
+  '; then
+    echo "FAIL(cli-selfhost-emit-obj-symbols) emit_obj_import_user"
+    /usr/bin/nm -g "$user_obj" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-emit-obj) emit_obj_imported_symbols"
+}
+
 expect_init_in_cwd() {
   local case_dir="$tmpdir/init_in_cwd_case"
   local expected_name
@@ -170,6 +248,7 @@ expect_init_named_dir() {
 expect_init_in_cwd
 expect_init_named_dir
 expect_emit_obj_global_symbols
+expect_emit_obj_imported_symbols
 
 if [[ "$failures" -ne 0 ]]; then
   echo "cli selfhost tests: $failures failure(s)"

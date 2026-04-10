@@ -510,6 +510,7 @@ type Codegen {
     const_int_vals: Vec[i64],
     decl_source_paths: Vec[str],
     current_decl_source_file: str,
+    module_object_mode: i32,
 
     // Loop stack (fixed-size arrays via Vec)
     loop_break_bbs: Vec[i64],
@@ -845,6 +846,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         const_int_vals: Vec.new(),
         decl_source_paths: Vec.new(),
         current_decl_source_file: "<unknown>",
+        module_object_mode: 0,
         loop_break_bbs: Vec.new(),
         loop_continue_bbs: Vec.new(),
         loop_result_allocas: Vec.new(),
