@@ -1296,6 +1296,10 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
         // const without initializer is always extern (defined elsewhere)
         tl_attr ++ "extern let " ++ safe_name ++ ": " ++ actual_type ++ "\n"
     else:
+        if g_migrate_no_c_export != 0:
+            let init_val = ci_try_eval_var_init(session, idx)
+            if init_val.len() > 0:
+                return tl_attr ++ "var " ++ safe_name ++ ": " ++ actual_type ++ " = " ++ init_val ++ "\n"
         // --no-c-export: mutable vars are module-local definitions
         let var_kw = if g_migrate_no_c_export != 0: "var " else: "extern var "
         tl_attr ++ var_kw ++ safe_name ++ ": " ++ actual_type ++ "\n"
@@ -3817,6 +3821,40 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     // Initializer list — { expr1, expr2, ... }
     if kind == CXK_INIT_LIST:
         let nc = with_ci_num_children(session, cursor)
+        let init_ty = with_ci_cursor_type(session, cursor)
+        let ty_str = with_ci_type_translated(session, init_ty)
+        if ty_str.len() > 0 and ty_str.byte_at(0) == 91:
+            var array_items = ""
+            var ai = 0
+            while ai < nc:
+                if ai > 0:
+                    array_items = array_items ++ ", "
+                let item = ci_trans_expr(session, with_ci_child(session, cursor, ai), scope)
+                if item.len() == 0:
+                    return ""
+                array_items = array_items ++ item
+                ai = ai + 1
+            return "[" ++ array_items ++ "]"
+        let aggregate_field_count = ci_type_field_count(session, ty_str)
+        if aggregate_field_count > 0:
+            var fields = ""
+            var fi = 0
+            while fi < nc:
+                let item = ci_trans_expr(session, with_ci_child(session, cursor, fi), scope)
+                if item.len() == 0:
+                    return ""
+                let field_name = ci_type_field_name(session, ty_str, fi)
+                if field_name.len() == 0:
+                    return ""
+                let field_type = ci_type_field_type(session, ty_str, fi)
+                let coerced_item = ci_coerce_init_value_for_type(item, field_type)
+                if fi > 0:
+                    fields = fields ++ ", "
+                fields = fields ++ field_name ++ ": " ++ coerced_item
+                fi = fi + 1
+            return ty_str ++ " { " ++ fields ++ " }"
+        if nc == 1:
+            return ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
         var items = ""
         var ii = 0
         while ii < nc:
@@ -3827,9 +3865,6 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                 return ""
             items = items ++ item
             ii = ii + 1
-        // Get the target type for struct init
-        let init_ty = with_ci_cursor_type(session, cursor)
-        let ty_str = with_ci_type_translated(session, init_ty)
         if ty_str != "i32" and not ci_starts_with(ty_str, "__UNSUPPORTED"):
             return ty_str ++ " { " ++ items ++ " }"
         return "{ " ++ items ++ " }"
@@ -4164,7 +4199,8 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                 let vty_str = with_ci_type_translated(session, vty)
                 let child_nc = with_ci_num_children(session, child)
                 if child_nc > 0:
-                    let init = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
+                    let init_cursor = ci_find_var_init_cursor(session, child)
+                    let init = if init_cursor >= 0: ci_trans_expr(session, init_cursor, scope) else: ""
                     if result.len() > 0:
                         result = result ++ "\n" ++ ci_indent_str(indent)
                     // For array types, reject non-array initializers (e.g., dimension expression)
@@ -4275,30 +4311,16 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
 
 fn ci_try_eval_var_init(session: i64, idx: i32) -> str:
     // Try to evaluate a variable's initializer using libclang's cursor eval API
-    let root = with_ci_root_cursor(session)
-    let n = with_ci_num_children(session, root)
-    // Find the variable declaration cursor by matching name
     let target_name = with_cimport_decl_name(session, idx)
-    var i = 0
-    while i < n:
-        let child = with_ci_child(session, root, i)
-        let ck = with_ci_cursor_kind(session, child)
-        if ck == CXK_VAR_DECL:
-            let cname = with_ci_cursor_spelling(session, child)
-            if cname == target_name:
-                // Found the variable — check for initializer child
-                let child_nc = with_ci_num_children(session, child)
-                if child_nc > 0:
-                    let init_cursor = with_ci_child(session, child, 0)
-                    // Try integer evaluation
-                    if with_ci_eval_int_valid(session, init_cursor) != 0:
-                        return f"{with_ci_eval_int_value(session, init_cursor)}"
-                    // Try expression translation
-                    let expr = ci_trans_expr(session, init_cursor, "")
-                    if expr.len() > 0:
-                        return expr
-                return ""
-        i = i + 1
+    let var_cursor = ci_find_var_cursor(session, target_name)
+    if var_cursor >= 0:
+        let init_cursor = ci_find_var_init_cursor(session, var_cursor)
+        if init_cursor >= 0:
+            if with_ci_eval_int_valid(session, init_cursor) != 0:
+                return f"{with_ci_eval_int_value(session, init_cursor)}"
+            let expr = ci_trans_expr(session, init_cursor, "")
+            if expr.len() > 0:
+                return expr
     ""
 
 // Get source location for a declaration by matching name in AST
@@ -4725,7 +4747,8 @@ fn ci_trans_decl_stmt_scoped(session: i64, cursor: i32, indent: i32, scope: str)
             if result.len() > 0:
                 result = result ++ "\n" ++ ci_indent_str(indent)
             if child_nc > 0:
-                let init = ci_trans_expr(session, with_ci_child(session, child, 0), new_scope)
+                let init_cursor = ci_find_var_init_cursor(session, child)
+                let init = if init_cursor >= 0: ci_trans_expr(session, init_cursor, new_scope) else: ""
                 // For array types, reject non-array initializers (e.g., dimension expression)
                 if init.len() > 0 and not (vty_str.len() > 0 and vty_str.byte_at(0) == 91 and init.byte_at(0) != 91):
                     result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ init
@@ -6133,7 +6156,8 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
                     let vname = ci_escape_reserved(with_ci_cursor_spelling(session, dchild))
                     let init_nc = with_ci_num_children(session, dchild)
                     if init_nc > 0:
-                        let init_expr = ci_trans_expr(session, with_ci_child(session, dchild, 0), scope)
+                        let init_cursor = ci_find_var_init_cursor(session, dchild)
+                        let init_expr = if init_cursor >= 0: ci_trans_expr(session, init_cursor, scope) else: ""
                         if init_expr.len() > 0:
                             output = output ++ ci_indent_str(indent + 3) ++ vname ++ " = " ++ init_expr ++ "\n"
                             arm_has_content = true
@@ -6328,7 +6352,8 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
                     continue
                 let init_nc = with_ci_num_children(session, dchild)
                 if init_nc > 0:
-                    let init_expr = ci_trans_expr(session, with_ci_child(session, dchild, 0), scope)
+                    let init_cursor = ci_find_var_init_cursor(session, dchild)
+                    let init_expr = if init_cursor >= 0: ci_trans_expr(session, init_cursor, scope) else: ""
                     if init_expr.len() > 0:
                         if result.len() > 0:
                             result = result ++ "\n"
@@ -6340,6 +6365,134 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
     ci_trans_stmt(session, cursor, indent, scope)
 
 // Find a function cursor in the cursor tree by name.
+fn ci_find_var_cursor(session: i64, name: str) -> i32:
+    let root = with_ci_root_cursor(session)
+    let n = with_ci_num_children(session, root)
+    var fallback = -1
+    var i = 0
+    while i < n:
+        let child = with_ci_child(session, root, i)
+        if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
+            let cname = with_ci_cursor_spelling(session, child)
+            if cname == name:
+                if with_ci_num_children(session, child) > 0:
+                    return child
+                if fallback < 0:
+                    fallback = child
+        i = i + 1
+    fallback
+
+fn ci_cursor_kind_is_expr(kind: i32) -> bool:
+    kind >= 100 and kind < 200
+
+fn ci_find_var_init_cursor(session: i64, var_cursor: i32) -> i32:
+    let nc = with_ci_num_children(session, var_cursor)
+    var i = nc - 1
+    while i >= 0:
+        let child = with_ci_child(session, var_cursor, i)
+        if ci_cursor_kind_is_expr(with_ci_cursor_kind(session, child)):
+            return child
+        i = i - 1
+    -1
+
+fn ci_decl_name_matches_type(decl_name: str, ty_name: str) -> bool:
+    decl_name == ty_name or ci_escape_reserved(decl_name) == ty_name
+
+fn ci_struct_field_emitted_name(session: i64, idx: i32, fi: i32) -> str:
+    let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, fi)
+    let fname = with_cimport_struct_field_name(session, idx, fi)
+    if anon_kind != 0:
+        if fname.len() > 0:
+            return ci_escape_reserved(fname)
+        var anon_idx = 0
+        var ai = 0
+        while ai <= fi:
+            if with_cimport_struct_field_is_anonymous_record(session, idx, ai) != 0:
+                if ai == fi:
+                    return "anon_" ++ i64_to_string(anon_idx as i64)
+                anon_idx = anon_idx + 1
+            ai = ai + 1
+    let actual_name = if fname.len() == 0: f"unnamed_{fi}" else: fname
+    ci_escape_reserved(actual_name)
+
+fn ci_type_field_count(session: i64, ty_name: str) -> i32:
+    if ty_name.len() == 0:
+        return 0
+    let decl_count = with_cimport_decl_count(session)
+    var i = 0
+    while i < decl_count:
+        let kind = with_cimport_decl_kind(session, i)
+        let decl_name = with_cimport_decl_name(session, i)
+        if (kind == CK_STRUCT or kind == CK_UNION) and ci_decl_name_matches_type(decl_name, ty_name):
+            return with_cimport_struct_field_count(session, i)
+        if kind == CK_TYPEDEF and ci_decl_name_matches_type(decl_name, ty_name):
+            let anon_count = with_cimport_typedef_anon_record_field_count(session, i)
+            if anon_count > 0:
+                return anon_count
+            let underlying = with_cimport_typedef_underlying_translated(session, i)
+            if underlying.len() > 0 and underlying != ty_name:
+                return ci_type_field_count(session, underlying)
+            return 0
+        i = i + 1
+    0
+
+fn ci_type_field_name(session: i64, ty_name: str, field_idx: i32) -> str:
+    if ty_name.len() == 0 or field_idx < 0:
+        return ""
+    let decl_count = with_cimport_decl_count(session)
+    var i = 0
+    while i < decl_count:
+        let kind = with_cimport_decl_kind(session, i)
+        let decl_name = with_cimport_decl_name(session, i)
+        if (kind == CK_STRUCT or kind == CK_UNION) and ci_decl_name_matches_type(decl_name, ty_name):
+            if field_idx >= with_cimport_struct_field_count(session, i):
+                return ""
+            return ci_struct_field_emitted_name(session, i, field_idx)
+        if kind == CK_TYPEDEF and ci_decl_name_matches_type(decl_name, ty_name):
+            let anon_count = with_cimport_typedef_anon_record_field_count(session, i)
+            if anon_count > 0:
+                if field_idx >= anon_count:
+                    return ""
+                let fname = with_cimport_typedef_anon_field_name(session, i, field_idx)
+                let actual_fname = if fname.len() == 0: f"unnamed_{field_idx}" else: fname
+                return ci_escape_reserved(actual_fname)
+            let underlying = with_cimport_typedef_underlying_translated(session, i)
+            if underlying.len() > 0 and underlying != ty_name:
+                return ci_type_field_name(session, underlying, field_idx)
+            return ""
+        i = i + 1
+    ""
+
+fn ci_type_field_type(session: i64, ty_name: str, field_idx: i32) -> str:
+    if ty_name.len() == 0 or field_idx < 0:
+        return ""
+    let decl_count = with_cimport_decl_count(session)
+    var i = 0
+    while i < decl_count:
+        let kind = with_cimport_decl_kind(session, i)
+        let decl_name = with_cimport_decl_name(session, i)
+        if (kind == CK_STRUCT or kind == CK_UNION) and ci_decl_name_matches_type(decl_name, ty_name):
+            if field_idx >= with_cimport_struct_field_count(session, i):
+                return ""
+            return with_cimport_struct_field_type_translated(session, i, field_idx)
+        if kind == CK_TYPEDEF and ci_decl_name_matches_type(decl_name, ty_name):
+            let anon_count = with_cimport_typedef_anon_record_field_count(session, i)
+            if anon_count > 0:
+                if field_idx >= anon_count:
+                    return ""
+                return with_cimport_typedef_anon_field_type(session, i, field_idx)
+            let underlying = with_cimport_typedef_underlying_translated(session, i)
+            if underlying.len() > 0 and underlying != ty_name:
+                return ci_type_field_type(session, underlying, field_idx)
+            return ""
+        i = i + 1
+    ""
+
+fn ci_coerce_init_value_for_type(value: str, ty: str) -> str:
+    if value == "0" and (ci_starts_with(ty, "*") or ci_starts_with(ty, "Option[")):
+        return "null"
+    value
+
 fn ci_find_fn_cursor(session: i64, name: str) -> i32:
     let root = with_ci_root_cursor(session)
     let n = with_ci_num_children(session, root)
