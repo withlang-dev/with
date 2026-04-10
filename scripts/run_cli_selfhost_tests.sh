@@ -27,6 +27,46 @@ run_cli() {
   runner_exec_capture "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" "$@"
 }
 
+expect_emit_obj_global_symbols() {
+  local case_dir="$tmpdir/emit_obj_globals_case"
+  local src="$case_dir/emit_obj_globals.w"
+  local obj="$case_dir/emit_obj_globals.o"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+var explicit_global: i32 = 42
+var zero_global: i32
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$src" --emit-obj -o "$obj"; then
+    echo "FAIL(cli-selfhost-emit-obj-build) emit_obj_globals"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! /usr/bin/nm -g "$obj" | awk '
+    {
+      name = $NF
+      sub(/^_/, "", name)
+      if (name == "explicit_global" || name == "zero_global") {
+        if ($2 == "U") bad = 1
+        seen[name] = 1
+      }
+    }
+    END {
+      exit !(seen["explicit_global"] && seen["zero_global"]) || bad
+    }
+  '; then
+    echo "FAIL(cli-selfhost-emit-obj-symbols) emit_obj_globals"
+    /usr/bin/nm -g "$obj" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-emit-obj) emit_obj_globals"
+}
+
 expect_init_in_cwd() {
   local case_dir="$tmpdir/init_in_cwd_case"
   local expected_name
@@ -129,6 +169,7 @@ expect_init_named_dir() {
 
 expect_init_in_cwd
 expect_init_named_dir
+expect_emit_obj_global_symbols
 
 if [[ "$failures" -ne 0 ]]; then
   echo "cli selfhost tests: $failures failure(s)"

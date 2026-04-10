@@ -851,24 +851,32 @@ fn Codegen.emit_vec_new_global(self: Codegen, name_sym: i32, vec_tid: i32, is_mu
     fields.push(wl_const_int(i64_ty, self.abi_size_of(elem_llvm), 0))
     let init = wl_const_named_struct(vec_llvm, vec_data_i64(&fields), 4)
 
-    let name_str = self.intern.resolve(name_sym)
-    let global = wl_add_global(self.llmod, vec_llvm, name_str)
-    wl_set_initializer(global, init)
-    if is_mut == 0:
-        wl_set_global_constant(global, 1)
-    wl_set_linkage(global, wl_internal_linkage())
-    self.module_constants.insert(name_sym, global)
+    let _ = self.record_module_binding_global(name_sym, vec_llvm, init, is_mut)
     true
 
-fn Codegen.queue_module_runtime_init(self: Codegen, name_sym: i32, value_node: i32, result_tid: i32) -> bool:
+fn Codegen.finalize_module_binding_global(self: Codegen, global: i64, is_mut: i32):
+    let _ = self
+    if is_mut == 0:
+        wl_set_global_constant(global, 1)
+        wl_set_linkage(global, wl_internal_linkage())
+        return
+    // Mutable module bindings are storage definitions. Keep external linkage
+    // so `--emit-obj` exports a symbol other modules and C code can link.
+    wl_set_linkage(global, 0)
+
+fn Codegen.record_module_binding_global(self: Codegen, name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
+    let name_str = self.intern.resolve(name_sym)
+    let global = wl_add_global(self.llmod, global_ty, name_str)
+    wl_set_initializer(global, init)
+    self.finalize_module_binding_global(global, is_mut)
+    self.module_constants.insert(name_sym, global)
+    global
+
+fn Codegen.queue_module_runtime_init(self: Codegen, name_sym: i32, value_node: i32, result_tid: i32, is_mut: i32) -> bool:
     let global_ty = self.sema_type_to_llvm(result_tid)
     if global_ty == 0:
         return false
-    let name_str = self.intern.resolve(name_sym)
-    let global = wl_add_global(self.llmod, global_ty, name_str)
-    wl_set_initializer(global, wl_const_null(global_ty))
-    wl_set_linkage(global, wl_internal_linkage())
-    self.module_constants.insert(name_sym, global)
+    let _ = self.record_module_binding_global(name_sym, global_ty, self.build_default_value(global_ty), is_mut)
     self.module_runtime_init_syms.push(name_sym)
     self.module_runtime_init_nodes.push(value_node)
     self.module_runtime_init_type_ids.push(result_tid)
@@ -1403,19 +1411,27 @@ fn Codegen.emit_const_array_global(self: Codegen, name_sym: i32, array_tid: i32,
     let init = self.try_eval_const_llvm(value_node, resolved as i32)
     if init == 0:
         return false
-    let name_str = self.intern.resolve(name_sym)
-    let global = wl_add_global(self.llmod, global_ty, name_str)
-    wl_set_initializer(global, init)
-    if is_mut == 0:
-        wl_set_global_constant(global, 1)
-    wl_set_linkage(global, wl_internal_linkage())
-    self.module_constants.insert(name_sym, global)
+    let _ = self.record_module_binding_global(name_sym, global_ty, init, is_mut)
     true
 
 fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     let name_sym = self.pool.get_data0(let_node)
     var value_node = self.pool.get_data1(let_node)
-    if value_node == 0: return
+    let flags = self.pool.get_data2(let_node)
+    let is_mut = flags % 2
+    let binding_ty = if self.sema.typed_binding_types.contains(let_node):
+        self.sema.typed_binding_types.get(let_node).unwrap()
+    else:
+        0
+    let resolved_binding_ty = if binding_ty != 0: self.sema.resolve_alias(binding_ty) else: 0
+    if value_node == 0:
+        if resolved_binding_ty == 0:
+            return
+        let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
+        if global_ty == 0:
+            return
+        let _ = self.record_module_binding_global(name_sym, global_ty, self.build_default_value(global_ty), is_mut)
+        return
 
     // NK_COMPTIME wrapper is already removed by ComptimeTransform.
     // Unwrap only as a fallback for cases the transform didn't handle.
@@ -1424,13 +1440,6 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         if ct_inner != 0:
             value_node = ct_inner
 
-    let flags = self.pool.get_data2(let_node)
-    let is_mut = flags % 2
-    let binding_ty = if self.sema.typed_binding_types.contains(let_node):
-        self.sema.typed_binding_types.get(let_node).unwrap()
-    else:
-        0
-    let resolved_binding_ty = if binding_ty != 0: self.sema.resolve_alias(binding_ty) else: 0
     if self.pool.kind(value_node) == NodeKind.NK_NULL_LIT:
         var null_ty = resolved_binding_ty
         if null_ty == 0 and self.sema.typed_expr_types.contains(value_node):
@@ -1441,13 +1450,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         if null_tk == TypeKind.TY_PTR or null_tk == TypeKind.TY_REF:
             let global_ty = self.sema_type_to_llvm(null_ty)
             if global_ty != 0:
-                let name_str = self.intern.resolve(name_sym)
-                let global = wl_add_global(self.llmod, global_ty, name_str)
-                wl_set_initializer(global, wl_const_null(global_ty))
-                if is_mut == 0:
-                    wl_set_global_constant(global, 1)
-                wl_set_linkage(global, wl_internal_linkage())
-                self.module_constants.insert(name_sym, global)
+                let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_null(global_ty), is_mut)
                 return
     let val = self.try_eval_const_int(value_node)
     if val != CONST_EVAL_FAIL():
@@ -1456,23 +1459,11 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
             if binding_kind == TypeKind.TY_PTR or binding_kind == TypeKind.TY_REF:
                 let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
                 if global_ty != 0 and val == 0:
-                    let name_str = self.intern.resolve(name_sym)
-                    let global = wl_add_global(self.llmod, global_ty, name_str)
-                    wl_set_initializer(global, wl_const_null(global_ty))
-                    if is_mut == 0:
-                        wl_set_global_constant(global, 1)
-                    wl_set_linkage(global, wl_internal_linkage())
-                    self.module_constants.insert(name_sym, global)
+                    let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_null(global_ty), is_mut)
                     return
         if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TypeKind.TY_FLOAT:
             let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
-            let name_str = self.intern.resolve(name_sym)
-            let global = wl_add_global(self.llmod, global_ty, name_str)
-            wl_set_initializer(global, wl_const_real(global_ty, val as f64))
-            if is_mut == 0:
-                wl_set_global_constant(global, 1)
-            wl_set_linkage(global, wl_internal_linkage())
-            self.module_constants.insert(name_sym, global)
+            let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_real(global_ty, val as f64), is_mut)
             return
         if is_mut == 0:
             self.const_int_syms.push(name_sym)
@@ -1483,13 +1474,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
             let inferred_llvm = self.sema_type_to_llvm(resolved_binding_ty)
             if inferred_llvm != 0:
                 global_ty = inferred_llvm
-        let name_str = self.intern.resolve(name_sym)
-        let global = wl_add_global(self.llmod, global_ty, name_str)
-        wl_set_initializer(global, wl_const_int(global_ty, val, 1))
-        if is_mut == 0:
-            wl_set_global_constant(global, 1)
-        wl_set_linkage(global, wl_internal_linkage())
-        self.module_constants.insert(name_sym, global)
+        let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_int(global_ty, val, 1), is_mut)
         return
 
     if resolved_binding_ty != 0:
@@ -1499,13 +1484,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
             if init != 0:
                 let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
                 if global_ty != 0:
-                    let name_str = self.intern.resolve(name_sym)
-                    let global = wl_add_global(self.llmod, global_ty, name_str)
-                    wl_set_initializer(global, init)
-                    if is_mut == 0:
-                        wl_set_global_constant(global, 1)
-                    wl_set_linkage(global, wl_internal_linkage())
-                    self.module_constants.insert(name_sym, global)
+                    let _ = self.record_module_binding_global(name_sym, global_ty, init, is_mut)
                     return
 
     let str_value = self.try_eval_const_string(value_node, self.current_decl_source_file, 0)
@@ -1530,9 +1509,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
 
         let global = wl_add_global(self.llmod, str_ty, name_str)
         wl_set_initializer(global, str_init)
-        if is_mut == 0:
-            wl_set_global_constant(global, 1)
-        wl_set_linkage(global, wl_internal_linkage())
+        self.finalize_module_binding_global(global, is_mut)
         self.module_constants.insert(name_sym, global)
         return
 
@@ -1573,13 +1550,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
             let inferred_llvm = self.sema_type_to_llvm(resolved_binding_ty)
             if inferred_llvm != 0:
                 global_ty = inferred_llvm
-        let name_str = self.intern.resolve(name_sym)
-        let global = wl_add_global(self.llmod, global_ty, name_str)
-        wl_set_initializer(global, wl_const_real(global_ty, fval))
-        if is_mut == 0:
-            wl_set_global_constant(global, 1)
-        wl_set_linkage(global, wl_internal_linkage())
-        self.module_constants.insert(name_sym, global)
+        let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_real(global_ty, fval), is_mut)
         return
 
     let runtime_tid =
@@ -1593,5 +1564,5 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         let resolved_runtime = self.sema.resolve_alias(runtime_tid as TypeId)
         let runtime_kind = self.sema.get_type_kind(resolved_runtime)
         if runtime_kind != TypeKind.TY_INT and runtime_kind != TypeKind.TY_FLOAT and runtime_kind != TypeKind.TY_STR:
-            if self.module_const_contains_runtime_collection(value_node) and self.queue_module_runtime_init(name_sym, value_node, runtime_tid):
+            if self.module_const_contains_runtime_collection(value_node) and self.queue_module_runtime_init(name_sym, value_node, runtime_tid, is_mut):
                 return
