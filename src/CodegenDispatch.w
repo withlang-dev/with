@@ -5586,6 +5586,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     var is_indirect = false
     var fn_ptr_val: i64 = 0
     var ctx_ptr_val: i64 = 0
+    let callee_sema_ty = self.mir_operand_sema_type(body, callee_operand)
     let callee_ty = wl_type_of(callee)
     if wl_get_type_kind(callee_ty) == wl_function_type_kind():
         call_ft = callee_ty
@@ -5606,27 +5607,14 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 is_indirect = true
                 fn_ptr_val = wl_build_extract_value(self.builder, callee, 0)
                 ctx_ptr_val = wl_build_extract_value(self.builder, callee, 1)
-                let co_ok = body.operand_kinds.get(callee_operand as i64)
-                let co_od = body.operand_d0.get(callee_operand as i64)
-                if (co_ok == OperandKind.OK_COPY or co_ok == OperandKind.OK_MOVE) and co_od >= 0 and co_od < body.place_locals.len() as i32:
-                    let co_local = body.place_locals.get(co_od as i64)
-                    if co_local >= 0 and co_local < body.local_type_ids.len() as i32:
-                        let co_sema_ty = body.local_type_ids.get(co_local as i64)
-                        if co_sema_ty > 0:
-                            call_ft = self.mir_build_closure_fn_type(co_sema_ty)
+                if callee_sema_ty > 0:
+                    call_ft = self.mir_build_closure_fn_type(callee_sema_ty)
     else:
         let gvt2 = wl_global_get_value_type(callee)
         if gvt2 != 0 and wl_get_type_kind(gvt2) == wl_function_type_kind():
             call_ft = gvt2
-    if call_ft == 0 and callee_operand >= 0 and callee_operand < body.operand_kinds.len() as i32:
-        let co_ok = body.operand_kinds.get(callee_operand as i64)
-        let co_od = body.operand_d0.get(callee_operand as i64)
-        if (co_ok == OperandKind.OK_COPY or co_ok == OperandKind.OK_MOVE) and co_od >= 0 and co_od < body.place_locals.len() as i32:
-            let co_local = body.place_locals.get(co_od as i64)
-            if co_local >= 0 and co_local < body.local_type_ids.len() as i32:
-                let co_sema_ty = body.local_type_ids.get(co_local as i64)
-                if co_sema_ty > 0:
-                    call_ft = self.mir_build_raw_fn_type(co_sema_ty)
+    if call_ft == 0 and callee_sema_ty > 0:
+        call_ft = self.mir_build_raw_fn_type(callee_sema_ty)
     if call_ft == 0:
         return false
 
