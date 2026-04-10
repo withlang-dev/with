@@ -225,15 +225,15 @@ fn pcre2_regerror(errcode: c_int, preg: *const regex_t, errbuf: *mut i8, errbuf_
     var have_offset: c_int = 0
     var i: c_ulong
     (i = 0)
-    while (if unsafe: *message != 0: 1 else: 0) != 0:
+    while (if (unsafe: *message) != 0: 1 else: 0) != 0:
         if (if (i +% 1) < errbuf_size: 1 else: 0) != 0:
-            (errbuf[i] = unsafe: *message)
+            (errbuf[i] = (unsafe: *message))
 
     if have_offset != 0:
         (message = ((&offset_buf[0] as *mut c_char) as *const i8))
-        while (if unsafe: *message != 0: 1 else: 0) != 0:
+        while (if (unsafe: *message) != 0: 1 else: 0) != 0:
             if (if (i +% 1) < errbuf_size: 1 else: 0) != 0:
-                (errbuf[i] = unsafe: *message)
+                (errbuf[i] = (unsafe: *message))
         
 
     if (if errbuf_size > 0: 1 else: 0) != 0:

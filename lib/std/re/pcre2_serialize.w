@@ -118,8 +118,8 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
         dst_bytes = dst_bytes + re.blocksize
         (i = i + 1)
 
-    (unsafe: *serialized_bytes = bytes)
-    (unsafe: *serialized_size = total_size)
+    ((unsafe: *serialized_bytes) = bytes)
+    ((unsafe: *serialized_size) = total_size)
     return number_of_codes
 
 fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_of_codes: c_int, bytes: *const u8, gcontext: *mut pcre2_real_general_context_8) -> c_int:
@@ -786,9 +786,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint

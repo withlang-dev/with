@@ -630,9 +630,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -916,15 +916,15 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                 prev_cap_d = 0
                 prev_recurse_recno = -1
                 prev_recurse_d = 0
-                if (if (if unsafe: *code >= OP_SBRA: 1 else: 0) != 0 and (if unsafe: *code <= OP_SCOND: 1 else: 0) != 0: 1 else: 0) != 0:
+                if (if (if (unsafe: *code) >= OP_SBRA: 1 else: 0) != 0 and (if (unsafe: *code) <= OP_SCOND: 1 else: 0) != 0: 1 else: 0) != 0:
                     return 0
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if (if unsafe: *code == OP_CBRA: 1 else: 0) != 0 or (if unsafe: *code == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0:
+                if (if (if (unsafe: *code) == OP_CBRA: 1 else: 0) != 0 or (if (unsafe: *code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0:
                     cc = cc + 2
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ((unsafe: *countptr) = (unsafe: *countptr) + 1) > 1000: 1 else: 0) != 0:
+                if (if (((unsafe: *countptr)) = ((unsafe: *countptr)) + 1) > 1000: 1 else: 0) != 0:
                     return -1
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
@@ -938,12 +938,12 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (op = unsafe: *cc)
+                    (op = (unsafe: *cc))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     match op
                         OP_COND =>
-                            if (if unsafe: *cs != OP_ALT: 1 else: 0) != 0:
+                            if (if (unsafe: *cs) != OP_ALT: 1 else: 0) != 0:
                                 (cc = ((cs + (1 as isize as usize)) + (2 as isize as usize)))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -1040,7 +1040,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                         OP_TYPEUPTO =>
                             cc = cc + _pcre2_OP_lengths_8[op]
                         OP_CLASS =>
-                            match unsafe: *cc
+                            match (unsafe: *cc)
                                 OP_CRPLUS => 0
                                 OP_CRSTAR => 0
                                 OP_CRRANGE =>
@@ -1048,7 +1048,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 _ =>
                                     (branchlength = branchlength + 1)
                         OP_DNREF =>
-                            cc = cc + _pcre2_OP_lengths_8[unsafe: *cc]
+                            cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)]
                             __pc = 2
                             __goto_pending = 1
                             if (if (if recno <= backref_cache[0]: 1 else: 0) != 0 and (if backref_cache[recno] >= 0: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -1121,8 +1121,8 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 (backref_cache[0] = recno)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            cc = cc + _pcre2_OP_lengths_8[unsafe: *cc]
-                            match unsafe: *cc
+                            cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)]
+                            match (unsafe: *cc)
                                 OP_CRSTAR =>
                                     (cc = cc + 1)
                                 OP_CRPLUS =>
@@ -1206,8 +1206,8 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 (backref_cache[0] = recno)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            cc = cc + _pcre2_OP_lengths_8[unsafe: *cc]
-                            match unsafe: *cc
+                            cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)]
+                            match (unsafe: *cc)
                                 OP_CRSTAR =>
                                     (cc = cc + 1)
                                 OP_CRPLUS =>
@@ -1305,21 +1305,21 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
     var c: c_uint
     var yield_: c_int = SSB_DONE
     var table_limit: c_int = 32
-    unsafe: *depthptr = unsafe: *depthptr + 1
-    if (if unsafe: *depthptr > 1000: 1 else: 0) != 0:
+    (unsafe: *depthptr) = (unsafe: *depthptr) + 1
+    if (if (unsafe: *depthptr) > 1000: 1 else: 0) != 0:
         return SSB_TOODEEP
 
     while true:
         var try_next: c_int
         var tcode: *const u8
-        if (if (if (if (if unsafe: *code == OP_CBRA: 1 else: 0) != 0 or (if unsafe: *code == OP_SCBRA: 1 else: 0) != 0: 1 else: 0) != 0 or (if unsafe: *code == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0 or (if unsafe: *code == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0:
+        if (if (if (if (if (unsafe: *code) == OP_CBRA: 1 else: 0) != 0 or (if (unsafe: *code) == OP_SCBRA: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0:
             tcode = tcode + 2
         
         while try_next != 0:
             var rc: c_int
             var ncode: *const u8
             var classmap: *const u8
-            match unsafe: *tcode
+            match (unsafe: *tcode)
                 OP_ACCEPT =>
                     tcode = tcode + _pcre2_OP_lengths_8[OP_CIRC]
                 OP_CIRC =>
@@ -1334,7 +1334,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                     ncode = ncode + (1 + 2)
                     var done: c_int
                     while (if done != 0: 0 else: 1) != 0:
-                        match unsafe: *ncode
+                        match (unsafe: *ncode)
                             OP_ASSERT =>
                                 ncode = ncode + (1 + 2)
                             OP_WORD_BOUNDARY => 0
@@ -1344,7 +1344,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                             _ =>
                                 (done = 1)
                         
-                    match unsafe: *ncode
+                    match (unsafe: *ncode)
                         OP_PROP =>
                             if (if ncode[1] != 9: 1 else: 0) != 0:
                                 break
@@ -1435,7 +1435,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                             (c = c + 1)
                         
                         
-                    match unsafe: *tcode
+                    match (unsafe: *tcode)
                         OP_CRSTAR => 0
                         OP_CRRANGE => 0
                         _ =>
@@ -1444,7 +1444,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                     return SSB_UNKNOWN
             
         
-        if not ((if unsafe: *code == OP_ALT: 1 else: 0) != 0):
+        if not ((if (unsafe: *code) == OP_ALT: 1 else: 0) != 0):
             break
 
     return yield_

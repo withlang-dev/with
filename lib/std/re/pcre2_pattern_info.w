@@ -112,7 +112,7 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
     (cb.version = 0)
     while 1 != 0:
         var rc: c_int
-        match unsafe: *cc
+        match (unsafe: *cc)
             OP_END =>
                 return 0
             OP_CHAR => 0
@@ -126,7 +126,7 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
                 (rc = callback((&mut cb as *mut pcre2_callout_enumerate_block_8), callout_data))
                 if (if rc != 0: 1 else: 0) != 0:
                     return rc
-                cc = cc + _pcre2_OP_lengths_8[unsafe: *cc]
+                cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)]
             OP_CALLOUT_STR =>
                 (cb.callout_number = 0)
                 (cb.callout_string = ((cc + (((1 + (4 * 2))) as isize as usize)) + (1 as isize as usize)))
@@ -134,7 +134,7 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
                 if (if rc != 0: 1 else: 0) != 0:
                     return rc
             _ =>
-                cc = cc + _pcre2_OP_lengths_8[unsafe: *cc]
+                cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)]
         
 
 
@@ -708,9 +708,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint

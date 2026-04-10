@@ -630,9 +630,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -720,9 +720,9 @@ fn _pcre2_strcmp_8(__param_str1: *const u8, __param_str2: *const u8) -> c_int:
     var str2 = __param_str2
     var c1: u8
     var c2: u8
-    while (if (if unsafe: *str1 != 0: 1 else: 0) != 0 or (if unsafe: *str2 != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-        (c1 = unsafe: *(str1 = str1 + 1))
-        (c2 = unsafe: *(str2 = str2 + 1))
+    while (if (if (unsafe: *str1) != 0: 1 else: 0) != 0 or (if (unsafe: *str2) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+        (c1 = (unsafe: *(str1 = str1 + 1)))
+        (c2 = (unsafe: *(str2 = str2 + 1)))
         if (if c1 != c2: 1 else: 0) != 0:
             return (((((if c1 > c2: 1 else: 0)) << 1)) - 1)
         
@@ -734,9 +734,9 @@ fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) -> c_int
     var str2 = __param_str2
     var c1: u8
     var c2: u8
-    while (if (if unsafe: *str1 != 0: 1 else: 0) != 0 or (if unsafe: *str2 != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-        (c1 = unsafe: *(str1 = str1 + 1))
-        (c2 = unsafe: *(str2 = str2 + 1))
+    while (if (if (unsafe: *str1) != 0: 1 else: 0) != 0 or (if (unsafe: *str2) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+        (c1 = (unsafe: *(str1 = str1 + 1)))
+        (c2 = (unsafe: *(str2 = str2 + 1)))
         if (if c1 != c2: 1 else: 0) != 0:
             return (((((if c1 > c2: 1 else: 0)) << 1)) - 1)
         
@@ -746,17 +746,17 @@ fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) -> c_int
 fn _pcre2_strcpy_c8_8(str1: *mut u8, __param_str2: *const i8) -> c_ulong:
     var str2 = __param_str2
     var t: *mut u8
-    while (if unsafe: *str2 != 0: 1 else: 0) != 0:
-        (unsafe: *t = unsafe: *(str2 = str2 + 1))
+    while (if (unsafe: *str2) != 0: 1 else: 0) != 0:
+        (unsafe: *t = (unsafe: *(str2 = str2 + 1)))
         (t = t + 1)
 
-    (unsafe: *t = 0)
+    ((unsafe: *t) = 0)
     return ((t as usize -% str1 as usize) / sizeof[u8]())
 
 fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong:
     var str = __param_str
     var c: c_ulong
-    while (if unsafe: *(str = str + 1) != 0: 1 else: 0) != 0:
+    while (if (unsafe: *(str = str + 1)) != 0: 1 else: 0) != 0:
         (c = c + 1)
 
     return c
@@ -768,8 +768,8 @@ fn _pcre2_strncmp_8(__param_str1: *const u8, __param_str2: *const u8, __param_le
     var c1: u8
     var c2: u8
     while (if len > 0: 1 else: 0) != 0:
-        (c1 = unsafe: *(str1 = str1 + 1))
-        (c2 = unsafe: *(str2 = str2 + 1))
+        (c1 = (unsafe: *(str1 = str1 + 1)))
+        (c2 = (unsafe: *(str2 = str2 + 1)))
         if (if c1 != c2: 1 else: 0) != 0:
             return (((((if c1 > c2: 1 else: 0)) << 1)) - 1)
         
@@ -784,8 +784,8 @@ fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const i8, __param
     var c1: u8
     var c2: u8
     while (if len > 0: 1 else: 0) != 0:
-        (c1 = unsafe: *(str1 = str1 + 1))
-        (c2 = unsafe: *(str2 = str2 + 1))
+        (c1 = (unsafe: *(str1 = str1 + 1)))
+        (c2 = (unsafe: *(str2 = str2 + 1)))
         if (if c1 != c2: 1 else: 0) != 0:
             return (((((if c1 > c2: 1 else: 0)) << 1)) - 1)
         

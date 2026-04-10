@@ -630,9 +630,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -712,7 +712,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
     var utf: c_int
     var ucp: c_int
     while true:
-        (c = unsafe: *code)
+        (c = (unsafe: *code))
         if (if c >= OP_TABLE_LENGTH: 1 else: 0) != 0:
             return -1
         
@@ -723,29 +723,29 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
             if (if (if end != (null as *const u8): 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, ((&list[0] as *mut c_uint) as *const c_uint), end, (&mut rec_limit as *mut c_int)) != 0: 1 else: 0) != 0:
                 match c
                     OP_STAR =>
-                        unsafe: *code = unsafe: *code + (OP_POSSTAR - OP_STAR)
+                        (unsafe: *code) = (unsafe: *code) + (OP_POSSTAR - OP_STAR)
                     OP_MINSTAR =>
-                        unsafe: *code = unsafe: *code + (OP_POSSTAR - OP_MINSTAR)
+                        (unsafe: *code) = (unsafe: *code) + (OP_POSSTAR - OP_MINSTAR)
                     OP_PLUS =>
-                        unsafe: *code = unsafe: *code + (OP_POSPLUS - OP_PLUS)
+                        (unsafe: *code) = (unsafe: *code) + (OP_POSPLUS - OP_PLUS)
                     OP_MINPLUS =>
-                        unsafe: *code = unsafe: *code + (OP_POSPLUS - OP_MINPLUS)
+                        (unsafe: *code) = (unsafe: *code) + (OP_POSPLUS - OP_MINPLUS)
                     OP_QUERY =>
-                        unsafe: *code = unsafe: *code + (OP_POSQUERY - OP_QUERY)
+                        (unsafe: *code) = (unsafe: *code) + (OP_POSQUERY - OP_QUERY)
                     OP_MINQUERY =>
-                        unsafe: *code = unsafe: *code + (OP_POSQUERY - OP_MINQUERY)
+                        (unsafe: *code) = (unsafe: *code) + (OP_POSQUERY - OP_MINQUERY)
                     OP_UPTO =>
-                        unsafe: *code = unsafe: *code + (OP_POSUPTO - OP_UPTO)
+                        (unsafe: *code) = (unsafe: *code) + (OP_POSUPTO - OP_UPTO)
                     OP_MINUPTO =>
-                        unsafe: *code = unsafe: *code + (OP_POSUPTO - OP_MINUPTO)
+                        (unsafe: *code) = (unsafe: *code) + (OP_POSUPTO - OP_MINUPTO)
                     _ => 0
                 
             
-            (c = unsafe: *code)
+            (c = (unsafe: *code))
         else:
             if (if (if c == OP_CLASS: 1 else: 0) != 0 or (if c == OP_NCLASS: 1 else: 0) != 0: 1 else: 0) != 0:
                 (repeat_opcode = ((code + (1 as isize as usize)) + ((32 / sizeof[u8]()))))
-                (c = unsafe: *repeat_opcode)
+                (c = (unsafe: *repeat_opcode))
                 if (if (if c >= OP_CRSTAR: 1 else: 0) != 0 and (if c <= OP_CRMINRANGE: 1 else: 0) != 0: 1 else: 0) != 0:
                     (end = get_chr_property_list((code as *const u8), utf, ucp, cb.fcc, (&list[0] as *mut c_uint)))
                     ((&list[0] as *mut c_uint)[1] = (if ((c & 1)) == 0: 1 else: 0))
@@ -759,7 +759,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                         
                     
                 
-                (c = unsafe: *code)
+                (c = (unsafe: *code))
         
         match c
             OP_END =>
@@ -830,7 +830,7 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             OP_NOTSTARI =>
                 (list[0] = 32)
             OP_TYPESTAR =>
-                (list[0] = unsafe: *code)
+                (list[0] = (unsafe: *code))
                 (code = code + 1)
             _ => 0
         
@@ -858,7 +858,7 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             return code
         OP_NCLASS =>
             (class_end = end)
-            match unsafe: *end
+            match (unsafe: *end)
                 OP_CRSTAR =>
                     (end = end + 1)
                 OP_CRPLUS => 0
@@ -886,12 +886,12 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
     var accepted: c_int
     var invert_bits: c_int
     var entered_a_group: c_int
-    if (if ((unsafe: *rec_limit) = (unsafe: *rec_limit) - 1) <= 0: 1 else: 0) != 0:
+    if (if (((unsafe: *rec_limit)) = ((unsafe: *rec_limit)) - 1) <= 0: 1 else: 0) != 0:
         return 0
 
     while true:
         var bracode: *const u8
-        (c = unsafe: *code)
+        (c = (unsafe: *code))
         if (if c == OP_CALLOUT: 1 else: 0) != 0:
             code = code + _pcre2_OP_lengths_8[c]
             continue
@@ -900,13 +900,13 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
             continue
         
         if (if c == OP_ALT: 1 else: 0) != 0:
-            (c = unsafe: *code)
+            (c = (unsafe: *code))
         
         match c
             OP_END =>
                 return (if base_list[1] != 0: 1 else: 0)
             OP_KET =>
-                match unsafe: *bracode
+                match (unsafe: *bracode)
                     OP_CBRA => 0
                     OP_SCRIPT_RUN =>
                         if (if (if base_list[0] != 29: 1 else: 0) != 0 and (if base_list[0] != 30: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -920,14 +920,14 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                 code = code + _pcre2_OP_lengths_8[c]
                 continue
                 code = code + _pcre2_OP_lengths_8[c]
-                while (if unsafe: *next_code == OP_ALT: 1 else: 0) != 0:
+                while (if (unsafe: *next_code) == OP_ALT: 1 else: 0) != 0:
                     if (if compare_opcodes(code, utf, ucp, cb, base_list, base_end, rec_limit) != 0: 0 else: 1) != 0:
                         return 0
                     
                     (code = ((next_code + (1 as isize as usize)) + (2 as isize as usize)))
                 (entered_a_group = 1)
                 continue
-                if (if (if (if unsafe: *next_code != OP_BRA: 1 else: 0) != 0 and (if unsafe: *next_code != OP_CBRA: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *next_code != OP_ONCE: 1 else: 0) != 0: 1 else: 0) != 0:
+                if (if (if (if (unsafe: *next_code) != OP_BRA: 1 else: 0) != 0 and (if (unsafe: *next_code) != OP_CBRA: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *next_code) != OP_ONCE: 1 else: 0) != 0: 1 else: 0) != 0:
                     return 0
                 next_code = next_code + (1 + 2)
                 if (if compare_opcodes(next_code, utf, ucp, cb, base_list, base_end, rec_limit) != 0: 0 else: 1) != 0:
@@ -936,14 +936,14 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                 continue
             OP_ONCE =>
                 code = code + _pcre2_OP_lengths_8[c]
-                while (if unsafe: *next_code == OP_ALT: 1 else: 0) != 0:
+                while (if (unsafe: *next_code) == OP_ALT: 1 else: 0) != 0:
                     if (if compare_opcodes(code, utf, ucp, cb, base_list, base_end, rec_limit) != 0: 0 else: 1) != 0:
                         return 0
                     
                     (code = ((next_code + (1 as isize as usize)) + (2 as isize as usize)))
                 (entered_a_group = 1)
                 continue
-                if (if (if (if unsafe: *next_code != OP_BRA: 1 else: 0) != 0 and (if unsafe: *next_code != OP_CBRA: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *next_code != OP_ONCE: 1 else: 0) != 0: 1 else: 0) != 0:
+                if (if (if (if (unsafe: *next_code) != OP_BRA: 1 else: 0) != 0 and (if (unsafe: *next_code) != OP_CBRA: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *next_code) != OP_ONCE: 1 else: 0) != 0: 1 else: 0) != 0:
                     return 0
                 next_code = next_code + (1 + 2)
                 if (if compare_opcodes(next_code, utf, ucp, cb, base_list, base_end, rec_limit) != 0: 0 else: 1) != 0:
@@ -951,7 +951,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                 code = code + _pcre2_OP_lengths_8[c]
                 continue
             OP_BRAZERO =>
-                if (if (if (if unsafe: *next_code != OP_BRA: 1 else: 0) != 0 and (if unsafe: *next_code != OP_CBRA: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *next_code != OP_ONCE: 1 else: 0) != 0: 1 else: 0) != 0:
+                if (if (if (if (unsafe: *next_code) != OP_BRA: 1 else: 0) != 0 and (if (unsafe: *next_code) != OP_CBRA: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *next_code) != OP_ONCE: 1 else: 0) != 0: 1 else: 0) != 0:
                     return 0
                 next_code = next_code + (1 + 2)
                 if (if compare_opcodes(next_code, utf, ucp, cb, base_list, base_end, rec_limit) != 0: 0 else: 1) != 0:
@@ -973,27 +973,27 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                 (list_ptr = base_list)
         
         while true:
-            (chr = unsafe: *chr_ptr)
+            (chr = (unsafe: *chr_ptr))
             match list_ptr[0]
                 29 =>
                     (ochr_ptr = (list_ptr + (2 as isize as usize)))
                     while true:
-                        if (if chr == unsafe: *ochr_ptr: 1 else: 0) != 0:
+                        if (if chr == (unsafe: *ochr_ptr): 1 else: 0) != 0:
                             return 0
                         
                         (ochr_ptr = ochr_ptr + 1)
-                        if not ((if unsafe: *ochr_ptr != 4294967295: 1 else: 0) != 0):
+                        if not ((if (unsafe: *ochr_ptr) != 4294967295: 1 else: 0) != 0):
                             break
                 31 =>
                     (ochr_ptr = (list_ptr + (2 as isize as usize)))
                     while true:
-                        if (if chr == unsafe: *ochr_ptr: 1 else: 0) != 0:
+                        if (if chr == (unsafe: *ochr_ptr): 1 else: 0) != 0:
                             break
                         
                         (ochr_ptr = ochr_ptr + 1)
-                        if not ((if unsafe: *ochr_ptr != 4294967295: 1 else: 0) != 0):
+                        if not ((if (unsafe: *ochr_ptr) != 4294967295: 1 else: 0) != 0):
                             break
-                    if (if unsafe: *ochr_ptr == 4294967295: 1 else: 0) != 0:
+                    if (if (unsafe: *ochr_ptr) == 4294967295: 1 else: 0) != 0:
                         return 0
                 7 =>
                     if (if (if chr < 256: 1 else: 0) != 0 and (if ((cb.ctypes[chr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -1048,7 +1048,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                     return 0
             
             (chr_ptr = chr_ptr + 1)
-            if not ((if unsafe: *chr_ptr != 4294967295: 1 else: 0) != 0):
+            if not ((if (unsafe: *chr_ptr) != 4294967295: 1 else: 0) != 0):
                 break
         
         if (if (&list[0] as *mut c_uint)[1] == 0: 1 else: 0) != 0:

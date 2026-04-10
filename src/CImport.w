@@ -1296,7 +1296,7 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
         // const without initializer is always extern (defined elsewhere)
         tl_attr ++ "extern let " ++ safe_name ++ ": " ++ actual_type ++ "\n"
     else:
-        // --no-c-export: mutable vars are module-local (no extern)
+        // --no-c-export: mutable vars are module-local definitions
         let var_kw = if g_migrate_no_c_export != 0: "var " else: "extern var "
         tl_attr ++ var_kw ++ safe_name ++ ": " ++ actual_type ++ "\n"
 

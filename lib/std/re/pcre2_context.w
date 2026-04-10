@@ -64,7 +64,7 @@ fn pcre2_compile_context_create_8(gcontext: *mut pcre2_real_general_context_8) -
     if (if ccontext == (null as *mut pcre2_real_compile_context_8): 1 else: 0) != 0:
         return (null as *mut pcre2_real_compile_context_8)
 
-    (unsafe: *ccontext = _pcre2_default_compile_context_8)
+    ((unsafe: *ccontext) = _pcre2_default_compile_context_8)
     return ccontext
 
 fn pcre2_compile_context_free_8(ccontext: *mut pcre2_real_compile_context_8):
@@ -145,7 +145,7 @@ fn pcre2_convert_context_create_8(gcontext: *mut pcre2_real_general_context_8) -
     if (if ccontext == (null as *mut pcre2_real_convert_context_8): 1 else: 0) != 0:
         return (null as *mut pcre2_real_convert_context_8)
 
-    (unsafe: *ccontext = _pcre2_default_convert_context_8)
+    ((unsafe: *ccontext) = _pcre2_default_convert_context_8)
     return ccontext
 
 fn pcre2_convert_context_free_8(ccontext: *mut pcre2_real_convert_context_8):
@@ -176,7 +176,7 @@ fn pcre2_match_context_create_8(gcontext: *mut pcre2_real_general_context_8) -> 
     if (if mcontext == (null as *mut pcre2_real_match_context_8): 1 else: 0) != 0:
         return (null as *mut pcre2_real_match_context_8)
 
-    (unsafe: *mcontext = _pcre2_default_match_context_8)
+    ((unsafe: *mcontext) = _pcre2_default_match_context_8)
     return mcontext
 
 fn pcre2_match_context_free_8(mcontext: *mut pcre2_real_match_context_8):
@@ -801,9 +801,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -894,7 +894,7 @@ fn _pcre2_memctl_malloc_8(size: c_ulong, memctl: *mut pcre2_memctl) -> *mut c_vo
         (newmemctl.free = default_free)
         (newmemctl.memory_data = null)
     else:
-        (unsafe: *newmemctl = unsafe: *memctl)
+        ((unsafe: *newmemctl) = (unsafe: *memctl))
 
     return yield_
 

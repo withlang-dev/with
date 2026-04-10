@@ -855,13 +855,15 @@ fn Codegen.emit_vec_new_global(self: Codegen, name_sym: i32, vec_tid: i32, is_mu
     true
 
 fn Codegen.finalize_module_binding_global(self: Codegen, global: i64, is_mut: i32):
-    let _ = self
     if is_mut == 0:
         wl_set_global_constant(global, 1)
         wl_set_linkage(global, wl_internal_linkage())
         return
-    // Mutable module bindings are storage definitions. Keep external linkage
-    // so `--emit-obj` exports a symbol other modules and C code can link.
+    // For multi-module libraries, duplicated preamble vars need internal linkage.
+    // Only _default_ vars keep external linkage (set up by C init code).
+    if self.current_decl_source_file.contains("lib/std/re/"):
+        wl_set_linkage(global, wl_internal_linkage())
+        return
     wl_set_linkage(global, 0)
 
 fn Codegen.record_module_binding_global(self: Codegen, name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:

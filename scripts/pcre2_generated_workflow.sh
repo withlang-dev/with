@@ -110,6 +110,11 @@ prepare_generated_tree() {
         fi
     done
 
+    # Default context vars need extern (storage provided by pcre2_context_init.c)
+    for dst in "$generated_dir"/*.w; do
+        perl -pi -e 's/^var (_pcre2_default_\w+_context_8:)/extern var $1/' "$dst"
+    done
+
     # Concatenate adjacent string literals: "foo" "bar" → "foobar"
     # Cast with_alloc to *mut c_void (returns *i8 but often assigned to void*)
     for dst in "$generated_dir"/*.w; do

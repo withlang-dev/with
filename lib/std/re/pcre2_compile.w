@@ -130,7 +130,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 errorcode = 0
                 if (if errorptr == (null as *mut c_int): 1 else: 0) != 0:
                     if (if erroroffset != (null as *mut c_ulong): 1 else: 0) != 0:
-                        (unsafe: *erroroffset = 0)
+                        ((unsafe: *erroroffset) = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     return (null as *mut pcre2_real_code_8)
@@ -140,7 +140,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                     continue
                 if (if erroroffset == (null as *mut c_ulong): 1 else: 0) != 0:
                     if (if errorptr != (null as *mut c_int): 1 else: 0) != 0:
-                        (unsafe: *errorptr = ERR120)
+                        ((unsafe: *errorptr) = ERR120)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     return (null as *mut pcre2_real_code_8)
@@ -148,17 +148,17 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *errorptr = ERR0)
+                ((unsafe: *errorptr) = ERR0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *erroroffset = 0)
+                ((unsafe: *erroroffset) = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if pattern == (null as *const u8): 1 else: 0) != 0:
                     if (if patlen == 0: 1 else: 0) != 0:
                         (pattern = ((&null_str[0] as *mut u8) as *const u8))
                     else:
-                        (unsafe: *errorptr = ERR16)
+                        ((unsafe: *errorptr) = ERR16)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         return (null as *mut pcre2_real_code_8)
@@ -176,7 +176,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if patlen > ccontext.max_pattern_length: 1 else: 0) != 0:
-                    (unsafe: *errorptr = ERR88)
+                    ((unsafe: *errorptr) = ERR88)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     return (null as *mut pcre2_real_code_8)
@@ -514,7 +514,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                     continue
                 if (if parsed_size_needed > 1024: 1 else: 0) != 0:
                     if (if heap_parsed_pattern == (null as *mut c_uint): 1 else: 0) != 0:
-                        (unsafe: *errorptr = ERR21)
+                        ((unsafe: *errorptr) = ERR21)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         __pc = 1
@@ -584,7 +584,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 (code = cworkspace)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *code = 137)
+                ((unsafe: *code) = 137)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 compile_regex(cb.external_options, xoptions, (&mut code as *mut *mut u8), (&mut pptr as *mut *mut c_uint), (&mut errorcode as *mut c_int), 0, (&mut firstcu as *mut c_uint), (&mut firstcuflags as *mut c_uint), (&mut reqcu as *mut c_uint), (&mut reqcuflags as *mut c_uint), (null as *mut branch_chain_8), (null as *mut open_capitem), (&mut cb as *mut compile_block_8), (&mut length as *mut c_ulong))
@@ -747,7 +747,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 (pptr = cb.parsed_pattern)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *code = 137)
+                ((unsafe: *code) = 137)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 (regexrc = compile_regex(re.overall_options, re.extra_options, (&mut code as *mut *mut u8), (&mut pptr as *mut *mut c_uint), (&mut errorcode as *mut c_int), 0, (&mut firstcu as *mut c_uint), (&mut firstcuflags as *mut c_uint), (&mut reqcu as *mut c_uint), (&mut reqcuflags as *mut c_uint), (null as *mut branch_chain_8), (null as *mut open_capitem), (&mut cb as *mut compile_block_8), (null as *mut c_ulong)))
@@ -1018,14 +1018,14 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 continue
             3 =>  // HAD_EARLY_ERROR
                 (__goto_pending = 0)
-                (unsafe: *erroroffset = ((ptr as usize -% pattern as usize) / sizeof[u8]()))
+                ((unsafe: *erroroffset) = ((ptr as usize -% pattern as usize) / sizeof[u8]()))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 4
                 continue
             4 =>  // HAD_ERROR
                 (__goto_pending = 0)
-                (unsafe: *errorptr = errorcode)
+                ((unsafe: *errorptr) = errorcode)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 pcre2_code_free_8(re)
@@ -1058,9 +1058,9 @@ fn pcre2_code_free_8(code: *mut pcre2_real_code_8):
     var ref_count: *mut c_ulong
     if (if code != (null as *mut pcre2_real_code_8): 1 else: 0) != 0:
         if (if ((code.flags & 262144)) != 0: 1 else: 0) != 0:
-            if (if unsafe: *ref_count > 0: 1 else: 0) != 0:
-                ((unsafe: *ref_count) = (unsafe: *ref_count) - 1)
-                if (if unsafe: *ref_count == 0: 1 else: 0) != 0:
+            if (if (unsafe: *ref_count) > 0: 1 else: 0) != 0:
+                (((unsafe: *ref_count)) = ((unsafe: *ref_count)) - 1)
+                if (if (unsafe: *ref_count) == 0: 1 else: 0) != 0:
                     code.memctl.free((code.tables as *mut c_void), code.memctl.memory_data)
                 
             
@@ -1081,7 +1081,7 @@ fn pcre2_code_copy_8(code: *const pcre2_real_code_8) -> *mut pcre2_real_code_8:
     with_memcpy((newcode as *mut c_void) as *i8, (code as *const c_void) as *i8, code.blocksize as i64)
     (newcode.executable_jit = null)
     if (if ((code.flags & 262144)) != 0: 1 else: 0) != 0:
-        ((unsafe: *ref_count) = (unsafe: *ref_count) + 1)
+        (((unsafe: *ref_count)) = ((unsafe: *ref_count)) + 1)
 
     return newcode
 
@@ -1104,7 +1104,7 @@ fn pcre2_code_copy_with_tables_8(code: *const pcre2_real_code_8) -> *mut pcre2_r
         return (null as *mut pcre2_real_code_8)
 
     with_memcpy((newtables as *mut c_void) as *i8, (code.tables as *const c_void) as *i8, 1088 as i64)
-    (unsafe: *ref_count = 1)
+    ((unsafe: *ref_count) = 1)
     (newcode.tables = (newtables as *const u8))
     newcode.flags = newcode.flags | 262144
     return newcode
@@ -1681,9 +1681,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
@@ -1776,7 +1776,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                 (__goto_pending = 0)
                 escape = 0
                 if (if ptr >= ptrend: 1 else: 0) != 0:
-                    (unsafe: *errorcodeptr = ERR1)
+                    ((unsafe: *errorcodeptr) = ERR1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     return 0
@@ -1787,17 +1787,17 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                 0
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *errorcodeptr = 0)
+                ((unsafe: *errorcodeptr) = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 2
                 continue
             2 =>  // EXIT
                 (__goto_pending = 0)
-                (unsafe: *ptrptr = ptr)
+                ((unsafe: *ptrptr) = ptr)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *chptr = c)
+                ((unsafe: *chptr) = c)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return escape
@@ -1988,7 +1988,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
     var length: c_ulong
     var bc: branch_chain_8
     if (if (if cb.cx.stack_guard != (null as *const fn(c_uint, *mut c_void) -> c_int): 1 else: 0) != 0 and cb.cx.stack_guard(cb.parens_depth, cb.cx.stack_guard_data) != 0: 1 else: 0) != 0:
-        (unsafe: *errorcodeptr = ERR33)
+        ((unsafe: *errorcodeptr) = ERR33)
         (cb.erroroffset = 0)
         return 0
 
@@ -1999,15 +1999,15 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
     (reqcuflags = (4294967295 as c_uint))
     (firstcuflags = reqcuflags)
     (length = (6 +% skipunits))
-    (lookbehind = (if (if (if unsafe: *code == OP_ASSERTBACK: 1 else: 0) != 0 or (if unsafe: *code == OP_ASSERTBACK_NOT: 1 else: 0) != 0: 1 else: 0) != 0 or (if unsafe: *code == OP_ASSERTBACK_NA: 1 else: 0) != 0: 1 else: 0))
+    (lookbehind = (if (if (if (unsafe: *code) == OP_ASSERTBACK: 1 else: 0) != 0 or (if (unsafe: *code) == OP_ASSERTBACK_NOT: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *code) == OP_ASSERTBACK_NA: 1 else: 0) != 0: 1 else: 0))
     if lookbehind != 0:
-        (lookbehindminlength = unsafe: *pptr)
+        (lookbehindminlength = (unsafe: *pptr))
         pptr = pptr + 2
     else:
         (lookbehindminlength = 0)
         (lookbehindlength = lookbehindminlength)
 
-    if (if unsafe: *code == OP_CBRA: 1 else: 0) != 0:
+    if (if (unsafe: *code) == OP_CBRA: 1 else: 0) != 0:
         (capitem.number = capnumber)
         (capitem.next = open_caps)
         (capitem.assert_depth = cb.assert_depth)
@@ -2038,7 +2038,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
             (okreturn = -1)
         
         if (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0:
-            if (if unsafe: *last_branch != OP_ALT: 1 else: 0) != 0:
+            if (if (unsafe: *last_branch) != OP_ALT: 1 else: 0) != 0:
                 (firstcu = branchfirstcu)
                 (firstcuflags = branchfirstcuflags)
                 (reqcu = branchreqcu)
@@ -2066,10 +2066,10 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
             
         
         if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-            (code = (((unsafe: *codeptr + (1 as isize as usize)) + (2 as isize as usize)) + skipunits))
+            (code = ((((unsafe: *codeptr) + (1 as isize as usize)) + (2 as isize as usize)) + skipunits))
             length = length + 3
         else:
-            (unsafe: *code = 121)
+            ((unsafe: *code) = 121)
             (last_branch = code)
             (bc.current_branch = last_branch)
             code = code + (1 + 2)
@@ -2110,8 +2110,8 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                 (__goto_pending = 0)
                 branchlength = 0
                 branchminlength = 0
-                if (if ((unsafe: *lcptr) = (unsafe: *lcptr) + 1) > 2000: 1 else: 0) != 0:
-                    (unsafe: *errcodeptr = ERR35)
+                if (if (((unsafe: *lcptr)) = ((unsafe: *lcptr)) + 1) > 2000: 1 else: 0) != 0:
+                    ((unsafe: *errcodeptr) = ERR35)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     return -1
@@ -2120,7 +2120,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 while (pptr = pptr + 1) != null:
-                    if (if unsafe: *pptr < 2147483648: 1 else: 0) != 0:
+                    if (if (unsafe: *pptr) < 2147483648: 1 else: 0) != 0:
                         (itemminlength = 1)
                         (itemlength = itemminlength)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2128,7 +2128,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if (if (2147483647 - branchlength) < (itemlength as c_int): 1 else: 0) != 0 or (if (branchlength = branchlength + itemlength) > ((65535 as c_int)): 1 else: 0) != 0: 1 else: 0) != 0:
-                        (unsafe: *errcodeptr = ERR87)
+                        ((unsafe: *errcodeptr) = ERR87)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         return -1
@@ -2153,10 +2153,10 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                 continue
             5 =>  // EXIT
                 (__goto_pending = 0)
-                (unsafe: *pptrptr = pptr)
+                ((unsafe: *pptrptr) = pptr)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *minptr = branchminlength)
+                ((unsafe: *minptr) = branchminlength)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return branchlength
@@ -2166,7 +2166,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                 continue
             6 =>  // PARSED_SKIP_FAILED
                 (__goto_pending = 0)
-                (unsafe: *errcodeptr = ERR90)
+                ((unsafe: *errcodeptr) = ERR90)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return -1
@@ -2182,7 +2182,7 @@ fn set_lookbehind_lengths(pptrptr: *mut *mut c_uint, errcodeptr: *mut c_int, lcp
     var minlength: c_int = 2147483647
     var variable: c_int
     0
-    unsafe: *pptrptr = unsafe: *pptrptr + 2
+    (unsafe: *pptrptr) = (unsafe: *pptrptr) + 2
     if variable != 0:
         (gbptr[1] = minlength)
     else:
@@ -2194,8 +2194,8 @@ fn check_lookbehinds(__param_pptr: *mut c_uint, retptr: *mut *mut c_uint, recurs
     var pptr = __param_pptr
     var errorcode: c_int = 0
     var nestlevel: c_int = 0
-    while (if unsafe: *pptr != 2147483648: 1 else: 0) != 0:
-        if (if unsafe: *pptr < 2147483648: 1 else: 0) != 0:
+    while (if (unsafe: *pptr) != 2147483648: 1 else: 0) != 0:
+        if (if (unsafe: *pptr) < 2147483648: 1 else: 0) != 0:
             continue
         
         (pptr = pptr + 1)
@@ -2249,11 +2249,11 @@ fn read_number(ptrptr: *mut *const u8, ptrend: *const u8, allow_sign: c_int, __p
             0 =>
                 (__goto_pending = 0)
                 sign = 0
-                (unsafe: *errorcodeptr = 0)
+                ((unsafe: *errorcodeptr) = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if (if allow_sign >= 0: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0:
-                    if (if unsafe: *ptr == 43: 1 else: 0) != 0:
+                    if (if (unsafe: *ptr) == 43: 1 else: 0) != 0:
                         (sign = 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
@@ -2264,7 +2264,7 @@ fn read_number(ptrptr: *mut *const u8, ptrend: *const u8, allow_sign: c_int, __p
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     else:
-                        if (if unsafe: *ptr == 45: 1 else: 0) != 0:
+                        if (if (unsafe: *ptr) == 45: 1 else: 0) != 0:
                             (sign = -1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
@@ -2277,7 +2277,7 @@ fn read_number(ptrptr: *mut *const u8, ptrend: *const u8, allow_sign: c_int, __p
                     continue
                 if (if (if allow_sign >= 0: 1 else: 0) != 0 and (if sign != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                     if (if n == 0: 1 else: 0) != 0:
-                        (unsafe: *errorcodeptr = ERR26)
+                        ((unsafe: *errorcodeptr) = ERR26)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         __pc = 1
@@ -2299,10 +2299,10 @@ fn read_number(ptrptr: *mut *const u8, ptrend: *const u8, allow_sign: c_int, __p
                 continue
             1 =>  // EXIT
                 (__goto_pending = 0)
-                (unsafe: *intptr = n)
+                ((unsafe: *intptr) = n)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *ptrptr = ptr)
+                ((unsafe: *ptrptr) = ptr)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return yield_
@@ -2323,10 +2323,10 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
         match __pc
             0 =>
                 (__goto_pending = 0)
-                (unsafe: *errorcodeptr = 0)
+                ((unsafe: *errorcodeptr) = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if unsafe: *p == 32: 1 else: 0) != 0 or (if unsafe: *p == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p) == 32: 1 else: 0) != 0 or (if (unsafe: *p) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                     (p = p + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
@@ -2335,7 +2335,7 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                 (pp = p)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (if (if pp < ptrend: 1 else: 0) != 0 and ((if (if unsafe: *pp == 32: 1 else: 0) != 0 or (if unsafe: *pp == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                while (if (if pp < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *pp) == 32: 1 else: 0) != 0 or (if (unsafe: *pp) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                     (pp = pp + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
@@ -2345,17 +2345,17 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                     return 0
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if unsafe: *pp == 125: 1 else: 0) != 0:
+                if (if (unsafe: *pp) == 125: 1 else: 0) != 0:
                     if (if had_minimum != 0: 0 else: 1) != 0:
                         return 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 else:
-                    if (if unsafe: *(pp = pp + 1) != 44: 1 else: 0) != 0:
+                    if (if (unsafe: *(pp = pp + 1)) != 44: 1 else: 0) != 0:
                         return 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    while (if (if pp < ptrend: 1 else: 0) != 0 and ((if (if unsafe: *pp == 32: 1 else: 0) != 0 or (if unsafe: *pp == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                    while (if (if pp < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *pp) == 32: 1 else: 0) != 0 or (if (unsafe: *pp) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                         (pp = pp + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
@@ -2365,20 +2365,20 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                         return 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    while (if (if pp < ptrend: 1 else: 0) != 0 and ((if (if unsafe: *pp == 32: 1 else: 0) != 0 or (if unsafe: *pp == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                    while (if (if pp < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *pp) == 32: 1 else: 0) != 0 or (if (unsafe: *pp) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                         (pp = pp + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if (if pp >= ptrend: 1 else: 0) != 0 or (if unsafe: *pp != 125: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (if (if pp >= ptrend: 1 else: 0) != 0 or (if (unsafe: *pp) != 125: 1 else: 0) != 0: 1 else: 0) != 0:
                         return 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if read_number((&mut p as *mut *const u8), ptrend, -1, 65535, 105, (&mut min as *mut c_int), errorcodeptr) != 0: 0 else: 1) != 0:
-                    if (if unsafe: *errorcodeptr != 0: 1 else: 0) != 0:
+                    if (if (unsafe: *errorcodeptr) != 0: 1 else: 0) != 0:
                         __pc = 1
                         __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2386,14 +2386,14 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                     (p = p + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if unsafe: *p == 32: 1 else: 0) != 0 or (if unsafe: *p == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                    while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p) == 32: 1 else: 0) != 0 or (if (unsafe: *p) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                         (p = p + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     if (if read_number((&mut p as *mut *const u8), ptrend, -1, 65535, 105, (&mut max as *mut c_int), errorcodeptr) != 0: 0 else: 1) != 0:
-                        if (if unsafe: *errorcodeptr != 0: 1 else: 0) != 0:
+                        if (if (unsafe: *errorcodeptr) != 0: 1 else: 0) != 0:
                             __pc = 1
                             __goto_pending = 1
                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2401,13 +2401,13 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 else:
-                    while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if unsafe: *p == 32: 1 else: 0) != 0 or (if unsafe: *p == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                    while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p) == 32: 1 else: 0) != 0 or (if (unsafe: *p) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                         (p = p + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if unsafe: *p == 125: 1 else: 0) != 0:
+                    if (if (unsafe: *p) == 125: 1 else: 0) != 0:
                         (max = min)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
@@ -2415,14 +2415,14 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                         (p = p + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if unsafe: *p == 32: 1 else: 0) != 0 or (if unsafe: *p == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                        while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p) == 32: 1 else: 0) != 0 or (if (unsafe: *p) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                             (p = p + 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         if (if read_number((&mut p as *mut *const u8), ptrend, -1, 65535, 105, (&mut max as *mut c_int), errorcodeptr) != 0: 0 else: 1) != 0:
-                            if (if unsafe: *errorcodeptr != 0: 1 else: 0) != 0:
+                            if (if (unsafe: *errorcodeptr) != 0: 1 else: 0) != 0:
                                 __pc = 1
                                 __goto_pending = 1
                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2430,7 +2430,7 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         if (if max < min: 1 else: 0) != 0:
-                            (unsafe: *errorcodeptr = ERR4)
+                            ((unsafe: *errorcodeptr) = ERR4)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                             __pc = 1
@@ -2443,7 +2443,7 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if unsafe: *p == 32: 1 else: 0) != 0 or (if unsafe: *p == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p) == 32: 1 else: 0) != 0 or (if (unsafe: *p) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                     (p = p + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
@@ -2459,7 +2459,7 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                 continue
             1 =>  // EXIT
                 (__goto_pending = 0)
-                (unsafe: *ptrptr = p)
+                ((unsafe: *ptrptr) = p)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return yield_
@@ -2470,16 +2470,16 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
 fn check_posix_syntax(__param_ptr: *const u8, ptrend: *const u8, endptr: *mut *const u8) -> c_int:
     var ptr = __param_ptr
     var terminator: u8
-    (terminator = unsafe: *(ptr = ptr + 1))
+    (terminator = (unsafe: *(ptr = ptr + 1)))
     while (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 2: 1 else: 0) != 0:
-        if (if (if unsafe: *ptr == 92: 1 else: 0) != 0 and ((if (if ptr[1] == 93: 1 else: 0) != 0 or (if ptr[1] == 92: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+        if (if (if (unsafe: *ptr) == 92: 1 else: 0) != 0 and ((if (if ptr[1] == 93: 1 else: 0) != 0 or (if ptr[1] == 92: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
             (ptr = ptr + 1)
         else:
-            if (if ((if (if unsafe: *ptr == 91: 1 else: 0) != 0 and (if ptr[1] == terminator: 1 else: 0) != 0: 1 else: 0)) != 0 or (if unsafe: *ptr == 93: 1 else: 0) != 0: 1 else: 0) != 0:
+            if (if ((if (if (unsafe: *ptr) == 91: 1 else: 0) != 0 and (if ptr[1] == terminator: 1 else: 0) != 0: 1 else: 0)) != 0 or (if (unsafe: *ptr) == 93: 1 else: 0) != 0: 1 else: 0) != 0:
                 return 0
             else:
-                if (if (if unsafe: *ptr == terminator: 1 else: 0) != 0 and (if ptr[1] == 93: 1 else: 0) != 0: 1 else: 0) != 0:
-                    (unsafe: *endptr = ptr)
+                if (if (if (unsafe: *ptr) == terminator: 1 else: 0) != 0 and (if ptr[1] == 93: 1 else: 0) != 0: 1 else: 0) != 0:
+                    ((unsafe: *endptr) = ptr)
                     return 1
         
         (ptr = ptr + 1)
@@ -2509,14 +2509,14 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
             0 =>
                 (__goto_pending = 0)
                 if is_braced != 0:
-                    while (if (if ptr < ptrend: 1 else: 0) != 0 and ((if (if unsafe: *ptr == 32: 1 else: 0) != 0 or (if unsafe: *ptr == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                    while (if (if ptr < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *ptr) == 32: 1 else: 0) != 0 or (if (unsafe: *ptr) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                         (ptr = ptr + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if ptr >= ptrend: 1 else: 0) != 0:
-                    (unsafe: *errorcodeptr = (if is_group != 0: ERR62 else: ERR60))
+                    ((unsafe: *errorcodeptr) = (if is_group != 0: ERR62 else: ERR60))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     __pc = 1
@@ -2525,13 +2525,13 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *nameptr = ptr)
+                ((unsafe: *nameptr) = ptr)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 utf
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (if (if (if ptr < ptrend: 1 else: 0) != 0 and 1 != 0: 1 else: 0) != 0 and (if ((cb.ctypes[unsafe: *ptr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                while (if (if (if ptr < ptrend: 1 else: 0) != 0 and 1 != 0: 1 else: 0) != 0 and (if ((cb.ctypes[(unsafe: *ptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                     (ptr = ptr + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
@@ -2541,8 +2541,8 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                     continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ((ptr as usize -% unsafe: *nameptr as usize) / sizeof[u8]()) > 128: 1 else: 0) != 0:
-                    (unsafe: *errorcodeptr = ERR48)
+                if (if ((ptr as usize -% (unsafe: *nameptr) as usize) / sizeof[u8]()) > 128: 1 else: 0) != 0:
+                    ((unsafe: *errorcodeptr) = ERR48)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     __pc = 1
@@ -2552,8 +2552,8 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if is_group != 0:
-                    if (if ptr == unsafe: *nameptr: 1 else: 0) != 0:
-                        (unsafe: *errorcodeptr = ERR62)
+                    if (if ptr == (unsafe: *nameptr): 1 else: 0) != 0:
+                        ((unsafe: *errorcodeptr) = ERR62)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         __pc = 1
@@ -2563,7 +2563,7 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     if is_braced != 0:
-                        while (if (if ptr < ptrend: 1 else: 0) != 0 and ((if (if unsafe: *ptr == 32: 1 else: 0) != 0 or (if unsafe: *ptr == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                        while (if (if ptr < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *ptr) == 32: 1 else: 0) != 0 or (if (unsafe: *ptr) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                             (ptr = ptr + 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
@@ -2577,7 +2577,7 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *ptrptr = ptr)
+                ((unsafe: *ptrptr) = ptr)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return 1
@@ -2587,7 +2587,7 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                 continue
             1 =>  // FAILED
                 (__goto_pending = 0)
-                (unsafe: *ptrptr = ptr)
+                ((unsafe: *ptrptr) = ptr)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return 0
@@ -2611,8 +2611,8 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
         match __pc
             0 =>
                 (__goto_pending = 0)
-                if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if unsafe: *ptr != 40: 1 else: 0) != 0: 1 else: 0) != 0:
-                    (unsafe: *errorcodeptr = ERR118)
+                if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 40: 1 else: 0) != 0: 1 else: 0) != 0:
+                    ((unsafe: *errorcodeptr) = ERR118)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     __pc = 2
@@ -2626,7 +2626,7 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if ptr >= ptrend: 1 else: 0) != 0:
-                        (unsafe: *errorcodeptr = ERR117)
+                        ((unsafe: *errorcodeptr) = ERR117)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         __pc = 2
@@ -2637,7 +2637,7 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                         break
                     if read_number((&mut ptr as *mut *const u8), ptrend, cb.bracount, 65535, 161, (&mut i as *mut c_int), errorcodeptr) != 0:
                         if (if i <= 0: 1 else: 0) != 0:
-                            (unsafe: *errorcodeptr = ERR15)
+                            ((unsafe: *errorcodeptr) = ERR15)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             __pc = 2
@@ -2650,17 +2650,17 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     else:
-                        if (if unsafe: *errorcodeptr != 0: 1 else: 0) != 0:
+                        if (if (unsafe: *errorcodeptr) != 0: 1 else: 0) != 0:
                             __pc = 2
                             __goto_pending = 1
                         else:
-                            if (if unsafe: *ptr == 60: 1 else: 0) != 0:
+                            if (if (unsafe: *ptr) == 60: 1 else: 0) != 0:
                                 (terminator = 62)
                             else:
-                                if (if unsafe: *ptr == 39: 1 else: 0) != 0:
+                                if (if (unsafe: *ptr) == 39: 1 else: 0) != 0:
                                     (terminator = 39)
                                 else:
-                                    (unsafe: *errorcodeptr = ERR117)
+                                    ((unsafe: *errorcodeptr) = ERR117)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 2
@@ -2704,12 +2704,12 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                         __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if unsafe: *ptr == 41: 1 else: 0) != 0:
+                    if (if (unsafe: *ptr) == 41: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if unsafe: *ptr != 44: 1 else: 0) != 0:
-                        (unsafe: *errorcodeptr = ERR24)
+                    if (if (unsafe: *ptr) != 44: 1 else: 0) != 0:
+                        ((unsafe: *errorcodeptr) = ERR24)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         __pc = 2
@@ -2722,7 +2722,7 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *ptrptr = (ptr + (1 as isize as usize)))
+                ((unsafe: *ptrptr) = (ptr + (1 as isize as usize)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return parsed_pattern
@@ -2732,14 +2732,14 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                 continue
             1 =>  // UNCLOSED_PARENTHESIS
                 (__goto_pending = 0)
-                (unsafe: *errorcodeptr = ERR14)
+                ((unsafe: *errorcodeptr) = ERR14)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 2
                 continue
             2 =>  // FAILED
                 (__goto_pending = 0)
-                (unsafe: *ptrptr = ptr)
+                ((unsafe: *ptrptr) = ptr)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return (null as *mut c_uint)
@@ -2761,7 +2761,7 @@ fn manage_callouts(ptr: *const u8, pcalloutptr: *mut *mut c_uint, auto_callout: 
             (previous_callout[3] = 255)
         
 
-    (unsafe: *pcalloutptr = previous_callout)
+    ((unsafe: *pcalloutptr) = previous_callout)
     return parsed_pattern
 
 fn handle_escdsw(escape: c_int, __param_parsed_pattern: *mut c_uint, options: c_uint, xoptions: c_uint) -> *mut c_uint:
@@ -3015,7 +3015,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if inescq != 0:
-                        if (if (if (if c == 92: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *ptr == 69: 1 else: 0) != 0: 1 else: 0) != 0:
+                        if (if (if (if c == 92: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 69: 1 else: 0) != 0: 1 else: 0) != 0:
                             (inescq = 0)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
@@ -3049,8 +3049,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if (if c == 92: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0:
-                        if (if (if unsafe: *ptr == 81: 1 else: 0) != 0 or (if unsafe: *ptr == 69: 1 else: 0) != 0: 1 else: 0) != 0:
-                            if (if (if (if expect_cond_assert > 0: 1 else: 0) != 0 and (if unsafe: *ptr == 81: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((if (if (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0 and (if ptr[1] == 92: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[2] == 69: 1 else: 0) != 0: 1 else: 0)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+                        if (if (if (unsafe: *ptr) == 81: 1 else: 0) != 0 or (if (unsafe: *ptr) == 69: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if (if expect_cond_assert > 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 81: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((if (if (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0 and (if ptr[1] == 92: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[2] == 69: 1 else: 0) != 0: 1 else: 0)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
                                 (ptr = ptr - 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -3063,7 +3063,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (inescq = (if unsafe: *ptr == 81: 1 else: 0))
+                            (inescq = (if (unsafe: *ptr) == 81: 1 else: 0))
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             (ptr = ptr + 1)
@@ -3098,7 +3098,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if (if (if (if c == 40: 1 else: 0) != 0 and (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[0] == 63: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 35: 1 else: 0) != 0: 1 else: 0) != 0:
-                        while (if (if (ptr = ptr + 1) < ptrend: 1 else: 0) != 0 and (if unsafe: *ptr != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                        while (if (if (ptr = ptr + 1) < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                             0
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
@@ -3255,10 +3255,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             __pc = 1
                                             __goto_pending = 1
                                         ESC_g =>
-                                            (terminator = (if ((if unsafe: *ptr == 60: 1 else: 0)) != 0: 62 else: (if ((if unsafe: *ptr == 39: 1 else: 0)) != 0: 39 else: 125)))
+                                            (terminator = (if ((if (unsafe: *ptr) == 60: 1 else: 0)) != 0: 62 else: (if ((if (unsafe: *ptr) == 39: 1 else: 0)) != 0: 39 else: 125)))
                                             if (if (if escape == ESC_g: 1 else: 0) != 0 and (if terminator != 125: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 if read_number((&mut p as *mut *const u8), ptrend, cb.bracount, 65535, 161, (&mut i as *mut c_int), (&mut errorcode as *mut c_int)) != 0:
-                                                    if (if (if p >= ptrend: 1 else: 0) != 0 or (if unsafe: *p != terminator: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if p >= ptrend: 1 else: 0) != 0 or (if (unsafe: *p) != terminator: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (ptr = p)
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
@@ -3338,7 +3338,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if unsafe: *prev_parsed_item == 2150498304: 1 else: 0) != 0:
+                            if (if (unsafe: *prev_parsed_item) == 2150498304: 1 else: 0) != 0:
                                 (p = (parsed_pattern - (1 as isize as usize)))
                                 while (if p >= verbstartptr: 1 else: 0) != 0:
                                     (p[1] = p[0])
@@ -3347,7 +3347,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *verbstartptr = (2149449728 as c_uint))
+                                ((unsafe: *verbstartptr) = (2149449728 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (parsed_pattern[1] = (2149384192 as c_uint))
@@ -3395,7 +3395,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if unsafe: *prev_parsed_item == 2150498304: 1 else: 0) != 0:
+                            if (if (unsafe: *prev_parsed_item) == 2150498304: 1 else: 0) != 0:
                                 (p = (parsed_pattern - (1 as isize as usize)))
                                 while (if p >= verbstartptr: 1 else: 0) != 0:
                                     (p[1] = p[0])
@@ -3404,7 +3404,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *verbstartptr = (2149449728 as c_uint))
+                                ((unsafe: *verbstartptr) = (2149449728 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (parsed_pattern[1] = (2149384192 as c_uint))
@@ -3449,7 +3449,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if unsafe: *prev_parsed_item == 2150498304: 1 else: 0) != 0:
+                            if (if (unsafe: *prev_parsed_item) == 2150498304: 1 else: 0) != 0:
                                 (p = (parsed_pattern - (1 as isize as usize)))
                                 while (if p >= verbstartptr: 1 else: 0) != 0:
                                     (p[1] = p[0])
@@ -3458,7 +3458,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *verbstartptr = (2149449728 as c_uint))
+                                ((unsafe: *verbstartptr) = (2149449728 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (parsed_pattern[1] = (2149384192 as c_uint))
@@ -3500,7 +3500,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if unsafe: *prev_parsed_item == 2150498304: 1 else: 0) != 0:
+                            if (if (unsafe: *prev_parsed_item) == 2150498304: 1 else: 0) != 0:
                                 (p = (parsed_pattern - (1 as isize as usize)))
                                 while (if p >= verbstartptr: 1 else: 0) != 0:
                                     (p[1] = p[0])
@@ -3509,7 +3509,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *verbstartptr = (2149449728 as c_uint))
+                                ((unsafe: *verbstartptr) = (2149449728 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (parsed_pattern[1] = (2149384192 as c_uint))
@@ -3545,7 +3545,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     (parsed_pattern = parsed_pattern + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (unsafe: *has_lookbehind = 1)
+                                    ((unsafe: *has_lookbehind) = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     0
@@ -3580,8 +3580,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if (if (if ptr < ptrend: 1 else: 0) != 0 and ((if (if (if unsafe: *ptr == 58: 1 else: 0) != 0 or (if unsafe: *ptr == 46: 1 else: 0) != 0: 1 else: 0) != 0 or (if unsafe: *ptr == 61: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and check_posix_syntax(ptr, ptrend, (&mut tempptr as *mut *const u8)) != 0: 1 else: 0) != 0:
-                                (errorcode = (if ((if unsafe: *(ptr = ptr - 1) == 58: 1 else: 0)) != 0: ERR12 else: ERR13))
+                            if (if (if (if ptr < ptrend: 1 else: 0) != 0 and ((if (if (if (unsafe: *ptr) == 58: 1 else: 0) != 0 or (if (unsafe: *ptr) == 46: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *ptr) == 61: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and check_posix_syntax(ptr, ptrend, (&mut tempptr as *mut *const u8)) != 0: 1 else: 0) != 0:
+                                (errorcode = (if ((if (unsafe: *(ptr = ptr - 1)) == 58: 1 else: 0)) != 0: ERR12 else: ERR13))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (ptr = (tempptr + (2 as isize as usize)))
@@ -3600,7 +3600,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             (class_start = (null as *mut c_uint))
                             while true:
                                 if inescq != 0:
-                                    if (if (if (if c == 92: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *ptr == 69: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (if c == 92: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 69: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (inescq = 0)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -3634,7 +3634,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if (if (if (if (if class_depth_m1 >= 0: 1 else: 0) != 0 and (if c == 91: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (if unsafe: *ptr == 58: 1 else: 0) != 0 or (if unsafe: *ptr == 46: 1 else: 0) != 0: 1 else: 0) != 0 or (if unsafe: *ptr == 61: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and check_posix_syntax(ptr, ptrend, (&mut tempptr as *mut *const u8)) != 0: 1 else: 0) != 0:
+                                if (if (if (if (if (if class_depth_m1 >= 0: 1 else: 0) != 0 and (if c == 91: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (if (unsafe: *ptr) == 58: 1 else: 0) != 0 or (if (unsafe: *ptr) == 46: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *ptr) == 61: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and check_posix_syntax(ptr, ptrend, (&mut tempptr as *mut *const u8)) != 0: 1 else: 0) != 0:
                                     if (if class_range_state == 1: 1 else: 0) != 0:
                                         (ptr = (tempptr + (2 as isize as usize)))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -3674,7 +3674,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if unsafe: *ptr != 58: 1 else: 0) != 0:
+                                    if (if (unsafe: *ptr) != 58: 1 else: 0) != 0:
                                         (ptr = (tempptr + (2 as isize as usize)))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -3687,7 +3687,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if unsafe: *((ptr = ptr + 1)) == 94: 1 else: 0) != 0:
+                                    if (if (unsafe: *((ptr = ptr + 1))) == 94: 1 else: 0) != 0:
                                         (posix_negate = 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -3785,7 +3785,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                             else:
                                                 if (if c == 92: 1 else: 0) != 0:
-                                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if unsafe: *ptr == 69: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 69: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (ptr = ptr + 1)
                                                     else:
                                                         if (if (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(ptr, "Q\\E", 3) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
@@ -3802,7 +3802,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                         if (if (if (if c == 93: 1 else: 0) != 0 and (if ((cb.external_options & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if new_class_mode_state < 2: 1 else: 0) != 0: 1 else: 0) != 0:
                                             if (if class_start != (null as *mut c_uint): 1 else: 0) != 0:
-                                                unsafe: *class_start = unsafe: *class_start | 1
+                                                (unsafe: *class_start) = (unsafe: *class_start) | 1
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 (class_start = (null as *mut c_uint))
@@ -3831,7 +3831,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if class_start != (null as *mut c_uint): 1 else: 0) != 0:
-                                            unsafe: *class_start = unsafe: *class_start | 1
+                                            (unsafe: *class_start) = (unsafe: *class_start) | 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             (class_start = (null as *mut c_uint))
@@ -3942,7 +3942,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                             if (if (class_depth_m1 = class_depth_m1 - 1) < 0: 1 else: 0) != 0:
                                                 if (if class_mode_state == 2: 1 else: 0) != 0:
-                                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if unsafe: *ptr != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (errorcode = ERR115)
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
@@ -3988,7 +3988,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 if (if class_start != (null as *mut c_uint): 1 else: 0) != 0:
-                                                    unsafe: *class_start = unsafe: *class_start | 1
+                                                    (unsafe: *class_start) = (unsafe: *class_start) | 1
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                     (class_start = (null as *mut c_uint))
@@ -4019,7 +4019,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                     if (if class_start != (null as *mut c_uint): 1 else: 0) != 0:
-                                                        unsafe: *class_start = unsafe: *class_start | 1
+                                                        (unsafe: *class_start) = (unsafe: *class_start) | 1
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         (class_start = (null as *mut c_uint))
@@ -4038,12 +4038,12 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                 else:
-                                                    if (if (if (if (if class_mode_state == 1: 1 else: 0) != 0 and ((if (if (if (if c == 124: 1 else: 0) != 0 or (if c == 45: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 38: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 126: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *ptr == c: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if (if (if class_mode_state == 1: 1 else: 0) != 0 and ((if (if (if (if c == 124: 1 else: 0) != 0 or (if c == 45: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 38: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 126: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == c: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (ptr = ptr + 1)
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        if (if (if ptr < ptrend: 1 else: 0) != 0 and (if unsafe: *ptr == c: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                            while (if (if ptr < ptrend: 1 else: 0) != 0 and (if unsafe: *ptr == c: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == c: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                            while (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == c: 1 else: 0) != 0: 1 else: 0) != 0:
                                                                 (ptr = ptr + 1)
                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                     break
@@ -4069,7 +4069,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         if (if class_start != (null as *mut c_uint): 1 else: 0) != 0:
-                                                            unsafe: *class_start = unsafe: *class_start | 1
+                                                            (unsafe: *class_start) = (unsafe: *class_start) | 1
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             (class_start = (null as *mut c_uint))
@@ -4380,8 +4380,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             if (if ptr >= ptrend: 1 else: 0) != 0:
                                 __pc = 18
                                 __goto_pending = 1
-                            if (if unsafe: *ptr != 63: 1 else: 0) != 0:
-                                if (if unsafe: *ptr != 42: 1 else: 0) != 0:
+                            if (if (unsafe: *ptr) != 63: 1 else: 0) != 0:
+                                if (if (unsafe: *ptr) != 42: 1 else: 0) != 0:
                                     (nest_depth = nest_depth + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -4426,7 +4426,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if unsafe: *ptr != 58: 1 else: 0) != 0:
+                                            if (if (unsafe: *ptr) != 58: 1 else: 0) != 0:
                                                 (errorcode = ERR95)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -4615,7 +4615,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if ptr >= ptrend: 1 else: 0) != 0 or ((if (if unsafe: *ptr != 58: 1 else: 0) != 0 and (if unsafe: *ptr != 41: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr >= ptrend: 1 else: 0) != 0 or ((if (if (unsafe: *ptr) != 58: 1 else: 0) != 0 and (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                                                 (errorcode = ERR60)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -4649,11 +4649,11 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if (if unsafe: *ptr == 58: 1 else: 0) != 0 and (if (ptr + (1 as isize as usize)) < ptrend: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if (if (unsafe: *ptr) == 58: 1 else: 0) != 0 and (if (ptr + (1 as isize as usize)) < ptrend: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 (ptr = ptr + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if (&verbs[0] as *mut verbitem)[i].has_arg > 0: 1 else: 0) != 0 and (if unsafe: *ptr != 58: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if (&verbs[0] as *mut verbitem)[i].has_arg > 0: 1 else: 0) != 0 and (if (unsafe: *ptr) != 58: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 (errorcode = ERR66)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
@@ -4669,7 +4669,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             (okquantifier = ((if (&verbs[0] as *mut verbitem)[i].meta == 2150498304: 1 else: 0)))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if unsafe: *(ptr = ptr + 1) == 58: 1 else: 0) != 0:
+                                            if (if (unsafe: *(ptr = ptr + 1)) == 58: 1 else: 0) != 0:
                                                 if (if (&verbs[0] as *mut verbitem)[i].has_arg < 0: 1 else: 0) != 0:
                                                     (add_after_mark = (&verbs[0] as *mut verbitem)[i].meta)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -4710,12 +4710,12 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             if (if (ptr = ptr + 1) >= ptrend: 1 else: 0) != 0:
                                 __pc = 18
                                 __goto_pending = 1
-                            match unsafe: *ptr
+                            match (unsafe: *ptr)
                                 80 =>
                                     if (if (ptr = ptr + 1) >= ptrend: 1 else: 0) != 0:
                                         __pc = 18
                                         __goto_pending = 1
-                                    if (if unsafe: *ptr == 60: 1 else: 0) != 0:
+                                    if (if (unsafe: *ptr) == 60: 1 else: 0) != 0:
                                         (terminator = 62)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -4723,10 +4723,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if unsafe: *ptr == 62: 1 else: 0) != 0:
+                                    if (if (unsafe: *ptr) == 62: 1 else: 0) != 0:
                                         __pc = 8
                                         __goto_pending = 1
-                                    if (if unsafe: *ptr != 61: 1 else: 0) != 0:
+                                    if (if (unsafe: *ptr) != 61: 1 else: 0) != 0:
                                         (errorcode = ERR41)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -4746,7 +4746,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 82 =>
                                     (i = 0)
                                     (ptr = ptr + 1)
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or ((if (if unsafe: *ptr != 41: 1 else: 0) != 0 and (if unsafe: *ptr != 40: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or ((if (if (unsafe: *ptr) != 41: 1 else: 0) != 0 and (if (unsafe: *ptr) != 40: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                                         (errorcode = ERR58)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -4780,7 +4780,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     (okquantifier = 1)
                                     if (if terminator != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if unsafe: *ptr == 40: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, offset, (&mut errorcode as *mut c_int), cb))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -4789,7 +4789,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if unsafe: *ptr != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 18
                                         __goto_pending = 1
                                     (ptr = ptr + 1)
@@ -4817,7 +4817,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     (okquantifier = 1)
                                     if (if terminator != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if unsafe: *ptr == 40: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, offset, (&mut errorcode as *mut c_int), cb))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -4826,7 +4826,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if unsafe: *ptr != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 18
                                         __goto_pending = 1
                                     (ptr = ptr + 1)
@@ -4846,7 +4846,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     (okquantifier = 1)
                                     if (if terminator != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if unsafe: *ptr == 40: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, offset, (&mut errorcode as *mut c_int), cb))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -4855,7 +4855,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if unsafe: *ptr != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 18
                                         __goto_pending = 1
                                     (ptr = ptr + 1)
@@ -4872,7 +4872,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     (okquantifier = 1)
                                     if (if terminator != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if unsafe: *ptr == 40: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, offset, (&mut errorcode as *mut c_int), cb))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -4881,7 +4881,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if unsafe: *ptr != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 18
                                         __goto_pending = 1
                                     (ptr = ptr + 1)
@@ -4905,7 +4905,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         (parsed_pattern = previous_callout)
                                     (previous_callout = parsed_pattern)
                                     (after_manual_callout = 1)
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if unsafe: *ptr != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (errorcode = ERR39)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -4920,7 +4920,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         __pc = 18
                                         __goto_pending = 1
                                     (nest_depth = nest_depth + 1)
-                                    if (if (if unsafe: *ptr == 63: 1 else: 0) != 0 or (if unsafe: *ptr == 42: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (unsafe: *ptr) == 63: 1 else: 0) != 0 or (if (unsafe: *ptr) == 42: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (unsafe: *parsed_pattern = 2148466688)
                                         (parsed_pattern = parsed_pattern + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -4971,7 +4971,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 ptr = ptr + 7
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if unsafe: *ptr == 62: 1 else: 0) != 0:
+                                                if (if (unsafe: *ptr) == 62: 1 else: 0) != 0:
                                                     (ge = 1)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
@@ -4985,7 +4985,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     __goto_pending = 1
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if (if ptr < ptrend: 1 else: 0) != 0 and (if unsafe: *ptr == 46: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 46: 1 else: 0) != 0: 1 else: 0) != 0:
                                                     if (if read_number((&mut ptr as *mut *const u8), ptrend, -1, 1000, 179, (&mut minor as *mut c_int), (&mut errorcode as *mut c_int)) != 0: 0 else: 1) != 0:
                                                         __pc = 19
                                                         __goto_pending = 1
@@ -4993,7 +4993,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if unsafe: *ptr != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                                     (errorcode = ERR79)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
@@ -5025,7 +5025,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                             else:
-                                                if (if (if (if unsafe: *ptr == 82: 1 else: 0) != 0 and (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) > 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 38: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                if (if (if (if (unsafe: *ptr) == 82: 1 else: 0) != 0 and (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) > 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 38: 1 else: 0) != 0: 1 else: 0) != 0:
                                                     (terminator = 41)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
@@ -5036,10 +5036,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                 else:
-                                                    if (if unsafe: *ptr == 60: 1 else: 0) != 0:
+                                                    if (if (unsafe: *ptr) == 60: 1 else: 0) != 0:
                                                         (terminator = 62)
                                                     else:
-                                                        if (if unsafe: *ptr == 39: 1 else: 0) != 0:
+                                                        if (if (unsafe: *ptr) == 39: 1 else: 0) != 0:
                                                             (terminator = 39)
                                                         else:
                                                             (terminator = 41)
@@ -5056,7 +5056,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 if was_r_ampersand != 0:
-                                                    (unsafe: *parsed_pattern = (2148728832 as c_uint))
+                                                    ((unsafe: *parsed_pattern) = (2148728832 as c_uint))
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                     (ptr = ptr - 1)
@@ -5065,9 +5065,9 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 else:
                                                     if (if terminator == 41: 1 else: 0) != 0:
                                                         if (if (if namelen == 6: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(name, ((&STRING_DEFINE[0] as *mut c_char) as *const i8), 6) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                            (unsafe: *parsed_pattern = (2148532224 as c_uint))
+                                                            ((unsafe: *parsed_pattern) = (2148532224 as c_uint))
                                                         else:
-                                                            (unsafe: *parsed_pattern = (if ((if (if unsafe: *name == 82: 1 else: 0) != 0 and (if i >= (namelen as c_int): 1 else: 0) != 0: 1 else: 0)) != 0: 2148794368 else: 2148597760))
+                                                            ((unsafe: *parsed_pattern) = (if ((if (if (unsafe: *name) == 82: 1 else: 0) != 0 and (if i >= (namelen as c_int): 1 else: 0) != 0: 1 else: 0)) != 0: 2148794368 else: 2148597760))
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -5076,10 +5076,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                     else:
-                                                        (unsafe: *parsed_pattern = (2148597760 as c_uint))
+                                                        ((unsafe: *parsed_pattern) = (2148597760 as c_uint))
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if unsafe: *(parsed_pattern = parsed_pattern + 1) != 2148532224: 1 else: 0) != 0:
+                                                if (if (unsafe: *(parsed_pattern = parsed_pattern + 1)) != 2148532224: 1 else: 0) != 0:
                                                     (unsafe: *parsed_pattern = namelen)
                                                     (parsed_pattern = parsed_pattern + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -5087,7 +5087,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 0
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if unsafe: *ptr != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (errorcode = ERR24)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -5127,7 +5127,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                     (unsafe: *parsed_pattern = (if ((if ptr[1] == 61: 1 else: 0)) != 0: 2150170624 else: (if ((if ptr[1] == 33: 1 else: 0)) != 0: 2150236160 else: 2150367232)))
                                     (parsed_pattern = parsed_pattern + 1)
-                                    (unsafe: *has_lookbehind = 1)
+                                    ((unsafe: *has_lookbehind) = 1)
                                     0
                                     ptr = ptr + 2
                                     (nest_depth = nest_depth + 1)
@@ -5159,7 +5159,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                     (unsafe: *parsed_pattern = (if ((if ptr[1] == 61: 1 else: 0)) != 0: 2150170624 else: (if ((if ptr[1] == 33: 1 else: 0)) != 0: 2150236160 else: 2150367232)))
                                     (parsed_pattern = parsed_pattern + 1)
-                                    (unsafe: *has_lookbehind = 1)
+                                    ((unsafe: *has_lookbehind) = 1)
                                     0
                                     ptr = ptr + 2
                                     (nest_depth = nest_depth + 1)
@@ -5186,7 +5186,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                     (unsafe: *parsed_pattern = (if ((if ptr[1] == 61: 1 else: 0)) != 0: 2150170624 else: (if ((if ptr[1] == 33: 1 else: 0)) != 0: 2150236160 else: 2150367232)))
                                     (parsed_pattern = parsed_pattern + 1)
-                                    (unsafe: *has_lookbehind = 1)
+                                    ((unsafe: *has_lookbehind) = 1)
                                     0
                                     ptr = ptr + 2
                                     (nest_depth = nest_depth + 1)
@@ -5208,7 +5208,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                     (unsafe: *parsed_pattern = (if ((if ptr[1] == 61: 1 else: 0)) != 0: 2150170624 else: (if ((if ptr[1] == 33: 1 else: 0)) != 0: 2150236160 else: 2150367232)))
                                     (parsed_pattern = parsed_pattern + 1)
-                                    (unsafe: *has_lookbehind = 1)
+                                    ((unsafe: *has_lookbehind) = 1)
                                     0
                                     ptr = ptr + 2
                                     (nest_depth = nest_depth + 1)
@@ -5281,14 +5281,14 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     (cb.names_found = cb.names_found + 1)
                                 91 =>
                                     (class_mode_state = 2)
-                                    (c = unsafe: *(ptr = ptr + 1))
+                                    (c = (unsafe: *(ptr = ptr + 1)))
                                     __pc = 3
                                     __goto_pending = 1
                                 _ =>
                                     (nest_depth = nest_depth + 1)
                                     (top_nest.nest_depth = nest_depth)
                                     (top_nest.flags = 0)
-                                    if (if unsafe: *ptr == 124: 1 else: 0) != 0:
+                                    if (if (unsafe: *ptr) == 124: 1 else: 0) != 0:
                                         top_nest.flags = top_nest.flags | 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -5323,7 +5323,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         (xoptset = (&mut xset as *mut c_uint))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if ptr < ptrend: 1 else: 0) != 0 and (if unsafe: *ptr == 94: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 94: 1 else: 0) != 0: 1 else: 0) != 0:
                                             options = options & (0 - ((((((8 | 1024) | 8192) | 32) | 128) | 16777216)) - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -5338,8 +5338,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        while (if (if (if ptr < ptrend: 1 else: 0) != 0 and (if unsafe: *ptr != 41: 1 else: 0) != 0: 1 else: 0) != 0 and (if unsafe: *ptr != 58: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            match unsafe: *(ptr = ptr + 1)
+                                        while (if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) != 58: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            match (unsafe: *(ptr = ptr + 1))
                                                 45 =>
                                                     if (if hyphenok != 0: 0 else: 1) != 0:
                                                         (errorcode = ERR94)
@@ -5354,8 +5354,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     (hyphenok = 0)
                                                 97 =>
                                                     if (if ptr < ptrend: 1 else: 0) != 0:
-                                                        if (if unsafe: *ptr == 68: 1 else: 0) != 0:
-                                                            unsafe: *xoptset = unsafe: *xoptset | 256
+                                                        if (if (unsafe: *ptr) == 68: 1 else: 0) != 0:
+                                                            (unsafe: *xoptset) = (unsafe: *xoptset) | 256
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             (ptr = ptr + 1)
@@ -5366,8 +5366,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                 break
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        if (if unsafe: *ptr == 80: 1 else: 0) != 0:
-                                                            unsafe: *xoptset = unsafe: *xoptset | ((2048 | 4096))
+                                                        if (if (unsafe: *ptr) == 80: 1 else: 0) != 0:
+                                                            (unsafe: *xoptset) = (unsafe: *xoptset) | ((2048 | 4096))
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             (ptr = ptr + 1)
@@ -5378,8 +5378,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                 break
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        if (if unsafe: *ptr == 83: 1 else: 0) != 0:
-                                                            unsafe: *xoptset = unsafe: *xoptset | 512
+                                                        if (if (unsafe: *ptr) == 83: 1 else: 0) != 0:
+                                                            (unsafe: *xoptset) = (unsafe: *xoptset) | 512
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             (ptr = ptr + 1)
@@ -5390,8 +5390,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                 break
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        if (if unsafe: *ptr == 84: 1 else: 0) != 0:
-                                                            unsafe: *xoptset = unsafe: *xoptset | 4096
+                                                        if (if (unsafe: *ptr) == 84: 1 else: 0) != 0:
+                                                            (unsafe: *xoptset) = (unsafe: *xoptset) | 4096
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             (ptr = ptr + 1)
@@ -5402,8 +5402,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                 break
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        if (if unsafe: *ptr == 87: 1 else: 0) != 0:
-                                                            unsafe: *xoptset = unsafe: *xoptset | 1024
+                                                        if (if (unsafe: *ptr) == 87: 1 else: 0) != 0:
+                                                            (unsafe: *xoptset) = (unsafe: *xoptset) | 1024
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             (ptr = ptr + 1)
@@ -5414,26 +5414,26 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                 break
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                    unsafe: *xoptset = unsafe: *xoptset | ((((256 | 512) | 1024) | 4096) | 2048)
+                                                    (unsafe: *xoptset) = (unsafe: *xoptset) | ((((256 | 512) | 1024) | 4096) | 2048)
                                                 74 =>
-                                                    unsafe: *optset = unsafe: *optset | 64
+                                                    (unsafe: *optset) = (unsafe: *optset) | 64
                                                     cb.external_flags = cb.external_flags | 1024
                                                 105 =>
-                                                    unsafe: *optset = unsafe: *optset | 8
+                                                    (unsafe: *optset) = (unsafe: *optset) | 8
                                                 109 =>
-                                                    unsafe: *optset = unsafe: *optset | 1024
+                                                    (unsafe: *optset) = (unsafe: *optset) | 1024
                                                 110 =>
-                                                    unsafe: *optset = unsafe: *optset | 8192
+                                                    (unsafe: *optset) = (unsafe: *optset) | 8192
                                                 114 =>
-                                                    unsafe: *xoptset = unsafe: *xoptset | 128
+                                                    (unsafe: *xoptset) = (unsafe: *xoptset) | 128
                                                 115 =>
-                                                    unsafe: *optset = unsafe: *optset | 32
+                                                    (unsafe: *optset) = (unsafe: *optset) | 32
                                                 85 =>
-                                                    unsafe: *optset = unsafe: *optset | 262144
+                                                    (unsafe: *optset) = (unsafe: *optset) | 262144
                                                 120 =>
-                                                    unsafe: *optset = unsafe: *optset | 128
-                                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if unsafe: *ptr == 120: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                        unsafe: *optset = unsafe: *optset | 16777216
+                                                    (unsafe: *optset) = (unsafe: *optset) | 128
+                                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 120: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (unsafe: *optset) = (unsafe: *optset) | 16777216
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         (ptr = ptr + 1)
@@ -5464,7 +5464,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if unsafe: *(ptr = ptr + 1) == 41: 1 else: 0) != 0:
+                                        if (if (unsafe: *(ptr = ptr + 1)) == 41: 1 else: 0) != 0:
                                             (nest_depth = nest_depth - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -5580,7 +5580,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *parsed_pattern = (2147483648 as c_uint))
+                ((unsafe: *parsed_pattern) = (2147483648 as c_uint))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if nest_depth == 0: 1 else: 0) != 0:
@@ -5624,9 +5624,9 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
 fn first_significant_code(__param_code: *const u8, skipassert: c_int) -> *const u8:
     var code = __param_code
     while true:
-        match (unsafe: *code as c_int)
+        match ((unsafe: *code) as c_int)
             OP_ASSERT_NOT =>
-                code = code + _pcre2_OP_lengths_8[unsafe: *code]
+                code = code + _pcre2_OP_lengths_8[(unsafe: *code)]
             OP_WORD_BOUNDARY => 0
             OP_CALLOUT => 0
             OP_CALLOUT_STR => 0
@@ -5756,7 +5756,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                 while (pptr = pptr + 1) != null:
                     if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
                         if (if code >= (cb.start_workspace + cb.workspace_size): 1 else: 0) != 0:
-                            (unsafe: *errorcodeptr = ERR52)
+                            ((unsafe: *errorcodeptr) = ERR52)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             (cb.erroroffset = 0)
@@ -5768,7 +5768,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         if (if code > ((cb.start_workspace + cb.workspace_size) - ((100) as isize as usize)): 1 else: 0) != 0:
-                            (unsafe: *errorcodeptr = ERR86)
+                            ((unsafe: *errorcodeptr) = ERR86)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             (cb.erroroffset = 0)
@@ -5784,8 +5784,8 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         if (if (if meta < 2151153664: 1 else: 0) != 0 or (if meta > 2151874560: 1 else: 0) != 0: 1 else: 0) != 0:
-                            if (if unsafe: *lengthptr > 65536: 1 else: 0) != 0:
-                                (unsafe: *errorcodeptr = ERR20)
+                            if (if (unsafe: *lengthptr) > 65536: 1 else: 0) != 0:
+                                ((unsafe: *errorcodeptr) = ERR20)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (cb.erroroffset = 0)
@@ -5830,11 +5830,11 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                         break
                     match meta
                         2147483648 =>
-                            (unsafe: *firstcuflagsptr = firstcuflags)
-                            (unsafe: *reqcuptr = reqcu)
-                            (unsafe: *reqcuflagsptr = reqcuflags)
-                            (unsafe: *codeptr = code)
-                            (unsafe: *pptrptr = pptr)
+                            ((unsafe: *firstcuflagsptr) = firstcuflags)
+                            ((unsafe: *reqcuptr) = reqcu)
+                            ((unsafe: *reqcuflagsptr) = reqcuflags)
+                            ((unsafe: *codeptr) = code)
+                            ((unsafe: *pptrptr) = pptr)
                             return okreturn
                         2148073472 =>
                             if (if ((options & 1024)) != 0: 1 else: 0) != 0:
@@ -5883,7 +5883,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (zerofirstcu = firstcu)
                             (zerofirstcuflags = firstcuflags)
                         2148401152 =>
-                            if (if ((unsafe: *pptr & 1)) != 0: 1 else: 0) != 0:
+                            if (if (((unsafe: *pptr) & 1)) != 0: 1 else: 0) != 0:
                                 if (if _pcre2_compile_class_nested_8(options, xoptions, (&mut pptr as *mut *mut c_uint), (&mut code as *mut *mut u8), errorcodeptr, cb, lengthptr) != 0: 0 else: 1) != 0:
                                     return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -5977,7 +5977,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (oc = open_caps)
                             while (if (if oc != (null as *mut open_capitem): 1 else: 0) != 0 and (if oc.assert_depth >= cb.assert_depth: 1 else: 0) != 0: 1 else: 0) != 0:
                                 if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                    unsafe: *lengthptr = unsafe: *lengthptr + 3
+                                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + 3
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
@@ -6004,13 +6004,13 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             cb.external_flags = cb.external_flags | 4096
                             __pc = 2
                             __goto_pending = 1
-                            (verbarglen = unsafe: *((pptr = pptr + 1)))
+                            (verbarglen = (unsafe: *((pptr = pptr + 1))))
                             (verbculen = 0)
                             (tempcode = code)
                             (code = code + 1)
                             i = 0
                             while (if i < (verbarglen as c_int): 1 else: 0) != 0:
-                                (meta = unsafe: *((pptr = pptr + 1)))
+                                (meta = (unsafe: *((pptr = pptr + 1))))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (mclength = 1)
@@ -6022,7 +6022,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                    unsafe: *lengthptr = unsafe: *lengthptr + mclength
+                                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + mclength
                                 else:
                                     code = code + mclength
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -6035,17 +6035,17 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 (i = i + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (unsafe: *tempcode = verbculen)
+                            ((unsafe: *tempcode) = verbculen)
                             (unsafe: *code = 0)
                             (code = code + 1)
                         2150825984 =>
-                            (verbarglen = unsafe: *((pptr = pptr + 1)))
+                            (verbarglen = (unsafe: *((pptr = pptr + 1))))
                             (verbculen = 0)
                             (tempcode = code)
                             (code = code + 1)
                             i = 0
                             while (if i < (verbarglen as c_int): 1 else: 0) != 0:
-                                (meta = unsafe: *((pptr = pptr + 1)))
+                                (meta = (unsafe: *((pptr = pptr + 1))))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (mclength = 1)
@@ -6057,7 +6057,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                    unsafe: *lengthptr = unsafe: *lengthptr + mclength
+                                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + mclength
                                 else:
                                     code = code + mclength
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -6070,17 +6070,17 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 (i = i + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (unsafe: *tempcode = verbculen)
+                            ((unsafe: *tempcode) = verbculen)
                             (unsafe: *code = 0)
                             (code = code + 1)
                         2150432768 =>
-                            (verbarglen = unsafe: *((pptr = pptr + 1)))
+                            (verbarglen = (unsafe: *((pptr = pptr + 1))))
                             (verbculen = 0)
                             (tempcode = code)
                             (code = code + 1)
                             i = 0
                             while (if i < (verbarglen as c_int): 1 else: 0) != 0:
-                                (meta = unsafe: *((pptr = pptr + 1)))
+                                (meta = (unsafe: *((pptr = pptr + 1))))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (mclength = 1)
@@ -6092,7 +6092,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                    unsafe: *lengthptr = unsafe: *lengthptr + mclength
+                                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + mclength
                                 else:
                                     code = code + mclength
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -6105,14 +6105,14 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 (i = i + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (unsafe: *tempcode = verbculen)
+                            ((unsafe: *tempcode) = verbculen)
                             (unsafe: *code = 0)
                             (code = code + 1)
                         2149515264 =>
-                            (options = unsafe: *((pptr = pptr + 1)))
-                            (unsafe: *optionsptr = options)
-                            (xoptions = unsafe: *((pptr = pptr + 1)))
-                            (unsafe: *xoptionsptr = xoptions)
+                            (options = (unsafe: *((pptr = pptr + 1))))
+                            ((unsafe: *optionsptr) = options)
+                            (xoptions = (unsafe: *((pptr = pptr + 1))))
+                            ((unsafe: *xoptionsptr) = xoptions)
                             (greedy_default = ((if ((options & 262144)) != 0: 1 else: 0)))
                             (greedy_non_default = (greedy_default ^ 1))
                             (req_caseopt = (if ((if ((options & 8)) != 0: 1 else: 0)) != 0: 1 else: 0))
@@ -6166,7 +6166,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             if (if groupnumber > 65535: 1 else: 0) != 0:
-                                                (unsafe: *errorcodeptr = ERR61)
+                                                ((unsafe: *errorcodeptr) = ERR61)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 (cb.erroroffset = (offset +% i))
@@ -6185,7 +6185,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if meta != 2148794368: 1 else: 0) != 0 or (if groupnumber > cb.bracount: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (unsafe: *errorcodeptr = ERR15)
+                                        ((unsafe: *errorcodeptr) = ERR15)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         (cb.erroroffset = offset)
@@ -6313,9 +6313,9 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
-                            (groupnumber = unsafe: *((pptr = pptr + 1)))
+                            (groupnumber = (unsafe: *((pptr = pptr + 1))))
                             if (if groupnumber > cb.bracount: 1 else: 0) != 0:
-                                (unsafe: *errorcodeptr = ERR15)
+                                ((unsafe: *errorcodeptr) = ERR15)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (cb.erroroffset = offset)
@@ -6397,7 +6397,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             if (if groupnumber > 65535: 1 else: 0) != 0:
-                                                (unsafe: *errorcodeptr = ERR61)
+                                                ((unsafe: *errorcodeptr) = ERR61)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 (cb.erroroffset = (offset +% i))
@@ -6416,7 +6416,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if meta != 2148794368: 1 else: 0) != 0 or (if groupnumber > cb.bracount: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (unsafe: *errorcodeptr = ERR15)
+                                        ((unsafe: *errorcodeptr) = ERR15)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         (cb.erroroffset = offset)
@@ -6544,9 +6544,9 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
-                            (groupnumber = unsafe: *((pptr = pptr + 1)))
+                            (groupnumber = (unsafe: *((pptr = pptr + 1))))
                             if (if groupnumber > cb.bracount: 1 else: 0) != 0:
-                                (unsafe: *errorcodeptr = ERR15)
+                                ((unsafe: *errorcodeptr) = ERR15)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (cb.erroroffset = offset)
@@ -6616,9 +6616,9 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
-                            (groupnumber = unsafe: *((pptr = pptr + 1)))
+                            (groupnumber = (unsafe: *((pptr = pptr + 1))))
                             if (if groupnumber > cb.bracount: 1 else: 0) != 0:
-                                (unsafe: *errorcodeptr = ERR15)
+                                ((unsafe: *errorcodeptr) = ERR15)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (cb.erroroffset = offset)
@@ -6679,9 +6679,9 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
-                            (groupnumber = unsafe: *((pptr = pptr + 1)))
+                            (groupnumber = (unsafe: *((pptr = pptr + 1))))
                             if (if groupnumber > cb.bracount: 1 else: 0) != 0:
-                                (unsafe: *errorcodeptr = ERR15)
+                                ((unsafe: *errorcodeptr) = ERR15)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (cb.erroroffset = offset)
@@ -6901,7 +6901,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (bravalue = OP_BRA)
                             (note_group_empty = 1)
                             cb.parens_depth = cb.parens_depth + 1
-                            (unsafe: *code = bravalue)
+                            ((unsafe: *code) = bravalue)
                             (pptr = pptr + 1)
                             (tempcode = code)
                             (tempreqvary = cb.req_varyopt)
@@ -6923,7 +6923,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if not ((if unsafe: *tc != OP_KET: 1 else: 0) != 0):
+                                    if not ((if (unsafe: *tc) != OP_KET: 1 else: 0) != 0):
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -6932,7 +6932,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         (cb.erroroffset = offset)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *errorcodeptr = ERR54)
+                                        ((unsafe: *errorcodeptr) = ERR54)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -6951,7 +6951,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         (cb.erroroffset = offset)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *errorcodeptr = ERR27)
+                                        ((unsafe: *errorcodeptr) = ERR27)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -6970,8 +6970,8 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                if (if (2147483627 -% unsafe: *lengthptr) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
-                                    (unsafe: *errorcodeptr = ERR20)
+                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
+                                    ((unsafe: *errorcodeptr) = ERR20)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     return 0
@@ -6979,7 +6979,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                unsafe: *lengthptr = unsafe: *lengthptr + ((length_prevgroup -% 2) -% 4)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup -% 2) -% 4)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (code = code + 1)
@@ -7064,7 +7064,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (bravalue = OP_BRA)
                             (note_group_empty = 1)
                             cb.parens_depth = cb.parens_depth + 1
-                            (unsafe: *code = bravalue)
+                            ((unsafe: *code) = bravalue)
                             (pptr = pptr + 1)
                             (tempcode = code)
                             (tempreqvary = cb.req_varyopt)
@@ -7086,7 +7086,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if not ((if unsafe: *tc != OP_KET: 1 else: 0) != 0):
+                                    if not ((if (unsafe: *tc) != OP_KET: 1 else: 0) != 0):
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -7095,7 +7095,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         (cb.erroroffset = offset)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *errorcodeptr = ERR54)
+                                        ((unsafe: *errorcodeptr) = ERR54)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -7114,7 +7114,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         (cb.erroroffset = offset)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *errorcodeptr = ERR27)
+                                        ((unsafe: *errorcodeptr) = ERR27)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -7133,8 +7133,8 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                if (if (2147483627 -% unsafe: *lengthptr) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
-                                    (unsafe: *errorcodeptr = ERR20)
+                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
+                                    ((unsafe: *errorcodeptr) = ERR20)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     return 0
@@ -7142,7 +7142,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                unsafe: *lengthptr = unsafe: *lengthptr + ((length_prevgroup -% 2) -% 4)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup -% 2) -% 4)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (code = code + 1)
@@ -7223,7 +7223,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (bravalue = OP_BRA)
                             (note_group_empty = 1)
                             cb.parens_depth = cb.parens_depth + 1
-                            (unsafe: *code = bravalue)
+                            ((unsafe: *code) = bravalue)
                             (pptr = pptr + 1)
                             (tempcode = code)
                             (tempreqvary = cb.req_varyopt)
@@ -7245,7 +7245,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if not ((if unsafe: *tc != OP_KET: 1 else: 0) != 0):
+                                    if not ((if (unsafe: *tc) != OP_KET: 1 else: 0) != 0):
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -7254,7 +7254,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         (cb.erroroffset = offset)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *errorcodeptr = ERR54)
+                                        ((unsafe: *errorcodeptr) = ERR54)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -7273,7 +7273,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         (cb.erroroffset = offset)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *errorcodeptr = ERR27)
+                                        ((unsafe: *errorcodeptr) = ERR27)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -7292,8 +7292,8 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                if (if (2147483627 -% unsafe: *lengthptr) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
-                                    (unsafe: *errorcodeptr = ERR20)
+                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
+                                    ((unsafe: *errorcodeptr) = ERR20)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     return 0
@@ -7301,7 +7301,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                unsafe: *lengthptr = unsafe: *lengthptr + ((length_prevgroup -% 2) -% 4)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup -% 2) -% 4)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (code = code + 1)
@@ -7378,7 +7378,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (bravalue = OP_BRA)
                             (note_group_empty = 1)
                             cb.parens_depth = cb.parens_depth + 1
-                            (unsafe: *code = bravalue)
+                            ((unsafe: *code) = bravalue)
                             (pptr = pptr + 1)
                             (tempcode = code)
                             (tempreqvary = cb.req_varyopt)
@@ -7400,7 +7400,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if not ((if unsafe: *tc != OP_KET: 1 else: 0) != 0):
+                                    if not ((if (unsafe: *tc) != OP_KET: 1 else: 0) != 0):
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -7409,7 +7409,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         (cb.erroroffset = offset)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *errorcodeptr = ERR54)
+                                        ((unsafe: *errorcodeptr) = ERR54)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -7428,7 +7428,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         (cb.erroroffset = offset)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *errorcodeptr = ERR27)
+                                        ((unsafe: *errorcodeptr) = ERR27)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -7447,8 +7447,8 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                if (if (2147483627 -% unsafe: *lengthptr) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
-                                    (unsafe: *errorcodeptr = ERR20)
+                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
+                                    ((unsafe: *errorcodeptr) = ERR20)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     return 0
@@ -7456,7 +7456,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                unsafe: *lengthptr = unsafe: *lengthptr + ((length_prevgroup -% 2) -% 4)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup -% 2) -% 4)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (code = code + 1)
@@ -7530,7 +7530,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (bravalue = OP_BRA)
                             (note_group_empty = 1)
                             cb.parens_depth = cb.parens_depth + 1
-                            (unsafe: *code = bravalue)
+                            ((unsafe: *code) = bravalue)
                             (pptr = pptr + 1)
                             (tempcode = code)
                             (tempreqvary = cb.req_varyopt)
@@ -7552,7 +7552,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if not ((if unsafe: *tc != OP_KET: 1 else: 0) != 0):
+                                    if not ((if (unsafe: *tc) != OP_KET: 1 else: 0) != 0):
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -7561,7 +7561,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         (cb.erroroffset = offset)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *errorcodeptr = ERR54)
+                                        ((unsafe: *errorcodeptr) = ERR54)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -7580,7 +7580,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         (cb.erroroffset = offset)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *errorcodeptr = ERR27)
+                                        ((unsafe: *errorcodeptr) = ERR27)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -7599,8 +7599,8 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                if (if (2147483627 -% unsafe: *lengthptr) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
-                                    (unsafe: *errorcodeptr = ERR20)
+                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
+                                    ((unsafe: *errorcodeptr) = ERR20)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     return 0
@@ -7608,7 +7608,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                unsafe: *lengthptr = unsafe: *lengthptr + ((length_prevgroup -% 2) -% 4)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup -% 2) -% 4)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (code = code + 1)
@@ -7679,7 +7679,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (bravalue = OP_BRA)
                             (note_group_empty = 1)
                             cb.parens_depth = cb.parens_depth + 1
-                            (unsafe: *code = bravalue)
+                            ((unsafe: *code) = bravalue)
                             (pptr = pptr + 1)
                             (tempcode = code)
                             (tempreqvary = cb.req_varyopt)
@@ -7701,7 +7701,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if not ((if unsafe: *tc != OP_KET: 1 else: 0) != 0):
+                                    if not ((if (unsafe: *tc) != OP_KET: 1 else: 0) != 0):
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -7710,7 +7710,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         (cb.erroroffset = offset)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *errorcodeptr = ERR54)
+                                        ((unsafe: *errorcodeptr) = ERR54)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -7729,7 +7729,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         (cb.erroroffset = offset)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *errorcodeptr = ERR27)
+                                        ((unsafe: *errorcodeptr) = ERR27)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -7748,8 +7748,8 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                if (if (2147483627 -% unsafe: *lengthptr) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
-                                    (unsafe: *errorcodeptr = ERR20)
+                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
+                                    ((unsafe: *errorcodeptr) = ERR20)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     return 0
@@ -7757,7 +7757,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                unsafe: *lengthptr = unsafe: *lengthptr + ((length_prevgroup -% 2) -% 4)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup -% 2) -% 4)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 (code = code + 1)
@@ -7832,7 +7832,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             code = code + _pcre2_OP_lengths_8[OP_CALLOUT]
                         2147942400 =>
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                unsafe: *lengthptr = unsafe: *lengthptr + (pptr[3] +% 9)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + (pptr[3] +% 9)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 pptr = pptr + 3
@@ -7859,9 +7859,9 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 (pp = (cb.start_pattern + offset))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *callout_string = unsafe: *(pp = pp + 1))
+                                (unsafe: *callout_string = (unsafe: *(pp = pp + 1)))
                                 (callout_string = callout_string + 1)
-                                (delimiter = unsafe: *(callout_string = callout_string + 1))
+                                (delimiter = (unsafe: *(callout_string = callout_string + 1)))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if delimiter == 123: 1 else: 0) != 0:
@@ -7869,7 +7869,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 while (if (length = length - 1) > 1: 1 else: 0) != 0:
-                                    if (if (if unsafe: *pp == delimiter: 1 else: 0) != 0 and (if pp[1] == delimiter: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (unsafe: *pp) == delimiter: 1 else: 0) != 0 and (if pp[1] == delimiter: 1 else: 0) != 0: 1 else: 0) != 0:
                                         (unsafe: *callout_string = delimiter)
                                         (callout_string = callout_string + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -7881,7 +7881,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (unsafe: *callout_string = unsafe: *(pp = pp + 1))
+                                        (unsafe: *callout_string = (unsafe: *(pp = pp + 1)))
                                         (callout_string = callout_string + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -7897,7 +7897,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         2151809024 =>
-                            (repeat_max = unsafe: *((pptr = pptr + 1)))
+                            (repeat_max = (unsafe: *((pptr = pptr + 1))))
                             __pc = 5
                             __goto_pending = 1
                             __pc = 5
@@ -7930,7 +7930,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     (repeat_type = greedy_default)
                                     (possessive_quantifier = 0)
                             (tempcode = previous)
-                            (op_previous = unsafe: *previous)
+                            (op_previous = (unsafe: *previous))
                             match op_previous
                                 OP_CHAR =>
                                     (op_type = (&chartypeoffset[0] as *mut c_uint)[(op_previous - OP_CHAR)])
@@ -7966,8 +7966,8 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if (if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if possessive_quantifier != 0: 0 else: 1) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
-                                    (unsafe: *previous = 137)
-                                    (op_previous = unsafe: *previous)
+                                    ((unsafe: *previous) = 137)
+                                    (op_previous = (unsafe: *previous))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     (previous[(3 +% length)] = 122)
@@ -7979,7 +7979,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 OP_ASSERT => 0
                                 _ =>
                                     if (if (if op_previous >= OP_EODN: 1 else: 0) != 0 or (if op_previous <= OP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (unsafe: *errorcodeptr = ERR10)
+                                        ((unsafe: *errorcodeptr) = ERR10)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -8047,9 +8047,9 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             if possessive_quantifier != 0:
-                                match unsafe: *tempcode
+                                match (unsafe: *tempcode)
                                     OP_TYPEEXACT =>
-                                        tempcode = tempcode + (_pcre2_OP_lengths_8[unsafe: *tempcode] + ((if ((if (if tempcode[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
+                                        tempcode = tempcode + (_pcre2_OP_lengths_8[(unsafe: *tempcode)] + ((if ((if (if tempcode[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
                                     OP_CHAR => 0
                                     OP_CLASS => 0
                                     OP_REF => 0
@@ -8060,11 +8060,11 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if len > 0: 1 else: 0) != 0:
-                                    repcode = unsafe: *tempcode
+                                    repcode = (unsafe: *tempcode)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if repcode < 119: 1 else: 0) != 0 and (if (&opcode_possessify[0] as *mut u8)[repcode] > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (unsafe: *tempcode = (&opcode_possessify[0] as *mut u8)[repcode])
+                                        ((unsafe: *tempcode) = (&opcode_possessify[0] as *mut u8)[repcode])
                                     else:
                                         code = code + (1 + 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -8115,7 +8115,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     (repeat_type = greedy_default)
                                     (possessive_quantifier = 0)
                             (tempcode = previous)
-                            (op_previous = unsafe: *previous)
+                            (op_previous = (unsafe: *previous))
                             match op_previous
                                 OP_CHAR =>
                                     (op_type = (&chartypeoffset[0] as *mut c_uint)[(op_previous - OP_CHAR)])
@@ -8151,8 +8151,8 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if (if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if possessive_quantifier != 0: 0 else: 1) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
-                                    (unsafe: *previous = 137)
-                                    (op_previous = unsafe: *previous)
+                                    ((unsafe: *previous) = 137)
+                                    (op_previous = (unsafe: *previous))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     (previous[(3 +% length)] = 122)
@@ -8164,7 +8164,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 OP_ASSERT => 0
                                 _ =>
                                     if (if (if op_previous >= OP_EODN: 1 else: 0) != 0 or (if op_previous <= OP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (unsafe: *errorcodeptr = ERR10)
+                                        ((unsafe: *errorcodeptr) = ERR10)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -8232,9 +8232,9 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             if possessive_quantifier != 0:
-                                match unsafe: *tempcode
+                                match (unsafe: *tempcode)
                                     OP_TYPEEXACT =>
-                                        tempcode = tempcode + (_pcre2_OP_lengths_8[unsafe: *tempcode] + ((if ((if (if tempcode[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
+                                        tempcode = tempcode + (_pcre2_OP_lengths_8[(unsafe: *tempcode)] + ((if ((if (if tempcode[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
                                     OP_CHAR => 0
                                     OP_CLASS => 0
                                     OP_REF => 0
@@ -8245,11 +8245,11 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if len > 0: 1 else: 0) != 0:
-                                    repcode = unsafe: *tempcode
+                                    repcode = (unsafe: *tempcode)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if repcode < 119: 1 else: 0) != 0 and (if (&opcode_possessify[0] as *mut u8)[repcode] > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (unsafe: *tempcode = (&opcode_possessify[0] as *mut u8)[repcode])
+                                        ((unsafe: *tempcode) = (&opcode_possessify[0] as *mut u8)[repcode])
                                     else:
                                         code = code + (1 + 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -8298,7 +8298,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     (repeat_type = greedy_default)
                                     (possessive_quantifier = 0)
                             (tempcode = previous)
-                            (op_previous = unsafe: *previous)
+                            (op_previous = (unsafe: *previous))
                             match op_previous
                                 OP_CHAR =>
                                     (op_type = (&chartypeoffset[0] as *mut c_uint)[(op_previous - OP_CHAR)])
@@ -8334,8 +8334,8 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if (if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if possessive_quantifier != 0: 0 else: 1) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
-                                    (unsafe: *previous = 137)
-                                    (op_previous = unsafe: *previous)
+                                    ((unsafe: *previous) = 137)
+                                    (op_previous = (unsafe: *previous))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     (previous[(3 +% length)] = 122)
@@ -8347,7 +8347,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 OP_ASSERT => 0
                                 _ =>
                                     if (if (if op_previous >= OP_EODN: 1 else: 0) != 0 or (if op_previous <= OP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (unsafe: *errorcodeptr = ERR10)
+                                        ((unsafe: *errorcodeptr) = ERR10)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -8415,9 +8415,9 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             if possessive_quantifier != 0:
-                                match unsafe: *tempcode
+                                match (unsafe: *tempcode)
                                     OP_TYPEEXACT =>
-                                        tempcode = tempcode + (_pcre2_OP_lengths_8[unsafe: *tempcode] + ((if ((if (if tempcode[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
+                                        tempcode = tempcode + (_pcre2_OP_lengths_8[(unsafe: *tempcode)] + ((if ((if (if tempcode[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
                                     OP_CHAR => 0
                                     OP_CLASS => 0
                                     OP_REF => 0
@@ -8428,11 +8428,11 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if len > 0: 1 else: 0) != 0:
-                                    repcode = unsafe: *tempcode
+                                    repcode = (unsafe: *tempcode)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if repcode < 119: 1 else: 0) != 0 and (if (&opcode_possessify[0] as *mut u8)[repcode] > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (unsafe: *tempcode = (&opcode_possessify[0] as *mut u8)[repcode])
+                                        ((unsafe: *tempcode) = (&opcode_possessify[0] as *mut u8)[repcode])
                                     else:
                                         code = code + (1 + 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -8479,7 +8479,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     (repeat_type = greedy_default)
                                     (possessive_quantifier = 0)
                             (tempcode = previous)
-                            (op_previous = unsafe: *previous)
+                            (op_previous = (unsafe: *previous))
                             match op_previous
                                 OP_CHAR =>
                                     (op_type = (&chartypeoffset[0] as *mut c_uint)[(op_previous - OP_CHAR)])
@@ -8515,8 +8515,8 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if (if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if possessive_quantifier != 0: 0 else: 1) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
-                                    (unsafe: *previous = 137)
-                                    (op_previous = unsafe: *previous)
+                                    ((unsafe: *previous) = 137)
+                                    (op_previous = (unsafe: *previous))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     (previous[(3 +% length)] = 122)
@@ -8528,7 +8528,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 OP_ASSERT => 0
                                 _ =>
                                     if (if (if op_previous >= OP_EODN: 1 else: 0) != 0 or (if op_previous <= OP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (unsafe: *errorcodeptr = ERR10)
+                                        ((unsafe: *errorcodeptr) = ERR10)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -8596,9 +8596,9 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             if possessive_quantifier != 0:
-                                match unsafe: *tempcode
+                                match (unsafe: *tempcode)
                                     OP_TYPEEXACT =>
-                                        tempcode = tempcode + (_pcre2_OP_lengths_8[unsafe: *tempcode] + ((if ((if (if tempcode[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
+                                        tempcode = tempcode + (_pcre2_OP_lengths_8[(unsafe: *tempcode)] + ((if ((if (if tempcode[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
                                     OP_CHAR => 0
                                     OP_CLASS => 0
                                     OP_REF => 0
@@ -8609,11 +8609,11 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if len > 0: 1 else: 0) != 0:
-                                    repcode = unsafe: *tempcode
+                                    repcode = (unsafe: *tempcode)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (if repcode < 119: 1 else: 0) != 0 and (if (&opcode_possessify[0] as *mut u8)[repcode] > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (unsafe: *tempcode = (&opcode_possessify[0] as *mut u8)[repcode])
+                                        ((unsafe: *tempcode) = (&opcode_possessify[0] as *mut u8)[repcode])
                                     else:
                                         code = code + (1 + 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -8648,7 +8648,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 (cb.erroroffset = offset)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *errorcodeptr = ERR15)
+                                ((unsafe: *errorcodeptr) = ERR15)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
@@ -8677,7 +8677,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 (cb.erroroffset = offset)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *errorcodeptr = ERR15)
+                                ((unsafe: *errorcodeptr) = ERR15)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
@@ -8703,13 +8703,13 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 (cb.erroroffset = offset)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *errorcodeptr = ERR15)
+                                ((unsafe: *errorcodeptr) = ERR15)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (unsafe: *code = 118)
+                            ((unsafe: *code) = 118)
                             code = code + (1 + 2)
                             (length_prevgroup = 3)
                             (groupsetfirstcu = 0)
@@ -8737,7 +8737,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (zeroreqcu = reqcu)
                             (zeroreqcuflags = reqcuflags)
                             if (if (if (if cb.assert_depth > 0: 1 else: 0) != 0 and (if meta_arg == 3: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((xoptions & 64)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (unsafe: *errorcodeptr = ERR99)
+                                ((unsafe: *errorcodeptr) = ERR99)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
@@ -8773,7 +8773,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (zeroreqcu = reqcu)
                             (zeroreqcuflags = reqcuflags)
                             if (if (if (if cb.assert_depth > 0: 1 else: 0) != 0 and (if meta_arg == 3: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((xoptions & 64)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (unsafe: *errorcodeptr = ERR99)
+                                ((unsafe: *errorcodeptr) = ERR99)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
@@ -8797,13 +8797,13 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (code = code + 1)
                         _ =>
                             if (if meta >= 2147483648: 1 else: 0) != 0:
-                                (unsafe: *errorcodeptr = ERR89)
+                                ((unsafe: *errorcodeptr) = ERR89)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (meta = unsafe: *pptr)
+                            (meta = (unsafe: *pptr))
                             (matched_char = 1)
                             (mclength = 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -8894,7 +8894,7 @@ fn is_anchored(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_bl
     var code = __param_code
     while true:
         var scode: *const u8
-        var op: c_int = unsafe: *scode
+        var op: c_int = (unsafe: *scode)
         if (if (if (if (if op == OP_BRA: 1 else: 0) != 0 or (if op == OP_BRAPOS: 1 else: 0) != 0: 1 else: 0) != 0 or (if op == OP_SBRA: 1 else: 0) != 0: 1 else: 0) != 0 or (if op == OP_SBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0:
             if (if is_anchored(scode, bracket_map, cb, atomcount, inassert, dotstar_anchor) != 0: 0 else: 1) != 0:
                 return 0
@@ -8930,7 +8930,7 @@ fn is_anchored(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_bl
                                 if (if (if (if op != OP_SOD: 1 else: 0) != 0 and (if op != OP_SOM: 1 else: 0) != 0: 1 else: 0) != 0 and (if op != OP_CIRC: 1 else: 0) != 0: 1 else: 0) != 0:
                                     return 0
         
-        if not ((if unsafe: *code == OP_ALT: 1 else: 0) != 0):
+        if not ((if (unsafe: *code) == OP_ALT: 1 else: 0) != 0):
             break
 
     return 1
@@ -8939,13 +8939,13 @@ fn is_startline(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_b
     var code = __param_code
     while true:
         var scode: *const u8
-        var op: c_int = unsafe: *scode
+        var op: c_int = (unsafe: *scode)
         if (if op == OP_COND: 1 else: 0) != 0:
             scode = scode + (1 + 2)
-            if (if unsafe: *scode == OP_CALLOUT: 1 else: 0) != 0:
+            if (if (unsafe: *scode) == OP_CALLOUT: 1 else: 0) != 0:
                 scode = scode + _pcre2_OP_lengths_8[OP_CALLOUT]
             
-            match unsafe: *scode
+            match (unsafe: *scode)
                 OP_CREF =>
                     if (if is_startline(scode, bracket_map, cb, atomcount, 1, dotstar_anchor) != 0: 0 else: 1) != 0:
                         return 0
@@ -8956,7 +8956,7 @@ fn is_startline(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_b
                     scode = scode + (1 + 2)
             
             (scode = first_significant_code(scode, 0))
-            (op = unsafe: *scode)
+            (op = (unsafe: *scode))
         
         if (if (if (if (if op == OP_BRA: 1 else: 0) != 0 or (if op == OP_BRAPOS: 1 else: 0) != 0: 1 else: 0) != 0 or (if op == OP_SBRA: 1 else: 0) != 0: 1 else: 0) != 0 or (if op == OP_SBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0:
             if (if is_startline(scode, bracket_map, cb, atomcount, inassert, dotstar_anchor) != 0: 0 else: 1) != 0:
@@ -8988,7 +8988,7 @@ fn is_startline(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_b
                             if (if (if op != OP_CIRC: 1 else: 0) != 0 and (if op != OP_CIRCM: 1 else: 0) != 0: 1 else: 0) != 0:
                                 return 0
         
-        if not ((if unsafe: *code == OP_ALT: 1 else: 0) != 0):
+        if not ((if (unsafe: *code) == OP_ALT: 1 else: 0) != 0):
             break
 
     return 1
@@ -9009,11 +9009,11 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
     var code = __param_code
     var c: c_uint
     var cflags: c_uint
-    (unsafe: *flags = (4294967294 as c_uint))
+    ((unsafe: *flags) = (4294967294 as c_uint))
     while true:
         var d: c_uint
         var dflags: c_uint
-        var xl: c_int = (if ((if (if (if (if unsafe: *code == OP_CBRA: 1 else: 0) != 0 or (if unsafe: *code == OP_SCBRA: 1 else: 0) != 0: 1 else: 0) != 0 or (if unsafe: *code == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0 or (if unsafe: *code == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)
+        var xl: c_int = (if ((if (if (if (if (unsafe: *code) == OP_CBRA: 1 else: 0) != 0 or (if (unsafe: *code) == OP_SCBRA: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)
         var scode: *const u8
         var op: u8
         match op
@@ -9059,10 +9059,10 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
             _ =>
                 return 0
         
-        if not ((if unsafe: *code == OP_ALT: 1 else: 0) != 0):
+        if not ((if (unsafe: *code) == OP_ALT: 1 else: 0) != 0):
             break
 
-    (unsafe: *flags = cflags)
+    ((unsafe: *flags) = cflags)
     return c
 
 fn parsed_skip(__param_pptr: *mut c_uint, skiptype: c_uint) -> *mut c_uint:
@@ -9075,7 +9075,7 @@ fn parsed_skip(__param_pptr: *mut c_uint, skiptype: c_uint) -> *mut c_uint:
                 return (null as *mut c_uint)
             2147680256 => 0
             2149318656 =>
-                if (if (if (unsafe: *pptr -% (2149318656 as c_uint)) == 15: 1 else: 0) != 0 or (if (unsafe: *pptr -% (2149318656 as c_uint)) == 16: 1 else: 0) != 0: 1 else: 0) != 0:
+                if (if (if ((unsafe: *pptr) -% (2149318656 as c_uint)) == 15: 1 else: 0) != 0 or (if ((unsafe: *pptr) -% (2149318656 as c_uint)) == 16: 1 else: 0) != 0: 1 else: 0) != 0:
                     pptr = pptr + 1
             2150432768 => 0
             2148335616 =>
@@ -9122,10 +9122,10 @@ fn get_grouplength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, isinline: c_in
                         continue
                     if (if ((groupinfo & (2147483648 as c_uint))) != 0: 1 else: 0) != 0:
                         if isinline != 0:
-                            (unsafe: *pptrptr = parsed_skip(unsafe: *pptrptr, 2))
+                            ((unsafe: *pptrptr) = parsed_skip((unsafe: *pptrptr), 2))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        (unsafe: *minptr = gi[1])
+                        ((unsafe: *minptr) = gi[1])
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         return (groupinfo & 65535)
@@ -9152,11 +9152,11 @@ fn get_grouplength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, isinline: c_in
                         (groupminlength = branchminlength)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if unsafe: (*unsafe: *pptrptr) == 2149384192: 1 else: 0) != 0:
+                    if (if (unsafe: *(unsafe: *pptrptr)) == 2149384192: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    unsafe: *pptrptr = unsafe: *pptrptr + 1
+                    (unsafe: *pptrptr) = (unsafe: *pptrptr) + 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -9169,7 +9169,7 @@ fn get_grouplength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, isinline: c_in
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *minptr = groupminlength)
+                ((unsafe: *minptr) = groupminlength)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return grouplength

@@ -82,20 +82,20 @@ fn pcre2_next_match_8(match_data: *mut pcre2_real_match_data_8, pstart_offset: *
         if (if start_offset >= match_data.subject_length: 1 else: 0) != 0:
             return 0
         
-        (unsafe: *pstart_offset = do_bumpalong(match_data, ovector[1]))
-        (unsafe: *poptions = 0)
+        ((unsafe: *pstart_offset) = do_bumpalong(match_data, ovector[1]))
+        ((unsafe: *poptions) = 0)
         return 1
 
     if (if ovector[0] == ovector[1]: 1 else: 0) != 0:
         if (if ovector[0] >= match_data.subject_length: 1 else: 0) != 0:
             return 0
         
-        (unsafe: *pstart_offset = ovector[1])
-        (unsafe: *poptions = 8)
+        ((unsafe: *pstart_offset) = ovector[1])
+        ((unsafe: *poptions) = 8)
         return 1
 
-    (unsafe: *pstart_offset = ovector[1])
-    (unsafe: *poptions = 0)
+    ((unsafe: *pstart_offset) = ovector[1])
+    ((unsafe: *poptions) = 0)
     return 1
 
 extern fn pcre2_substring_copy_byname_8(p0: *mut pcre2_real_match_data_8, p1: *const u8, p2: *mut u8, p3: *mut c_ulong) -> c_int
@@ -656,9 +656,9 @@ var _pcre2_utf8_table4: *u8
 var _pcre2_OP_lengths_8: *u8
 var _pcre2_callout_end_delims_8: *c_uint
 var _pcre2_callout_start_delims_8: *c_uint
-var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
 var _pcre2_default_tables_8: *u8
 var _pcre2_hspace_list_8: *c_uint
 var _pcre2_vspace_list_8: *c_uint
