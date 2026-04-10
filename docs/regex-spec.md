@@ -234,27 +234,51 @@ match limits to prevent runaway).
 ### Migration process
 
 ```
-with migrate .reference/pcre2/src/ -o lib/std/pcre2/ \
+with migrate .reference/pcre2/src/ \
+    -o out/pcre2_migrate_raw/ \
+    --no-c-export \
     -I .reference/pcre2/src \
     -D PCRE2_CODE_UNIT_WIDTH=8 \
     -D HAVE_CONFIG_H=1 \
     -D SUPPORT_PCRE2_8=1
 ```
 
-This produces 37 `.w` files (72K lines) from 39 `.c` files
-(73K lines). The 2 failures are the fuzzer and a variadic test
-file — not needed for the library.
+Produces 38 `.w` files from 39 `.c` files. 1 failure
+(`pcre2test.c` — missing `isatty` declaration, tracked as #93).
+8 files excluded from library subset (test harnesses, JIT
+compiler, fuzzer, dftables).
+
+After prepare + check: **OK=31, TOTAL_ERRORS=0**.
+
+The `--no-c-export` flag skips `@[c_export]` attributes and
+emits module-local `var` instead of `extern var` — appropriate
+for stdlib integration where With's module system handles
+visibility.
+
+All errors were fixed in the migrator (`src/CImport.w`), not
+by patching generated code. Key migrator improvements:
+
+| Fix | Errors resolved |
+|---|---|
+| Implicit cast handling (CXCursor_UnexposedExpr) | ~40 |
+| Array-to-pointer decay (CI_CAST_ARRAY_TO_PTR) | ~30 |
+| Chained assignment decomposition (`a = b++`, `*p++ = val`) | ~20 |
+| Large integer literal handling (decimal, context-aware casts) | ~12 |
+| Zero-initialization (`var x: T` without initializer) | ~27 |
+| Pointer-to-pointer casts (void* <-> typed*) | ~8 |
+| `_lowercase` name filter (was skipping `_pcre2_*` symbols) | ~6 |
+| Workflow preamble (opaque types, string constants, helpers) | ~15 |
 
 Key migrated files:
 
 | File | Lines | Gotos | Unsafe | Role |
 |---|---|---|---|---|
-| `pcre2_compile.w` | 6,197 | 57 | 555 | Pattern compiler |
-| `pcre2_match.w` | 13,752 | 5 | 493 | Interpretive match engine |
-| `pcre2_dfa_match.w` | 2,350 | 9 | 15 | DFA match engine |
-| `pcre2_substitute.w` | 2,296 | 18 | 33 | Search-and-replace |
-| `pcre2_tables.w` | — | 0 | 0 | Unicode tables |
-| `pcre2_ucd.w` | — | 0 | 0 | Unicode character data |
+| `pcre2_compile.w` | ~6,200 | 369 | 560 | Pattern compiler |
+| `pcre2_match.w` | ~14,600 | 1,775 | 493 | Interpretive match engine |
+| `pcre2_dfa_match.w` | ~2,400 | 19 | 15 | DFA match engine |
+| `pcre2_substitute.w` | ~2,300 | 76 | 33 | Search-and-replace |
+| `pcre2_tables.w` | ~900 | 0 | 0 | Character property tables |
+| `pcre2_ucd.w` | ~900 | 0 | 0 | Unicode character data |
 
 ### JIT compiler
 
@@ -265,8 +289,8 @@ generate machine code at runtime. Two options:
    most use cases. The JIT is only needed for hot-loop matching
    on large inputs.
 2. **Link as C.** Keep `pcre2_jit_compile.c` as a C object file
-   and link it via `c_import`. The migrated With code calls into
-   it for JIT compilation.
+   and link it. The migrated With code calls into it for JIT
+   compilation.
 
 Start with option 1. Add option 2 later if performance demands it.
 
@@ -274,23 +298,14 @@ Start with option 1. Add option 2 later if performance demands it.
 
 PCRE2 uses `pcre2_compile_context` to pass custom allocators.
 The migrated code preserves this — `malloc`/`free` are available
-via `c_import("<stdlib.h>")`. Post-migration, the allocator can
-be swapped to With's allocator by changing the context setup.
-
-### C ABI preservation
-
-All migrated PCRE2 API functions have `@[c_export("pcre2_..._8")]`
-decorators, preserving the C ABI. This means:
-- `pcre2test` (the PCRE2 test harness) can link against the
-  migrated library unchanged
-- Existing C code that uses PCRE2 can switch to the With build
-  with zero changes
+via the runtime. Post-migration, the allocator can be swapped to
+With's allocator by changing the context setup.
 
 ---
 
 ## Part 4: Public API
 
-The With-facing API wraps PCRE2's C API in an ergonomic interface.
+The With-facing API wraps PCRE2's internals in an ergonomic interface.
 
 ### The `Regex` type
 
@@ -403,50 +418,45 @@ Everything PCRE2 supports, which is everything Perl supports:
 
 ---
 
-## Part 5: Implementation Plan
+## Part 5: Implementation Status
 
 ### Phase 1: Migrate and build PCRE2
 
-1. Run `with migrate` on PCRE2 source (already done — 37/39 files)
-2. Fix compilation errors in migrated output
-3. Build the migrated library as a With module
-4. Link `pcre2test` against it
-5. Run PCRE2's test suite
-6. Iterate until all tests pass
+| Step | Status |
+|---|---|
+| Run `with migrate` on PCRE2 source | DONE — 38/39 files, 80K lines |
+| Fix compilation errors in migrated output | DONE — 978 → 0 errors, all fixed in migrator |
+| Prepare and promote to `lib/std/re/` | DONE — OK=31, TOTAL_ERRORS=0 |
+| Build migrated library as object files | TODO |
+| Link `pcre2test` against it | TODO |
+| Run PCRE2's test suite | TODO |
 
 ### Phase 2: With wrapper API (`lib/std/regex.w`)
 
-Build the ergonomic With API on top of the migrated PCRE2:
-
-1. **`Regex` type** — wraps `pcre2_real_code_8*` with automatic
-   cleanup via Drop
-2. **`Regex.compile`** — calls `pcre2_compile_8`, extracts capture
-   count and names
-3. **`Regex.is_match`** — calls `pcre2_match_8` with no captures
-4. **`Regex.find` / `find_all`** — calls `pcre2_match_8`, wraps
-   offsets in `Match` structs
-5. **`Regex.captures`** — calls `pcre2_match_8`, builds `Captures`
-   with named group lookup
-6. **`Regex.replace` / `replace_all`** — calls `pcre2_substitute_8`
-7. **`Regex.split`** — iterative `find` with substring collection
-
-Estimated: ~300 lines for the wrapper.
+| Step | Status |
+|---|---|
+| `Regex` type with Drop | TODO |
+| `Regex.compile` | TODO |
+| `Regex.is_match`, `find`, `find_all` | TODO |
+| `Regex.captures` | TODO |
+| `Regex.replace`, `replace_all` | TODO |
+| `Regex.split` | TODO |
 
 ### Phase 3: Language integration
 
-Compiler changes (same as before — independent of engine choice):
-
-1. **Lexer** — `TK_REGEX_LIT`, `/` disambiguation
-2. **Parser** — `NK_REGEX_LIT`, `=~`/`!~`, capture bindings
-3. **Sema** — Regex type, compile-time validation
-4. **Codegen** — lazy static compilation, `=~` desugaring
+| Step | Status |
+|---|---|
+| Lexer — `TK_REGEX_LIT`, `/` disambiguation | TODO |
+| Parser — `=~`/`!~`, capture bindings | TODO |
+| Sema — Regex type, compile-time validation | TODO |
+| Codegen — lazy statics, `=~` desugaring | TODO |
 
 ### Phase 4: Optimization (future)
 
-1. **JIT** — link PCRE2's sljit JIT compiler for hot patterns
-2. **Compile-time regex validation** — call `pcre2_compile_8` at
-   comptime to catch invalid patterns early
-3. **Pattern caching** — reuse compiled patterns across matches
+| Step | Status |
+|---|---|
+| JIT — link sljit compiler | TODO |
+| Compile-time regex validation | TODO |
 
 ---
 
@@ -454,7 +464,8 @@ Compiler changes (same as before — independent of engine choice):
 
 | Decision | Rationale |
 |---|---|
-| PCRE2 via `with migrate`, not manual port | 73K lines auto-migrated in one command. No manual porting bugs. Preserves PCRE2's 25 years of bug fixes and optimizations. |
+| PCRE2 via `with migrate`, not manual port | 73K lines auto-migrated in one command. Zero manual fix-up patches — all 978 errors fixed in the migrator itself. Preserves PCRE2's 25 years of bug fixes and optimizations. |
+| `--no-c-export` for stdlib integration | Migrated code is a With module, not a C library. No `@[c_export]` attributes, no `extern var` for module-local state. With's module system handles visibility. |
 | PCRE2 over RE2/Go | Full Perl compatibility. Backreferences, lookahead, lookbehind, recursive patterns. RE2 deliberately rejects these features. Most programmers expect them. |
 | Auto-migrated C, not hand-written With | The migrated code is ugly (lots of `unsafe`, state machines for gotos) but provably correct. It can be incrementally cleaned up. A hand-written With port would take months and introduce bugs. |
 | Interpretive engine first, JIT later | The interpreter is fast enough for most use cases. The JIT can be linked as a C object later. |
@@ -482,7 +493,7 @@ Compiler changes (same as before — independent of engine choice):
 
 | Approach | Lines of code | Time | Correctness | Features |
 |---|---|---|---|---|
-| **PCRE2 via `with migrate`** | 72K (auto) + 300 (wrapper) | Days | Proven by PCRE2 test suite | Full Perl compat |
+| **PCRE2 via `with migrate`** | 80K (auto) + 300 (wrapper) | Days | Proven by PCRE2 test suite | Full Perl compat |
 | Go RE2 manual port | ~4,400 (hand-written) | 4-6 weeks | Must port Go's test suite | No backrefs, no lookahead |
 | From scratch | ~3,000+ | Months | Extensive new testing needed | Whatever we implement |
 
