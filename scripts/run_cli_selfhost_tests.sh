@@ -222,6 +222,59 @@ EOF
   echo "PASS(cli-selfhost-migrate) host_header_compat"
 }
 
+expect_migrate_assignment_compat() {
+  local case_dir="$tmpdir/migrate_assignment_compat_case"
+  local src="$case_dir/assignments.c"
+  local out_w="$case_dir/assignments.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+typedef unsigned int c_uint;
+typedef struct {
+  c_uint *groupinfo;
+  c_uint *parsed_pattern;
+} compile_block;
+
+void f(void) {
+  compile_block cb;
+  c_uint stack_groupinfo[32];
+  c_uint stack_parsed_pattern[64];
+  c_uint pp = 0;
+  c_uint skipatstart = 0;
+  cb.groupinfo = stack_groupinfo;
+  cb.parsed_pattern = stack_parsed_pattern;
+  skipatstart = (pp = pp + 1);
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) assignment_compat"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq '(cb.groupinfo = (&stack_groupinfo[0] as *mut c_uint))' "$out_w" \
+    || ! grep -Fq '(cb.parsed_pattern = (&stack_parsed_pattern[0] as *mut c_uint))' "$out_w" \
+    || ! grep -Fq '(pp = (pp +% 1))' "$out_w" \
+    || ! grep -Fq '(skipatstart = pp)' "$out_w" \
+    || grep -Fq '(skipatstart = (pp = pp + 1))' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) assignment_compat"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) assignment_compat"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) assignment_compat"
+}
+
 expect_pcre2_prepare_shared_externs() {
   local case_dir="$tmpdir/pcre2_prepare_case"
   local raw_dir="$case_dir/raw"
@@ -384,6 +437,7 @@ expect_emit_obj_global_symbols
 expect_emit_obj_imported_symbols
 expect_migrate_global_init_list
 expect_migrate_host_header_compat
+expect_migrate_assignment_compat
 expect_pcre2_prepare_shared_externs
 
 if [[ "$failures" -ne 0 ]]; then
