@@ -4130,10 +4130,10 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                     let init = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
                     if result.len() > 0:
                         result = result ++ "\n" ++ ci_indent_str(indent)
-                    if init.len() > 0:
+                    // For array types, reject non-array initializers (e.g., dimension expression)
+                    if init.len() > 0 and not (vty_str.len() > 0 and vty_str.byte_at(0) == 91 and init.byte_at(0) != 91):
                         result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ init
                     else:
-                        // Can't translate initializer — use zero-init
                         result = result ++ "var " ++ vname ++ ": " ++ vty_str
                 else:
                     if result.len() > 0:
@@ -4663,18 +4663,15 @@ fn ci_trans_decl_stmt_scoped(session: i64, cursor: i32, indent: i32, scope: str)
                 result = result ++ "\n" ++ ci_indent_str(indent)
             if child_nc > 0:
                 let init = ci_trans_expr(session, with_ci_child(session, child, 0), new_scope)
-                if init.len() > 0:
+                // For array types, reject non-array initializers (e.g., dimension expression)
+                if init.len() > 0 and not (vty_str.len() > 0 and vty_str.byte_at(0) == 91 and init.byte_at(0) != 91):
                     result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ init
                 else:
-                    // Initializer failed to translate — use zero-init
+                    // Zero-init (failed/invalid initializer or array with scalar)
                     result = result ++ "var " ++ mangled ++ ": " ++ vty_str
             else:
                 // No initializer — zero-initialized by With semantics
-                let default_val = ci_default_for_type(vty_str)
-                if default_val.len() > 0:
-                    result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ default_val
-                else:
-                    result = result ++ "var " ++ mangled ++ ": " ++ vty_str
+                result = result ++ "var " ++ mangled ++ ": " ++ vty_str
         i = i + 1
     if new_scope != scope:
         return "SCOPE:" ++ new_scope ++ "\n" ++ result
