@@ -4182,6 +4182,10 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_CALL:
         let callee = self.ast.get_data0(node)
         if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+            // Distinguish method syntax from a callable field like
+            // `ctx.memctl.free(...)`, which should lower as an indirect call.
+            if self.callable_fn_type_for_expr(callee) != 0:
+                return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), self.expr_type(node), node)
             return self.lower_method_call(self.ast.get_data0(callee), self.ast.get_data1(callee), self.ast.get_data1(node), self.ast.get_data2(node), node)
         var generic_builtin_sym = 0
         if self.ast.kind(callee) == NodeKind.NK_INDEX or self.ast.kind(callee) == NodeKind.NK_TYPE_GENERIC:
