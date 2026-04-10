@@ -33,6 +33,52 @@ externize_shared_vars_except_owner() {
     done
 }
 
+hoist_shared_lets_to_defs() {
+    local generated_dir="$1"
+    python3 - "$generated_dir" <<'PY'
+from __future__ import annotations
+
+import collections
+import re
+import sys
+from pathlib import Path
+
+generated_dir = Path(sys.argv[1])
+defs_path = generated_dir / "defs.w"
+module_paths = sorted(path for path in generated_dir.glob("*.w") if path.name != "defs.w")
+decl_pattern = re.compile(r"^let\s+[A-Za-z_][A-Za-z0-9_]*(?:\s*:|\s*=)")
+
+occurrences: collections.OrderedDict[str, list[Path]] = collections.OrderedDict()
+for module_path in module_paths:
+    for line in module_path.read_text().splitlines():
+        if decl_pattern.match(line):
+            occurrences.setdefault(line, []).append(module_path)
+
+duplicate_lines = [line for line, owners in occurrences.items() if len(owners) >= 2]
+if not duplicate_lines:
+    raise SystemExit(0)
+
+defs_lines = defs_path.read_text().splitlines()
+defs_seen = set(defs_lines)
+if defs_lines and defs_lines[-1] != "":
+    defs_lines.append("")
+for line in duplicate_lines:
+    if line not in defs_seen:
+        defs_lines.append(line)
+        defs_seen.add(line)
+defs_path.write_text("\n".join(defs_lines) + "\n")
+
+duplicate_set = set(duplicate_lines)
+for module_path in module_paths:
+    kept_lines = []
+    for line in module_path.read_text().splitlines():
+        if decl_pattern.match(line) and line in duplicate_set:
+            continue
+        kept_lines.append(line)
+    module_path.write_text("\n".join(kept_lines) + "\n")
+PY
+}
+
 is_excluded() {
     case "$1" in
         pcre2test.w|pcre2demo.w|pcre2grep.w|pcre2posix_test.w|\
@@ -122,6 +168,24 @@ prepare_generated_tree() {
         fi
     done
 
+    # Strip broken initializers: C comments, unexpanded STR_* macros,
+    # STRING_* macros in var declarations → fall back to zero-init
+    for dst in "$generated_dir"/*.w; do
+        # var with C comment in initializer → strip to bare var
+        perl -pi -e 's/^(var \w+: [^=]+) = .*\/\*.*/$1/' "$dst"
+        # var with STR_ macro concatenation → strip initializer
+        perl -pi -e 's/^(var \w+: [^=]+) = .*STR_\w+.*/$1/' "$dst"
+        # var with STRING_ macro → strip initializer
+        perl -pi -e 's/^(var \w+: [^=]+) = .*STRING_\w+.*/$1/' "$dst"
+        # Remove orphan continuation lines from stripped multi-line initializers
+        perl -pi -e 's/^\s+STRING_\w+.*$//' "$dst"
+        perl -pi -e 's/^\s+STR_\w+.*$//' "$dst"
+        # Array dimension assigned to array var in goto body
+        # These are re-declarations of hoisted array vars where the migrator
+        # emitted the dimension as an assignment value
+        perl -pi -e 's/^(\s+)(temp|null_str|stack_groupinfo|stack_parsed_pattern|named_groups|backref_cache) = \[?\d+\]?$/$1\/\/ $2 re-declared (skipped)/' "$dst"
+    done
+
     # Default context vars need extern (storage provided by pcre2_context_init.c)
     for dst in "$generated_dir"/*.w; do
         perl -pi -e 's/^var (_pcre2_default_\w+_context_8:)/extern var $1/' "$dst"
@@ -145,6 +209,8 @@ prepare_generated_tree() {
         perl -pi -e 's/"([^"]*)" "([^"]*)"/"$1$2"/g' "$dst"
         perl -pi -e 's/(?<!fn )with_alloc\(([^)]+)\)/(with_alloc($1) as *mut c_void)/g' "$dst"
     done
+
+    hoist_shared_lets_to_defs "$generated_dir"
 }
 
 count_generated_errors() {
@@ -158,8 +224,10 @@ count_generated_errors() {
     [ -d "$raw_dir" ] || die "missing raw migration directory: $raw_dir"
     [ -d "$generated_dir" ] || die "missing generated directory: $generated_dir"
 
-    local tf
-    tf="$(mktemp "${TMPDIR:-/tmp}/pcre2-check.XXXXXX.w")"
+    local tf_base tf
+    tf_base="$(mktemp "${TMPDIR:-/tmp}/pcre2-check.XXXXXX")"
+    tf="${tf_base}.w"
+    mv "$tf_base" "$tf"
     CLEANUP_FILES+=("$tf")
 
     local mod errs size
