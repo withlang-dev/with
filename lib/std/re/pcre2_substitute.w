@@ -95,182 +95,271 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
     var match_data = __param_match_data
     var replacement = __param_replacement
     var rlength = __param_rlength
-    var rc: c_int = 0
-    var subs: c_int = 0
-    var ovector_count: c_uint = 0
-    var goptions: c_uint = 0
-    var suboptions: c_uint = 0
-    var internal_match_data: *mut pcre2_real_match_data_8 = null
-    var escaped_literal: c_int = 0
-    var overflowed: c_int = 0
-    var use_existing_match: c_int = 0
-    var replacement_only: c_int = 0
-    var utf: c_int = 0
-    var partial: c_int = 0
-    var temp: [6]u8 = [0 as u8; 6]
-    var null_str: [1]u8 = [0 as u8; 1]
-    var original_subject: *const u8 = null
-    var ptr: *const u8 = null
-    var repend: *const u8 = null
-    var extra_needed: c_ulong = 0
-    var buff_offset: c_ulong = 0
-    var buff_length: c_ulong = 0
-    var lengthleft: c_ulong = 0
-    var fraglength: c_ulong = 0
-    var ovector: *mut c_ulong = null
-    var ovecsave: [2]c_ulong = [0 as c_ulong; 2]
-    var scb: pcre2_substitute_callout_block_8
-    var sub_start_extra_needed: c_ulong = 0
-    var substitute_case_callout: *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong = null
-    var substitute_case_callout_data: *mut c_void = null
-    var gcontext: pcre2_real_general_context_8
-    var pairs: c_int = 0
-    var chkmc_length: c_ulong = 0
-    var ptrstack: [20]*const u8 = [null as *const u8; 20]
-    var ptrstackptr: c_uint = 0
-    var forcecase: case_state
-    var casestart_offset: c_ulong = 0
-    var casestart_extra_needed: c_ulong = 0
-    var ch: c_uint = 0
-    var chlen: c_uint = 0
-    var group: c_int = 0
-    var special: c_uint = 0
-    var text1_start: *const u8 = null
-    var text1_end: *const u8 = null
-    var text2_start: *const u8 = null
-    var text2_end: *const u8 = null
-    var name: [129]u8 = [0 as u8; 129]
-    var inparens: c_int = 0
-    var inangle: c_int = 0
-    var star: c_int = 0
-    var sublength: c_ulong = 0
-    var next: u8 = 0
-    var subptr: *const u8 = null
-    var subptrend: *const u8 = null
-    var name_len: c_ulong = 0
-    var name_start: *const u8 = null
-    var mark: *const u8 = null
-    var chkcc_length: c_ulong = 0
-    var chkcc_rc: c_ulong = 0
-    var first: *const u8 = null
-    var last: *const u8 = null
-    var entry: *const u8 = null
-    var ng: c_uint = 0
-    var errorcode: c_int = 0
-    var new_forcecase: case_state
-    var chars_outstanding: c_ulong = 0
-    var guess: c_ulong = 0
-    var ch_start: *const u8 = null
-    var newlength: c_ulong = 0
-    var oldlength: c_ulong = 0
-    var newlength_buf: c_ulong = 0
-    var newlength_extra: c_ulong = 0
-    var additional: c_ulong = 0
+    var rc__goto_764_5: c_int = 0
+    var subs__goto_765_5: c_int = 0
+    var ovector_count__goto_766_10: c_uint = 0
+    var goptions__goto_767_10: c_uint = 0
+    var suboptions__goto_768_10: c_uint = 0
+    var internal_match_data__goto_769_19: *mut pcre2_real_match_data_8 = null
+    var escaped_literal__goto_770_6: c_int = 0
+    var overflowed__goto_771_6: c_int = 0
+    var use_existing_match__goto_772_6: c_int = 0
+    var replacement_only__goto_773_6: c_int = 0
+    var utf__goto_774_6: c_int = 0
+    var partial__goto_775_6: c_int = 0
+    var temp__goto_776_13: [6]u8 = [0 as u8; 6]
+    var null_str__goto_777_13: [1]u8 = [0 as u8; 1]
+    var original_subject__goto_778_12: *const u8 = null
+    var ptr__goto_779_12: *const u8 = null
+    var repend__goto_780_12: *const u8 = null
+    var extra_needed__goto_781_12: c_ulong = 0
+    var buff_offset__goto_782_12: c_ulong = 0
+    var buff_length__goto_782_25: c_ulong = 0
+    var lengthleft__goto_782_38: c_ulong = 0
+    var fraglength__goto_782_50: c_ulong = 0
+    var ovector__goto_783_13: *mut c_ulong = null
+    var ovecsave__goto_784_12: [2]c_ulong = [0 as c_ulong; 2]
+    var scb__goto_785_32: pcre2_substitute_callout_block_8
+    var sub_start_extra_needed__goto_786_12: c_ulong = 0
+    var substitute_case_callout__goto_787_14: *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong = null
+    var substitute_case_callout_data__goto_789_7: *mut c_void = null
+    var gcontext__goto_905_25: pcre2_real_general_context_8
+    var pairs__goto_916_7: c_int = 0
+    var gcontext__goto_917_25: pcre2_real_general_context_8
+    var chkmc_length__goto_981_24: c_ulong = 0
+    var ptrstack__goto_989_14: [20]*const u8 = [null as *const u8; 20]
+    var ptrstackptr__goto_990_12: c_uint = 0
+    var forcecase__goto_991_14: case_state
+    var casestart_offset__goto_992_14: c_ulong = 0
+    var casestart_extra_needed__goto_993_14: c_ulong = 0
+    var chkmc_length__goto_1061_26: c_ulong = 0
+    var chkmc_length__goto_1072_5: c_ulong = 0
+    var ch__goto_1082_14: c_uint = 0
+    var chlen__goto_1083_18: c_uint = 0
+    var group__goto_1084_9: c_int = 0
+    var special__goto_1085_14: c_uint = 0
+    var text1_start__goto_1086_16: *const u8 = null
+    var text1_end__goto_1087_16: *const u8 = null
+    var text2_start__goto_1088_16: *const u8 = null
+    var text2_end__goto_1089_16: *const u8 = null
+    var name__goto_1090_17: [129]u8 = [0 as u8; 129]
+    var inparens__goto_1119_12: c_int = 0
+    var inangle__goto_1120_12: c_int = 0
+    var star__goto_1121_12: c_int = 0
+    var sublength__goto_1122_18: c_ulong = 0
+    var next__goto_1123_19: u8 = 0
+    var subptr__goto_1124_18: *const u8 = null
+    var subptrend__goto_1124_26: *const u8 = null
+    var name_len__goto_1289_20: c_ulong = 0
+    var name_start__goto_1290_20: *const u8 = null
+    var mark__goto_1356_22: *const u8 = null
+    var chkcc_length__goto_1364_15: c_ulong = 0
+    var chkcc_rc__goto_1364_15: c_ulong = 0
+    var chkmc_length__goto_1366_15: c_ulong = 0
+    var first__goto_1385_22: *const u8 = null
+    var last__goto_1385_29: *const u8 = null
+    var entry__goto_1385_35: *const u8 = null
+    var ng__goto_1397_24: c_uint = 0
+    var chkcc_length__goto_1477_11: c_ulong = 0
+    var chkcc_rc__goto_1477_11: c_ulong = 0
+    var chkmc_length__goto_1479_11: c_ulong = 0
+    var errorcode__goto_1491_11: c_int = 0
+    var new_forcecase__goto_1492_18: case_state
+    var chars_outstanding__goto_1550_11: c_ulong = 0
+    var guess__goto_1550_11: c_ulong = 0
+    var chkcc_length__goto_1550_11: c_ulong = 0
+    var chkcc_rc__goto_1550_11: c_ulong = 0
+    var chkcc_length__goto_1589_11: c_ulong = 0
+    var chkcc_rc__goto_1589_11: c_ulong = 0
+    var chkmc_length__goto_1591_11: c_ulong = 0
+    var name_len__goto_1596_22: c_ulong = 0
+    var name_start__goto_1597_22: *const u8 = null
+    var ch_start__goto_1635_18: *const u8 = null
+    var chkcc_length__goto_1644_9: c_ulong = 0
+    var chkcc_rc__goto_1644_9: c_ulong = 0
+    var chkmc_length__goto_1646_9: c_ulong = 0
+    var chars_outstanding__goto_1659_5: c_ulong = 0
+    var guess__goto_1659_5: c_ulong = 0
+    var chkcc_length__goto_1659_5: c_ulong = 0
+    var chkcc_rc__goto_1659_5: c_ulong = 0
+    var newlength__goto_1680_20: c_ulong = 0
+    var oldlength__goto_1681_20: c_ulong = 0
+    var chkmc_length__goto_1685_32: c_ulong = 0
+    var newlength_buf__goto_1704_18: c_ulong = 0
+    var newlength_extra__goto_1705_18: c_ulong = 0
+    var newlength__goto_1706_18: c_ulong = 0
+    var oldlength__goto_1709_18: c_ulong = 0
+    var additional__goto_1716_20: c_ulong = 0
+    var chkmc_length__goto_1754_3: c_ulong = 0
+    var chkmc_length__goto_1758_1: c_ulong = 0
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                goptions = 0
-                internal_match_data = (null as *mut pcre2_real_match_data_8)
-                escaped_literal = 0
-                overflowed = 0
-                utf = (if ((code.overall_options & 524288)) != 0: 1 else: 0)
-                partial = (if ((options & ((32 | 16)))) != 0: 1 else: 0)
-                // temp re-declared (skipped)
-                // null_str re-declared (skipped)
-                original_subject = subject
-                repend = (null as *const u8)
-                extra_needed = 0
-                ovecsave = [0, 0]
-                substitute_case_callout = (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong)
-                substitute_case_callout_data = null
-                (buff_offset = 0)
+                goptions__goto_767_10 = 0
+                internal_match_data__goto_769_19 = (null as *mut pcre2_real_match_data_8)
+                escaped_literal__goto_770_6 = 0
+                overflowed__goto_771_6 = 0
+                utf__goto_774_6 = (if ((code.overall_options & 524288)) != 0: 1 else: 0)
+                partial__goto_775_6 = (if ((options & ((32 | 16)))) != 0: 1 else: 0)
+                original_subject__goto_778_12 = subject
+                repend__goto_780_12 = (null as *const u8)
+                extra_needed__goto_781_12 = 0
+                substitute_case_callout__goto_787_14 = (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong)
+                substitute_case_callout_data__goto_789_7 = null
+                (buff_offset__goto_782_12 = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (buff_length = (unsafe: *blength))
-                (lengthleft = buff_length)
+                (buff_length__goto_782_25 = (unsafe: *blength))
+                (lengthleft__goto_782_38 = buff_length__goto_782_25)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                ((unsafe: *blength) = ((0 -% 1)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if mcontext != (null as *mut pcre2_real_match_context_8): 1 else: 0) != 0:
-                    (substitute_case_callout = mcontext.substitute_case_callout)
+                    (substitute_case_callout__goto_787_14 = mcontext.substitute_case_callout)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (substitute_case_callout_data = mcontext.substitute_case_callout_data)
+                    (substitute_case_callout_data__goto_789_7 = mcontext.substitute_case_callout_data)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if partial__goto_775_6 != 0 and (if ((options & 131072)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    return (-34)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if replacement == (null as *const u8): 1 else: 0) != 0:
-                    (replacement = ((&null_str[0] as *mut u8) as *const u8))
+                    if (if rlength != 0: 1 else: 0) != 0:
+                        return (-51)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (replacement = ((&null_str__goto_777_13[0] as *mut u8) as *const u8))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (repend = (replacement + rlength))
+                if (if rlength == ((0 -% 1)): 1 else: 0) != 0:
+                    (rlength = _pcre2_strlen_8(replacement))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (repend__goto_780_12 = (replacement + rlength))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if subject == (null as *const u8): 1 else: 0) != 0:
-                    (subject = ((&null_str[0] as *mut u8) as *const u8))
+                    if (if length != 0: 1 else: 0) != 0:
+                        return (-51)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (subject = ((&null_str__goto_777_13[0] as *mut u8) as *const u8))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (use_existing_match = ((if ((options & 65536)) != 0: 1 else: 0)))
+                if (if length == ((0 -% 1)): 1 else: 0) != 0:
+                    (length = _pcre2_strlen_8(subject))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (replacement_only = ((if ((options & 131072)) != 0: 1 else: 0)))
+                (use_existing_match__goto_772_6 = ((if ((options & 65536)) != 0: 1 else: 0)))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (replacement_only__goto_773_6 = ((if ((options & 131072)) != 0: 1 else: 0)))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if use_existing_match__goto_772_6 != 0 and (if match_data == (null as *mut pcre2_real_match_data_8): 1 else: 0) != 0: 1 else: 0) != 0:
+                    return (-51)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if use_existing_match__goto_772_6 != 0:
+                    if (if (if match_data.rc < 0: 1 else: 0) != 0 and (if match_data.rc != ((0 -% 1)): 1 else: 0) != 0: 1 else: 0) != 0:
+                        return match_data.rc
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    if (if match_data.matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0:
+                        return (-41)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    if (if code != match_data.code: 1 else: 0) != 0:
+                        return (-71)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    if (if start_offset != match_data.start_offset: 1 else: 0) != 0:
+                        return (-73)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if match_data == (null as *mut pcre2_real_match_data_8): 1 else: 0) != 0:
-                    (internal_match_data = pcre2_match_data_create_from_pattern_8(code, (&mut gcontext as *mut pcre2_real_general_context_8)))
-                    (match_data = internal_match_data)
+                    (gcontext__goto_905_25.memctl = (if ((if mcontext == (null as *mut pcre2_real_match_context_8): 1 else: 0)) != 0: ((code as *mut pcre2_real_code_8)).memctl else: ((mcontext as *mut pcre2_real_match_context_8)).memctl))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (internal_match_data__goto_769_19 = pcre2_match_data_create_from_pattern_8(code, (&mut gcontext__goto_905_25 as *mut pcre2_real_general_context_8)))
+                    (match_data = internal_match_data__goto_769_19)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    if (if internal_match_data__goto_769_19 == (null as *mut pcre2_real_match_data_8): 1 else: 0) != 0:
+                        return (-48)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 else:
-                    if use_existing_match != 0:
-                        (pairs = (if ((if (code.top_bracket + 1) < match_data.oveccount: 1 else: 0)) != 0: (code.top_bracket + 1) else: match_data.oveccount))
+                    if use_existing_match__goto_772_6 != 0:
+                        (gcontext__goto_917_25.memctl = (if ((if mcontext == (null as *mut pcre2_real_match_context_8): 1 else: 0)) != 0: ((code as *mut pcre2_real_code_8)).memctl else: ((mcontext as *mut pcre2_real_match_context_8)).memctl))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        (internal_match_data = pcre2_match_data_create_8(match_data.oveccount, (&mut gcontext as *mut pcre2_real_general_context_8)))
+                        (pairs__goto_916_7 = (if ((if (code.top_bracket + 1) < match_data.oveccount: 1 else: 0)) != 0: (code.top_bracket + 1) else: match_data.oveccount))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        (internal_match_data.heapframes = (null as *mut heapframe))
+                        (internal_match_data__goto_769_19 = pcre2_match_data_create_8(match_data.oveccount, (&mut gcontext__goto_917_25 as *mut pcre2_real_general_context_8)))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        (internal_match_data.heapframes_size = 0)
+                        if (if internal_match_data__goto_769_19 == (null as *mut pcre2_real_match_data_8): 1 else: 0) != 0:
+                            return (-48)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        internal_match_data.flags = internal_match_data.flags & (0 - 1 - 1)
+                        (internal_match_data__goto_769_19.heapframes = (null as *mut heapframe))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        (match_data = internal_match_data)
+                        (internal_match_data__goto_769_19.heapframes_size = 0)
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        internal_match_data__goto_769_19.flags = internal_match_data__goto_769_19.flags & (0 - 1 - 1)
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (match_data = internal_match_data__goto_769_19)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if internal_match_data != (null as *mut pcre2_real_match_data_8): 1 else: 0) != 0:
+                if (if internal_match_data__goto_769_19 != (null as *mut pcre2_real_match_data_8): 1 else: 0) != 0:
                     options = options & (0 - 16384 - 1)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (ovector = pcre2_get_ovector_pointer_8(match_data))
+                (ovector__goto_783_13 = pcre2_get_ovector_pointer_8(match_data))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (ovector_count = pcre2_get_ovector_count_8(match_data))
+                (ovector_count__goto_766_10 = pcre2_get_ovector_count_8(match_data))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (scb.version = 0)
+                (scb__goto_785_32.version = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (scb.input = subject)
+                (scb__goto_785_32.input = subject)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (scb.ovector = ovector)
+                (scb__goto_785_32.output = (buffer as *const u8))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (scb__goto_785_32.ovector = ovector__goto_783_13)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if start_offset > length: 1 else: 0) != 0:
                     (match_data.leftchar = 0)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (rc__goto_764_5 = (-33))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     __pc = 6
@@ -279,13 +368,10 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if replacement_only != 0: 0 else: 1) != 0:
+                if (if replacement_only__goto_773_6 != 0: 0 else: 1) != 0:
                     while true:
-                        chkmc_length = start_offset
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
-                            break
-                        if overflowed != 0:
-                            extra_needed = extra_needed + chkmc_length
+                        if overflowed__goto_771_6 != 0:
+                            extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkmc_length__goto_981_24
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -296,82 +382,92 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                             break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (subs = 0)
+                (subs__goto_765_5 = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 while true:
-                    ptrstackptr = 0
+                    ptrstackptr__goto_990_12 = 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    forcecase = case_state { to_case: 0, single_char: 0 }
+                    forcecase__goto_991_14 = case_state { to_case: 0, single_char: 0 }
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    casestart_offset = 0
+                    casestart_offset__goto_992_14 = 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    casestart_extra_needed = 0
+                    casestart_extra_needed__goto_993_14 = 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if use_existing_match != 0:
-                        (rc = match_data.rc)
+                    if use_existing_match__goto_772_6 != 0:
+                        (rc__goto_764_5 = match_data.rc)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (use_existing_match = 0)
+                        (use_existing_match__goto_772_6 = 0)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     else:
-                        (rc = pcre2_match_8(code, subject, length, start_offset, (options | goptions), match_data, mcontext))
+                        (rc__goto_764_5 = pcre2_match_8(code, subject, length, start_offset, (options | goptions__goto_767_10), match_data, mcontext))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if rc < 0: 1 else: 0) != 0:
+                    if (if rc__goto_764_5 == ((0 -% 1)): 1 else: 0) != 0:
+                        break
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        break
+                    if (if rc__goto_764_5 < 0: 1 else: 0) != 0:
                         __pc = 6
                         __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if ovector[1] < ovector[0]: 1 else: 0) != 0 or (if ovector[0] < start_offset: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (if (if ovector__goto_783_13[1] < ovector__goto_783_13[0]: 1 else: 0) != 0 or (if ovector__goto_783_13[0] < start_offset: 1 else: 0) != 0: 1 else: 0) != 0:
+                        (rc__goto_764_5 = (-60))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            break
                         __pc = 6
                         __goto_pending = 1
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if subs > 0: 1 else: 0) != 0 and (if ((if (if ovector[1] > (&ovecsave[0] as *mut c_ulong)[1]: 1 else: 0) != 0 or ((if (if (if ovector[1] == ovector[0]: 1 else: 0) != 0 and (if (&ovecsave[0] as *mut c_ulong)[1] > (&ovecsave[0] as *mut c_ulong)[0]: 1 else: 0) != 0: 1 else: 0) != 0 and (if ovector[1] == (&ovecsave[0] as *mut c_ulong)[1]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+                    if (if (if subs__goto_765_5 > 0: 1 else: 0) != 0 and (if ((if (if ovector__goto_783_13[1] > (&ovecsave__goto_784_12[0] as *mut c_ulong)[1]: 1 else: 0) != 0 or ((if (if (if ovector__goto_783_13[1] == ovector__goto_783_13[0]: 1 else: 0) != 0 and (if (&ovecsave__goto_784_12[0] as *mut c_ulong)[1] > (&ovecsave__goto_784_12[0] as *mut c_ulong)[0]: 1 else: 0) != 0: 1 else: 0) != 0 and (if ovector__goto_783_13[1] == (&ovecsave__goto_784_12[0] as *mut c_ulong)[1]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+                        (rc__goto_764_5 = (-65))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            break
                         __pc = 6
                         __goto_pending = 1
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    ((&ovecsave[0] as *mut c_ulong)[0] = ovector[0])
+                    ((&ovecsave__goto_784_12[0] as *mut c_ulong)[0] = ovector__goto_783_13[0])
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    ((&ovecsave[0] as *mut c_ulong)[1] = ovector[1])
+                    ((&ovecsave__goto_784_12[0] as *mut c_ulong)[1] = ovector__goto_783_13[1])
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if subs == 2147483647: 1 else: 0) != 0:
+                    if (if subs__goto_765_5 == 2147483647: 1 else: 0) != 0:
+                        (rc__goto_764_5 = (-61))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            break
                         __pc = 6
                         __goto_pending = 1
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (subs = subs + 1)
+                    (subs__goto_765_5 = subs__goto_765_5 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if rc == 0: 1 else: 0) != 0:
-                        (rc = ovector_count)
+                    if (if rc__goto_764_5 == 0: 1 else: 0) != 0:
+                        (rc__goto_764_5 = ovector_count__goto_766_10)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (fraglength = (ovector[0] -% start_offset))
+                    (fraglength__goto_782_50 = (ovector__goto_783_13[0] -% start_offset))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if replacement_only != 0: 0 else: 1) != 0:
+                    if (if replacement_only__goto_773_6 != 0: 0 else: 1) != 0:
                         while true:
-                            chkmc_length = fraglength
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
-                                break
-                            if overflowed != 0:
-                                extra_needed = extra_needed + chkmc_length
+                            if overflowed__goto_771_6 != 0:
+                                extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkmc_length__goto_1061_26
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -382,25 +478,22 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                 break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    ((&scb.output_offsets[0] as *mut c_ulong)[0] = buff_offset)
+                    ((&scb__goto_785_32.output_offsets[0] as *mut c_ulong)[0] = buff_offset__goto_782_12)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (scb.oveccount = rc)
+                    (scb__goto_785_32.oveccount = rc__goto_764_5)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (sub_start_extra_needed = extra_needed)
+                    (sub_start_extra_needed__goto_786_12 = extra_needed__goto_781_12)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (ptr = replacement)
+                    (ptr__goto_779_12 = replacement)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if ((suboptions & 32768)) != 0: 1 else: 0) != 0:
+                    if (if ((suboptions__goto_768_10 & 32768)) != 0: 1 else: 0) != 0:
                         while true:
-                            chkmc_length = rlength
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
-                                break
-                            if overflowed != 0:
-                                extra_needed = extra_needed + chkmc_length
+                            if overflowed__goto_771_6 != 0:
+                                extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkmc_length__goto_1072_5
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -413,27 +506,27 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                             break
                     else:
                         while true:
-                            text1_start = (null as *const u8)
+                            text1_start__goto_1086_16 = (null as *const u8)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            text1_end = (null as *const u8)
+                            text1_end__goto_1087_16 = (null as *const u8)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            text2_start = (null as *const u8)
+                            text2_start__goto_1088_16 = (null as *const u8)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            text2_end = (null as *const u8)
+                            text2_end__goto_1089_16 = (null as *const u8)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if (if ptr >= repend: 1 else: 0) != 0:
-                                if (if ptrstackptr == 0: 1 else: 0) != 0:
+                            if (if ptr__goto_779_12 >= repend__goto_780_12: 1 else: 0) != 0:
+                                if (if ptrstackptr__goto_990_12 == 0: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (repend = (&ptrstack[0] as *mut *const u8)[(ptrstackptr = ptrstackptr - 1)])
+                                (repend__goto_780_12 = (&ptrstack__goto_989_14[0] as *mut *const u8)[(ptrstackptr__goto_990_12 = ptrstackptr__goto_990_12 - 1)])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (ptr = (&ptrstack[0] as *mut *const u8)[(ptrstackptr = ptrstackptr - 1)])
+                                (ptr__goto_779_12 = (&ptrstack__goto_989_14[0] as *mut *const u8)[(ptrstackptr__goto_990_12 = ptrstackptr__goto_990_12 - 1)])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 continue
@@ -441,12 +534,12 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if escaped_literal != 0:
-                                if (if (if (if ptr[0] == 92: 1 else: 0) != 0 and (if ptr < (repend - (1 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 69: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (escaped_literal = 0)
+                            if escaped_literal__goto_770_6 != 0:
+                                if (if (if (if ptr__goto_779_12[0] == 92: 1 else: 0) != 0 and (if ptr__goto_779_12 < (repend__goto_780_12 - (1 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr__goto_779_12[1] == 69: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (escaped_literal__goto_770_6 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    ptr = ptr + 2
+                                    ptr__goto_779_12 = ptr__goto_779_12 + 2
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     continue
@@ -460,55 +553,55 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if (if (unsafe: *ptr) == 36: 1 else: 0) != 0:
-                                if (if (ptr = ptr + 1) >= repend: 1 else: 0) != 0:
+                            if (if (unsafe: *ptr__goto_779_12) == 36: 1 else: 0) != 0:
+                                if (if (ptr__goto_779_12 = ptr__goto_779_12 + 1) >= repend__goto_780_12: 1 else: 0) != 0:
                                     __pc = 10
                                     __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if ((next = (unsafe: *ptr))) == 36: 1 else: 0) != 0:
+                                if (if ((next__goto_1123_19 = (unsafe: *ptr__goto_779_12))) == 36: 1 else: 0) != 0:
                                     __pc = 5
                                     __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (special = 0)
+                                (special__goto_1085_14 = 0)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (text1_start = (null as *const u8))
+                                (text1_start__goto_1086_16 = (null as *const u8))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (text1_end = (null as *const u8))
+                                (text1_end__goto_1087_16 = (null as *const u8))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (text2_start = (null as *const u8))
+                                (text2_start__goto_1088_16 = (null as *const u8))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (text2_end = (null as *const u8))
+                                (text2_end__goto_1089_16 = (null as *const u8))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (group = -1)
+                                (group__goto_1084_9 = -1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (inparens = 0)
+                                (inparens__goto_1119_12 = 0)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (inangle = 0)
+                                (inangle__goto_1120_12 = 0)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (star = 0)
+                                (star__goto_1121_12 = 0)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (subptr = (null as *const u8))
+                                (subptr__goto_1124_18 = (null as *const u8))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (subptrend = (null as *const u8))
+                                (subptrend__goto_1124_26 = (null as *const u8))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if next == 38: 1 else: 0) != 0:
-                                    (ptr = ptr + 1)
+                                if (if next__goto_1123_19 == 38: 1 else: 0) != 0:
+                                    (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (group = 0)
+                                    (group__goto_1084_9 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 1
@@ -517,39 +610,42 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if (if next == 96: 1 else: 0) != 0 or (if next == 39: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (ptr = ptr + 1)
+                                if (if (if next__goto_1123_19 == 96: 1 else: 0) != 0 or (if next__goto_1123_19 == 39: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (rc = pcre2_substring_length_bynumber_8(match_data, 0, (&mut sublength as *mut c_ulong)))
+                                    (rc__goto_764_5 = pcre2_substring_length_bynumber_8(match_data, 0, (&mut sublength__goto_1122_18 as *mut c_ulong)))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if rc < 0: 1 else: 0) != 0:
+                                    if (if rc__goto_764_5 < 0: 1 else: 0) != 0:
                                         __pc = 12
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if next == 96: 1 else: 0) != 0:
-                                        (subptr = subject)
+                                    if (if next__goto_1123_19 == 96: 1 else: 0) != 0:
+                                        (subptr__goto_1124_18 = subject)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (subptrend = (subject + ovector[0]))
+                                        (subptrend__goto_1124_26 = (subject + ovector__goto_783_13[0]))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        if partial != 0:
+                                        if partial__goto_775_6 != 0:
+                                            (rc__goto_764_5 = (-76))
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
                                             __pc = 12
                                             __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (subptr = (subject + ovector[1]))
+                                        (subptr__goto_1124_18 = (subject + ovector__goto_783_13[1]))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (subptrend = (subject + length))
+                                        (subptrend__goto_1124_26 = (subject + length))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -560,21 +656,24 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if next == 95: 1 else: 0) != 0:
-                                    (ptr = ptr + 1)
+                                if (if next__goto_1123_19 == 95: 1 else: 0) != 0:
+                                    (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if partial != 0:
+                                    if partial__goto_775_6 != 0:
+                                        (rc__goto_764_5 = (-76))
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
                                         __pc = 12
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (subptr = subject)
+                                    (subptr__goto_1124_18 = subject)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (subptrend = (subject + length))
+                                    (subptrend__goto_1124_26 = (subject + length))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 3
@@ -583,34 +682,52 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if (if next == 43: 1 else: 0) != 0 and (if ((if (if (ptr + (1 as isize as usize)) < repend: 1 else: 0) != 0 and (if ptr[1] == 123: 1 else: 0) != 0: 1 else: 0)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
-                                    (ptr = ptr + 1)
+                                if (if (if next__goto_1123_19 == 43: 1 else: 0) != 0 and (if ((if (if (ptr__goto_779_12 + (1 as isize as usize)) < repend__goto_780_12: 1 else: 0) != 0 and (if ptr__goto_779_12[1] == 123: 1 else: 0) != 0: 1 else: 0)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+                                    (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if code.top_bracket == 0: 1 else: 0) != 0:
-                                        if (if ((suboptions & 2048)) == 0: 1 else: 0) != 0:
+                                        if (if ((suboptions__goto_768_10 & 2048)) == 0: 1 else: 0) != 0:
+                                            (rc__goto_764_5 = (-49))
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
                                             __pc = 12
                                             __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (group = 0)
+                                        (group__goto_1084_9 = 0)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
                                         if (if match_data.oveccount < (code.top_bracket + 1): 1 else: 0) != 0:
+                                            (rc__goto_764_5 = (-54))
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
                                             __pc = 12
                                             __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
+                                        (group__goto_1084_9 = code.top_bracket)
+                                        while (if group__goto_1084_9 > 0: 1 else: 0) != 0:
+                                            if (if ovector__goto_783_13[(2 * group__goto_1084_9)] != ((0 -% 1)): 1 else: 0) != 0:
+                                                break
+                                            (group__goto_1084_9 = group__goto_1084_9 - 1)
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if group == 0: 1 else: 0) != 0:
-                                        if (if ((suboptions & 1024)) != 0: 1 else: 0) != 0:
+                                    if (if group__goto_1084_9 == 0: 1 else: 0) != 0:
+                                        if (if ((suboptions__goto_768_10 & 1024)) != 0: 1 else: 0) != 0:
                                             continue
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        (rc__goto_764_5 = (-55))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 12
@@ -625,65 +742,65 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if next == 123: 1 else: 0) != 0:
-                                    if (if (ptr = ptr + 1) >= repend: 1 else: 0) != 0:
+                                if (if next__goto_1123_19 == 123: 1 else: 0) != 0:
+                                    if (if (ptr__goto_779_12 = ptr__goto_779_12 + 1) >= repend__goto_780_12: 1 else: 0) != 0:
                                         __pc = 10
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (next = (unsafe: *ptr))
+                                    (next__goto_1123_19 = (unsafe: *ptr__goto_779_12))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (inparens = 1)
+                                    (inparens__goto_1119_12 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if next == 60: 1 else: 0) != 0:
-                                        if (if (ptr = ptr + 1) >= repend: 1 else: 0) != 0:
+                                    if (if next__goto_1123_19 == 60: 1 else: 0) != 0:
+                                        if (if (ptr__goto_779_12 = ptr__goto_779_12 + 1) >= repend__goto_780_12: 1 else: 0) != 0:
                                             __pc = 10
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (next = (unsafe: *ptr))
+                                        (next__goto_1123_19 = (unsafe: *ptr__goto_779_12))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (inangle = 1)
+                                        (inangle__goto_1120_12 = 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if (if inangle != 0: 0 else: 1) != 0 and (if next == 42: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    if (if (ptr = ptr + 1) >= repend: 1 else: 0) != 0:
+                                if (if (if inangle__goto_1120_12 != 0: 0 else: 1) != 0 and (if next__goto_1123_19 == 42: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (ptr__goto_779_12 = ptr__goto_779_12 + 1) >= repend__goto_780_12: 1 else: 0) != 0:
                                         __pc = 10
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (next = (unsafe: *ptr))
+                                    (next__goto_1123_19 = (unsafe: *ptr__goto_779_12))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (star = 1)
+                                    (star__goto_1121_12 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if (if (if (if star != 0: 0 else: 1) != 0 and (if inangle != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if next >= 48: 1 else: 0) != 0: 1 else: 0) != 0 and (if next <= 57: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (group = (next - 48))
+                                if (if (if (if (if star__goto_1121_12 != 0: 0 else: 1) != 0 and (if inangle__goto_1120_12 != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if next__goto_1123_19 >= 48: 1 else: 0) != 0: 1 else: 0) != 0 and (if next__goto_1123_19 <= 57: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (group__goto_1084_9 = (next__goto_1123_19 - 48))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    while (if (ptr = ptr + 1) < repend: 1 else: 0) != 0:
-                                        (next = (unsafe: *ptr))
+                                    while (if (ptr__goto_779_12 = ptr__goto_779_12 + 1) < repend__goto_780_12: 1 else: 0) != 0:
+                                        (next__goto_1123_19 = (unsafe: *ptr__goto_779_12))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if next < 48: 1 else: 0) != 0 or (if next > 57: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if next__goto_1123_19 < 48: 1 else: 0) != 0 or (if next__goto_1123_19 > 57: 1 else: 0) != 0: 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (group = ((group * 10) + ((next - 48))))
+                                        (group__goto_1084_9 = ((group__goto_1084_9 * 10) + ((next__goto_1123_19 - 48))))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if group > code.top_bracket: 1 else: 0) != 0:
-                                            if (if ((suboptions & 2048)) != 0: 1 else: 0) != 0:
-                                                while (if (if (if (ptr = ptr + 1) < repend: 1 else: 0) != 0 and (if (unsafe: *ptr) >= 48: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) <= 57: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if group__goto_1084_9 > code.top_bracket: 1 else: 0) != 0:
+                                            if (if ((suboptions__goto_768_10 & 2048)) != 0: 1 else: 0) != 0:
+                                                while (if (if (if (ptr__goto_779_12 = ptr__goto_779_12 + 1) < repend__goto_780_12: 1 else: 0) != 0 and (if (unsafe: *ptr__goto_779_12) >= 48: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr__goto_779_12) <= 57: 1 else: 0) != 0: 1 else: 0) != 0:
                                                     0
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
@@ -693,6 +810,9 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                             else:
+                                                (rc__goto_764_5 = (-49))
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
                                                 __pc = 12
                                                 __goto_pending = 1
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -706,70 +826,76 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    name_start = ptr
+                                    name_start__goto_1290_20 = ptr__goto_779_12
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
+                                    (name_len__goto_1289_20 = ((ptr__goto_779_12 as usize -% name_start__goto_1290_20 as usize) / sizeof[u8]()))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    ((&name[0] as *mut u8)[name_len] = 0)
+                                    ((&name__goto_1090_17[0] as *mut u8)[name_len__goto_1289_20] = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (next = 0)
+                                (next__goto_1123_19 = 0)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                next
+                                next__goto_1123_19
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if inparens != 0:
-                                    if (if (if (if (if ((suboptions & 512)) != 0: 1 else: 0) != 0 and (if star != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if ptr < (repend - (2 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 58: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (special = (unsafe: *((ptr = ptr + 1))))
+                                if inparens__goto_1119_12 != 0:
+                                    if (if (if (if (if ((suboptions__goto_768_10 & 512)) != 0: 1 else: 0) != 0 and (if star__goto_1121_12 != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if ptr__goto_779_12 < (repend__goto_780_12 - (2 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr__goto_779_12) == 58: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (special__goto_1085_14 = (unsafe: *((ptr__goto_779_12 = ptr__goto_779_12 + 1))))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if special != 43: 1 else: 0) != 0 and (if special != 45: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if special__goto_1085_14 != 43: 1 else: 0) != 0 and (if special__goto_1085_14 != 45: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (rc__goto_764_5 = (-59))
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
                                             __pc = 12
                                             __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (ptr = ptr + 1)
-                                        (text1_start = ptr)
+                                        (ptr__goto_779_12 = ptr__goto_779_12 + 1)
+                                        (text1_start__goto_1086_16 = ptr__goto_779_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (rc = find_text_end(code, (&mut ptr as *mut *const u8), repend, (if special == 45: 1 else: 0)))
+                                        (rc__goto_764_5 = find_text_end(code, (&mut ptr__goto_779_12 as *mut *const u8), repend__goto_780_12, (if special__goto_1085_14 == 45: 1 else: 0)))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if rc != 0: 1 else: 0) != 0:
+                                        if (if rc__goto_764_5 != 0: 1 else: 0) != 0:
                                             __pc = 12
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (text1_end = ptr)
+                                        (text1_end__goto_1087_16 = ptr__goto_779_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if special == 43: 1 else: 0) != 0 and (if (unsafe: *ptr) == 58: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (ptr = ptr + 1)
-                                            (text2_start = ptr)
+                                        if (if (if special__goto_1085_14 == 43: 1 else: 0) != 0 and (if (unsafe: *ptr__goto_779_12) == 58: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (ptr__goto_779_12 = ptr__goto_779_12 + 1)
+                                            (text2_start__goto_1088_16 = ptr__goto_779_12)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (rc = find_text_end(code, (&mut ptr as *mut *const u8), repend, 1))
+                                            (rc__goto_764_5 = find_text_end(code, (&mut ptr__goto_779_12 as *mut *const u8), repend__goto_780_12, 1))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if rc != 0: 1 else: 0) != 0:
+                                            if (if rc__goto_764_5 != 0: 1 else: 0) != 0:
                                                 __pc = 12
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (text2_end = ptr)
+                                            (text2_end__goto_1089_16 = ptr__goto_779_12)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 125: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if ptr__goto_779_12 >= repend__goto_780_12: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_779_12) != 125: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (rc__goto_764_5 = (-58))
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
                                             __pc = 12
                                             __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -778,35 +904,35 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (ptr = ptr + 1)
+                                    (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if inangle != 0:
-                                    if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if inangle__goto_1120_12 != 0:
+                                    if (if (if ptr__goto_779_12 >= repend__goto_780_12: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_779_12) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 10
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (ptr = ptr + 1)
+                                    (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if star != 0:
-                                    if (if _pcre2_strcmp_c8_8(((&name[0] as *mut u8) as *const u8), ((&STRING_MARK[0] as *mut c_char) as *const i8)) == 0: 1 else: 0) != 0:
-                                        mark = pcre2_get_mark_8(match_data)
+                                if star__goto_1121_12 != 0:
+                                    if (if _pcre2_strcmp_c8_8(((&name__goto_1090_17[0] as *mut u8) as *const u8), "MARK") == 0: 1 else: 0) != 0:
+                                        mark__goto_1356_22 = pcre2_get_mark_8(match_data)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if mark != (null as *const u8): 1 else: 0) != 0:
-                                            (fraglength = mark[-1])
+                                        if (if mark__goto_1356_22 != (null as *const u8): 1 else: 0) != 0:
+                                            (fraglength__goto_782_50 = mark__goto_1356_22[-1])
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if forcecase.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout == (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if forcecase__goto_991_14.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout__goto_787_14 == (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
-                                                    if overflowed != 0:
-                                                        extra_needed = extra_needed + chkcc_rc
+                                                    if overflowed__goto_771_6 != 0:
+                                                        extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkcc_rc__goto_1364_15
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         break
@@ -822,11 +948,8 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                         break
                                             else:
                                                 while true:
-                                                    chkmc_length = fraglength
-                                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                        break
-                                                    if overflowed != 0:
-                                                        extra_needed = extra_needed + chkmc_length
+                                                    if overflowed__goto_771_6 != 0:
+                                                        extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkmc_length__goto_1366_15
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -845,18 +968,64 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if group < 0: 1 else: 0) != 0:
-                                        (rc = pcre2_substring_nametable_scan_8(code, ((&name[0] as *mut u8) as *const u8), (&mut first as *mut *const u8), (&mut last as *mut *const u8)))
+                                    if (if group__goto_1084_9 < 0: 1 else: 0) != 0:
+                                        (rc__goto_764_5 = pcre2_substring_nametable_scan_8(code, ((&name__goto_1090_17[0] as *mut u8) as *const u8), (&mut first__goto_1385_22 as *mut *const u8), (&mut last__goto_1385_29 as *mut *const u8)))
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        if (if (if rc__goto_764_5 == (-49): 1 else: 0) != 0 and (if ((suboptions__goto_768_10 & 2048)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (group__goto_1084_9 = (code.top_bracket + 1))
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                        else:
+                                            if (if rc__goto_764_5 < 0: 1 else: 0) != 0:
+                                                __pc = 12
+                                                __goto_pending = 1
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            (entry__goto_1385_35 = first__goto_1385_22)
+                                            while (if entry__goto_1385_35 <= last__goto_1385_29: 1 else: 0) != 0:
+                                                if (if ng__goto_1397_24 < ovector_count__goto_766_10: 1 else: 0) != 0:
+                                                    if (if group__goto_1084_9 < 0: 1 else: 0) != 0:
+                                                        (group__goto_1084_9 = ng__goto_1397_24)
+                                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                        break
+                                                    if (if ovector__goto_783_13[(ng__goto_1397_24 *% 2)] != ((0 -% 1)): 1 else: 0) != 0:
+                                                        (group__goto_1084_9 = ng__goto_1397_24)
+                                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                            break
+                                                        break
+                                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                            break
+                                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                        break
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
+                                                entry__goto_1385_35 = entry__goto_1385_35 + rc__goto_764_5
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (rc = pcre2_substring_length_bynumber_8(match_data, group, (&mut sublength as *mut c_ulong)))
+                                    (rc__goto_764_5 = pcre2_substring_length_bynumber_8(match_data, group__goto_1084_9, (&mut sublength__goto_1122_18 as *mut c_ulong)))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if rc < 0: 1 else: 0) != 0:
-                                        if (if special == 0: 1 else: 0) != 0:
-                                            if (if ((suboptions & 1024)) != 0: 1 else: 0) != 0:
+                                    if (if rc__goto_764_5 < 0: 1 else: 0) != 0:
+                                        if (if (if rc__goto_764_5 == (-49): 1 else: 0) != 0 and (if ((suboptions__goto_768_10 & 2048)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (rc__goto_764_5 = (-55))
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        if (if rc__goto_764_5 != (-55): 1 else: 0) != 0:
+                                            __pc = 12
+                                            __goto_pending = 1
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        if (if special__goto_1085_14 == 0: 1 else: 0) != 0:
+                                            if (if ((suboptions__goto_768_10 & 1024)) != 0: 1 else: 0) != 0:
                                                 continue
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
@@ -868,44 +1037,44 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if special != 0: 1 else: 0) != 0:
-                                        if (if special == 45: 1 else: 0) != 0:
-                                            if (if rc == 0: 1 else: 0) != 0:
+                                    if (if special__goto_1085_14 != 0: 1 else: 0) != 0:
+                                        if (if special__goto_1085_14 == 45: 1 else: 0) != 0:
+                                            if (if rc__goto_764_5 == 0: 1 else: 0) != 0:
                                                 __pc = 2
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (text2_start = text1_start)
+                                            (text2_start__goto_1088_16 = text1_start__goto_1086_16)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (text2_end = text1_end)
+                                            (text2_end__goto_1089_16 = text1_end__goto_1087_16)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if ptrstackptr >= 20: 1 else: 0) != 0:
+                                        if (if ptrstackptr__goto_990_12 >= 20: 1 else: 0) != 0:
                                             __pc = 10
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        ((&ptrstack[0] as *mut *const u8)[(ptrstackptr = ptrstackptr + 1)] = ptr)
+                                        ((&ptrstack__goto_989_14[0] as *mut *const u8)[(ptrstackptr__goto_990_12 = ptrstackptr__goto_990_12 + 1)] = ptr__goto_779_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        ((&ptrstack[0] as *mut *const u8)[(ptrstackptr = ptrstackptr + 1)] = repend)
+                                        ((&ptrstack__goto_989_14[0] as *mut *const u8)[(ptrstackptr__goto_990_12 = ptrstackptr__goto_990_12 + 1)] = repend__goto_780_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if rc == 0: 1 else: 0) != 0:
-                                            (ptr = text1_start)
+                                        if (if rc__goto_764_5 == 0: 1 else: 0) != 0:
+                                            (ptr__goto_779_12 = text1_start__goto_1086_16)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (repend = text1_end)
+                                            (repend__goto_780_12 = text1_end__goto_1087_16)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         else:
-                                            (ptr = text2_start)
+                                            (ptr__goto_779_12 = text2_start__goto_1088_16)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (repend = text2_end)
+                                            (repend__goto_780_12 = text2_end__goto_1089_16)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -915,16 +1084,16 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (subptr = (subject + ovector[(group * 2)]))
+                                    (subptr__goto_1124_18 = (subject + ovector__goto_783_13[(group__goto_1084_9 * 2)]))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (subptrend = (subject + ovector[((group * 2) + 1)]))
+                                    (subptrend__goto_1124_26 = (subject + ovector__goto_783_13[((group__goto_1084_9 * 2) + 1)]))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if forcecase.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout == (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if forcecase__goto_991_14.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout__goto_787_14 == (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
-                                            if overflowed != 0:
-                                                extra_needed = extra_needed + chkcc_rc
+                                            if overflowed__goto_771_6 != 0:
+                                                extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkcc_rc__goto_1477_11
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 break
@@ -940,11 +1109,8 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                 break
                                     else:
                                         while true:
-                                            chkmc_length = ((subptrend as usize -% subptr as usize) / sizeof[u8]())
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                break
-                                            if overflowed != 0:
-                                                extra_needed = extra_needed + chkmc_length
+                                            if overflowed__goto_771_6 != 0:
+                                                extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkmc_length__goto_1479_11
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -958,59 +1124,59 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if (if (if ((suboptions & 512)) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 92: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    new_forcecase = case_state { to_case: 0, single_char: 0 }
+                                if (if (if ((suboptions__goto_768_10 & 512)) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr__goto_779_12) == 92: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    new_forcecase__goto_1492_18 = case_state { to_case: 0, single_char: 0 }
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if ptr < (repend - (1 as isize as usize)): 1 else: 0) != 0:
-                                        match ptr[1]
+                                    if (if ptr__goto_779_12 < (repend__goto_780_12 - (1 as isize as usize)): 1 else: 0) != 0:
+                                        match ptr__goto_779_12[1]
                                             76 =>
-                                                (new_forcecase.to_case = 1)
-                                                (new_forcecase.single_char = 0)
-                                                ptr = ptr + 2
+                                                (new_forcecase__goto_1492_18.to_case = 1)
+                                                (new_forcecase__goto_1492_18.single_char = 0)
+                                                ptr__goto_779_12 = ptr__goto_779_12 + 2
                                             108 =>
-                                                (new_forcecase.to_case = 1)
-                                                (new_forcecase.single_char = 1)
-                                                ptr = ptr + 2
-                                                if (if (if (if (ptr + (2 as isize as usize)) < repend: 1 else: 0) != 0 and (if ptr[0] == 92: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 85: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                    (new_forcecase.to_case = 4)
+                                                (new_forcecase__goto_1492_18.to_case = 1)
+                                                (new_forcecase__goto_1492_18.single_char = 1)
+                                                ptr__goto_779_12 = ptr__goto_779_12 + 2
+                                                if (if (if (if (ptr__goto_779_12 + (2 as isize as usize)) < repend__goto_780_12: 1 else: 0) != 0 and (if ptr__goto_779_12[0] == 92: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr__goto_779_12[1] == 85: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    (new_forcecase__goto_1492_18.to_case = 4)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    (new_forcecase.single_char = 0)
+                                                    (new_forcecase__goto_1492_18.single_char = 0)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    ptr = ptr + 2
+                                                    ptr__goto_779_12 = ptr__goto_779_12 + 2
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                             85 =>
-                                                (new_forcecase.to_case = 2)
-                                                (new_forcecase.single_char = 0)
-                                                ptr = ptr + 2
+                                                (new_forcecase__goto_1492_18.to_case = 2)
+                                                (new_forcecase__goto_1492_18.single_char = 0)
+                                                ptr__goto_779_12 = ptr__goto_779_12 + 2
                                             117 =>
-                                                (new_forcecase.to_case = 3)
-                                                (new_forcecase.single_char = 1)
-                                                ptr = ptr + 2
-                                                if (if (if (if (ptr + (2 as isize as usize)) < repend: 1 else: 0) != 0 and (if ptr[0] == 92: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 76: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                    (new_forcecase.to_case = 3)
+                                                (new_forcecase__goto_1492_18.to_case = 3)
+                                                (new_forcecase__goto_1492_18.single_char = 1)
+                                                ptr__goto_779_12 = ptr__goto_779_12 + 2
+                                                if (if (if (if (ptr__goto_779_12 + (2 as isize as usize)) < repend__goto_780_12: 1 else: 0) != 0 and (if ptr__goto_779_12[0] == 92: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr__goto_779_12[1] == 76: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    (new_forcecase__goto_1492_18.to_case = 3)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    (new_forcecase.single_char = 0)
+                                                    (new_forcecase__goto_1492_18.single_char = 0)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    ptr = ptr + 2
+                                                    ptr__goto_779_12 = ptr__goto_779_12 + 2
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                             _ => 0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if new_forcecase.to_case != 0: 1 else: 0) != 0:
-                                        (forcecase = new_forcecase)
+                                    if (if new_forcecase__goto_1492_18.to_case != 0: 1 else: 0) != 0:
+                                        (forcecase__goto_991_14 = new_forcecase__goto_1492_18)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (casestart_offset = buff_offset)
+                                        (casestart_offset__goto_992_14 = buff_offset__goto_782_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (casestart_extra_needed = extra_needed)
+                                        (casestart_extra_needed__goto_993_14 = extra_needed__goto_781_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         continue
@@ -1018,35 +1184,35 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (ptr = ptr + 1)
+                                    (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (rc = _pcre2_check_escape_8((&mut ptr as *mut *const u8), repend, (&mut ch as *mut c_uint), (&mut errorcode as *mut c_int), code.overall_options, code.extra_options, code.top_bracket, 0, (null as *mut compile_block_8)))
+                                    (rc__goto_764_5 = _pcre2_check_escape_8((&mut ptr__goto_779_12 as *mut *const u8), repend__goto_780_12, (&mut ch__goto_1082_14 as *mut c_uint), (&mut errorcode__goto_1491_11 as *mut c_int), code.overall_options, code.extra_options, code.top_bracket, 0, (null as *mut compile_block_8)))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if errorcode != 0: 1 else: 0) != 0:
+                                    if (if errorcode__goto_1491_11 != 0: 1 else: 0) != 0:
                                         __pc = 11
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    match rc
+                                    match rc__goto_764_5
                                         ESC_E =>
                                             __pc = 4
                                             __goto_pending = 1
-                                            (escaped_literal = 1)
+                                            (escaped_literal__goto_770_6 = 1)
                                             continue
-                                            if (if rc == ESC_v: 1 else: 0) != 0:
-                                                (ch = 11)
-                                            ((&temp[0] as *mut u8)[0] = ch)
+                                            if (if rc__goto_764_5 == ESC_v: 1 else: 0) != 0:
+                                                (ch__goto_1082_14 = 11)
+                                            ((&temp__goto_776_13[0] as *mut u8)[0] = ch__goto_1082_14)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (chlen = 1)
+                                            (chlen__goto_1083_18 = 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if forcecase.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout == (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if forcecase__goto_991_14.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout__goto_787_14 == (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
-                                                    if overflowed != 0:
-                                                        extra_needed = extra_needed + chkcc_rc
+                                                    if overflowed__goto_771_6 != 0:
+                                                        extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkcc_rc__goto_1589_11
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         break
@@ -1062,11 +1228,8 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                         break
                                             else:
                                                 while true:
-                                                    chkmc_length = chlen
-                                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                        break
-                                                    if overflowed != 0:
-                                                        extra_needed = extra_needed + chkmc_length
+                                                    if overflowed__goto_771_6 != 0:
+                                                        extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkmc_length__goto_1591_11
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1076,46 +1239,46 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                     if not (0 != 0):
                                                         break
                                             continue
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 60: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr__goto_779_12 >= repend__goto_780_12: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_779_12) != 60: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (ptr = ptr + 1)
+                                            (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (name_start = ptr)
+                                            (name_start__goto_1597_22 = ptr__goto_779_12)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
+                                            (name_len__goto_1596_22 = ((ptr__goto_779_12 as usize -% name_start__goto_1597_22 as usize) / sizeof[u8]()))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr__goto_779_12 >= repend__goto_780_12: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_779_12) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (ptr = ptr + 1)
+                                            (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (special = 0)
+                                            (special__goto_1085_14 = 0)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (group = -1)
+                                            (group__goto_1084_9 = -1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            ((&name[0] as *mut u8)[name_len] = 0)
+                                            ((&name__goto_1090_17[0] as *mut u8)[name_len__goto_1596_22] = 0)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             __pc = 1
                                             __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if rc < 0: 1 else: 0) != 0:
-                                                (special = 0)
+                                            if (if rc__goto_764_5 < 0: 1 else: 0) != 0:
+                                                (special__goto_1085_14 = 0)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (group = ((0 - rc) - 1))
+                                                (group__goto_1084_9 = ((0 - rc__goto_764_5) - 1))
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 1
@@ -1125,20 +1288,20 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             __pc = 11
                                             __goto_pending = 1
                                         ESC_Q =>
-                                            (escaped_literal = 1)
+                                            (escaped_literal__goto_770_6 = 1)
                                             continue
-                                            if (if rc == ESC_v: 1 else: 0) != 0:
-                                                (ch = 11)
-                                            ((&temp[0] as *mut u8)[0] = ch)
+                                            if (if rc__goto_764_5 == ESC_v: 1 else: 0) != 0:
+                                                (ch__goto_1082_14 = 11)
+                                            ((&temp__goto_776_13[0] as *mut u8)[0] = ch__goto_1082_14)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (chlen = 1)
+                                            (chlen__goto_1083_18 = 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if forcecase.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout == (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if forcecase__goto_991_14.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout__goto_787_14 == (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
-                                                    if overflowed != 0:
-                                                        extra_needed = extra_needed + chkcc_rc
+                                                    if overflowed__goto_771_6 != 0:
+                                                        extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkcc_rc__goto_1589_11
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         break
@@ -1154,11 +1317,8 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                         break
                                             else:
                                                 while true:
-                                                    chkmc_length = chlen
-                                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                        break
-                                                    if overflowed != 0:
-                                                        extra_needed = extra_needed + chkmc_length
+                                                    if overflowed__goto_771_6 != 0:
+                                                        extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkmc_length__goto_1591_11
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1168,46 +1328,46 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                     if not (0 != 0):
                                                         break
                                             continue
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 60: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr__goto_779_12 >= repend__goto_780_12: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_779_12) != 60: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (ptr = ptr + 1)
+                                            (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (name_start = ptr)
+                                            (name_start__goto_1597_22 = ptr__goto_779_12)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
+                                            (name_len__goto_1596_22 = ((ptr__goto_779_12 as usize -% name_start__goto_1597_22 as usize) / sizeof[u8]()))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr__goto_779_12 >= repend__goto_780_12: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_779_12) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (ptr = ptr + 1)
+                                            (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (special = 0)
+                                            (special__goto_1085_14 = 0)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (group = -1)
+                                            (group__goto_1084_9 = -1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            ((&name[0] as *mut u8)[name_len] = 0)
+                                            ((&name__goto_1090_17[0] as *mut u8)[name_len__goto_1596_22] = 0)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             __pc = 1
                                             __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if rc < 0: 1 else: 0) != 0:
-                                                (special = 0)
+                                            if (if rc__goto_764_5 < 0: 1 else: 0) != 0:
+                                                (special__goto_1085_14 = 0)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (group = ((0 - rc) - 1))
+                                                (group__goto_1084_9 = ((0 - rc__goto_764_5) - 1))
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 1
@@ -1217,18 +1377,18 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             __pc = 11
                                             __goto_pending = 1
                                         0 =>
-                                            if (if rc == ESC_v: 1 else: 0) != 0:
-                                                (ch = 11)
-                                            ((&temp[0] as *mut u8)[0] = ch)
+                                            if (if rc__goto_764_5 == ESC_v: 1 else: 0) != 0:
+                                                (ch__goto_1082_14 = 11)
+                                            ((&temp__goto_776_13[0] as *mut u8)[0] = ch__goto_1082_14)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (chlen = 1)
+                                            (chlen__goto_1083_18 = 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if forcecase.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout == (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if forcecase__goto_991_14.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout__goto_787_14 == (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
                                                 while true:
-                                                    if overflowed != 0:
-                                                        extra_needed = extra_needed + chkcc_rc
+                                                    if overflowed__goto_771_6 != 0:
+                                                        extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkcc_rc__goto_1589_11
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         break
@@ -1244,11 +1404,8 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                         break
                                             else:
                                                 while true:
-                                                    chkmc_length = chlen
-                                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                        break
-                                                    if overflowed != 0:
-                                                        extra_needed = extra_needed + chkmc_length
+                                                    if overflowed__goto_771_6 != 0:
+                                                        extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkmc_length__goto_1591_11
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1258,46 +1415,46 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                     if not (0 != 0):
                                                         break
                                             continue
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 60: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr__goto_779_12 >= repend__goto_780_12: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_779_12) != 60: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (ptr = ptr + 1)
+                                            (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (name_start = ptr)
+                                            (name_start__goto_1597_22 = ptr__goto_779_12)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
+                                            (name_len__goto_1596_22 = ((ptr__goto_779_12 as usize -% name_start__goto_1597_22 as usize) / sizeof[u8]()))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr__goto_779_12 >= repend__goto_780_12: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_779_12) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (ptr = ptr + 1)
+                                            (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (special = 0)
+                                            (special__goto_1085_14 = 0)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (group = -1)
+                                            (group__goto_1084_9 = -1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            ((&name[0] as *mut u8)[name_len] = 0)
+                                            ((&name__goto_1090_17[0] as *mut u8)[name_len__goto_1596_22] = 0)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             __pc = 1
                                             __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if rc < 0: 1 else: 0) != 0:
-                                                (special = 0)
+                                            if (if rc__goto_764_5 < 0: 1 else: 0) != 0:
+                                                (special__goto_1085_14 = 0)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (group = ((0 - rc) - 1))
+                                                (group__goto_1084_9 = ((0 - rc__goto_764_5) - 1))
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 1
@@ -1307,46 +1464,46 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             __pc = 11
                                             __goto_pending = 1
                                         ESC_g =>
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 60: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr__goto_779_12 >= repend__goto_780_12: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_779_12) != 60: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (ptr = ptr + 1)
+                                            (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (name_start = ptr)
+                                            (name_start__goto_1597_22 = ptr__goto_779_12)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (name_len = ((ptr as usize -% name_start as usize) / sizeof[u8]()))
+                                            (name_len__goto_1596_22 = ((ptr__goto_779_12 as usize -% name_start__goto_1597_22 as usize) / sizeof[u8]()))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if ptr >= repend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if (if ptr__goto_779_12 >= repend__goto_780_12: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_779_12) != 62: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 __pc = 11
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (ptr = ptr + 1)
+                                            (ptr__goto_779_12 = ptr__goto_779_12 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (special = 0)
+                                            (special__goto_1085_14 = 0)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (group = -1)
+                                            (group__goto_1084_9 = -1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            ((&name[0] as *mut u8)[name_len] = 0)
+                                            ((&name__goto_1090_17[0] as *mut u8)[name_len__goto_1596_22] = 0)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             __pc = 1
                                             __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if rc < 0: 1 else: 0) != 0:
-                                                (special = 0)
+                                            if (if rc__goto_764_5 < 0: 1 else: 0) != 0:
+                                                (special__goto_1085_14 = 0)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (group = ((0 - rc) - 1))
+                                                (group__goto_1084_9 = ((0 - rc__goto_764_5) - 1))
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 1
@@ -1356,11 +1513,11 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             __pc = 11
                                             __goto_pending = 1
                                         _ =>
-                                            if (if rc < 0: 1 else: 0) != 0:
-                                                (special = 0)
+                                            if (if rc__goto_764_5 < 0: 1 else: 0) != 0:
+                                                (special__goto_1085_14 = 0)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (group = ((0 - rc) - 1))
+                                                (group__goto_1084_9 = ((0 - rc__goto_764_5) - 1))
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 1
@@ -1372,19 +1529,19 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    (ch_start = ptr)
+                                    (ch_start__goto_1635_18 = ptr__goto_779_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    ch
+                                    ch__goto_1082_14
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if forcecase.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout == (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if forcecase__goto_991_14.to_case != 0: 1 else: 0) != 0 and (if substitute_case_callout__goto_787_14 == (null as *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
                                         while true:
-                                            if overflowed != 0:
-                                                extra_needed = extra_needed + chkcc_rc
+                                            if overflowed__goto_771_6 != 0:
+                                                extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkcc_rc__goto_1644_9
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 break
@@ -1400,11 +1557,8 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                                 break
                                     else:
                                         while true:
-                                            chkmc_length = ((ptr as usize -% ch_start as usize) / sizeof[u8]())
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                break
-                                            if overflowed != 0:
-                                                extra_needed = extra_needed + chkmc_length
+                                            if overflowed__goto_771_6 != 0:
+                                                extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkmc_length__goto_1646_9
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1422,36 +1576,33 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if (if mcontext != (null as *mut pcre2_real_match_context_8): 1 else: 0) != 0 and (if mcontext.substitute_callout != (null as *const fn(*mut pcre2_substitute_callout_block_8, *mut c_void) -> c_int): 1 else: 0) != 0: 1 else: 0) != 0:
-                        if (if overflowed != 0: 0 else: 1) != 0:
-                            (scb.subscount = subs)
+                        if (if overflowed__goto_771_6 != 0: 0 else: 1) != 0:
+                            (scb__goto_785_32.subscount = subs__goto_765_5)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            ((&scb.output_offsets[0] as *mut c_ulong)[1] = buff_offset)
+                            ((&scb__goto_785_32.output_offsets[0] as *mut c_ulong)[1] = buff_offset__goto_782_12)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (rc = mcontext.substitute_callout((&mut scb as *mut pcre2_substitute_callout_block_8), mcontext.substitute_callout_data))
+                            (rc__goto_764_5 = mcontext.substitute_callout((&mut scb__goto_785_32 as *mut pcre2_substitute_callout_block_8), mcontext.substitute_callout_data))
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if (if rc != 0: 1 else: 0) != 0:
-                                newlength = ((&scb.output_offsets[0] as *mut c_ulong)[1] -% (&scb.output_offsets[0] as *mut c_ulong)[0])
+                            if (if rc__goto_764_5 != 0: 1 else: 0) != 0:
+                                newlength__goto_1680_20 = ((&scb__goto_785_32.output_offsets[0] as *mut c_ulong)[1] -% (&scb__goto_785_32.output_offsets[0] as *mut c_ulong)[0])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                oldlength = (ovector[1] -% ovector[0])
+                                oldlength__goto_1681_20 = (ovector__goto_783_13[1] -% ovector__goto_783_13[0])
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                buff_offset = buff_offset - newlength
+                                buff_offset__goto_782_12 = buff_offset__goto_782_12 - newlength__goto_1680_20
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                lengthleft = lengthleft + newlength
+                                lengthleft__goto_782_38 = lengthleft__goto_782_38 + newlength__goto_1680_20
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if replacement_only != 0: 0 else: 1) != 0:
+                                if (if replacement_only__goto_773_6 != 0: 0 else: 1) != 0:
                                     while true:
-                                        chkmc_length = oldlength
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
-                                            break
-                                        if overflowed != 0:
-                                            extra_needed = extra_needed + chkmc_length
+                                        if overflowed__goto_771_6 != 0:
+                                            extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkmc_length__goto_1685_32
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1462,27 +1613,35 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if rc < 0: 1 else: 0) != 0:
-                                    suboptions = suboptions & ((0 - 256 - 1))
+                                if (if rc__goto_764_5 < 0: 1 else: 0) != 0:
+                                    suboptions__goto_768_10 = suboptions__goto_768_10 & ((0 - 256 - 1))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         else:
-                            newlength_buf = (buff_offset -% (&scb.output_offsets[0] as *mut c_ulong)[0])
+                            newlength_buf__goto_1704_18 = (buff_offset__goto_782_12 -% (&scb__goto_785_32.output_offsets[0] as *mut c_ulong)[0])
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            newlength_extra = (extra_needed -% sub_start_extra_needed)
+                            newlength_extra__goto_1705_18 = (extra_needed__goto_781_12 -% sub_start_extra_needed__goto_786_12)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            oldlength = (ovector[1] -% ovector[0])
+                            newlength__goto_1706_18 = (if ((if newlength_extra__goto_1705_18 > ((0 - (0 as c_ulong) - 1) -% newlength_buf__goto_1704_18): 1 else: 0)) != 0: (0 - (0 as c_ulong) - 1) else: (newlength_buf__goto_1704_18 +% newlength_extra__goto_1705_18))
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if (if oldlength > newlength: 1 else: 0) != 0:
-                                additional = (oldlength -% newlength)
+                            oldlength__goto_1709_18 = (ovector__goto_783_13[1] -% ovector__goto_783_13[0])
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
+                            if (if oldlength__goto_1709_18 > newlength__goto_1706_18: 1 else: 0) != 0:
+                                additional__goto_1716_20 = (oldlength__goto_1709_18 -% newlength__goto_1706_18)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                extra_needed = extra_needed + additional
+                                if (if additional__goto_1716_20 > ((0 - (0 as c_ulong) - 1) -% extra_needed__goto_781_12): 1 else: 0) != 0:
+                                    __pc = 9
+                                    __goto_pending = 1
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                extra_needed__goto_781_12 = extra_needed__goto_781_12 + additional__goto_1716_20
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1491,8 +1650,8 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if ((suboptions & 256)) == 0: 1 else: 0) != 0 or (if pcre2_next_match_8(match_data, (&mut start_offset as *mut c_ulong), (&mut goptions as *mut c_uint)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
-                        (start_offset = ovector[1])
+                    if (if (if ((suboptions__goto_768_10 & 256)) == 0: 1 else: 0) != 0 or (if pcre2_next_match_8(match_data, (&mut start_offset as *mut c_ulong), (&mut goptions__goto_767_10 as *mut c_uint)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+                        (start_offset = ovector__goto_783_13[1])
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         break
@@ -1504,16 +1663,13 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if replacement_only != 0: 0 else: 1) != 0:
-                    (fraglength = (length -% start_offset))
+                if (if replacement_only__goto_773_6 != 0: 0 else: 1) != 0:
+                    (fraglength__goto_782_50 = (length -% start_offset))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     while true:
-                        chkmc_length = fraglength
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
-                            break
-                        if overflowed != 0:
-                            extra_needed = extra_needed + chkmc_length
+                        if overflowed__goto_771_6 != 0:
+                            extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkmc_length__goto_1754_3
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1526,15 +1682,12 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((&temp[0] as *mut u8)[0] = 0)
+                ((&temp__goto_776_13[0] as *mut u8)[0] = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 while true:
-                    chkmc_length = 1
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                        break
-                    if overflowed != 0:
-                        extra_needed = extra_needed + chkmc_length
+                    if overflowed__goto_771_6 != 0:
+                        extra_needed__goto_781_12 = extra_needed__goto_781_12 + chkmc_length__goto_1758_1
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1545,15 +1698,23 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if overflowed != 0:
-                    ((unsafe: *blength) = (buff_length +% extra_needed))
+                if overflowed__goto_771_6 != 0:
+                    (rc__goto_764_5 = (-48))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    if (if extra_needed__goto_781_12 > ((0 - (0 as c_ulong) - 1) -% buff_length__goto_782_25): 1 else: 0) != 0:
+                        __pc = 9
+                        __goto_pending = 1
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    ((unsafe: *blength) = (buff_length__goto_782_25 +% extra_needed__goto_781_12))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 else:
-                    (rc = subs)
+                    (rc__goto_764_5 = subs__goto_765_5)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    ((unsafe: *blength) = (buff_offset -% 1))
+                    ((unsafe: *blength) = (buff_offset__goto_782_12 -% 1))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1562,48 +1723,65 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                 continue
             6 =>  // EXIT
                 (__goto_pending = 0)
-                if (if internal_match_data != (null as *mut pcre2_real_match_data_8): 1 else: 0) != 0:
-                    pcre2_match_data_free_8(internal_match_data)
+                if (if internal_match_data__goto_769_19 != (null as *mut pcre2_real_match_data_8): 1 else: 0) != 0:
+                    pcre2_match_data_free_8(internal_match_data__goto_769_19)
                 else:
-                    (match_data.rc = rc)
+                    (match_data.rc = rc__goto_764_5)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                return rc
+                return rc__goto_764_5
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 7
                 continue
             7 =>  // NOROOM
                 (__goto_pending = 0)
+                (rc__goto_764_5 = (-48))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 __pc = 6
                 continue
                 __pc = 8
                 continue
             8 =>  // CASEERROR
                 (__goto_pending = 0)
+                (rc__goto_764_5 = (-69))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 __pc = 6
                 continue
                 __pc = 9
                 continue
             9 =>  // TOOLARGEREPLACE
                 (__goto_pending = 0)
+                (rc__goto_764_5 = (-70))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 __pc = 6
                 continue
                 __pc = 10
                 continue
             10 =>  // BAD
                 (__goto_pending = 0)
+                (rc__goto_764_5 = (-35))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 __pc = 12
                 continue
                 __pc = 11
                 continue
             11 =>  // BADESCAPE
                 (__goto_pending = 0)
-                // empty
+                (rc__goto_764_5 = (-57))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 __pc = 12
                 continue
             12 =>  // PTREXIT
                 (__goto_pending = 0)
+                ((unsafe: *blength) = ((((ptr__goto_779_12 as usize -% replacement as usize) / sizeof[u8]())) as c_ulong))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 __pc = 6
                 continue
             _ => break
@@ -1696,12 +1874,27 @@ type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
 type struct_pcre2_real_jit_stack_8 = pcre2_real_jit_stack_8
 type dfa_recursion_info { prevrec: *mut dfa_recursion_info = null, subject_position: *const u8 = null, last_used_ptr: *const u8 = null, group_num: c_uint = 0 }
 type struct_dfa_recursion_info = dfa_recursion_info
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:696:8: demoted to opaque
-type heapframe = opaque
+// union
+type heapframe_fields_char_repeat_oc { oc: c_uint = 0, occu: [4]u8 = [0 as u8; 4] }
+type heapframe_fields_char_repeat { start_eptr: *const u8 = null, charptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: heapframe_fields_char_repeat_oc }
+type heapframe_fields_charnot_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: c_uint = 0 }
+type heapframe_fields_class_repeat { start_eptr: *const u8 = null, byte_map_address: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_xclass_repeat { start_eptr: *const u8 = null, xclass_data: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_eclass_repeat { start_eptr: *const u8 = null, eclass_data: *const u8 = null, eclass_len: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_type_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, ctype: c_uint = 0, propvalue: c_uint = 0 }
+type heapframe_fields_ref_repeat { start: *const u8 = null, offset: c_ulong = 0, length: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_op_bra { frame_type: c_uint = 0 }
+type heapframe_fields_op_brapos { start_eptr: *const u8 = null, start_group: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_recurse { start_branch: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_assert_scs { saved_end_subject: *const u8 = null, saved_eptr: *const u8 = null, true_end_extra: c_ulong = 0, saved_moptions: c_uint = 0 }
+type heapframe_fields_op_cond { start_branch: *const u8 = null, length: c_ulong = 0 }
+type heapframe_fields_op_vreverse { min: c_uint = 0, max: c_uint = 0 }
+// union
+type heapframe_fields { char_repeat: heapframe_fields_char_repeat, charnot_repeat: heapframe_fields_charnot_repeat, class_repeat: heapframe_fields_class_repeat, xclass_repeat: heapframe_fields_xclass_repeat, eclass_repeat: heapframe_fields_eclass_repeat, type_repeat: heapframe_fields_type_repeat, ref_repeat: heapframe_fields_ref_repeat, op_bra: heapframe_fields_op_bra, op_brapos: heapframe_fields_op_brapos, op_recurse: heapframe_fields_op_recurse, op_assert_scs: heapframe_fields_op_assert_scs, op_cond: heapframe_fields_op_cond, op_vreverse: heapframe_fields_op_vreverse }
+type heapframe { ecode: *const u8 = null, back_frame: c_ulong = 0, rdepth: c_uint = 0, group_frame_type: c_uint = 0, return_id: u8 = 0, op: u8 = 0, byte1: u8 = 0, byte2: u8 = 0, fields: heapframe_fields, eptr: *const u8 = null, start_match: *const u8 = null, mark: *const u8 = null, recurse_last_used: *const u8 = null, current_recurse: c_uint = 0, capture_last: c_uint = 0, last_group_offset: c_ulong = 0, offset_top: c_ulong = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
 type struct_heapframe = heapframe
 type static_assertion_heapframe_size = [1]c_int
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:1024:16: demoted to opaque
-type heapframe_align = opaque
+type heapframe_align { unalign: c_char = 0, frame: heapframe }
 type struct_heapframe_align = heapframe_align
 type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, hitend: c_int = 0, hasthen: c_int = 0, hasbsk: c_int = 0, allowemptypartial: c_int = 0, allowlookaroundbsk: c_int = 0, lcc: *const u8 = null, fcc: *const u8 = null, ctypes: *const u8 = null, start_offset: c_ulong = 0, end_offset_top: c_ulong = 0, partial: c_ushort = 0, bsr_convention: c_ushort = 0, name_count: c_ushort = 0, name_entry_size: c_ushort = 0, name_table: *const u8 = null, start_code: *const u8 = null, start_subject: *const u8 = null, check_subject: *const u8 = null, end_subject: *const u8 = null, true_end_subject: *const u8 = null, end_match_ptr: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, mark: *const u8 = null, nomatch_mark: *const u8 = null, verb_ecode_ptr: *const u8 = null, verb_skip_ptr: *const u8 = null, verb_current_recurse: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, skip_arg_count: c_uint = 0, ignore_skip_arg: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null }
 type struct_match_block_8 = match_block_8
@@ -1732,133 +1925,140 @@ extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mu
 extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
 extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
 fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend: *const u8, last: c_int) -> c_int:
-    var rc: c_int = 0
-    var nestlevel: c_uint = 0
-    var literal: c_int = 0
-    var ptr: *const u8 = null
-    var erc: c_int = 0
-    var errorcode: c_int = 0
-    var ch: c_uint = 0
-    var esc_end_ptr: *const u8 = null
+    var rc__goto_96_5: c_int = 0
+    var nestlevel__goto_97_10: c_uint = 0
+    var literal__goto_98_6: c_int = 0
+    var ptr__goto_99_12: *const u8 = null
+    var erc__goto_131_9: c_int = 0
+    var errorcode__goto_132_9: c_int = 0
+    var ch__goto_133_14: c_uint = 0
+    var esc_end_ptr__goto_134_16: *const u8 = null
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                rc = 0
-                nestlevel = 0
-                literal = 0
-                ptr = (unsafe: *ptrptr)
-                while (if ptr < ptrend: 1 else: 0) != 0:
-                    if literal != 0:
-                        if (if (if (if ptr[0] == 92: 1 else: 0) != 0 and (if ptr < (ptrend - (1 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 69: 1 else: 0) != 0: 1 else: 0) != 0:
-                            (literal = 0)
+                rc__goto_96_5 = 0
+                nestlevel__goto_97_10 = 0
+                literal__goto_98_6 = 0
+                ptr__goto_99_12 = (unsafe: *ptrptr)
+                while (if ptr__goto_99_12 < ptrend: 1 else: 0) != 0:
+                    if literal__goto_98_6 != 0:
+                        if (if (if (if ptr__goto_99_12[0] == 92: 1 else: 0) != 0 and (if ptr__goto_99_12 < (ptrend - (1 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr__goto_99_12[1] == 69: 1 else: 0) != 0: 1 else: 0) != 0:
+                            (literal__goto_98_6 = 0)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            ptr = ptr + 1
+                            ptr__goto_99_12 = ptr__goto_99_12 + 1
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     else:
-                        if (if (unsafe: *ptr) == 125: 1 else: 0) != 0:
-                            if (if nestlevel == 0: 1 else: 0) != 0:
+                        if (if (unsafe: *ptr__goto_99_12) == 125: 1 else: 0) != 0:
+                            if (if nestlevel__goto_97_10 == 0: 1 else: 0) != 0:
                                 __pc = 1
                                 __goto_pending = 1
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (nestlevel = nestlevel - 1)
+                            (nestlevel__goto_97_10 = nestlevel__goto_97_10 - 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         else:
-                            if (if (if (if (unsafe: *ptr) == 58: 1 else: 0) != 0 and (if last != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if nestlevel == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if (if (unsafe: *ptr__goto_99_12) == 58: 1 else: 0) != 0 and (if last != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if nestlevel__goto_97_10 == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                 __pc = 1
                                 __goto_pending = 1
                             else:
-                                if (if (unsafe: *ptr) == 36: 1 else: 0) != 0:
-                                    if (if (if ptr < (ptrend - (1 as isize as usize)): 1 else: 0) != 0 and (if ptr[1] == 123: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (nestlevel = nestlevel + 1)
+                                if (if (unsafe: *ptr__goto_99_12) == 36: 1 else: 0) != 0:
+                                    if (if (if ptr__goto_99_12 < (ptrend - (1 as isize as usize)): 1 else: 0) != 0 and (if ptr__goto_99_12[1] == 123: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (nestlevel__goto_97_10 = nestlevel__goto_97_10 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        ptr = ptr + 1
+                                        ptr__goto_99_12 = ptr__goto_99_12 + 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if (unsafe: *ptr) == 92: 1 else: 0) != 0:
-                                        if (if ptr < (ptrend - (1 as isize as usize)): 1 else: 0) != 0:
-                                            match ptr[1]
+                                    if (if (unsafe: *ptr__goto_99_12) == 92: 1 else: 0) != 0:
+                                        if (if ptr__goto_99_12 < (ptrend - (1 as isize as usize)): 1 else: 0) != 0:
+                                            match ptr__goto_99_12[1]
                                                 76 =>
                                                     continue
                                                 _ => 0
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        ptr = ptr + 1
+                                        ptr__goto_99_12 = ptr__goto_99_12 + 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (erc = _pcre2_check_escape_8((&mut ptr as *mut *const u8), ptrend, (&mut ch as *mut c_uint), (&mut errorcode as *mut c_int), code.overall_options, code.extra_options, code.top_bracket, 0, (null as *mut compile_block_8)))
+                                        (erc__goto_131_9 = _pcre2_check_escape_8((&mut ptr__goto_99_12 as *mut *const u8), ptrend, (&mut ch__goto_133_14 as *mut c_uint), (&mut errorcode__goto_132_9 as *mut c_int), code.overall_options, code.extra_options, code.top_bracket, 0, (null as *mut compile_block_8)))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if errorcode != 0: 1 else: 0) != 0:
+                                        if (if errorcode__goto_132_9 != 0: 1 else: 0) != 0:
+                                            (rc__goto_96_5 = (-57))
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
                                             __pc = 1
                                             __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (esc_end_ptr = ptr)
+                                        (esc_end_ptr__goto_134_16 = ptr__goto_99_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        ptr = ptr - 1
+                                        ptr__goto_99_12 = ptr__goto_99_12 - 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        match erc
+                                        match erc__goto_131_9
                                             0 =>
-                                                (literal = 1)
+                                                (literal__goto_98_6 = 1)
                                             ESC_Q =>
-                                                (literal = 1)
+                                                (literal__goto_98_6 = 1)
                                             ESC_g => 0
                                             _ =>
-                                                if (if erc < 0: 1 else: 0) != 0:
+                                                if (if erc__goto_131_9 < 0: 1 else: 0) != 0:
                                                     break
-                                                (ptr = esc_end_ptr)
+                                                (ptr__goto_99_12 = esc_end_ptr__goto_134_16)
+                                                (rc__goto_96_5 = (-57))
                                                 __pc = 1
                                                 __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (ptr = ptr + 1)
+                    (ptr__goto_99_12 = ptr__goto_99_12 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (rc__goto_96_5 = (-58))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 1
                 continue
             1 =>  // EXIT
                 (__goto_pending = 0)
-                ((unsafe: *ptrptr) = ptr)
+                ((unsafe: *ptrptr) = ptr__goto_99_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                return rc
+                return rc__goto_96_5
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
             _ => break
 
 fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes: *const u8) -> c_int:
-    var ptr: *const u8 = null
-    var nameptr: *const u8 = null
+    var ptr__goto_221_12: *const u8 = null
+    var nameptr__goto_222_12: *const u8 = null
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                ptr = (unsafe: *ptrptr)
-                nameptr = ptr
-                if (if ptr >= ptrend: 1 else: 0) != 0:
+                ptr__goto_221_12 = (unsafe: *ptrptr)
+                nameptr__goto_222_12 = ptr__goto_221_12
+                if (if ptr__goto_221_12 >= ptrend: 1 else: 0) != 0:
                     __pc = 1
                     __goto_pending = 1
                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1866,8 +2066,8 @@ fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes
                 utf
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (if (if (if ptr < ptrend: 1 else: 0) != 0 and 1 != 0: 1 else: 0) != 0 and (if ((ctypes[(unsafe: *ptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                    (ptr = ptr + 1)
+                while (if (if (if ptr__goto_221_12 < ptrend: 1 else: 0) != 0 and 1 != 0: 1 else: 0) != 0 and (if ((ctypes[(unsafe: *ptr__goto_221_12)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (ptr__goto_221_12 = ptr__goto_221_12 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1876,17 +2076,17 @@ fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes
                     continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ((ptr as usize -% nameptr as usize) / sizeof[u8]()) > 128: 1 else: 0) != 0:
+                if (if ((ptr__goto_221_12 as usize -% nameptr__goto_222_12 as usize) / sizeof[u8]()) > 128: 1 else: 0) != 0:
                     __pc = 1
                     __goto_pending = 1
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ptr == nameptr: 1 else: 0) != 0:
+                if (if ptr__goto_221_12 == nameptr__goto_222_12: 1 else: 0) != 0:
                     __pc = 1
                     __goto_pending = 1
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((unsafe: *ptrptr) = ptr)
+                ((unsafe: *ptrptr) = ptr__goto_221_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return 1
@@ -1896,7 +2096,7 @@ fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes
                 continue
             1 =>  // FAILED
                 (__goto_pending = 0)
-                ((unsafe: *ptrptr) = ptr)
+                ((unsafe: *ptrptr) = ptr__goto_221_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return 0
@@ -1957,10 +2157,16 @@ fn default_substitute_case_callout(input: *const u8, input_len: c_ulong, __param
         else:
             (overflow = 1)
         
+        if (if chlen > ((0 - (0 as c_ulong) - 1) -% written): 1 else: 0) != 0:
+            return (0 - (0 as c_ulong) - 1)
+        
         written = written + chlen
         (next_to_upper = rest_to_upper)
         if single_char != 0:
             var rest_len: c_ulong = ((input_end as usize -% input as usize) / sizeof[u8]())
+            if (if rest_len > ((0 - (0 as c_ulong) - 1) -% written): 1 else: 0) != 0:
+                return (0 - (0 as c_ulong) - 1)
+            
             written = written + rest_len
             return written
         
@@ -2005,6 +2211,9 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
     (max_ch1_cap = (output_cap -% rest_len))
     while 1 != 0:
         (rc = substitute_case_callout(((&ch1[0] as *mut u8) as *const u8), ch1_len, output, ch1_cap, ch1_to_case, substitute_case_callout_data))
+        if (if rc == (0 - (0 as c_ulong) - 1): 1 else: 0) != 0:
+            return rc
+        
         if (if rc <= ch1_cap: 1 else: 0) != 0:
             break
         
@@ -2022,6 +2231,9 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
     else:
         var dummy: [1]u8
         (rc2 = substitute_case_callout(rest, rest_len, (if ch1_overflow != 0: (&dummy[0] as *mut u8) else: (output + rc)), (if ch1_overflow != 0: 0 else: (output_cap -% rc)), rest_to_case, substitute_case_callout_data))
+        if (if rc2 == (0 - (0 as c_ulong) - 1): 1 else: 0) != 0:
+            return rc2
+        
         if (if (if ch1_overflow != 0: 0 else: 1) != 0 and (if rc2 > (output_cap -% rc): 1 else: 0) != 0: 1 else: 0) != 0:
             (rest_overflow = 1)
         
@@ -2029,6 +2241,9 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
             (rc2 = rest_len)
         
         (state.to_case = 2)
+
+    if (if rc2 > ((0 - (0 as c_ulong) - 1) -% rc): 1 else: 0) != 0:
+        return (0 - (0 as c_ulong) - 1)
 
     rest_overflow
     return (rc +% rc2)
@@ -2211,9 +2426,9 @@ fn UCD_CATEGORY() -> Never:
 fn UCD_CHARTYPE() -> Never:
     comptime_error("untranslatable C macro: UCD_CHARTYPE")
 fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as c_int) == 0x69) or ((ch as c_int) == 0x0130))
+    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
 fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as c_int) == 0x0130): 0x69 else: (if ((ch as c_int) == 0x49): 0x0131 else: (ch as c_int)))
+    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
 // untranslatable fn-like macro
 fn UCD_GRAPHBREAK() -> Never:
     comptime_error("untranslatable C macro: UCD_GRAPHBREAK")

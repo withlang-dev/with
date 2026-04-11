@@ -2503,40 +2503,41 @@ pub fn ci_binary_op(session: i64, cursor_idx: i32) -> i32:
         op_e = op_e - 1
     let op_len = op_e - op_s
     let c0 = *((contents as i64 + op_s as i64) as *const u8)
+    // Return values must match the BO_* constants in CImport.w (1-indexed)
     if op_len == 1:
-        if c0 == 43: return 0   // +
-        if c0 == 45: return 1   // -
-        if c0 == 42: return 2   // *
-        if c0 == 47: return 3   // /
-        if c0 == 37: return 4   // %
-        if c0 == 38: return 5   // &
-        if c0 == 124: return 6  // |
-        if c0 == 94: return 7   // ^
-        if c0 == 60: return 12  // <
-        if c0 == 62: return 13  // >
-        if c0 == 61: return 18  // =
-        if c0 == 44: return 19  // ,
+        if c0 == 43: return 1   // + = BO_ADD
+        if c0 == 45: return 2   // - = BO_SUB
+        if c0 == 42: return 3   // * = BO_MUL
+        if c0 == 47: return 4   // / = BO_DIV
+        if c0 == 37: return 5   // % = BO_REM
+        if c0 == 38: return 6   // & = BO_AND
+        if c0 == 124: return 7  // | = BO_OR
+        if c0 == 94: return 8   // ^ = BO_XOR
+        if c0 == 60: return 13  // < = BO_LT
+        if c0 == 62: return 14  // > = BO_GT
+        if c0 == 61: return 19  // = = BO_ASSIGN
+        if c0 == 44: return 30  // , = BO_COMMA
     let c1 = *((contents as i64 + op_s as i64 + 1) as *const u8)
     if op_len == 2:
-        if c0 == 60 and c1 == 60: return 8   // <<
-        if c0 == 62 and c1 == 62: return 9   // >>
-        if c0 == 38 and c1 == 38: return 10  // &&
-        if c0 == 124 and c1 == 124: return 11 // ||
-        if c0 == 60 and c1 == 61: return 14  // <=
-        if c0 == 62 and c1 == 61: return 15  // >=
-        if c0 == 61 and c1 == 61: return 16  // ==
-        if c0 == 33 and c1 == 61: return 17  // !=
-        if c0 == 43 and c1 == 61: return 20  // +=
-        if c0 == 45 and c1 == 61: return 21  // -=
-        if c0 == 42 and c1 == 61: return 22  // *=
-        if c0 == 47 and c1 == 61: return 23  // /=
-        if c0 == 37 and c1 == 61: return 24  // %=
-        if c0 == 38 and c1 == 61: return 25  // &=
-        if c0 == 124 and c1 == 61: return 26 // |=
-        if c0 == 94 and c1 == 61: return 27  // ^=
+        if c0 == 60 and c1 == 60: return 9    // << = BO_SHL
+        if c0 == 62 and c1 == 62: return 10   // >> = BO_SHR
+        if c0 == 61 and c1 == 61: return 11   // == = BO_EQ
+        if c0 == 33 and c1 == 61: return 12   // != = BO_NE
+        if c0 == 60 and c1 == 61: return 15   // <= = BO_LE
+        if c0 == 62 and c1 == 61: return 16   // >= = BO_GE
+        if c0 == 38 and c1 == 38: return 17   // && = BO_LAND
+        if c0 == 124 and c1 == 124: return 18 // || = BO_LOR
+        if c0 == 43 and c1 == 61: return 20   // += = BO_ADD_ASSIGN
+        if c0 == 45 and c1 == 61: return 21   // -= = BO_SUB_ASSIGN
+        if c0 == 42 and c1 == 61: return 22   // *= = BO_MUL_ASSIGN
+        if c0 == 47 and c1 == 61: return 23   // /= = BO_DIV_ASSIGN
+        if c0 == 37 and c1 == 61: return 24   // %= = BO_REM_ASSIGN
+        if c0 == 38 and c1 == 61: return 25   // &= = BO_AND_ASSIGN
+        if c0 == 124 and c1 == 61: return 26  // |= = BO_OR_ASSIGN
+        if c0 == 94 and c1 == 61: return 27   // ^= = BO_XOR_ASSIGN
     if op_len == 3:
         let c2 = *((contents as i64 + op_s as i64 + 2) as *const u8)
-        if c0 == 60 and c1 == 60 and c2 == 61: return 28 // <<=
+        if c0 == 60 and c1 == 60 and c2 == 61: return 28 // <<= = BO_SHL_ASSIGN
         if c0 == 62 and c1 == 62 and c2 == 61: return 29 // >>=
     -1
 
@@ -2572,14 +2573,15 @@ pub fn ci_unary_op(session: i64, cursor_idx: i32) -> i32:
         var len = child_start_off - op_off
         let op = (contents as i64 + op_off as i64) as *const u8
         while len > 0 and (*((op as i64 + len as i64 - 1) as *const u8) == 32 or *((op as i64 + len as i64 - 1) as *const u8) == 9): len = len - 1
-        if len == 1 and *op == 45: return 0  // -
-        if len == 1 and *op == 126: return 1 // ~
-        if len == 1 and *op == 33: return 2  // !
-        if len == 1 and *op == 38: return 3  // &
-        if len == 1 and *op == 42: return 4  // *
-        if len == 1 and *op == 43: return 5  // +
-        if len == 2 and *op == 43 and *((op as i64 + 1) as *const u8) == 43: return 6 // ++
-        if len == 2 and *op == 45 and *((op as i64 + 1) as *const u8) == 45: return 7 // --
+        // Return values must match UO_* constants in CImport.w (1-indexed)
+        if len == 1 and *op == 45: return 1  // - = UO_MINUS
+        if len == 1 and *op == 126: return 2 // ~ = UO_NOT
+        if len == 1 and *op == 33: return 3  // ! = UO_LNOT
+        if len == 1 and *op == 38: return 4  // & = UO_ADDR
+        if len == 1 and *op == 42: return 5  // * = UO_DEREF
+        if len == 1 and *op == 43: return 6  // + = UO_PLUS
+        if len == 2 and *op == 43 and *((op as i64 + 1) as *const u8) == 43: return 7 // ++ = UO_PRE_INC
+        if len == 2 and *op == 45 and *((op as i64 + 1) as *const u8) == 45: return 8 // -- = UO_PRE_DEC
     // Postfix operator
     var range_end_off: u32 = 0
     clang_getFileLocation(clang_getRangeEnd(range), 0 as *mut *mut u8, 0 as *mut u32, 0 as *mut u32, &mut range_end_off)
@@ -2589,8 +2591,8 @@ pub fn ci_unary_op(session: i64, cursor_idx: i32) -> i32:
         while len2 > 0 and (*op2 == 32 or *op2 == 9):
             op2 = (op2 as i64 + 1) as *const u8
             len2 = len2 - 1
-        if len2 >= 2 and *op2 == 43 and *((op2 as i64 + 1) as *const u8) == 43: return 8 // x++
-        if len2 >= 2 and *op2 == 45 and *((op2 as i64 + 1) as *const u8) == 45: return 9 // x--
+        if len2 >= 2 and *op2 == 43 and *((op2 as i64 + 1) as *const u8) == 43: return 9  // x++ = UO_POST_INC
+        if len2 >= 2 and *op2 == 45 and *((op2 as i64 + 1) as *const u8) == 45: return 10 // x-- = UO_POST_DEC
     -1
 
 // ── Implicit cast kind ──────────────────────────────────────

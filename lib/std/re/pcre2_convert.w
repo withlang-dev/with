@@ -58,6 +58,13 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
         if (if bufflenptr != (null as *mut c_ulong): 1 else: 0) != 0:
             ((unsafe: *bufflenptr) = 0)
         
+        return (-51)
+
+    if (if plength == ((0 -% 1)): 1 else: 0) != 0:
+        (plength = _pcre2_strlen_8(pattern))
+
+    if (if ccontext == (null as *mut pcre2_real_convert_context_8): 1 else: 0) != 0:
+        (ccontext = (((&mut _pcre2_default_convert_context_8 as *mut pcre2_real_convert_context_8)) as *mut pcre2_real_convert_context_8))
 
     if utf != 0:
         ((unsafe: *bufflenptr) = 0)
@@ -77,19 +84,24 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
             4 => 0
             _ =>
                 ((unsafe: *bufflenptr) = 0)
+                return (-44)
         
+        (allocated = (_pcre2_memctl_malloc_8((sizeof[pcre2_memctl]() +% ((((unsafe: *bufflenptr) +% 1)) *% 8)), (ccontext as *mut pcre2_memctl)) as *mut u8))
         if (if allocated == (null as *mut u8): 1 else: 0) != 0:
             ((unsafe: *bufflenptr) = 0)
+            return (-48)
         
+        ((unsafe: *buffptr) = (((((allocated as *mut i8)) + sizeof[pcre2_memctl]())) as *mut u8))
         (use_buffer = (unsafe: *buffptr))
         (use_length = ((unsafe: *bufflenptr) +% 1))
         (i = i + 1)
 
     ((unsafe: *bufflenptr) = 0)
+    return (-44)
 
 fn pcre2_converted_pattern_free_8(converted: *mut u8):
     if (if converted != (null as *mut u8): 1 else: 0) != 0:
-        var memctl: *mut pcre2_memctl
+        var memctl: *mut pcre2_memctl = ((((converted as *mut i8) - sizeof[pcre2_memctl]())) as *mut pcre2_memctl)
         memctl.free((memctl as *mut c_void), memctl.memory_data)
 
 
@@ -227,12 +239,27 @@ type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
 type struct_pcre2_real_jit_stack_8 = pcre2_real_jit_stack_8
 type dfa_recursion_info { prevrec: *mut dfa_recursion_info = null, subject_position: *const u8 = null, last_used_ptr: *const u8 = null, group_num: c_uint = 0 }
 type struct_dfa_recursion_info = dfa_recursion_info
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:696:8: demoted to opaque
-type heapframe = opaque
+// union
+type heapframe_fields_char_repeat_oc { oc: c_uint = 0, occu: [4]u8 = [0 as u8; 4] }
+type heapframe_fields_char_repeat { start_eptr: *const u8 = null, charptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: heapframe_fields_char_repeat_oc }
+type heapframe_fields_charnot_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: c_uint = 0 }
+type heapframe_fields_class_repeat { start_eptr: *const u8 = null, byte_map_address: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_xclass_repeat { start_eptr: *const u8 = null, xclass_data: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_eclass_repeat { start_eptr: *const u8 = null, eclass_data: *const u8 = null, eclass_len: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_type_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, ctype: c_uint = 0, propvalue: c_uint = 0 }
+type heapframe_fields_ref_repeat { start: *const u8 = null, offset: c_ulong = 0, length: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_op_bra { frame_type: c_uint = 0 }
+type heapframe_fields_op_brapos { start_eptr: *const u8 = null, start_group: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_recurse { start_branch: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_assert_scs { saved_end_subject: *const u8 = null, saved_eptr: *const u8 = null, true_end_extra: c_ulong = 0, saved_moptions: c_uint = 0 }
+type heapframe_fields_op_cond { start_branch: *const u8 = null, length: c_ulong = 0 }
+type heapframe_fields_op_vreverse { min: c_uint = 0, max: c_uint = 0 }
+// union
+type heapframe_fields { char_repeat: heapframe_fields_char_repeat, charnot_repeat: heapframe_fields_charnot_repeat, class_repeat: heapframe_fields_class_repeat, xclass_repeat: heapframe_fields_xclass_repeat, eclass_repeat: heapframe_fields_eclass_repeat, type_repeat: heapframe_fields_type_repeat, ref_repeat: heapframe_fields_ref_repeat, op_bra: heapframe_fields_op_bra, op_brapos: heapframe_fields_op_brapos, op_recurse: heapframe_fields_op_recurse, op_assert_scs: heapframe_fields_op_assert_scs, op_cond: heapframe_fields_op_cond, op_vreverse: heapframe_fields_op_vreverse }
+type heapframe { ecode: *const u8 = null, back_frame: c_ulong = 0, rdepth: c_uint = 0, group_frame_type: c_uint = 0, return_id: u8 = 0, op: u8 = 0, byte1: u8 = 0, byte2: u8 = 0, fields: heapframe_fields, eptr: *const u8 = null, start_match: *const u8 = null, mark: *const u8 = null, recurse_last_used: *const u8 = null, current_recurse: c_uint = 0, capture_last: c_uint = 0, last_group_offset: c_ulong = 0, offset_top: c_ulong = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
 type struct_heapframe = heapframe
 type static_assertion_heapframe_size = [1]c_int
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:1024:16: demoted to opaque
-type heapframe_align = opaque
+type heapframe_align { unalign: c_char = 0, frame: heapframe }
 type struct_heapframe_align = heapframe_align
 type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, hitend: c_int = 0, hasthen: c_int = 0, hasbsk: c_int = 0, allowemptypartial: c_int = 0, allowlookaroundbsk: c_int = 0, lcc: *const u8 = null, fcc: *const u8 = null, ctypes: *const u8 = null, start_offset: c_ulong = 0, end_offset_top: c_ulong = 0, partial: c_ushort = 0, bsr_convention: c_ushort = 0, name_count: c_ushort = 0, name_entry_size: c_ushort = 0, name_table: *const u8 = null, start_code: *const u8 = null, start_subject: *const u8 = null, check_subject: *const u8 = null, end_subject: *const u8 = null, true_end_subject: *const u8 = null, end_match_ptr: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, mark: *const u8 = null, nomatch_mark: *const u8 = null, verb_ecode_ptr: *const u8 = null, verb_skip_ptr: *const u8 = null, verb_current_recurse: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, skip_arg_count: c_uint = 0, ignore_skip_arg: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null }
 type struct_match_block_8 = match_block_8
@@ -269,44 +296,48 @@ let POSIX_CLASS_NOT_STARTED: c_uint = 3
 let POSIX_CLASS_STARTING: c_uint = 4
 let POSIX_CLASS_STARTED: c_uint = 5
 var pcre2_escaped_literals: *const i8
-
-
-
-
 var posix_meta_escapes: *const i8 = "(){}123456789"
 var posix_classes: *const i8 = "alpha:lower:upper:alnum:ascii:blank:cntrl:digit:graph:print:punct:space:word:xdigit:"
 fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, utf: c_int, use_buffer: *mut u8, use_length: c_ulong, bufflenptr: *mut c_ulong, dummyrun: c_int, ccontext: *mut pcre2_real_convert_context_8) -> c_int:
     var plength = __param_plength
-    var posix: *const u8 = null
-    var p: *mut u8 = null
-    var pp: *mut u8 = null
-    var endp: *mut u8 = null
-    var convlength: c_ulong = 0
-    var bracount: c_uint = 0
-    var posix_state: c_uint = 0
-    var lastspecial: c_uint = 0
-    var extended: c_int = 0
-    var nextisliteral: c_int = 0
-    var s: *const i8 = null
-    var c: c_uint = 0
-    var sc: c_uint = 0
-    var clength: c_int = 0
+    var posix__goto_170_12: *const u8 = null
+    var p__goto_171_14: *mut u8 = null
+    var pp__goto_172_14: *mut u8 = null
+    var endp__goto_173_14: *mut u8 = null
+    var convlength__goto_174_12: c_ulong = 0
+    var bracount__goto_176_10: c_uint = 0
+    var posix_state__goto_177_10: c_uint = 0
+    var lastspecial__goto_178_10: c_uint = 0
+    var extended__goto_179_6: c_int = 0
+    var nextisliteral__goto_180_6: c_int = 0
+    var s__goto_188_1: *const i8 = null
+    var c__goto_194_12: c_uint = 0
+    var sc__goto_194_15: c_uint = 0
+    var clength__goto_195_7: c_int = 0
+    var s__goto_224_7: *const i8 = null
+    var s__goto_240_11: *const i8 = null
+    var s__goto_257_32: *const i8 = null
+    var s__goto_269_5: *const i8 = null
+    var s__goto_307_9: *const i8 = null
+    var s__goto_313_9: *const i8 = null
+    var s__goto_324_51: *const i8 = null
+    var s__goto_383_7: *const i8 = null
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                posix = pattern
-                p = use_buffer
-                pp = p
-                endp = ((p + use_length) - (1 as isize as usize))
-                convlength = 0
-                bracount = 0
-                posix_state = 0
-                lastspecial = 0
-                extended = (if ((pattype & 8)) != 0: 1 else: 0)
-                nextisliteral = 0
+                posix__goto_170_12 = pattern
+                p__goto_171_14 = use_buffer
+                pp__goto_172_14 = p__goto_171_14
+                endp__goto_173_14 = ((p__goto_171_14 + use_length) - (1 as isize as usize))
+                convlength__goto_174_12 = 0
+                bracount__goto_176_10 = 0
+                posix_state__goto_177_10 = 0
+                lastspecial__goto_178_10 = 0
+                extended__goto_179_6 = (if ((pattype & 8)) != 0: 1 else: 0)
+                nextisliteral__goto_180_6 = 0
                 utf
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
@@ -320,86 +351,90 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 while (if plength > 0: 1 else: 0) != 0:
-                    clength = 1
+                    clength__goto_195_7 = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    convlength = convlength + ((p as usize -% pp as usize) / sizeof[u8]())
+                    convlength__goto_174_12 = convlength__goto_174_12 + ((p__goto_171_14 as usize -% pp__goto_172_14 as usize) / sizeof[u8]())
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if dummyrun != 0:
-                        (p = use_buffer)
+                        (p__goto_171_14 = use_buffer)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (pp = p)
+                    (pp__goto_172_14 = p__goto_171_14)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (c = (unsafe: *posix))
+                    (c__goto_194_12 = (unsafe: *posix__goto_170_12))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    posix = posix + clength
+                    posix__goto_170_12 = posix__goto_170_12 + clength__goto_195_7
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    plength = plength - clength
+                    plength = plength - clength__goto_195_7
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (sc = (if nextisliteral != 0: 0 else: c))
+                    (sc__goto_194_15 = (if nextisliteral__goto_180_6 != 0: 0 else: c__goto_194_12))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (nextisliteral = 0)
+                    (nextisliteral__goto_180_6 = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if posix_state >= 3: 1 else: 0) != 0:
-                        if (if c == 93: 1 else: 0) != 0:
+                    if (if posix_state__goto_177_10 >= 3: 1 else: 0) != 0:
+                        if (if c__goto_194_12 == 93: 1 else: 0) != 0:
                             0
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (posix_state = 2)
+                            (posix_state__goto_177_10 = 2)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         else:
-                            match posix_state
+                            match posix_state__goto_177_10
                                 5 =>
-                                    (posix_state = 3)
-                                    if (if (if (if c == 58: 1 else: 0) != 0 and (if plength > 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *posix) == 93: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (posix_state__goto_177_10 = 3)
+                                    if (if (if (if c__goto_194_12 == 58: 1 else: 0) != 0 and (if plength > 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *posix__goto_170_12) == 93: 1 else: 0) != 0: 1 else: 0) != 0:
                                         0
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         (plength = plength - 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (posix = posix + 1)
+                                        (posix__goto_170_12 = posix__goto_170_12 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         continue
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if c == 91: 1 else: 0) != 0:
-                                        (posix_state = 4)
+                                    if (if c__goto_194_12 == 91: 1 else: 0) != 0:
+                                        (posix_state__goto_177_10 = 4)
                                 3 =>
-                                    if (if c == 91: 1 else: 0) != 0:
-                                        (posix_state = 4)
+                                    if (if c__goto_194_12 == 91: 1 else: 0) != 0:
+                                        (posix_state__goto_177_10 = 4)
                                 4 =>
-                                    if (if c == 58: 1 else: 0) != 0:
-                                        (posix_state = 5)
+                                    if (if c__goto_194_12 == 58: 1 else: 0) != 0:
+                                        (posix_state__goto_177_10 = 5)
                                 _ => 0
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            p = p + clength
+                            if (if (p__goto_171_14 + (clength__goto_195_7 as isize as usize)) > endp__goto_173_14: 1 else: 0) != 0:
+                                return (-48)
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
+                            p__goto_171_14 = p__goto_171_14 + clength__goto_195_7
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     else:
-                        match sc
+                        match sc__goto_194_15
                             91 =>
                                 0
-                                (posix_state = 3)
+                                (posix_state__goto_177_10 = 3)
                                 if (if plength > 0: 1 else: 0) != 0:
-                                    if (if (unsafe: *posix) == 94: 1 else: 0) != 0:
-                                        (posix = posix + 1)
+                                    if (if (unsafe: *posix__goto_170_12) == 94: 1 else: 0) != 0:
+                                        (posix__goto_170_12 = posix__goto_170_12 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         (plength = plength - 1)
@@ -410,8 +445,8 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if plength > 0: 1 else: 0) != 0 and (if (unsafe: *posix) == 93: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (posix = posix + 1)
+                                    if (if (if plength > 0: 1 else: 0) != 0 and (if (unsafe: *posix__goto_170_12) == 93: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (posix__goto_170_12 = posix__goto_170_12 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         (plength = plength - 1)
@@ -425,52 +460,64 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                             92 =>
                                 if (if plength == 0: 1 else: 0) != 0:
                                     return 101
-                                if extended != 0:
-                                    (nextisliteral = 1)
+                                if extended__goto_179_6 != 0:
+                                    (nextisliteral__goto_180_6 = 1)
                                 else:
-                                    if (if (if (unsafe: *posix) < 255: 1 else: 0) != 0 and (if string_find_char(posix_meta_escapes, (unsafe: *posix)) != (null as *mut i8): 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (unsafe: *posix__goto_170_12) < 255: 1 else: 0) != 0 and (if string_find_char(posix_meta_escapes, (unsafe: *posix__goto_170_12)) != (null as *mut i8): 1 else: 0) != 0: 1 else: 0) != 0:
                                         0
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *p = (unsafe: *(posix = posix + 1)))
-                                        (p = p + 1)
-                                        (lastspecial = (unsafe: *(p = p + 1)))
+                                        if (if (p__goto_171_14 + (1 as isize as usize)) > endp__goto_173_14: 1 else: 0) != 0:
+                                            return (-48)
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        (unsafe: *p__goto_171_14 = (unsafe: *(posix__goto_170_12 = posix__goto_170_12 + 1)))
+                                        (p__goto_171_14 = p__goto_171_14 + 1)
+                                        (lastspecial__goto_178_10 = (unsafe: *(p__goto_171_14 = p__goto_171_14 + 1)))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         (plength = plength - 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (nextisliteral = 1)
+                                        (nextisliteral__goto_180_6 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             41 =>
-                                if (if (if extended != 0: 0 else: 1) != 0 or (if bracount == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if (if extended__goto_179_6 != 0: 0 else: 1) != 0 or (if bracount__goto_176_10 == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                     __pc = 2
                                     __goto_pending = 1
-                                (bracount = bracount - 1)
+                                (bracount__goto_176_10 = bracount__goto_176_10 - 1)
                                 __pc = 1
                                 __goto_pending = 1
-                                (bracount = bracount + 1)
-                                (lastspecial = c)
-                                (unsafe: *p = c)
-                                (p = p + 1)
+                                (bracount__goto_176_10 = bracount__goto_176_10 + 1)
+                                (lastspecial__goto_178_10 = c__goto_194_12)
+                                if (if (p__goto_171_14 + (1 as isize as usize)) > endp__goto_173_14: 1 else: 0) != 0:
+                                    return (-48)
+                                (unsafe: *p__goto_171_14 = c__goto_194_12)
+                                (p__goto_171_14 = p__goto_171_14 + 1)
                             40 =>
-                                (bracount = bracount + 1)
-                                (lastspecial = c)
-                                (unsafe: *p = c)
-                                (p = p + 1)
+                                (bracount__goto_176_10 = bracount__goto_176_10 + 1)
+                                (lastspecial__goto_178_10 = c__goto_194_12)
+                                if (if (p__goto_171_14 + (1 as isize as usize)) > endp__goto_173_14: 1 else: 0) != 0:
+                                    return (-48)
+                                (unsafe: *p__goto_171_14 = c__goto_194_12)
+                                (p__goto_171_14 = p__goto_171_14 + 1)
                             63 =>
-                                (lastspecial = c)
-                                (unsafe: *p = c)
-                                (p = p + 1)
+                                (lastspecial__goto_178_10 = c__goto_194_12)
+                                if (if (p__goto_171_14 + (1 as isize as usize)) > endp__goto_173_14: 1 else: 0) != 0:
+                                    return (-48)
+                                (unsafe: *p__goto_171_14 = c__goto_194_12)
+                                (p__goto_171_14 = p__goto_171_14 + 1)
                             46 =>
-                                (lastspecial = c)
-                                (unsafe: *p = c)
-                                (p = p + 1)
+                                (lastspecial__goto_178_10 = c__goto_194_12)
+                                if (if (p__goto_171_14 + (1 as isize as usize)) > endp__goto_173_14: 1 else: 0) != 0:
+                                    return (-48)
+                                (unsafe: *p__goto_171_14 = c__goto_194_12)
+                                (p__goto_171_14 = p__goto_171_14 + 1)
                             42 =>
-                                if (if lastspecial != 42: 1 else: 0) != 0:
-                                    if (if (if extended != 0: 0 else: 1) != 0 and ((if (if posix_state < 2: 1 else: 0) != 0 or (if lastspecial == 40: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                if (if lastspecial__goto_178_10 != 42: 1 else: 0) != 0:
+                                    if (if (if extended__goto_179_6 != 0: 0 else: 1) != 0 and ((if (if posix_state__goto_177_10 < 2: 1 else: 0) != 0 or (if lastspecial__goto_178_10 == 40: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                                         __pc = 2
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -480,50 +527,54 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             94 =>
-                                if extended != 0:
+                                if extended__goto_179_6 != 0:
                                     __pc = 1
                                     __goto_pending = 1
-                                if (if (if posix_state == 0: 1 else: 0) != 0 or (if lastspecial == 40: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (posix_state = 1)
+                                if (if (if posix_state__goto_177_10 == 0: 1 else: 0) != 0 or (if lastspecial__goto_178_10 == 40: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (posix_state__goto_177_10 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 1
                                     __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                if (if (if c < 255: 1 else: 0) != 0 and (if string_find_char(pcre2_escaped_literals, c) != (null as *mut i8): 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if (if c__goto_194_12 < 255: 1 else: 0) != 0 and (if string_find_char(pcre2_escaped_literals, c__goto_194_12) != (null as *mut i8): 1 else: 0) != 0: 1 else: 0) != 0:
                                     0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                (lastspecial = 255)
-                                p = p + clength
-                                (posix_state = 2)
+                                (lastspecial__goto_178_10 = 255)
+                                if (if (p__goto_171_14 + (clength__goto_195_7 as isize as usize)) > endp__goto_173_14: 1 else: 0) != 0:
+                                    return (-48)
+                                p__goto_171_14 = p__goto_171_14 + clength__goto_195_7
+                                (posix_state__goto_177_10 = 2)
                             _ =>
-                                if (if (if c < 255: 1 else: 0) != 0 and (if string_find_char(pcre2_escaped_literals, c) != (null as *mut i8): 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if (if c__goto_194_12 < 255: 1 else: 0) != 0 and (if string_find_char(pcre2_escaped_literals, c__goto_194_12) != (null as *mut i8): 1 else: 0) != 0: 1 else: 0) != 0:
                                     0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                (lastspecial = 255)
-                                p = p + clength
-                                (posix_state = 2)
+                                (lastspecial__goto_178_10 = 255)
+                                if (if (p__goto_171_14 + (clength__goto_195_7 as isize as usize)) > endp__goto_173_14: 1 else: 0) != 0:
+                                    return (-48)
+                                p__goto_171_14 = p__goto_171_14 + clength__goto_195_7
+                                (posix_state__goto_177_10 = 2)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if posix_state >= 3: 1 else: 0) != 0:
+                if (if posix_state__goto_177_10 >= 3: 1 else: 0) != 0:
                     return 106
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                convlength = convlength + ((p as usize -% pp as usize) / sizeof[u8]())
+                convlength__goto_174_12 = convlength__goto_174_12 + ((p__goto_171_14 as usize -% pp__goto_172_14 as usize) / sizeof[u8]())
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((unsafe: *bufflenptr) = convlength)
+                ((unsafe: *bufflenptr) = convlength__goto_174_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *p = 0)
-                (p = p + 1)
+                (unsafe: *p__goto_171_14 = 0)
+                (p__goto_171_14 = p__goto_171_14 + 1)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return 0
@@ -596,6 +647,21 @@ fn convert_glob_parse_class(from: *mut *const u8, pattern_end: *const u8, out: *
             return 0
         
         (pattern = start)
+        while (if (unsafe: *pattern) == ((unsafe: *class_ptr) as u8): 1 else: 0) != 0:
+            if (if (unsafe: *pattern) == 58: 1 else: 0) != 0:
+                pattern = pattern + 2
+                start = start - 2
+                while true:
+                    convert_glob_write(out, (unsafe: *(start = start + 1)))
+                    if not ((if start < pattern: 1 else: 0) != 0):
+                        break
+                
+                ((unsafe: *from) = pattern)
+                return class_index
+            
+            (pattern = pattern + 1)
+            (class_ptr = class_ptr + 1)
+        
         while (if (unsafe: *class_ptr) != 58: 1 else: 0) != 0:
             (class_ptr = class_ptr + 1)
         
@@ -680,6 +746,7 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
                 ((&out.out_str[0] as *mut u8)[len] = 92)
                 (len = len + 1)
             
+            ((&out.out_str[0] as *mut u8)[len] = (separator as u8))
         
         convert_glob_write_str(out, (len + 1))
     else:
@@ -741,9 +808,11 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
                 else:
                     if (if (if c == 91: 1 else: 0) != 0 and (if (unsafe: *pattern) == 58: 1 else: 0) != 0: 1 else: 0) != 0:
                         ((unsafe: *from) = pattern)
+                        return (-64)
                 
                 if (if prev_c > c: 1 else: 0) != 0:
                     ((unsafe: *from) = pattern)
+                    return (-64)
                 
                 if (if (if prev_c < separator: 1 else: 0) != 0 and (if separator < c: 1 else: 0) != 0: 1 else: 0) != 0:
                     (separator_seen = 1)
@@ -948,6 +1017,7 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
         
         if (if (if escape != 0: 1 else: 0) != 0 and (if c == escape: 1 else: 0) != 0: 1 else: 0) != 0:
             if (if pattern >= pattern_end: 1 else: 0) != 0:
+                (result = (-64))
                 break
             
             (c = (unsafe: *(pattern = pattern + 1)))
@@ -967,6 +1037,9 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
             convert_glob_write((&mut out as *mut pcre2_output_context), 41)
         
         convert_glob_write((&mut out as *mut pcre2_output_context), 0)
+        if (if (if dummyrun != 0: 0 else: 1) != 0 and (if out.output_size != ((((out.output as usize -% use_buffer as usize) / sizeof[u8]())) as c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+            (result = (-48))
+        
 
     if (if result != 0: 1 else: 0) != 0:
         ((unsafe: *bufflenptr) = ((pattern as usize -% pattern_start as usize) / sizeof[u8]()))
@@ -1141,9 +1214,9 @@ fn UCD_CATEGORY() -> Never:
 fn UCD_CHARTYPE() -> Never:
     comptime_error("untranslatable C macro: UCD_CHARTYPE")
 fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as c_int) == 0x69) or ((ch as c_int) == 0x0130))
+    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
 fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as c_int) == 0x0130): 0x69 else: (if ((ch as c_int) == 0x49): 0x0131 else: (ch as c_int)))
+    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
 // untranslatable fn-like macro
 fn UCD_GRAPHBREAK() -> Never:
     comptime_error("untranslatable C macro: UCD_GRAPHBREAK")

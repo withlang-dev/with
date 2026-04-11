@@ -78,13 +78,23 @@ fn pcre2_substring_copy_byname_8(match_data: *mut pcre2_real_match_data_8, strin
     var entry: *const u8
     var failrc: c_int
     var entrysize: c_int
+    if (if match_data.matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0:
+        return (-41)
+
     (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, (&mut first as *mut *const u8), (&mut last as *mut *const u8)))
     if (if entrysize < 0: 1 else: 0) != 0:
         return entrysize
 
+    (failrc = (-54))
     (entry = first)
     while (if entry <= last: 1 else: 0) != 0:
         var n: c_uint
+        if (if n < match_data.oveccount: 1 else: 0) != 0:
+            if (if (&match_data.ovector[0] as *mut c_ulong)[(n *% 2)] != ((0 -% 1)): 1 else: 0) != 0:
+                return pcre2_substring_copy_bynumber_8(match_data, n, buffer, sizeptr)
+            
+            (failrc = (-55))
+        
         entry = entry + entrysize
 
     return failrc
@@ -96,13 +106,16 @@ fn pcre2_substring_copy_bynumber_8(match_data: *mut pcre2_real_match_data_8, str
     if (if rc < 0: 1 else: 0) != 0:
         return rc
 
+    if (if (size +% 1) > (unsafe: *sizeptr): 1 else: 0) != 0:
+        return (-48)
+
     (buffer[size] = 0)
     ((unsafe: *sizeptr) = size)
     return 0
 
 fn pcre2_substring_free_8(string: *mut u8):
     if (if string != (null as *mut u8): 1 else: 0) != 0:
-        var memctl: *mut pcre2_memctl
+        var memctl: *mut pcre2_memctl = ((((string as *mut i8) - sizeof[pcre2_memctl]())) as *mut pcre2_memctl)
         memctl.free((memctl as *mut c_void), memctl.memory_data)
 
 
@@ -112,13 +125,23 @@ fn pcre2_substring_get_byname_8(match_data: *mut pcre2_real_match_data_8, string
     var entry: *const u8
     var failrc: c_int
     var entrysize: c_int
+    if (if match_data.matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0:
+        return (-41)
+
     (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, (&mut first as *mut *const u8), (&mut last as *mut *const u8)))
     if (if entrysize < 0: 1 else: 0) != 0:
         return entrysize
 
+    (failrc = (-54))
     (entry = first)
     while (if entry <= last: 1 else: 0) != 0:
         var n: c_uint
+        if (if n < match_data.oveccount: 1 else: 0) != 0:
+            if (if (&match_data.ovector[0] as *mut c_ulong)[(n *% 2)] != ((0 -% 1)): 1 else: 0) != 0:
+                return pcre2_substring_get_bynumber_8(match_data, n, stringptr, sizeptr)
+            
+            (failrc = (-55))
+        
         entry = entry + entrysize
 
     return failrc
@@ -131,6 +154,11 @@ fn pcre2_substring_get_bynumber_8(match_data: *mut pcre2_real_match_data_8, stri
     if (if rc < 0: 1 else: 0) != 0:
         return rc
 
+    (yield_ = (_pcre2_memctl_malloc_8((sizeof[pcre2_memctl]() +% (((size +% 1)) *% 8)), (match_data as *mut pcre2_memctl)) as *mut u8))
+    if (if yield_ == (null as *mut u8): 1 else: 0) != 0:
+        return (-48)
+
+    (yield_ = (((((yield_ as *mut i8)) + sizeof[pcre2_memctl]())) as *mut u8))
     (yield_[size] = 0)
     ((unsafe: *stringptr) = yield_)
     ((unsafe: *sizeptr) = size)
@@ -142,13 +170,23 @@ fn pcre2_substring_length_byname_8(match_data: *mut pcre2_real_match_data_8, str
     var entry: *const u8
     var failrc: c_int
     var entrysize: c_int
+    if (if match_data.matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0:
+        return (-41)
+
     (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, (&mut first as *mut *const u8), (&mut last as *mut *const u8)))
     if (if entrysize < 0: 1 else: 0) != 0:
         return entrysize
 
+    (failrc = (-54))
     (entry = first)
     while (if entry <= last: 1 else: 0) != 0:
         var n: c_uint
+        if (if n < match_data.oveccount: 1 else: 0) != 0:
+            if (if (&match_data.ovector[0] as *mut c_ulong)[(n *% 2)] != ((0 -% 1)): 1 else: 0) != 0:
+                return pcre2_substring_length_bynumber_8(match_data, n, sizeptr)
+            
+            (failrc = (-55))
+        
         entry = entry + entrysize
 
     return failrc
@@ -157,8 +195,38 @@ fn pcre2_substring_length_bynumber_8(match_data: *mut pcre2_real_match_data_8, s
     var left: c_ulong
     var right: c_ulong
     var count: c_int = match_data.rc
+    if (if count == (-2): 1 else: 0) != 0:
+        if (if stringnumber > 0: 1 else: 0) != 0:
+            return (-2)
+        
+        (count = 0)
+    else:
+        if (if count < 0: 1 else: 0) != 0:
+            return count
+
+    if (if match_data.matchedby != PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0:
+        if (if stringnumber > match_data.code.top_bracket: 1 else: 0) != 0:
+            return (-49)
+        
+        if (if stringnumber >= match_data.oveccount: 1 else: 0) != 0:
+            return (-54)
+        
+        if (if (&match_data.ovector[0] as *mut c_ulong)[(stringnumber *% 2)] == ((0 -% 1)): 1 else: 0) != 0:
+            return (-55)
+        
+    else:
+        if (if stringnumber >= match_data.oveccount: 1 else: 0) != 0:
+            return (-54)
+        
+        if (if (if count != 0: 1 else: 0) != 0 and (if stringnumber >= (count as c_uint): 1 else: 0) != 0: 1 else: 0) != 0:
+            return (-55)
+        
+
     (left = (&match_data.ovector[0] as *mut c_ulong)[(stringnumber *% 2)])
     (right = (&match_data.ovector[0] as *mut c_ulong)[((stringnumber *% 2) +% 1)])
+    if (if (if left > match_data.subject_length: 1 else: 0) != 0 or (if right > match_data.subject_length: 1 else: 0) != 0: 1 else: 0) != 0:
+        return (-67)
+
     if (if sizeptr != (null as *mut c_ulong): 1 else: 0) != 0:
         ((unsafe: *sizeptr) = (if ((if left > right: 1 else: 0)) != 0: 0 else: (right -% left)))
 
@@ -168,7 +236,7 @@ fn pcre2_substring_nametable_scan_8(code: *const pcre2_real_code_8, stringname: 
     var bot: c_ushort = 0
     var top: c_ushort = code.name_count
     var entrysize: c_ushort = code.name_entry_size
-    var nametable: *const u8
+    var nametable: *const u8 = ((((code as *const i8) + sizeof[pcre2_real_code_8]())) as *const u8)
     while (if top > bot: 1 else: 0) != 0:
         var mid: c_ushort = (((top + bot)) / 2)
         var entry: *const u8 = (nametable + ((entrysize * mid) as isize as usize))
@@ -202,13 +270,14 @@ fn pcre2_substring_nametable_scan_8(code: *const pcre2_real_code_8, stringname: 
             (top = mid)
         
 
+    return (-49)
 
 fn pcre2_substring_number_from_name_8(code: *const pcre2_real_code_8, stringname: *const u8) -> c_int:
     return pcre2_substring_nametable_scan_8(code, stringname, (null as *mut *const u8), (null as *mut *const u8))
 
 fn pcre2_substring_list_free_8(list: *mut *mut u8):
     if (if list != (null as *mut *mut u8): 1 else: 0) != 0:
-        var memctl: *mut pcre2_memctl
+        var memctl: *mut pcre2_memctl = ((((list as *mut i8) - sizeof[pcre2_memctl]())) as *mut pcre2_memctl)
         memctl.free((memctl as *mut c_void), memctl.memory_data)
 
 
@@ -239,10 +308,19 @@ fn pcre2_substring_list_get_8(match_data: *mut pcre2_real_match_data_8, listptr:
         size = size + (sizeof[u8]() +% 1)
         i = i + 2
 
+    (memp = (_pcre2_memctl_malloc_8(size, (match_data as *mut pcre2_memctl)) as *mut pcre2_memctl))
+    if (if memp == (null as *mut pcre2_memctl): 1 else: 0) != 0:
+        return (-48)
+
+    (listp = ((((memp as *mut i8) + sizeof[pcre2_memctl]())) as *mut *mut u8))
+    ((unsafe: *listptr) = listp)
+    (lensp = ((((listp as *mut i8) + (sizeof[u8]() *% ((count + 1))))) as *mut c_ulong))
     if (if lengthsptr == (null as *mut *mut c_ulong): 1 else: 0) != 0:
+        (sp = (lensp as *mut u8))
         (lensp = (null as *mut c_ulong))
     else:
         ((unsafe: *lengthsptr) = lensp)
+        (sp = ((((lensp as *mut i8) + (sizeof[c_ulong]() *% count))) as *mut u8))
 
     (i = 0)
     while (if i < count2: 1 else: 0) != 0:
@@ -354,12 +432,27 @@ type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
 type struct_pcre2_real_jit_stack_8 = pcre2_real_jit_stack_8
 type dfa_recursion_info { prevrec: *mut dfa_recursion_info = null, subject_position: *const u8 = null, last_used_ptr: *const u8 = null, group_num: c_uint = 0 }
 type struct_dfa_recursion_info = dfa_recursion_info
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:696:8: demoted to opaque
-type heapframe = opaque
+// union
+type heapframe_fields_char_repeat_oc { oc: c_uint = 0, occu: [4]u8 = [0 as u8; 4] }
+type heapframe_fields_char_repeat { start_eptr: *const u8 = null, charptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: heapframe_fields_char_repeat_oc }
+type heapframe_fields_charnot_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: c_uint = 0 }
+type heapframe_fields_class_repeat { start_eptr: *const u8 = null, byte_map_address: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_xclass_repeat { start_eptr: *const u8 = null, xclass_data: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_eclass_repeat { start_eptr: *const u8 = null, eclass_data: *const u8 = null, eclass_len: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_type_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, ctype: c_uint = 0, propvalue: c_uint = 0 }
+type heapframe_fields_ref_repeat { start: *const u8 = null, offset: c_ulong = 0, length: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_op_bra { frame_type: c_uint = 0 }
+type heapframe_fields_op_brapos { start_eptr: *const u8 = null, start_group: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_recurse { start_branch: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_assert_scs { saved_end_subject: *const u8 = null, saved_eptr: *const u8 = null, true_end_extra: c_ulong = 0, saved_moptions: c_uint = 0 }
+type heapframe_fields_op_cond { start_branch: *const u8 = null, length: c_ulong = 0 }
+type heapframe_fields_op_vreverse { min: c_uint = 0, max: c_uint = 0 }
+// union
+type heapframe_fields { char_repeat: heapframe_fields_char_repeat, charnot_repeat: heapframe_fields_charnot_repeat, class_repeat: heapframe_fields_class_repeat, xclass_repeat: heapframe_fields_xclass_repeat, eclass_repeat: heapframe_fields_eclass_repeat, type_repeat: heapframe_fields_type_repeat, ref_repeat: heapframe_fields_ref_repeat, op_bra: heapframe_fields_op_bra, op_brapos: heapframe_fields_op_brapos, op_recurse: heapframe_fields_op_recurse, op_assert_scs: heapframe_fields_op_assert_scs, op_cond: heapframe_fields_op_cond, op_vreverse: heapframe_fields_op_vreverse }
+type heapframe { ecode: *const u8 = null, back_frame: c_ulong = 0, rdepth: c_uint = 0, group_frame_type: c_uint = 0, return_id: u8 = 0, op: u8 = 0, byte1: u8 = 0, byte2: u8 = 0, fields: heapframe_fields, eptr: *const u8 = null, start_match: *const u8 = null, mark: *const u8 = null, recurse_last_used: *const u8 = null, current_recurse: c_uint = 0, capture_last: c_uint = 0, last_group_offset: c_ulong = 0, offset_top: c_ulong = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
 type struct_heapframe = heapframe
 type static_assertion_heapframe_size = [1]c_int
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:1024:16: demoted to opaque
-type heapframe_align = opaque
+type heapframe_align { unalign: c_char = 0, frame: heapframe }
 type struct_heapframe_align = heapframe_align
 type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, hitend: c_int = 0, hasthen: c_int = 0, hasbsk: c_int = 0, allowemptypartial: c_int = 0, allowlookaroundbsk: c_int = 0, lcc: *const u8 = null, fcc: *const u8 = null, ctypes: *const u8 = null, start_offset: c_ulong = 0, end_offset_top: c_ulong = 0, partial: c_ushort = 0, bsr_convention: c_ushort = 0, name_count: c_ushort = 0, name_entry_size: c_ushort = 0, name_table: *const u8 = null, start_code: *const u8 = null, start_subject: *const u8 = null, check_subject: *const u8 = null, end_subject: *const u8 = null, true_end_subject: *const u8 = null, end_match_ptr: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, mark: *const u8 = null, nomatch_mark: *const u8 = null, verb_ecode_ptr: *const u8 = null, verb_skip_ptr: *const u8 = null, verb_current_recurse: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, skip_arg_count: c_uint = 0, ignore_skip_arg: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null }
 type struct_match_block_8 = match_block_8
@@ -548,9 +641,9 @@ fn UCD_CATEGORY() -> Never:
 fn UCD_CHARTYPE() -> Never:
     comptime_error("untranslatable C macro: UCD_CHARTYPE")
 fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as c_int) == 0x69) or ((ch as c_int) == 0x0130))
+    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
 fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as c_int) == 0x0130): 0x69 else: (if ((ch as c_int) == 0x49): 0x0131 else: (ch as c_int)))
+    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
 // untranslatable fn-like macro
 fn UCD_GRAPHBREAK() -> Never:
     comptime_error("untranslatable C macro: UCD_GRAPHBREAK")

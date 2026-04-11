@@ -176,12 +176,27 @@ type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
 type struct_pcre2_real_jit_stack_8 = pcre2_real_jit_stack_8
 type dfa_recursion_info { prevrec: *mut dfa_recursion_info = null, subject_position: *const u8 = null, last_used_ptr: *const u8 = null, group_num: c_uint = 0 }
 type struct_dfa_recursion_info = dfa_recursion_info
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:696:8: demoted to opaque
-type heapframe = opaque
+// union
+type heapframe_fields_char_repeat_oc { oc: c_uint = 0, occu: [4]u8 = [0 as u8; 4] }
+type heapframe_fields_char_repeat { start_eptr: *const u8 = null, charptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: heapframe_fields_char_repeat_oc }
+type heapframe_fields_charnot_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: c_uint = 0 }
+type heapframe_fields_class_repeat { start_eptr: *const u8 = null, byte_map_address: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_xclass_repeat { start_eptr: *const u8 = null, xclass_data: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_eclass_repeat { start_eptr: *const u8 = null, eclass_data: *const u8 = null, eclass_len: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_type_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, ctype: c_uint = 0, propvalue: c_uint = 0 }
+type heapframe_fields_ref_repeat { start: *const u8 = null, offset: c_ulong = 0, length: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_op_bra { frame_type: c_uint = 0 }
+type heapframe_fields_op_brapos { start_eptr: *const u8 = null, start_group: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_recurse { start_branch: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_assert_scs { saved_end_subject: *const u8 = null, saved_eptr: *const u8 = null, true_end_extra: c_ulong = 0, saved_moptions: c_uint = 0 }
+type heapframe_fields_op_cond { start_branch: *const u8 = null, length: c_ulong = 0 }
+type heapframe_fields_op_vreverse { min: c_uint = 0, max: c_uint = 0 }
+// union
+type heapframe_fields { char_repeat: heapframe_fields_char_repeat, charnot_repeat: heapframe_fields_charnot_repeat, class_repeat: heapframe_fields_class_repeat, xclass_repeat: heapframe_fields_xclass_repeat, eclass_repeat: heapframe_fields_eclass_repeat, type_repeat: heapframe_fields_type_repeat, ref_repeat: heapframe_fields_ref_repeat, op_bra: heapframe_fields_op_bra, op_brapos: heapframe_fields_op_brapos, op_recurse: heapframe_fields_op_recurse, op_assert_scs: heapframe_fields_op_assert_scs, op_cond: heapframe_fields_op_cond, op_vreverse: heapframe_fields_op_vreverse }
+type heapframe { ecode: *const u8 = null, back_frame: c_ulong = 0, rdepth: c_uint = 0, group_frame_type: c_uint = 0, return_id: u8 = 0, op: u8 = 0, byte1: u8 = 0, byte2: u8 = 0, fields: heapframe_fields, eptr: *const u8 = null, start_match: *const u8 = null, mark: *const u8 = null, recurse_last_used: *const u8 = null, current_recurse: c_uint = 0, capture_last: c_uint = 0, last_group_offset: c_ulong = 0, offset_top: c_ulong = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
 type struct_heapframe = heapframe
 type static_assertion_heapframe_size = [1]c_int
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:1024:16: demoted to opaque
-type heapframe_align = opaque
+type heapframe_align { unalign: c_char = 0, frame: heapframe }
 type struct_heapframe_align = heapframe_align
 type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, hitend: c_int = 0, hasthen: c_int = 0, hasbsk: c_int = 0, allowemptypartial: c_int = 0, allowlookaroundbsk: c_int = 0, lcc: *const u8 = null, fcc: *const u8 = null, ctypes: *const u8 = null, start_offset: c_ulong = 0, end_offset_top: c_ulong = 0, partial: c_ushort = 0, bsr_convention: c_ushort = 0, name_count: c_ushort = 0, name_entry_size: c_ushort = 0, name_table: *const u8 = null, start_code: *const u8 = null, start_subject: *const u8 = null, check_subject: *const u8 = null, end_subject: *const u8 = null, true_end_subject: *const u8 = null, end_match_ptr: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, mark: *const u8 = null, nomatch_mark: *const u8 = null, verb_ecode_ptr: *const u8 = null, verb_skip_ptr: *const u8 = null, verb_current_recurse: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, skip_arg_count: c_uint = 0, ignore_skip_arg: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null }
 type struct_match_block_8 = match_block_8
@@ -219,6 +234,7 @@ extern fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, s
 extern fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *mut c_uint, pcode: *mut *mut u8, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> c_int
 fn _pcre2_compile_get_hash_from_name8(name: *const u8, length: c_uint) -> c_ushort:
     var hash: c_ushort
+    (hash = (((((name[0] & 127)) | ((((name[(length -% 1)] & 255)) << 7)))) as c_ushort))
     return hash
 
 fn _pcre2_compile_find_named_group8(name: *const u8, length: c_uint, cb: *mut compile_block_8) -> *mut named_group_8:
@@ -323,6 +339,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
         return (null as *mut c_uint)
 
     (size = ((((cb.bracount +% 1) +% 7)) >> 3))
+    (captures = (cb.cx.memctl.malloc(size, cb.cx.memctl.memory_data) as *mut u8))
     if (if captures == (null as *mut u8): 1 else: 0) != 0:
         ((unsafe: *errorcodeptr) = ERR21)
         0
@@ -365,13 +382,16 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
         (cb.first_data = (&mut args.header as *mut compile_data))
 
     (cb.last_data = (&mut args.header as *mut compile_data))
+    (captures = (((args + (1 as isize as usize))) as *mut c_ushort))
     while 1 != 0:
         (pptr = pptr + 1)
         break
 
+    (args.skip_size = (((((pptr as usize -% pptr_start as usize) / sizeof[c_uint]())) as c_ulong) -% 1))
     if (if size == 1: 1 else: 0) != 0:
         return 1
 
+    (captures = (((args + (1 as isize as usize))) as *mut c_ushort))
     (i = (((size >> 1)) -% 1))
     while 1 != 0:
         do_heapify_u16(captures, size, i)
@@ -399,6 +419,7 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
         
         (current = current + 1)
 
+    (args.size = ((((captures as usize -% (((args + (1 as isize as usize))) as *mut c_ushort) as usize) / sizeof[c_ushort]())) as c_ulong))
     return 1
 
 fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset: c_ulong, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_ulong:
@@ -635,9 +656,9 @@ fn UCD_CATEGORY() -> Never:
 fn UCD_CHARTYPE() -> Never:
     comptime_error("untranslatable C macro: UCD_CHARTYPE")
 fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as c_int) == 0x69) or ((ch as c_int) == 0x0130))
+    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
 fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as c_int) == 0x0130): 0x69 else: (if ((ch as c_int) == 0x49): 0x0131 else: (ch as c_int)))
+    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
 // untranslatable fn-like macro
 fn UCD_GRAPHBREAK() -> Never:
     comptime_error("untranslatable C macro: UCD_GRAPHBREAK")

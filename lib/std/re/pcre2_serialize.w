@@ -92,19 +92,39 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
     var tables: *const u8
     var data: *mut pcre2_serialized_data
     var memctl: *const pcre2_memctl = ((if ((if gcontext != (null as *mut pcre2_real_general_context_8): 1 else: 0)) != 0: (&mut gcontext.memctl as *mut pcre2_memctl) else: (&mut _pcre2_default_compile_context_8.memctl as *mut pcre2_memctl)) as *const pcre2_memctl)
+    if (if (if (if codes == (null as *mut *const pcre2_real_code_8): 1 else: 0) != 0 or (if serialized_bytes == (null as *mut *mut u8): 1 else: 0) != 0: 1 else: 0) != 0 or (if serialized_size == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+        return (-51)
+
+    if (if number_of_codes <= 0: 1 else: 0) != 0:
+        return (-29)
+
     (total_size = (sizeof[pcre2_serialized_data]() +% 1088))
     (tables = (null as *const u8))
     (i = 0)
     while (if i < number_of_codes: 1 else: 0) != 0:
+        if (if codes[i] == (null as *const pcre2_real_code_8): 1 else: 0) != 0:
+            return (-51)
+        
+        (re = ((codes[i]) as *const pcre2_real_code_8))
+        if (if re.magic_number != 1346589253: 1 else: 0) != 0:
+            return (-31)
+        
         if (if tables == (null as *const u8): 1 else: 0) != 0:
             (tables = re.tables)
+        else:
+            if (if tables != re.tables: 1 else: 0) != 0:
+                return (-30)
         
         total_size = total_size + re.blocksize
         (i = i + 1)
 
     (bytes = (memctl.malloc((total_size +% sizeof[pcre2_memctl]()), memctl.memory_data) as *mut u8))
+    if (if bytes == (null as *mut u8): 1 else: 0) != 0:
+        return (-48)
+
     with_memcpy((bytes as *mut c_void) as *i8, (memctl as *const c_void) as *i8, sizeof[pcre2_memctl]() as i64)
     bytes = bytes + sizeof[pcre2_memctl]()
+    (data = (bytes as *mut pcre2_serialized_data))
     (data.magic = 1347564115)
     (data.version = 3145738)
     (data.config = 526337)
@@ -113,6 +133,7 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
     with_memcpy((dst_bytes as *mut c_void) as *i8, (tables as *const c_void) as *i8, 1088 as i64)
     (i = 0)
     while (if i < number_of_codes: 1 else: 0) != 0:
+        (re = ((codes[i]) as *const pcre2_real_code_8))
         with_memcpy((dst_bytes as *mut c_void) as *i8, ((re as *const i8) as *const c_void) as *i8, re.blocksize as i64)
         with_memset(((dst_bytes + 0) as *mut c_void) as *i8, 0, sizeof[pcre2_memctl]() as i64)
         dst_bytes = dst_bytes + re.blocksize
@@ -124,81 +145,120 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
 
 fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_of_codes: c_int, bytes: *const u8, gcontext: *mut pcre2_real_general_context_8) -> c_int:
     var number_of_codes = __param_number_of_codes
-    var data: *const pcre2_serialized_data = null
-    var memctl: *const pcre2_memctl = null
-    var src_bytes: *const u8 = null
-    var dst_re: *mut pcre2_real_code_8 = null
-    var tables: *mut u8 = null
-    var i: c_int = 0
-    var j: c_int = 0
-    var error_: c_int = 0
-    var blocksize: c_ulong = 0
+    var data__goto_180_30: *const pcre2_serialized_data = null
+    var memctl__goto_181_21: *const pcre2_memctl = null
+    var src_bytes__goto_184_16: *const u8 = null
+    var dst_re__goto_185_18: *mut pcre2_real_code_8 = null
+    var tables__goto_186_10: *mut u8 = null
+    var i__goto_187_9: c_int = 0
+    var j__goto_187_12: c_int = 0
+    var error___goto_188_9: c_int = 0
+    var blocksize__goto_222_23: c_ulong = 0
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                memctl = ((if ((if gcontext != (null as *mut pcre2_real_general_context_8): 1 else: 0)) != 0: (&mut gcontext.memctl as *mut pcre2_memctl) else: (&mut _pcre2_default_compile_context_8.memctl as *mut pcre2_memctl)) as *const pcre2_memctl)
-                dst_re = (null as *mut pcre2_real_code_8)
-                if (if number_of_codes > data.number_of_codes: 1 else: 0) != 0:
-                    (number_of_codes = data.number_of_codes)
+                data__goto_180_30 = (bytes as *const pcre2_serialized_data)
+                memctl__goto_181_21 = ((if ((if gcontext != (null as *mut pcre2_real_general_context_8): 1 else: 0)) != 0: (&mut gcontext.memctl as *mut pcre2_memctl) else: (&mut _pcre2_default_compile_context_8.memctl as *mut pcre2_memctl)) as *const pcre2_memctl)
+                dst_re__goto_185_18 = (null as *mut pcre2_real_code_8)
+                if (if (if data__goto_180_30 == (null as *const pcre2_serialized_data): 1 else: 0) != 0 or (if codes == (null as *mut *mut pcre2_real_code_8): 1 else: 0) != 0: 1 else: 0) != 0:
+                    return (-51)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (src_bytes = (bytes + sizeof[pcre2_serialized_data]()))
+                if (if number_of_codes <= 0: 1 else: 0) != 0:
+                    return (-29)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (tables = (memctl.malloc((1088 +% sizeof[c_ulong]()), memctl.memory_data) as *mut u8))
+                if (if data__goto_180_30.number_of_codes <= 0: 1 else: 0) != 0:
+                    return (-62)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                with_memcpy((tables as *mut c_void) as *i8, (src_bytes as *const c_void) as *i8, 1088 as i64)
+                if (if data__goto_180_30.magic != 1347564115: 1 else: 0) != 0:
+                    return (-31)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (i = 0)
-                while (if i < number_of_codes: 1 else: 0) != 0:
-                    with_memcpy(((&mut blocksize as *mut c_ulong) as *mut c_void) as *i8, ((src_bytes + 72) as *const c_void) as *i8, sizeof[c_ulong]() as i64)
+                if (if data__goto_180_30.version != 3145738: 1 else: 0) != 0:
+                    return (-32)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if number_of_codes > data__goto_180_30.number_of_codes: 1 else: 0) != 0:
+                    (number_of_codes = data__goto_180_30.number_of_codes)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (src_bytes__goto_184_16 = (bytes + sizeof[pcre2_serialized_data]()))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (tables__goto_186_10 = (memctl__goto_181_21.malloc((1088 +% sizeof[c_ulong]()), memctl__goto_181_21.memory_data) as *mut u8))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if tables__goto_186_10 == (null as *mut u8): 1 else: 0) != 0:
+                    return (-48)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                with_memcpy((tables__goto_186_10 as *mut c_void) as *i8, (src_bytes__goto_184_16 as *const c_void) as *i8, 1088 as i64)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (i__goto_187_9 = 0)
+                while (if i__goto_187_9 < number_of_codes: 1 else: 0) != 0:
+                    with_memcpy(((&mut blocksize__goto_222_23 as *mut c_ulong) as *mut c_void) as *i8, ((src_bytes__goto_184_16 + 72) as *const c_void) as *i8, sizeof[c_ulong]() as i64)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if blocksize <= sizeof[pcre2_real_code_8](): 1 else: 0) != 0:
+                    if (if blocksize__goto_222_23 <= sizeof[pcre2_real_code_8](): 1 else: 0) != 0:
+                        (error___goto_188_9 = (-62))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            break
                         __pc = 1
                         __goto_pending = 1
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if dst_re == (null as *mut pcre2_real_code_8): 1 else: 0) != 0:
+                    (dst_re__goto_185_18 = (_pcre2_memctl_malloc_8(blocksize__goto_222_23, (gcontext as *mut pcre2_memctl)) as *mut pcre2_real_code_8))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        break
+                    if (if dst_re__goto_185_18 == (null as *mut pcre2_real_code_8): 1 else: 0) != 0:
+                        (error___goto_188_9 = (-48))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            break
                         __pc = 1
                         __goto_pending = 1
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if (if dst_re.magic_number != 1346589253: 1 else: 0) != 0 or (if dst_re.name_entry_size > ((128 + 2) + 1): 1 else: 0) != 0: 1 else: 0) != 0 or (if dst_re.name_count > 10000: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        break
+                    if (if (if (if dst_re__goto_185_18.magic_number != 1346589253: 1 else: 0) != 0 or (if dst_re__goto_185_18.name_entry_size > ((128 + 2) + 1): 1 else: 0) != 0: 1 else: 0) != 0 or (if dst_re__goto_185_18.name_count > 10000: 1 else: 0) != 0: 1 else: 0) != 0:
+                        (error___goto_188_9 = (-62))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            break
                         __pc = 1
                         __goto_pending = 1
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (dst_re.tables = (tables as *const u8))
+                    (dst_re__goto_185_18.tables = (tables__goto_186_10 as *const u8))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (dst_re.executable_jit = null)
+                    (dst_re__goto_185_18.executable_jit = null)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    dst_re.flags = dst_re.flags | 262144
+                    dst_re__goto_185_18.flags = dst_re__goto_185_18.flags | 262144
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (codes[i] = dst_re)
+                    (codes[i__goto_187_9] = dst_re__goto_185_18)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (dst_re = (null as *mut pcre2_real_code_8))
+                    (dst_re__goto_185_18 = (null as *mut pcre2_real_code_8))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    src_bytes = src_bytes + blocksize
+                    src_bytes__goto_184_16 = src_bytes__goto_184_16 + blocksize__goto_222_23
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (i = i + 1)
+                    (i__goto_187_9 = i__goto_187_9 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -210,38 +270,47 @@ fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_o
                 continue
             1 =>  // cleanup
                 (__goto_pending = 0)
-                if (if dst_re != (null as *mut pcre2_real_code_8): 1 else: 0) != 0:
-                    memctl.free((dst_re as *mut c_void), memctl.memory_data)
+                if (if dst_re__goto_185_18 != (null as *mut pcre2_real_code_8): 1 else: 0) != 0:
+                    memctl__goto_181_21.free((dst_re__goto_185_18 as *mut c_void), memctl__goto_181_21.memory_data)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                memctl.free((tables as *mut c_void), memctl.memory_data)
+                memctl__goto_181_21.free((tables__goto_186_10 as *mut c_void), memctl__goto_181_21.memory_data)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (j = 0)
-                while (if j < i: 1 else: 0) != 0:
-                    memctl.free((codes[j] as *mut c_void), memctl.memory_data)
+                (j__goto_187_12 = 0)
+                while (if j__goto_187_12 < i__goto_187_9: 1 else: 0) != 0:
+                    memctl__goto_181_21.free((codes[j__goto_187_12] as *mut c_void), memctl__goto_181_21.memory_data)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (codes[j] = (null as *mut pcre2_real_code_8))
+                    (codes[j__goto_187_12] = (null as *mut pcre2_real_code_8))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (j = j + 1)
+                    (j__goto_187_12 = j__goto_187_12 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                return error_
+                return error___goto_188_9
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
             _ => break
 
 fn pcre2_serialize_get_number_of_codes_8(bytes: *const u8) -> c_int:
-    var data: *const pcre2_serialized_data
+    var data: *const pcre2_serialized_data = (bytes as *const pcre2_serialized_data)
+    if (if data == (null as *const pcre2_serialized_data): 1 else: 0) != 0:
+        return (-51)
+
+    if (if data.magic != 1347564115: 1 else: 0) != 0:
+        return (-31)
+
+    if (if data.version != 3145738: 1 else: 0) != 0:
+        return (-32)
+
     return data.number_of_codes
 
 fn pcre2_serialize_free_8(bytes: *mut u8):
     if (if bytes != (null as *mut u8): 1 else: 0) != 0:
-        var memctl: *mut pcre2_memctl
+        var memctl: *mut pcre2_memctl = (((bytes - sizeof[pcre2_memctl]())) as *mut pcre2_memctl)
         memctl.free((memctl as *mut c_void), memctl.memory_data)
 
 
@@ -334,12 +403,27 @@ type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
 type struct_pcre2_real_jit_stack_8 = pcre2_real_jit_stack_8
 type dfa_recursion_info { prevrec: *mut dfa_recursion_info = null, subject_position: *const u8 = null, last_used_ptr: *const u8 = null, group_num: c_uint = 0 }
 type struct_dfa_recursion_info = dfa_recursion_info
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:696:8: demoted to opaque
-type heapframe = opaque
+// union
+type heapframe_fields_char_repeat_oc { oc: c_uint = 0, occu: [4]u8 = [0 as u8; 4] }
+type heapframe_fields_char_repeat { start_eptr: *const u8 = null, charptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: heapframe_fields_char_repeat_oc }
+type heapframe_fields_charnot_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: c_uint = 0 }
+type heapframe_fields_class_repeat { start_eptr: *const u8 = null, byte_map_address: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_xclass_repeat { start_eptr: *const u8 = null, xclass_data: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_eclass_repeat { start_eptr: *const u8 = null, eclass_data: *const u8 = null, eclass_len: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_type_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, ctype: c_uint = 0, propvalue: c_uint = 0 }
+type heapframe_fields_ref_repeat { start: *const u8 = null, offset: c_ulong = 0, length: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_op_bra { frame_type: c_uint = 0 }
+type heapframe_fields_op_brapos { start_eptr: *const u8 = null, start_group: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_recurse { start_branch: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_assert_scs { saved_end_subject: *const u8 = null, saved_eptr: *const u8 = null, true_end_extra: c_ulong = 0, saved_moptions: c_uint = 0 }
+type heapframe_fields_op_cond { start_branch: *const u8 = null, length: c_ulong = 0 }
+type heapframe_fields_op_vreverse { min: c_uint = 0, max: c_uint = 0 }
+// union
+type heapframe_fields { char_repeat: heapframe_fields_char_repeat, charnot_repeat: heapframe_fields_charnot_repeat, class_repeat: heapframe_fields_class_repeat, xclass_repeat: heapframe_fields_xclass_repeat, eclass_repeat: heapframe_fields_eclass_repeat, type_repeat: heapframe_fields_type_repeat, ref_repeat: heapframe_fields_ref_repeat, op_bra: heapframe_fields_op_bra, op_brapos: heapframe_fields_op_brapos, op_recurse: heapframe_fields_op_recurse, op_assert_scs: heapframe_fields_op_assert_scs, op_cond: heapframe_fields_op_cond, op_vreverse: heapframe_fields_op_vreverse }
+type heapframe { ecode: *const u8 = null, back_frame: c_ulong = 0, rdepth: c_uint = 0, group_frame_type: c_uint = 0, return_id: u8 = 0, op: u8 = 0, byte1: u8 = 0, byte2: u8 = 0, fields: heapframe_fields, eptr: *const u8 = null, start_match: *const u8 = null, mark: *const u8 = null, recurse_last_used: *const u8 = null, current_recurse: c_uint = 0, capture_last: c_uint = 0, last_group_offset: c_ulong = 0, offset_top: c_ulong = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
 type struct_heapframe = heapframe
 type static_assertion_heapframe_size = [1]c_int
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:1024:16: demoted to opaque
-type heapframe_align = opaque
+type heapframe_align { unalign: c_char = 0, frame: heapframe }
 type struct_heapframe_align = heapframe_align
 type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, hitend: c_int = 0, hasthen: c_int = 0, hasbsk: c_int = 0, allowemptypartial: c_int = 0, allowlookaroundbsk: c_int = 0, lcc: *const u8 = null, fcc: *const u8 = null, ctypes: *const u8 = null, start_offset: c_ulong = 0, end_offset_top: c_ulong = 0, partial: c_ushort = 0, bsr_convention: c_ushort = 0, name_count: c_ushort = 0, name_entry_size: c_ushort = 0, name_table: *const u8 = null, start_code: *const u8 = null, start_subject: *const u8 = null, check_subject: *const u8 = null, end_subject: *const u8 = null, true_end_subject: *const u8 = null, end_match_ptr: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, mark: *const u8 = null, nomatch_mark: *const u8 = null, verb_ecode_ptr: *const u8 = null, verb_skip_ptr: *const u8 = null, verb_current_recurse: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, skip_arg_count: c_uint = 0, ignore_skip_arg: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null }
 type struct_match_block_8 = match_block_8
@@ -529,9 +613,9 @@ fn UCD_CATEGORY() -> Never:
 fn UCD_CHARTYPE() -> Never:
     comptime_error("untranslatable C macro: UCD_CHARTYPE")
 fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as c_int) == 0x69) or ((ch as c_int) == 0x0130))
+    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
 fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as c_int) == 0x0130): 0x69 else: (if ((ch as c_int) == 0x49): 0x0131 else: (ch as c_int)))
+    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
 // untranslatable fn-like macro
 fn UCD_GRAPHBREAK() -> Never:
     comptime_error("untranslatable C macro: UCD_GRAPHBREAK")

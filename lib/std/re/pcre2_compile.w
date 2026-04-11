@@ -59,87 +59,86 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
     var patlen = __param_patlen
     var options = __param_options
     var ccontext = __param_ccontext
-    var utf: c_int = 0
-    var ucp: c_int = 0
-    var has_lookbehind: c_int = 0
-    var zero_terminated: c_int = 0
-    var re: *mut pcre2_real_code_8 = null
-    var cb: compile_block_8
-    var tables: *const u8 = null
-    var null_str: [1]u8 = [0 as u8; 1]
-    var code: *mut u8 = null
-    var codestart: *mut u8 = null
-    var ptr: *const u8 = null
-    var pptr: *mut c_uint = null
-    var length: c_ulong = 0
-    var usedlength: c_ulong = 0
-    var re_blocksize: c_ulong = 0
-    var parsed_size_needed: c_ulong = 0
-    var firstcuflags: c_uint = 0
-    var reqcuflags: c_uint = 0
-    var firstcu: c_uint = 0
-    var reqcu: c_uint = 0
-    var setflags: c_uint = 0
-    var xoptions: c_uint = 0
-    var skipatstart: c_uint = 0
-    var limit_heap: c_uint = 0
-    var limit_match: c_uint = 0
-    var limit_depth: c_uint = 0
-    var newline: c_int = 0
-    var bsr: c_int = 0
-    var errorcode: c_int = 0
-    var regexrc: c_int = 0
-    var i: c_uint = 0
-    var optim_flags: c_uint = 0
-    var stack_groupinfo: [256]c_uint = [0 as c_uint; 256]
-    var stack_parsed_pattern: [1024]c_uint = [0 as c_uint; 1024]
-    var named_groups: [20]named_group_8
-    var c16workspace: [3000]c_uint = [0 as c_uint; 3000]
-    var cworkspace: *mut u8 = null
-    var p: *const pso = null
-    var c: c_uint = 0
-    var pp: c_uint = 0
-    var heap_parsed_pattern: *mut c_uint = null
-    var loopcount: c_int = 0
-    var ng: *mut named_group_8 = null
-    var tablecount: c_uint = 0
-    var rcode: *mut u8 = null
-    var rgroup: *const u8 = null
-    var ccount: c_uint = 0
-    var start: c_int = 0
-    var rc: [8]recurse_cache
-    var groupnumber: c_int = 0
-    var search_from: *const u8 = null
-    var temp: *mut u8 = null
-    var possessify_rc: c_int = 0
-    var dotstar_anchor: c_int = 0
-    var minminlength: c_int = 0
-    var study_rc: c_int = 0
-    var assertedcuflags: c_uint = 0
-    var assertedcu: c_uint = 0
-    var current_data: *mut compile_data = null
-    var next_data: *mut compile_data = null
+    var utf__goto_10299_6: c_int = 0
+    var ucp__goto_10300_6: c_int = 0
+    var has_lookbehind__goto_10301_6: c_int = 0
+    var zero_terminated__goto_10302_6: c_int = 0
+    var re__goto_10303_18: *mut pcre2_real_code_8 = null
+    var cb__goto_10304_15: compile_block_8
+    var tables__goto_10305_16: *const u8 = null
+    var null_str__goto_10307_13: [1]u8 = [0 as u8; 1]
+    var code__goto_10308_14: *mut u8 = null
+    var codestart__goto_10309_14: *mut u8 = null
+    var ptr__goto_10310_12: *const u8 = null
+    var pptr__goto_10311_11: *mut c_uint = null
+    var length__goto_10313_12: c_ulong = 0
+    var usedlength__goto_10314_12: c_ulong = 0
+    var re_blocksize__goto_10315_12: c_ulong = 0
+    var parsed_size_needed__goto_10316_12: c_ulong = 0
+    var firstcuflags__goto_10318_10: c_uint = 0
+    var reqcuflags__goto_10318_24: c_uint = 0
+    var firstcu__goto_10319_10: c_uint = 0
+    var reqcu__goto_10319_19: c_uint = 0
+    var setflags__goto_10320_10: c_uint = 0
+    var xoptions__goto_10321_10: c_uint = 0
+    var skipatstart__goto_10323_10: c_uint = 0
+    var limit_heap__goto_10324_10: c_uint = 0
+    var limit_match__goto_10325_10: c_uint = 0
+    var limit_depth__goto_10326_10: c_uint = 0
+    var newline__goto_10328_5: c_int = 0
+    var bsr__goto_10329_5: c_int = 0
+    var errorcode__goto_10330_5: c_int = 0
+    var regexrc__goto_10331_5: c_int = 0
+    var i__goto_10333_10: c_uint = 0
+    var optim_flags__goto_10336_10: c_uint = 0
+    var stack_groupinfo__goto_10341_10: [256]c_uint = [0 as c_uint; 256]
+    var stack_parsed_pattern__goto_10342_10: [1024]c_uint = [0 as c_uint; 1024]
+    var named_groups__goto_10343_13: [20]named_group_8
+    var c16workspace__goto_10348_10: [3000]c_uint = [0 as c_uint; 3000]
+    var cworkspace__goto_10349_14: *mut u8 = null
+    var p__goto_10521_18: *const pso = null
+    var c__goto_10526_18: c_uint = 0
+    var pp__goto_10526_21: c_uint = 0
+    var heap_parsed_pattern__goto_10764_13: *mut c_uint = null
+    var loopcount__goto_10792_7: c_int = 0
+    var ng__goto_10967_16: *mut named_group_8 = null
+    var tablecount__goto_10968_12: c_uint = 0
+    var rcode__goto_11030_16: *mut u8 = null
+    var rgroup__goto_11031_14: *const u8 = null
+    var ccount__goto_11032_16: c_uint = 0
+    var start__goto_11033_7: c_int = 0
+    var rc__goto_11034_17: [8]recurse_cache
+    var p__goto_11040_9: c_int = 0
+    var groupnumber__goto_11040_12: c_int = 0
+    var search_from__goto_11045_18: *const u8 = null
+    var temp__goto_11102_16: *mut u8 = null
+    var possessify_rc__goto_11103_7: c_int = 0
+    var dotstar_anchor__goto_11126_8: c_int = 0
+    var minminlength__goto_11140_7: c_int = 0
+    var study_rc__goto_11141_7: c_int = 0
+    var assertedcuflags__goto_11148_14: c_uint = 0
+    var assertedcu__goto_11149_14: c_uint = 0
+    var dotstar_anchor__goto_11204_10: c_int = 0
+    var current_data__goto_11347_17: *mut compile_data = null
+    var next_data__goto_11350_19: *mut compile_data = null
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                has_lookbehind = 0
-                re = (null as *mut pcre2_real_code_8)
-                // null_str re-declared (skipped)
-                length = 1
-                setflags = 0
-                limit_heap = 4294967295
-                limit_match = 4294967295
-                limit_depth = 4294967295
-                newline = 0
-                bsr = 0
-                errorcode = 0
-                optim_flags = (if (if ccontext != (null as *mut pcre2_real_compile_context_8): 1 else: 0) != 0: ccontext.optimization_flags else: 7)
-                // stack_groupinfo re-declared (skipped)
-                // stack_parsed_pattern re-declared (skipped)
-                // named_groups re-declared (skipped)
+                has_lookbehind__goto_10301_6 = 0
+                re__goto_10303_18 = (null as *mut pcre2_real_code_8)
+                length__goto_10313_12 = 1
+                setflags__goto_10320_10 = 0
+                limit_heap__goto_10324_10 = 4294967295
+                limit_match__goto_10325_10 = 4294967295
+                limit_depth__goto_10326_10 = 4294967295
+                newline__goto_10328_5 = 0
+                bsr__goto_10329_5 = 0
+                errorcode__goto_10330_5 = 0
+                optim_flags__goto_10336_10 = (if (if ccontext != (null as *mut pcre2_real_compile_context_8): 1 else: 0) != 0: ccontext.optimization_flags else: 7)
+                cworkspace__goto_10349_14 = ((&c16workspace__goto_10348_10[0] as *mut c_uint) as *mut u8)
                 if (if errorptr == (null as *mut c_int): 1 else: 0) != 0:
                     if (if erroroffset != (null as *mut c_ulong): 1 else: 0) != 0:
                         ((unsafe: *erroroffset) = 0)
@@ -168,7 +167,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                     continue
                 if (if pattern == (null as *const u8): 1 else: 0) != 0:
                     if (if patlen == 0: 1 else: 0) != 0:
-                        (pattern = ((&null_str[0] as *mut u8) as *const u8))
+                        (pattern = ((&null_str__goto_10307_13[0] as *mut u8) as *const u8))
                     else:
                         ((unsafe: *errorptr) = ERR16)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -180,11 +179,20 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
+                if (if ccontext == (null as *mut pcre2_real_compile_context_8): 1 else: 0) != 0:
+                    (ccontext = (((&mut _pcre2_default_compile_context_8 as *mut pcre2_real_compile_context_8)) as *mut pcre2_real_compile_context_8))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 if (if ((options & 67108864)) != 0: 1 else: 0) != 0:
                     options = options | 524288
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                zero_terminated
+                (zero_terminated__goto_10302_6 = ((if patlen == ((0 -% 1)): 1 else: 0)))
+                if zero_terminated__goto_10302_6 != 0:
+                    (patlen = _pcre2_strlen_8(pattern))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                zero_terminated__goto_10302_6
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if patlen > ccontext.max_pattern_length: 1 else: 0) != 0:
@@ -197,183 +205,191 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if ((options & 16384)) != 0: 1 else: 0) != 0:
-                    optim_flags = optim_flags & (0 - 1 - 1)
+                    optim_flags__goto_10336_10 = optim_flags__goto_10336_10 & (0 - 1 - 1)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if ((options & 32768)) != 0: 1 else: 0) != 0:
-                    optim_flags = optim_flags & (0 - 2 - 1)
+                    optim_flags__goto_10336_10 = optim_flags__goto_10336_10 & (0 - 2 - 1)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if ((options & 65536)) != 0: 1 else: 0) != 0:
-                    optim_flags = optim_flags & (0 - 4 - 1)
+                    optim_flags__goto_10336_10 = optim_flags__goto_10336_10 & (0 - 4 - 1)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (tables = (if ((if ccontext.tables != (null as *const u8): 1 else: 0)) != 0: ccontext.tables else: _pcre2_default_tables_8))
+                (tables__goto_10305_16 = (if ((if ccontext.tables != (null as *const u8): 1 else: 0)) != 0: ccontext.tables else: _pcre2_default_tables_8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.lcc = (tables + (0 as isize as usize)))
+                (cb__goto_10304_15.lcc = (tables__goto_10305_16 + (0 as isize as usize)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.fcc = (tables + (256 as isize as usize)))
+                (cb__goto_10304_15.fcc = (tables__goto_10305_16 + (256 as isize as usize)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.cbits = (tables + (512 as isize as usize)))
+                (cb__goto_10304_15.cbits = (tables__goto_10305_16 + (512 as isize as usize)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.assert_depth = 0)
+                (cb__goto_10304_15.assert_depth = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.bracount = 0)
+                (cb__goto_10304_15.bracount = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.cx = ccontext)
+                (cb__goto_10304_15.cx = ccontext)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.dupnames = 0)
+                (cb__goto_10304_15.dupnames = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.end_pattern = (pattern + patlen))
+                (cb__goto_10304_15.end_pattern = (pattern + patlen))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.erroroffset = 0)
+                (cb__goto_10304_15.erroroffset = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.external_flags = 0)
+                (cb__goto_10304_15.external_flags = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.external_options = options)
+                (cb__goto_10304_15.external_options = options)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.groupinfo = (&stack_groupinfo[0] as *mut c_uint))
+                (cb__goto_10304_15.groupinfo = (&stack_groupinfo__goto_10341_10[0] as *mut c_uint))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.had_recurse = 0)
+                (cb__goto_10304_15.had_recurse = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.lastcapture = 0)
+                (cb__goto_10304_15.lastcapture = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.max_lookbehind = 0)
+                (cb__goto_10304_15.max_lookbehind = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.max_varlookbehind = ccontext.max_varlookbehind)
+                (cb__goto_10304_15.max_varlookbehind = ccontext.max_varlookbehind)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.name_entry_size = 0)
+                (cb__goto_10304_15.name_entry_size = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.name_table = (null as *mut u8))
+                (cb__goto_10304_15.name_table = (null as *mut u8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.named_groups = (&named_groups[0] as *mut named_group_8))
+                (cb__goto_10304_15.named_groups = (&named_groups__goto_10343_13[0] as *mut named_group_8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.named_group_list_size = 20)
+                (cb__goto_10304_15.named_group_list_size = 20)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.names_found = 0)
+                (cb__goto_10304_15.names_found = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.parens_depth = 0)
+                (cb__goto_10304_15.parens_depth = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.parsed_pattern = (&stack_parsed_pattern[0] as *mut c_uint))
+                (cb__goto_10304_15.parsed_pattern = (&stack_parsed_pattern__goto_10342_10[0] as *mut c_uint))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.req_varyopt = 0)
+                (cb__goto_10304_15.req_varyopt = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.start_code = cworkspace)
+                (cb__goto_10304_15.start_code = cworkspace__goto_10349_14)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.start_pattern = pattern)
+                (cb__goto_10304_15.start_pattern = pattern)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.start_workspace = cworkspace)
+                (cb__goto_10304_15.start_workspace = cworkspace__goto_10349_14)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.workspace_size = 6000)
+                (cb__goto_10304_15.workspace_size = 6000)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.first_data = (null as *mut compile_data))
+                (cb__goto_10304_15.first_data = (null as *mut compile_data))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.last_data = (null as *mut compile_data))
+                (cb__goto_10304_15.last_data = (null as *mut compile_data))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.top_backref = 0)
+                (cb__goto_10304_15.top_backref = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.backref_map = 0)
+                (cb__goto_10304_15.backref_map = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (xoptions = ccontext.extra_options)
+                (i__goto_10333_10 = 0)
+                while (if i__goto_10333_10 < 10: 1 else: 0) != 0:
+                    ((&cb__goto_10304_15.small_ref_offset[0] as *mut c_ulong)[i__goto_10333_10] = ((0 -% 1)))
+                    (i__goto_10333_10 = i__goto_10333_10 + 1)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (ptr = pattern)
+                (xoptions__goto_10321_10 = ccontext.extra_options)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (skipatstart = 0)
+                (ptr__goto_10310_12 = pattern)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (skipatstart__goto_10323_10 = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if ((options & 33554432)) == 0: 1 else: 0) != 0:
-                    while (if (if (if (patlen -% skipatstart) >= 2: 1 else: 0) != 0 and (if ptr[skipatstart] == 40: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[(skipatstart +% 1)] == 42: 1 else: 0) != 0: 1 else: 0) != 0:
-                        (i = 0)
-                        while (if i < ((23 * sizeof[pso]()) / sizeof[pso]()): 1 else: 0) != 0:
-                            p = ((&pso_list[0] as *mut pso) + i)
+                    while (if (if (if (patlen -% skipatstart__goto_10323_10) >= 2: 1 else: 0) != 0 and (if ptr__goto_10310_12[skipatstart__goto_10323_10] == 40: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr__goto_10310_12[(skipatstart__goto_10323_10 +% 1)] == 42: 1 else: 0) != 0: 1 else: 0) != 0:
+                        (i__goto_10333_10 = 0)
+                        while (if i__goto_10333_10 < ((23 * sizeof[pso]()) / sizeof[pso]()): 1 else: 0) != 0:
+                            p__goto_10521_18 = ((&pso_list[0] as *mut pso) + i__goto_10333_10)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if (if (if ((patlen -% skipatstart) -% 2) >= p.length: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(((ptr + skipatstart) + (2 as isize as usize)), p.name, p.length) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                skipatstart = skipatstart + (p.length + 2)
+                            if (if (if ((patlen -% skipatstart__goto_10323_10) -% 2) >= p__goto_10521_18.length: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(((ptr__goto_10310_12 + skipatstart__goto_10323_10) + (2 as isize as usize)), p__goto_10521_18.name, p__goto_10521_18.length) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                skipatstart__goto_10323_10 = skipatstart__goto_10323_10 + (p__goto_10521_18.length + 2)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                match p.type_
+                                match p__goto_10521_18.type_
                                     PSO_OPT =>
-                                        cb.external_options = cb.external_options | p.value
+                                        cb__goto_10304_15.external_options = cb__goto_10304_15.external_options | p__goto_10521_18.value
                                     PSO_XOPT =>
-                                        xoptions = xoptions | p.value
+                                        xoptions__goto_10321_10 = xoptions__goto_10321_10 | p__goto_10521_18.value
                                     PSO_FLG =>
-                                        setflags = setflags | p.value
+                                        setflags__goto_10320_10 = setflags__goto_10320_10 | p__goto_10521_18.value
                                     PSO_NL =>
-                                        (newline = p.value)
-                                        setflags = setflags | 32768
+                                        (newline__goto_10328_5 = p__goto_10521_18.value)
+                                        setflags__goto_10320_10 = setflags__goto_10320_10 | 32768
                                     PSO_BSR =>
-                                        (bsr = p.value)
-                                        setflags = setflags | 16384
+                                        (bsr__goto_10329_5 = p__goto_10521_18.value)
+                                        setflags__goto_10320_10 = setflags__goto_10320_10 | 16384
                                     PSO_LIMM =>
-                                        (pp = skipatstart)
-                                        if (if (if (if pp >= patlen: 1 else: 0) != 0 or (if pp == skipatstart: 1 else: 0) != 0: 1 else: 0) != 0 or (if ptr[pp] != 41: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (errorcode = ERR60)
+                                        (pp__goto_10526_21 = skipatstart__goto_10323_10)
+                                        if (if (if (if pp__goto_10526_21 >= patlen: 1 else: 0) != 0 or (if pp__goto_10526_21 == skipatstart__goto_10323_10: 1 else: 0) != 0: 1 else: 0) != 0 or (if ptr__goto_10310_12[pp__goto_10526_21] != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (errorcode__goto_10330_5 = ERR60)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            ptr = ptr + pp
+                                            ptr__goto_10310_12 = ptr__goto_10310_12 + pp__goto_10526_21
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (utf = 0)
+                                            (utf__goto_10299_6 = 0)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             __pc = 3
                                             __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                        if (if p.type_ == PSO_LIMH: 1 else: 0) != 0:
-                                            (limit_heap = c)
+                                        if (if p__goto_10521_18.type_ == PSO_LIMH: 1 else: 0) != 0:
+                                            (limit_heap__goto_10324_10 = c__goto_10526_18)
                                         else:
-                                            if (if p.type_ == PSO_LIMM: 1 else: 0) != 0:
-                                                (limit_match = c)
+                                            if (if p__goto_10521_18.type_ == PSO_LIMM: 1 else: 0) != 0:
+                                                (limit_match__goto_10325_10 = c__goto_10526_18)
                                             else:
-                                                (limit_depth = c)
-                                        (pp = pp + 1)
-                                        (skipatstart = pp)
+                                                (limit_depth__goto_10326_10 = c__goto_10526_18)
+                                        (pp__goto_10526_21 = pp__goto_10526_21 + 1)
+                                        (skipatstart__goto_10323_10 = pp__goto_10526_21)
                                     PSO_OPTMZ =>
-                                        optim_flags = optim_flags & (0 - (p.value) - 1)
-                                        match p.value
+                                        optim_flags__goto_10336_10 = optim_flags__goto_10336_10 & (0 - (p__goto_10521_18.value) - 1)
+                                        match p__goto_10521_18.value
                                             1 =>
-                                                cb.external_options = cb.external_options | 16384
+                                                cb__goto_10304_15.external_options = cb__goto_10304_15.external_options | 16384
                                             2 =>
-                                                cb.external_options = cb.external_options | 32768
+                                                cb__goto_10304_15.external_options = cb__goto_10304_15.external_options | 32768
                                             4 =>
-                                                cb.external_options = cb.external_options | 65536
+                                                cb__goto_10304_15.external_options = cb__goto_10304_15.external_options | 65536
                                             _ => 0
                                     _ => 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -383,12 +399,12 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (i = i + 1)
+                            (i__goto_10333_10 = i__goto_10333_10 + 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if i >= ((23 * sizeof[pso]()) / sizeof[pso]()): 1 else: 0) != 0:
+                        if (if i__goto_10333_10 >= ((23 * sizeof[pso]()) / sizeof[pso]()): 1 else: 0) != 0:
                             break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
@@ -398,11 +414,11 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ptr = ptr + skipatstart
+                ptr__goto_10310_12 = ptr__goto_10310_12 + skipatstart__goto_10323_10
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ((cb.external_options & ((524288 | 131072)))) != 0: 1 else: 0) != 0:
-                    (errorcode = ERR32)
+                if (if ((cb__goto_10304_15.external_options & ((524288 | 131072)))) != 0: 1 else: 0) != 0:
+                    (errorcode__goto_10330_5 = ERR32)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     __pc = 3
@@ -411,12 +427,12 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (utf = (if ((cb.external_options & 524288)) != 0: 1 else: 0))
+                (utf__goto_10299_6 = (if ((cb__goto_10304_15.external_options & 524288)) != 0: 1 else: 0))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if utf != 0:
+                if utf__goto_10299_6 != 0:
                     if (if ((options & 4096)) != 0: 1 else: 0) != 0:
-                        (errorcode = ERR74)
+                        (errorcode__goto_10330_5 = ERR74)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         __pc = 3
@@ -425,18 +441,18 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if (if ((options & 1073741824)) == 0: 1 else: 0) != 0 and (if ((errorcode = _pcre2_valid_utf_8(pattern, patlen, erroroffset))) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (if (if ((options & 1073741824)) == 0: 1 else: 0) != 0 and (if ((errorcode__goto_10330_5 = _pcre2_valid_utf_8(pattern, patlen, erroroffset))) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                         __pc = 4
                         __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (ucp = (if ((cb.external_options & 131072)) != 0: 1 else: 0))
+                (ucp__goto_10300_6 = (if ((cb__goto_10304_15.external_options & 131072)) != 0: 1 else: 0))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ucp != 0 and (if ((cb.external_options & 2048)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                    (errorcode = ERR75)
+                if (if ucp__goto_10300_6 != 0 and (if ((cb__goto_10304_15.external_options & 2048)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (errorcode__goto_10330_5 = ERR75)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     __pc = 3
@@ -445,9 +461,9 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ((xoptions & 65536)) != 0: 1 else: 0) != 0:
-                    if (if (if utf != 0: 0 else: 1) != 0 and (if ucp != 0: 0 else: 1) != 0: 1 else: 0) != 0:
-                        (errorcode = ERR104)
+                if (if ((xoptions__goto_10321_10 & 65536)) != 0: 1 else: 0) != 0:
+                    if (if (if utf__goto_10299_6 != 0: 0 else: 1) != 0 and (if ucp__goto_10300_6 != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+                        (errorcode__goto_10330_5 = ERR104)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         __pc = 3
@@ -456,8 +472,8 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if utf != 0: 0 else: 1) != 0:
-                        (errorcode = ERR105)
+                    if (if utf__goto_10299_6 != 0: 0 else: 1) != 0:
+                        (errorcode__goto_10330_5 = ERR105)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         __pc = 3
@@ -466,8 +482,8 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if ((xoptions & 128)) != 0: 1 else: 0) != 0:
-                        (errorcode = ERR106)
+                    if (if ((xoptions__goto_10321_10 & 128)) != 0: 1 else: 0) != 0:
+                        (errorcode__goto_10330_5 = ERR106)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         __pc = 3
@@ -478,60 +494,60 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if bsr == 0: 1 else: 0) != 0:
-                    (bsr = ccontext.bsr_convention)
+                if (if bsr__goto_10329_5 == 0: 1 else: 0) != 0:
+                    (bsr__goto_10329_5 = ccontext.bsr_convention)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if newline == 0: 1 else: 0) != 0:
-                    (newline = ccontext.newline_convention)
+                if (if newline__goto_10328_5 == 0: 1 else: 0) != 0:
+                    (newline__goto_10328_5 = ccontext.newline_convention)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.nltype = 0)
+                (cb__goto_10304_15.nltype = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                match newline
+                match newline__goto_10328_5
                     1 =>
-                        (cb.nllen = 1)
-                        ((&cb.nl[0] as *mut u8)[0] = 13)
+                        (cb__goto_10304_15.nllen = 1)
+                        ((&cb__goto_10304_15.nl[0] as *mut u8)[0] = 13)
                     2 =>
-                        (cb.nllen = 1)
-                        ((&cb.nl[0] as *mut u8)[0] = 10)
+                        (cb__goto_10304_15.nllen = 1)
+                        ((&cb__goto_10304_15.nl[0] as *mut u8)[0] = 10)
                     6 =>
-                        (cb.nllen = 1)
-                        ((&cb.nl[0] as *mut u8)[0] = 0)
+                        (cb__goto_10304_15.nllen = 1)
+                        ((&cb__goto_10304_15.nl[0] as *mut u8)[0] = 0)
                     3 =>
-                        (cb.nllen = 2)
-                        ((&cb.nl[0] as *mut u8)[0] = 13)
-                        ((&cb.nl[0] as *mut u8)[1] = 10)
+                        (cb__goto_10304_15.nllen = 2)
+                        ((&cb__goto_10304_15.nl[0] as *mut u8)[0] = 13)
+                        ((&cb__goto_10304_15.nl[0] as *mut u8)[1] = 10)
                     4 =>
-                        (cb.nltype = 1)
+                        (cb__goto_10304_15.nltype = 1)
                     5 =>
-                        (cb.nltype = 2)
+                        (cb__goto_10304_15.nltype = 2)
                     _ =>
-                        (errorcode = ERR56)
+                        (errorcode__goto_10330_5 = ERR56)
                         __pc = 3
                         __goto_pending = 1
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (parsed_size_needed = max_parsed_pattern(ptr, cb.end_pattern, utf, options))
+                (parsed_size_needed__goto_10316_12 = max_parsed_pattern(ptr__goto_10310_12, cb__goto_10304_15.end_pattern, utf__goto_10299_6, options))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if ((ccontext.extra_options & ((4 | 8)))) != 0: 1 else: 0) != 0:
-                    parsed_size_needed = parsed_size_needed + 4
+                    parsed_size_needed__goto_10316_12 = parsed_size_needed__goto_10316_12 + 4
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if ((options & 4)) != 0: 1 else: 0) != 0:
-                    parsed_size_needed = parsed_size_needed + 4
+                    parsed_size_needed__goto_10316_12 = parsed_size_needed__goto_10316_12 + 4
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                parsed_size_needed = parsed_size_needed + 1
+                parsed_size_needed__goto_10316_12 = parsed_size_needed__goto_10316_12 + 1
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if parsed_size_needed > 1024: 1 else: 0) != 0:
-                    heap_parsed_pattern = (ccontext.memctl.malloc((parsed_size_needed *% sizeof[c_uint]()), ccontext.memctl.memory_data) as *mut c_uint)
+                if (if parsed_size_needed__goto_10316_12 > 1024: 1 else: 0) != 0:
+                    heap_parsed_pattern__goto_10764_13 = (ccontext.memctl.malloc((parsed_size_needed__goto_10316_12 *% sizeof[c_uint]()), ccontext.memctl.memory_data) as *mut c_uint)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if heap_parsed_pattern == (null as *mut c_uint): 1 else: 0) != 0:
+                    if (if heap_parsed_pattern__goto_10764_13 == (null as *mut c_uint): 1 else: 0) != 0:
                         ((unsafe: *errorptr) = ERR21)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
@@ -541,35 +557,35 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (cb.parsed_pattern = heap_parsed_pattern)
+                    (cb__goto_10304_15.parsed_pattern = heap_parsed_pattern__goto_10764_13)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.parsed_pattern_end = (cb.parsed_pattern + parsed_size_needed))
+                (cb__goto_10304_15.parsed_pattern_end = (cb__goto_10304_15.parsed_pattern + parsed_size_needed__goto_10316_12))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (errorcode = parse_regex(ptr, cb.external_options, xoptions, (&mut has_lookbehind as *mut c_int), (&mut cb as *mut compile_block_8)))
+                (errorcode__goto_10330_5 = parse_regex(ptr__goto_10310_12, cb__goto_10304_15.external_options, xoptions__goto_10321_10, (&mut has_lookbehind__goto_10301_6 as *mut c_int), (&mut cb__goto_10304_15 as *mut compile_block_8)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if errorcode != 0: 1 else: 0) != 0:
+                if (if errorcode__goto_10330_5 != 0: 1 else: 0) != 0:
                     __pc = 2
                     __goto_pending = 1
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if has_lookbehind != 0:
-                    loopcount = 0
+                if has_lookbehind__goto_10301_6 != 0:
+                    loopcount__goto_10792_7 = 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if cb.bracount >= 128: 1 else: 0) != 0:
-                        (cb.groupinfo = (ccontext.memctl.malloc((((2 *% ((cb.bracount +% 1)))) *% sizeof[c_uint]()), ccontext.memctl.memory_data) as *mut c_uint))
+                    if (if cb__goto_10304_15.bracount >= 128: 1 else: 0) != 0:
+                        (cb__goto_10304_15.groupinfo = (ccontext.memctl.malloc((((2 *% ((cb__goto_10304_15.bracount +% 1)))) *% sizeof[c_uint]()), ccontext.memctl.memory_data) as *mut c_uint))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        if (if cb.groupinfo == (null as *mut c_uint): 1 else: 0) != 0:
-                            (errorcode = ERR21)
+                        if (if cb__goto_10304_15.groupinfo == (null as *mut c_uint): 1 else: 0) != 0:
+                            (errorcode__goto_10330_5 = ERR21)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
-                            (cb.erroroffset = 0)
+                            (cb__goto_10304_15.erroroffset = 0)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                             __pc = 2
@@ -580,57 +596,44 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    with_memset((cb.groupinfo as *mut c_void) as *i8, 0, ((((2 *% cb.bracount) +% 1)) *% sizeof[c_uint]()) as i64)
+                    with_memset((cb__goto_10304_15.groupinfo as *mut c_void) as *i8, 0, ((((2 *% cb__goto_10304_15.bracount) +% 1)) *% sizeof[c_uint]()) as i64)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (errorcode = check_lookbehinds(cb.parsed_pattern, (null as *mut *mut c_uint), (null as *mut parsed_recurse_check), (&mut cb as *mut compile_block_8), (&mut loopcount as *mut c_int)))
+                    (errorcode__goto_10330_5 = check_lookbehinds(cb__goto_10304_15.parsed_pattern, (null as *mut *mut c_uint), (null as *mut parsed_recurse_check), (&mut cb__goto_10304_15 as *mut compile_block_8), (&mut loopcount__goto_10792_7 as *mut c_int)))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if errorcode != 0: 1 else: 0) != 0:
+                    if (if errorcode__goto_10330_5 != 0: 1 else: 0) != 0:
                         __pc = 2
                         __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.erroroffset = patlen)
+                (cb__goto_10304_15.erroroffset = patlen)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (pptr = cb.parsed_pattern)
+                (pptr__goto_10311_11 = cb__goto_10304_15.parsed_pattern)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (code = cworkspace)
+                (code__goto_10308_14 = cworkspace__goto_10349_14)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((unsafe: *code) = 137)
+                ((unsafe: *code__goto_10308_14) = 137)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                compile_regex(cb.external_options, xoptions, (&mut code as *mut *mut u8), (&mut pptr as *mut *mut c_uint), (&mut errorcode as *mut c_int), 0, (&mut firstcu as *mut c_uint), (&mut firstcuflags as *mut c_uint), (&mut reqcu as *mut c_uint), (&mut reqcuflags as *mut c_uint), (null as *mut branch_chain_8), (null as *mut open_capitem), (&mut cb as *mut compile_block_8), (&mut length as *mut c_ulong))
+                compile_regex(cb__goto_10304_15.external_options, xoptions__goto_10321_10, (&mut code__goto_10308_14 as *mut *mut u8), (&mut pptr__goto_10311_11 as *mut *mut c_uint), (&mut errorcode__goto_10330_5 as *mut c_int), 0, (&mut firstcu__goto_10319_10 as *mut c_uint), (&mut firstcuflags__goto_10318_10 as *mut c_uint), (&mut reqcu__goto_10319_19 as *mut c_uint), (&mut reqcuflags__goto_10318_24 as *mut c_uint), (null as *mut branch_chain_8), (null as *mut open_capitem), (&mut cb__goto_10304_15 as *mut compile_block_8), (&mut length__goto_10313_12 as *mut c_ulong))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if errorcode != 0: 1 else: 0) != 0:
+                if (if errorcode__goto_10330_5 != 0: 1 else: 0) != 0:
                     __pc = 2
                     __goto_pending = 1
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if length > 65536: 1 else: 0) != 0:
-                    (errorcode = ERR20)
+                if (if length__goto_10313_12 > 65536: 1 else: 0) != 0:
+                    (errorcode__goto_10330_5 = ERR20)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (cb.erroroffset = 0)
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                        continue
-                    __pc = 2
-                    __goto_pending = 1
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                        continue
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                if (if re_blocksize > ccontext.max_pattern_compiled_length: 1 else: 0) != 0:
-                    (errorcode = ERR101)
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                        continue
-                    (cb.erroroffset = 0)
+                    (cb__goto_10304_15.erroroffset = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     __pc = 2
@@ -639,14 +642,11 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                re_blocksize = re_blocksize + sizeof[pcre2_real_code_8]()
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                if (if re == (null as *mut pcre2_real_code_8): 1 else: 0) != 0:
-                    (errorcode = ERR21)
+                if (if re_blocksize__goto_10315_12 > ccontext.max_pattern_compiled_length: 1 else: 0) != 0:
+                    (errorcode__goto_10330_5 = ERR101)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (cb.erroroffset = 0)
+                    (cb__goto_10304_15.erroroffset = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     __pc = 2
@@ -655,165 +655,192 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                with_memset(((((re as *mut i8) + sizeof[pcre2_real_code_8]()) - (8 as isize as usize)) as *mut c_void) as *i8, 0, 8 as i64)
+                re_blocksize__goto_10315_12 = re_blocksize__goto_10315_12 + sizeof[pcre2_real_code_8]()
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (re.memctl = ccontext.memctl)
+                (re__goto_10303_18 = (ccontext.memctl.malloc(re_blocksize__goto_10315_12, ccontext.memctl.memory_data) as *mut pcre2_real_code_8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (re.tables = tables)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.executable_jit = null)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                with_memset(((&re.start_bitmap[0] as *mut u8) as *mut c_void) as *i8, 0, (32 *% sizeof[u8]()) as i64)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.blocksize = re_blocksize)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.magic_number = 1346589253)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.compile_options = options)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.overall_options = cb.external_options)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.extra_options = xoptions)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.flags = ((1 | cb.external_flags) | setflags))
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.limit_heap = limit_heap)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.limit_match = limit_match)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.limit_depth = limit_depth)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.first_codeunit = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.last_codeunit = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.bsr_convention = bsr)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.newline_convention = newline)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.max_lookbehind = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.minlength = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.top_bracket = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.top_backref = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.name_entry_size = cb.name_entry_size)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.name_count = cb.names_found)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (re.optimization_flags = optim_flags)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (cb.parens_depth = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (cb.assert_depth = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (cb.lastcapture = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (cb.start_code = codestart)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (cb.req_varyopt = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (cb.had_accept = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                (cb.had_pruneorskip = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
-                    continue
-                if (if cb.names_found > 0: 1 else: 0) != 0:
-                    ng = cb.named_groups
+                if (if re__goto_10303_18 == (null as *mut pcre2_real_code_8): 1 else: 0) != 0:
+                    (errorcode__goto_10330_5 = ERR21)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    tablecount = 0
+                    (cb__goto_10304_15.erroroffset = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (i = 0)
-                    while (if i < cb.names_found: 1 else: 0) != 0:
-                        if (if ng.length > 0: 1 else: 0) != 0:
-                            (tablecount = _pcre2_compile_add_name_to_table8((&mut cb as *mut compile_block_8), ng, tablecount))
+                    __pc = 2
+                    __goto_pending = 1
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                with_memset(((((re__goto_10303_18 as *mut i8) + sizeof[pcre2_real_code_8]()) - (8 as isize as usize)) as *mut c_void) as *i8, 0, 8 as i64)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.memctl = ccontext.memctl)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.tables = tables__goto_10305_16)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.executable_jit = null)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                with_memset(((&re__goto_10303_18.start_bitmap[0] as *mut u8) as *mut c_void) as *i8, 0, (32 *% sizeof[u8]()) as i64)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.blocksize = re_blocksize__goto_10315_12)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.magic_number = 1346589253)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.compile_options = options)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.overall_options = cb__goto_10304_15.external_options)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.extra_options = xoptions__goto_10321_10)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.flags = ((1 | cb__goto_10304_15.external_flags) | setflags__goto_10320_10))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.limit_heap = limit_heap__goto_10324_10)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.limit_match = limit_match__goto_10325_10)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.limit_depth = limit_depth__goto_10326_10)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.first_codeunit = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.last_codeunit = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.bsr_convention = bsr__goto_10329_5)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.newline_convention = newline__goto_10328_5)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.max_lookbehind = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.minlength = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.top_bracket = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.top_backref = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.name_entry_size = cb__goto_10304_15.name_entry_size)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.name_count = cb__goto_10304_15.names_found)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (re__goto_10303_18.optimization_flags = optim_flags__goto_10336_10)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (codestart__goto_10309_14 = ((((re__goto_10303_18 as *mut u8) + re__goto_10303_18.code_start)) as *mut u8))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (cb__goto_10304_15.parens_depth = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (cb__goto_10304_15.assert_depth = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (cb__goto_10304_15.lastcapture = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (cb__goto_10304_15.name_table = ((((re__goto_10303_18 as *mut u8) + sizeof[pcre2_real_code_8]())) as *mut u8))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (cb__goto_10304_15.start_code = codestart__goto_10309_14)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (cb__goto_10304_15.req_varyopt = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (cb__goto_10304_15.had_accept = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (cb__goto_10304_15.had_pruneorskip = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if cb__goto_10304_15.names_found > 0: 1 else: 0) != 0:
+                    ng__goto_10967_16 = cb__goto_10304_15.named_groups
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    tablecount__goto_10968_12 = 0
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (i__goto_10333_10 = 0)
+                    while (if i__goto_10333_10 < cb__goto_10304_15.names_found: 1 else: 0) != 0:
+                        if (if ng__goto_10967_16.length > 0: 1 else: 0) != 0:
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (pptr = cb.parsed_pattern)
+                (pptr__goto_10311_11 = cb__goto_10304_15.parsed_pattern)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((unsafe: *code) = 137)
+                (code__goto_10308_14 = (codestart__goto_10309_14 as *mut u8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (regexrc = compile_regex(re.overall_options, re.extra_options, (&mut code as *mut *mut u8), (&mut pptr as *mut *mut c_uint), (&mut errorcode as *mut c_int), 0, (&mut firstcu as *mut c_uint), (&mut firstcuflags as *mut c_uint), (&mut reqcu as *mut c_uint), (&mut reqcuflags as *mut c_uint), (null as *mut branch_chain_8), (null as *mut open_capitem), (&mut cb as *mut compile_block_8), (null as *mut c_ulong)))
+                ((unsafe: *code__goto_10308_14) = 137)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if regexrc < 0: 1 else: 0) != 0:
-                    re.flags = re.flags | 8192
+                (regexrc__goto_10331_5 = compile_regex(re__goto_10303_18.overall_options, re__goto_10303_18.extra_options, (&mut code__goto_10308_14 as *mut *mut u8), (&mut pptr__goto_10311_11 as *mut *mut c_uint), (&mut errorcode__goto_10330_5 as *mut c_int), 0, (&mut firstcu__goto_10319_10 as *mut c_uint), (&mut firstcuflags__goto_10318_10 as *mut c_uint), (&mut reqcu__goto_10319_19 as *mut c_uint), (&mut reqcuflags__goto_10318_24 as *mut c_uint), (null as *mut branch_chain_8), (null as *mut open_capitem), (&mut cb__goto_10304_15 as *mut compile_block_8), (null as *mut c_ulong)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (re.top_bracket = cb.bracount)
+                if (if regexrc__goto_10331_5 < 0: 1 else: 0) != 0:
+                    re__goto_10303_18.flags = re__goto_10303_18.flags | 8192
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (re.top_backref = cb.top_backref)
+                (re__goto_10303_18.top_bracket = cb__goto_10304_15.bracount)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (re.max_lookbehind = cb.max_lookbehind)
+                (re__goto_10303_18.top_backref = cb__goto_10304_15.top_backref)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if cb.had_accept != 0:
-                    (reqcu = 0)
+                (re__goto_10303_18.max_lookbehind = cb__goto_10304_15.max_lookbehind)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if cb__goto_10304_15.had_accept != 0:
+                    (reqcu__goto_10319_19 = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (reqcuflags = (4294967294 as c_uint))
+                    (reqcuflags__goto_10318_24 = (4294967294 as c_uint))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    re.flags = re.flags | 8388608
+                    re__goto_10303_18.flags = re__goto_10303_18.flags | 8388608
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (unsafe: *code = 0)
-                (code = code + 1)
+                (unsafe: *code__goto_10308_14 = 0)
+                (code__goto_10308_14 = code__goto_10308_14 + 1)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (usedlength = ((code as usize -% codestart as usize) / sizeof[u8]()))
+                (usedlength__goto_10314_12 = ((code__goto_10308_14 as usize -% codestart__goto_10309_14 as usize) / sizeof[u8]()))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if usedlength > length: 1 else: 0) != 0:
-                    (errorcode = ERR23)
+                if (if usedlength__goto_10314_12 > length__goto_10313_12: 1 else: 0) != 0:
+                    (errorcode__goto_10330_5 = ERR23)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (cb.erroroffset = 0)
+                    (cb__goto_10304_15.erroroffset = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     __pc = 2
@@ -822,27 +849,27 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if (if errorcode == 0: 1 else: 0) != 0 and cb.had_recurse != 0: 1 else: 0) != 0:
-                    ccount = 0
+                if (if (if errorcode__goto_10330_5 == 0: 1 else: 0) != 0 and cb__goto_10304_15.had_recurse != 0: 1 else: 0) != 0:
+                    ccount__goto_11032_16 = 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    start = 8
+                    start__goto_11033_7 = 8
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (rcode = find_recurse(codestart, utf))
-                    while (if rcode != (null as *mut u8): 1 else: 0) != 0:
-                        if (if groupnumber == 0: 1 else: 0) != 0:
-                            (rgroup = (codestart as *const u8))
+                    (rcode__goto_11030_16 = find_recurse(codestart__goto_10309_14, utf__goto_10299_6))
+                    while (if rcode__goto_11030_16 != (null as *mut u8): 1 else: 0) != 0:
+                        if (if groupnumber__goto_11040_12 == 0: 1 else: 0) != 0:
+                            (rgroup__goto_11031_14 = (codestart__goto_10309_14 as *const u8))
                         else:
-                            search_from = (codestart as *const u8)
+                            search_from__goto_11045_18 = (codestart__goto_10309_14 as *const u8)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (rgroup = (null as *const u8))
+                            (rgroup__goto_11031_14 = (null as *const u8))
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            while (if i < ccount: 1 else: 0) != 0:
-                                if (if groupnumber == (&rc[0] as *mut recurse_cache)[p].groupnumber: 1 else: 0) != 0:
-                                    (rgroup = (&rc[0] as *mut recurse_cache)[p].group)
+                            while (if i__goto_10333_10 < ccount__goto_11032_16: 1 else: 0) != 0:
+                                if (if groupnumber__goto_11040_12 == (&rc__goto_11034_17[0] as *mut recurse_cache)[p__goto_11040_9].groupnumber: 1 else: 0) != 0:
+                                    (rgroup__goto_11031_14 = (&rc__goto_11034_17[0] as *mut recurse_cache)[p__goto_11040_9].group)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     break
@@ -850,20 +877,20 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if groupnumber > (&rc[0] as *mut recurse_cache)[p].groupnumber: 1 else: 0) != 0:
-                                    (search_from = (&rc[0] as *mut recurse_cache)[p].group)
+                                if (if groupnumber__goto_11040_12 > (&rc__goto_11034_17[0] as *mut recurse_cache)[p__goto_11040_9].groupnumber: 1 else: 0) != 0:
+                                    (search_from__goto_11045_18 = (&rc__goto_11034_17[0] as *mut recurse_cache)[p__goto_11040_9].group)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if (if rgroup == (null as *const u8): 1 else: 0) != 0:
-                                (rgroup = _pcre2_find_bracket_8(search_from, utf, groupnumber))
+                            if (if rgroup__goto_11031_14 == (null as *const u8): 1 else: 0) != 0:
+                                (rgroup__goto_11031_14 = _pcre2_find_bracket_8(search_from__goto_11045_18, utf__goto_10299_6, groupnumber__goto_11040_12))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if rgroup == (null as *const u8): 1 else: 0) != 0:
-                                    (errorcode = ERR53)
+                                if (if rgroup__goto_11031_14 == (null as *const u8): 1 else: 0) != 0:
+                                    (errorcode__goto_10330_5 = ERR53)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     break
@@ -871,97 +898,99 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if (start = start - 1) < 0: 1 else: 0) != 0:
-                                    (start = (8 - 1))
+                                if (if (start__goto_11033_7 = start__goto_11033_7 - 1) < 0: 1 else: 0) != 0:
+                                    (start__goto_11033_7 = (8 - 1))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                ((&rc[0] as *mut recurse_cache)[start].groupnumber = groupnumber)
+                                ((&rc__goto_11034_17[0] as *mut recurse_cache)[start__goto_11033_7].groupnumber = groupnumber__goto_11040_12)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                ((&rc[0] as *mut recurse_cache)[start].group = rgroup)
+                                ((&rc__goto_11034_17[0] as *mut recurse_cache)[start__goto_11033_7].group = rgroup__goto_11031_14)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if ccount < 8: 1 else: 0) != 0:
-                                    (ccount = ccount + 1)
+                                if (if ccount__goto_11032_16 < 8: 1 else: 0) != 0:
+                                    (ccount__goto_11032_16 = ccount__goto_11032_16 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (rcode = find_recurse(((rcode + (1 as isize as usize)) + (2 as isize as usize)), utf))
+                        (rcode__goto_11030_16 = find_recurse(((rcode__goto_11030_16 + (1 as isize as usize)) + (2 as isize as usize)), utf__goto_10299_6))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if (if errorcode == 0: 1 else: 0) != 0 and (if ((optim_flags & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                    possessify_rc = _pcre2_auto_possessify_8(temp, ((&mut cb as *mut compile_block_8) as *const compile_block_8))
+                if (if (if errorcode__goto_10330_5 == 0: 1 else: 0) != 0 and (if ((optim_flags__goto_10336_10 & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    temp__goto_11102_16 = (codestart__goto_10309_14 as *mut u8)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if possessify_rc != 0: 1 else: 0) != 0:
-                        (errorcode = ERR80)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    if (if possessify_rc__goto_11103_7 != 0: 1 else: 0) != 0:
+                        (errorcode__goto_10330_5 = ERR80)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        (cb.erroroffset = 0)
+                        (cb__goto_10304_15.erroroffset = 0)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if errorcode != 0: 1 else: 0) != 0:
+                if (if errorcode__goto_10330_5 != 0: 1 else: 0) != 0:
                     __pc = 2
                     __goto_pending = 1
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ((re.overall_options & (2147483648 as c_uint))) == 0: 1 else: 0) != 0:
-                    dotstar_anchor = ((if ((optim_flags & 2)) != 0: 1 else: 0))
+                if (if ((re__goto_10303_18.overall_options & (2147483648 as c_uint))) == 0: 1 else: 0) != 0:
+                    dotstar_anchor__goto_11126_8 = ((if ((optim_flags__goto_10336_10 & 2)) != 0: 1 else: 0))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if is_anchored((codestart as *const u8), 0, (&mut cb as *mut compile_block_8), 0, 0, dotstar_anchor) != 0:
-                        re.overall_options = re.overall_options | 2147483648
+                    if is_anchored((codestart__goto_10309_14 as *const u8), 0, (&mut cb__goto_10304_15 as *mut compile_block_8), 0, 0, dotstar_anchor__goto_11126_8) != 0:
+                        re__goto_10303_18.overall_options = re__goto_10303_18.overall_options | 2147483648
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ((optim_flags & 4)) != 0: 1 else: 0) != 0:
-                    minminlength = 0
+                if (if ((optim_flags__goto_10336_10 & 4)) != 0: 1 else: 0) != 0:
+                    minminlength__goto_11140_7 = 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if firstcuflags >= 4294967294: 1 else: 0) != 0:
-                        assertedcuflags = 0
+                    if (if firstcuflags__goto_10318_10 >= 4294967294: 1 else: 0) != 0:
+                        assertedcuflags__goto_11148_14 = 0
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        assertedcu = find_firstassertedcu((codestart as *const u8), (&mut assertedcuflags as *mut c_uint), 0)
+                        assertedcu__goto_11149_14 = find_firstassertedcu((codestart__goto_10309_14 as *const u8), (&mut assertedcuflags__goto_11148_14 as *mut c_uint), 0)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        if (if (if assertedcuflags < 4294967294: 1 else: 0) != 0 and (if assertedcu != reqcu: 1 else: 0) != 0: 1 else: 0) != 0:
-                            (firstcu = assertedcu)
+                        if (if (if assertedcuflags__goto_11148_14 < 4294967294: 1 else: 0) != 0 and (if assertedcu__goto_11149_14 != reqcu__goto_10319_19: 1 else: 0) != 0: 1 else: 0) != 0:
+                            (firstcu__goto_10319_10 = assertedcu__goto_11149_14)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
-                            (firstcuflags = assertedcuflags)
+                            (firstcuflags__goto_10318_10 = assertedcuflags__goto_11148_14)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if firstcuflags < 4294967294: 1 else: 0) != 0:
-                        (re.first_codeunit = firstcu)
+                    if (if firstcuflags__goto_10318_10 < 4294967294: 1 else: 0) != 0:
+                        (re__goto_10303_18.first_codeunit = firstcu__goto_10319_10)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        re.flags = re.flags | 16
+                        re__goto_10303_18.flags = re__goto_10303_18.flags | 16
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        (minminlength = minminlength + 1)
+                        (minminlength__goto_11140_7 = minminlength__goto_11140_7 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        if (if ((firstcuflags & 1)) != 0: 1 else: 0) != 0:
-                            if (if (if firstcu < 128: 1 else: 0) != 0 or ((if (if (if utf != 0: 0 else: 1) != 0 and (if ucp != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if firstcu < 255: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                if (if cb.fcc[firstcu] != firstcu: 1 else: 0) != 0:
-                                    re.flags = re.flags | 32
+                        if (if ((firstcuflags__goto_10318_10 & 1)) != 0: 1 else: 0) != 0:
+                            if (if (if firstcu__goto_10319_10 < 128: 1 else: 0) != 0 or ((if (if (if utf__goto_10299_6 != 0: 0 else: 1) != 0 and (if ucp__goto_10300_6 != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if firstcu__goto_10319_10 < 255: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                if (if cb__goto_10304_15.fcc[firstcu__goto_10319_10] != firstcu__goto_10319_10: 1 else: 0) != 0:
+                                    re__goto_10303_18.flags = re__goto_10303_18.flags | 32
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     continue
                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -969,28 +998,28 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     else:
-                        if (if ((re.overall_options & (2147483648 as c_uint))) == 0: 1 else: 0) != 0:
-                            dotstar_anchor = ((if ((optim_flags & 2)) != 0: 1 else: 0))
+                        if (if ((re__goto_10303_18.overall_options & (2147483648 as c_uint))) == 0: 1 else: 0) != 0:
+                            dotstar_anchor__goto_11204_10 = ((if ((optim_flags__goto_10336_10 & 2)) != 0: 1 else: 0))
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
-                            if is_startline((codestart as *const u8), 0, (&mut cb as *mut compile_block_8), 0, 0, dotstar_anchor) != 0:
-                                re.flags = re.flags | 512
+                            if is_startline((codestart__goto_10309_14 as *const u8), 0, (&mut cb__goto_10304_15 as *mut compile_block_8), 0, 0, dotstar_anchor__goto_11204_10) != 0:
+                                re__goto_10303_18.flags = re__goto_10303_18.flags | 512
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if reqcuflags < 4294967294: 1 else: 0) != 0:
-                        if (if (if ((re.overall_options & (2147483648 as c_uint))) == 0: 1 else: 0) != 0 or (if ((reqcuflags & 2)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                            (re.last_codeunit = reqcu)
+                    if (if reqcuflags__goto_10318_24 < 4294967294: 1 else: 0) != 0:
+                        if (if (if ((re__goto_10303_18.overall_options & (2147483648 as c_uint))) == 0: 1 else: 0) != 0 or (if ((reqcuflags__goto_10318_24 & 2)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                            (re__goto_10303_18.last_codeunit = reqcu__goto_10319_19)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
-                            re.flags = re.flags | 128
+                            re__goto_10303_18.flags = re__goto_10303_18.flags | 128
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
-                            if (if ((reqcuflags & 1)) != 0: 1 else: 0) != 0:
-                                if (if (if reqcu < 128: 1 else: 0) != 0 or ((if (if (if utf != 0: 0 else: 1) != 0 and (if ucp != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if reqcu < 255: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                    if (if cb.fcc[reqcu] != reqcu: 1 else: 0) != 0:
-                                        re.flags = re.flags | 256
+                            if (if ((reqcuflags__goto_10318_24 & 1)) != 0: 1 else: 0) != 0:
+                                if (if (if reqcu__goto_10319_19 < 128: 1 else: 0) != 0 or ((if (if (if utf__goto_10299_6 != 0: 0 else: 1) != 0 and (if ucp__goto_10300_6 != 0: 0 else: 1) != 0: 1 else: 0) != 0 and (if reqcu__goto_10319_19 < 255: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                    if (if cb__goto_10304_15.fcc[reqcu__goto_10319_19] != reqcu__goto_10319_19: 1 else: 0) != 0:
+                                        re__goto_10303_18.flags = re__goto_10303_18.flags | 256
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         continue
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1001,14 +1030,14 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (study_rc = _pcre2_study_8(re))
+                    (study_rc__goto_11141_7 = _pcre2_study_8(re__goto_10303_18))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if study_rc != 0: 1 else: 0) != 0:
-                        (errorcode = ERR31)
+                    if (if study_rc__goto_11141_7 != 0: 1 else: 0) != 0:
+                        (errorcode__goto_10330_5 = ERR31)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        (cb.erroroffset = 0)
+                        (cb__goto_10304_15.erroroffset = 0)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         __pc = 2
@@ -1017,12 +1046,12 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if (if ((re.flags & 64)) != 0: 1 else: 0) != 0 and (if minminlength == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                        (minminlength = 1)
+                    if (if (if ((re__goto_10303_18.flags & 64)) != 0: 1 else: 0) != 0 and (if minminlength__goto_11140_7 == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                        (minminlength__goto_11140_7 = 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if re.minlength < minminlength: 1 else: 0) != 0:
-                        (re.minlength = minminlength)
+                    if (if re__goto_10303_18.minlength < minminlength__goto_11140_7: 1 else: 0) != 0:
+                        (re__goto_10303_18.minlength = minminlength__goto_11140_7)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1031,65 +1060,65 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 continue
             1 =>  // EXIT
                 (__goto_pending = 0)
-                if (if cb.parsed_pattern != (&stack_parsed_pattern[0] as *mut c_uint): 1 else: 0) != 0:
-                    ccontext.memctl.free((cb.parsed_pattern as *mut c_void), ccontext.memctl.memory_data)
+                if (if cb__goto_10304_15.parsed_pattern != (&stack_parsed_pattern__goto_10342_10[0] as *mut c_uint): 1 else: 0) != 0:
+                    ccontext.memctl.free((cb__goto_10304_15.parsed_pattern as *mut c_void), ccontext.memctl.memory_data)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if cb.named_group_list_size > 20: 1 else: 0) != 0:
-                    ccontext.memctl.free((cb.named_groups as *mut c_void), ccontext.memctl.memory_data)
+                if (if cb__goto_10304_15.named_group_list_size > 20: 1 else: 0) != 0:
+                    ccontext.memctl.free((cb__goto_10304_15.named_groups as *mut c_void), ccontext.memctl.memory_data)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if cb.groupinfo != (&stack_groupinfo[0] as *mut c_uint): 1 else: 0) != 0:
-                    ccontext.memctl.free((cb.groupinfo as *mut c_void), ccontext.memctl.memory_data)
+                if (if cb__goto_10304_15.groupinfo != (&stack_groupinfo__goto_10341_10[0] as *mut c_uint): 1 else: 0) != 0:
+                    ccontext.memctl.free((cb__goto_10304_15.groupinfo as *mut c_void), ccontext.memctl.memory_data)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                return re
+                return re__goto_10303_18
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 2
                 continue
             2 =>  // HAD_CB_ERROR
                 (__goto_pending = 0)
-                (ptr = (pattern + cb.erroroffset))
+                (ptr__goto_10310_12 = (pattern + cb__goto_10304_15.erroroffset))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 3
                 continue
             3 =>  // HAD_EARLY_ERROR
                 (__goto_pending = 0)
-                ((unsafe: *erroroffset) = ((ptr as usize -% pattern as usize) / sizeof[u8]()))
+                ((unsafe: *erroroffset) = ((ptr__goto_10310_12 as usize -% pattern as usize) / sizeof[u8]()))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 4
                 continue
             4 =>  // HAD_ERROR
                 (__goto_pending = 0)
-                ((unsafe: *errorptr) = errorcode)
+                ((unsafe: *errorptr) = errorcode__goto_10330_5)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                pcre2_code_free_8(re)
+                pcre2_code_free_8(re__goto_10303_18)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (re = (null as *mut pcre2_real_code_8))
+                (re__goto_10303_18 = (null as *mut pcre2_real_code_8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if cb.first_data != (null as *mut compile_data): 1 else: 0) != 0:
-                    current_data = cb.first_data
+                if (if cb__goto_10304_15.first_data != (null as *mut compile_data): 1 else: 0) != 0:
+                    current_data__goto_11347_17 = cb__goto_10304_15.first_data
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     while true:
-                        next_data = current_data.next
+                        next_data__goto_11350_19 = current_data__goto_11347_17.next
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        cb.cx.memctl.free((current_data as *mut c_void), cb.cx.memctl.memory_data)
+                        cb__goto_10304_15.cx.memctl.free((current_data__goto_11347_17 as *mut c_void), cb__goto_10304_15.cx.memctl.memory_data)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (current_data = next_data)
+                        (current_data__goto_11347_17 = next_data__goto_11350_19)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if not ((if current_data != (null as *mut compile_data): 1 else: 0) != 0):
+                        if not ((if current_data__goto_11347_17 != (null as *mut compile_data): 1 else: 0) != 0):
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
@@ -1272,12 +1301,27 @@ type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
 type struct_pcre2_real_jit_stack_8 = pcre2_real_jit_stack_8
 type dfa_recursion_info { prevrec: *mut dfa_recursion_info = null, subject_position: *const u8 = null, last_used_ptr: *const u8 = null, group_num: c_uint = 0 }
 type struct_dfa_recursion_info = dfa_recursion_info
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:696:8: demoted to opaque
-type heapframe = opaque
+// union
+type heapframe_fields_char_repeat_oc { oc: c_uint = 0, occu: [4]u8 = [0 as u8; 4] }
+type heapframe_fields_char_repeat { start_eptr: *const u8 = null, charptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: heapframe_fields_char_repeat_oc }
+type heapframe_fields_charnot_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: c_uint = 0 }
+type heapframe_fields_class_repeat { start_eptr: *const u8 = null, byte_map_address: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_xclass_repeat { start_eptr: *const u8 = null, xclass_data: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_eclass_repeat { start_eptr: *const u8 = null, eclass_data: *const u8 = null, eclass_len: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_type_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, ctype: c_uint = 0, propvalue: c_uint = 0 }
+type heapframe_fields_ref_repeat { start: *const u8 = null, offset: c_ulong = 0, length: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_op_bra { frame_type: c_uint = 0 }
+type heapframe_fields_op_brapos { start_eptr: *const u8 = null, start_group: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_recurse { start_branch: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_assert_scs { saved_end_subject: *const u8 = null, saved_eptr: *const u8 = null, true_end_extra: c_ulong = 0, saved_moptions: c_uint = 0 }
+type heapframe_fields_op_cond { start_branch: *const u8 = null, length: c_ulong = 0 }
+type heapframe_fields_op_vreverse { min: c_uint = 0, max: c_uint = 0 }
+// union
+type heapframe_fields { char_repeat: heapframe_fields_char_repeat, charnot_repeat: heapframe_fields_charnot_repeat, class_repeat: heapframe_fields_class_repeat, xclass_repeat: heapframe_fields_xclass_repeat, eclass_repeat: heapframe_fields_eclass_repeat, type_repeat: heapframe_fields_type_repeat, ref_repeat: heapframe_fields_ref_repeat, op_bra: heapframe_fields_op_bra, op_brapos: heapframe_fields_op_brapos, op_recurse: heapframe_fields_op_recurse, op_assert_scs: heapframe_fields_op_assert_scs, op_cond: heapframe_fields_op_cond, op_vreverse: heapframe_fields_op_vreverse }
+type heapframe { ecode: *const u8 = null, back_frame: c_ulong = 0, rdepth: c_uint = 0, group_frame_type: c_uint = 0, return_id: u8 = 0, op: u8 = 0, byte1: u8 = 0, byte2: u8 = 0, fields: heapframe_fields, eptr: *const u8 = null, start_match: *const u8 = null, mark: *const u8 = null, recurse_last_used: *const u8 = null, current_recurse: c_uint = 0, capture_last: c_uint = 0, last_group_offset: c_ulong = 0, offset_top: c_ulong = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
 type struct_heapframe = heapframe
 type static_assertion_heapframe_size = [1]c_int
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:1024:16: demoted to opaque
-type heapframe_align = opaque
+type heapframe_align { unalign: c_char = 0, frame: heapframe }
 type struct_heapframe_align = heapframe_align
 type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, hitend: c_int = 0, hasthen: c_int = 0, hasbsk: c_int = 0, allowemptypartial: c_int = 0, allowlookaroundbsk: c_int = 0, lcc: *const u8 = null, fcc: *const u8 = null, ctypes: *const u8 = null, start_offset: c_ulong = 0, end_offset_top: c_ulong = 0, partial: c_ushort = 0, bsr_convention: c_ushort = 0, name_count: c_ushort = 0, name_entry_size: c_ushort = 0, name_table: *const u8 = null, start_code: *const u8 = null, start_subject: *const u8 = null, check_subject: *const u8 = null, end_subject: *const u8 = null, true_end_subject: *const u8 = null, end_match_ptr: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, mark: *const u8 = null, nomatch_mark: *const u8 = null, verb_ecode_ptr: *const u8 = null, verb_skip_ptr: *const u8 = null, verb_current_recurse: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, skip_arg_count: c_uint = 0, ignore_skip_arg: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null }
 type struct_match_block_8 = match_block_8
@@ -1285,30 +1329,33 @@ type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, sta
 type struct_dfa_match_block_8 = dfa_match_block_8
 extern fn _pcre2_auto_possessify_8(p0: *mut u8, p1: *const compile_block_8) -> c_int
 fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut c_uint, errorcodeptr: *mut c_int, options: c_uint, xoptions: c_uint, bracount: c_uint, isclass: c_int, cb: *mut compile_block_8) -> c_int:
-    var utf: c_int = 0
-    var alt_bsux: c_int = 0
-    var ptr: *const u8 = null
-    var c: c_uint = 0
-    var cc: c_uint = 0
-    var escape: c_int = 0
-    var i: c_int = 0
-    var p: *const u8 = null
-    var s: c_int = 0
-    var oldptr: *const u8 = null
-    var overflow: c_int = 0
-    var xc: c_uint = 0
-    var hptr: *const u8 = null
+    var utf__goto_1510_6: c_int = 0
+    var alt_bsux__goto_1511_6: c_int = 0
+    var ptr__goto_1513_12: *const u8 = null
+    var c__goto_1514_10: c_uint = 0
+    var cc__goto_1514_13: c_uint = 0
+    var escape__goto_1515_5: c_int = 0
+    var i__goto_1516_5: c_int = 0
+    var p__goto_1562_18: *const u8 = null
+    var s__goto_1627_7: c_int = 0
+    var oldptr__goto_1628_14: *const u8 = null
+    var overflow__goto_1629_8: c_int = 0
+    var xc__goto_1668_16: c_uint = 0
+    var hptr__goto_1674_20: *const u8 = null
+    var p__goto_1773_18: *const u8 = null
+    var p__goto_1816_18: *const u8 = null
+    var xc__goto_2049_16: c_uint = 0
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                utf = (if ((options & 524288)) != 0: 1 else: 0)
-                alt_bsux = (if ((((options & 2)) | ((xoptions & 32)))) != 0: 1 else: 0)
-                ptr = (unsafe: *ptrptr)
-                escape = 0
-                if (if ptr >= ptrend: 1 else: 0) != 0:
+                utf__goto_1510_6 = (if ((options & 524288)) != 0: 1 else: 0)
+                alt_bsux__goto_1511_6 = (if ((((options & 2)) | ((xoptions & 32)))) != 0: 1 else: 0)
+                ptr__goto_1513_12 = (unsafe: *ptrptr)
+                escape__goto_1515_5 = 0
+                if (if ptr__goto_1513_12 >= ptrend: 1 else: 0) != 0:
                     ((unsafe: *errorcodeptr) = ERR1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
@@ -1327,20 +1374,20 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                 continue
             2 =>  // EXIT
                 (__goto_pending = 0)
-                ((unsafe: *ptrptr) = ptr)
+                ((unsafe: *ptrptr) = ptr__goto_1513_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((unsafe: *chptr) = c)
+                ((unsafe: *chptr) = c__goto_1514_10)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                return escape
+                return escape__goto_1515_5
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 3
                 continue
             3 =>  // ESCAPE_FAILED_FORWARD
                 (__goto_pending = 0)
-                (ptr = ptr + 1)
+                (ptr__goto_1513_12 = ptr__goto_1513_12 + 1)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 2
@@ -1491,40 +1538,40 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
     return 0
 
 fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *mut c_int, lcptr: *mut c_int, recurses: *mut parsed_recurse_check, cb: *mut compile_block_8) -> c_int:
-    var branchlength: c_int = 0
-    var branchminlength: c_int = 0
-    var grouplength: c_int = 0
-    var groupminlength: c_int = 0
-    var lastitemlength: c_uint = 0
-    var lastitemminlength: c_uint = 0
-    var pptr: *mut c_uint = null
-    var offset: c_ulong = 0
-    var this_recurse: parsed_recurse_check
-    var r: *mut parsed_recurse_check = null
-    var gptr: *mut c_uint = null
-    var gptrend: *mut c_uint = null
-    var escape: c_uint = 0
-    var min: c_uint = 0
-    var max: c_uint = 0
-    var group: c_uint = 0
-    var itemlength: c_uint = 0
-    var itemminlength: c_uint = 0
-    var name: *const u8 = null
-    var is_dupname: c_int = 0
-    var ng: *mut named_group_8 = null
-    var meta_code: c_uint = 0
-    var length: c_uint = 0
+    var branchlength__goto_9603_5: c_int = 0
+    var branchminlength__goto_9604_5: c_int = 0
+    var grouplength__goto_9605_5: c_int = 0
+    var groupminlength__goto_9605_18: c_int = 0
+    var lastitemlength__goto_9606_10: c_uint = 0
+    var lastitemminlength__goto_9607_10: c_uint = 0
+    var pptr__goto_9608_11: *mut c_uint = null
+    var offset__goto_9609_12: c_ulong = 0
+    var this_recurse__goto_9610_22: parsed_recurse_check
+    var r__goto_9626_25: *mut parsed_recurse_check = null
+    var gptr__goto_9627_13: *mut c_uint = null
+    var gptrend__goto_9627_20: *mut c_uint = null
+    var escape__goto_9628_12: c_uint = 0
+    var min__goto_9629_12: c_uint = 0
+    var max__goto_9629_17: c_uint = 0
+    var group__goto_9630_12: c_uint = 0
+    var itemlength__goto_9631_12: c_uint = 0
+    var itemminlength__goto_9632_12: c_uint = 0
+    var name__goto_9787_18: *const u8 = null
+    var is_dupname__goto_9788_12: c_int = 0
+    var ng__goto_9789_20: *mut named_group_8 = null
+    var meta_code__goto_9790_16: c_uint = 0
+    var length__goto_9791_16: c_uint = 0
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                branchlength = 0
-                branchminlength = 0
-                lastitemlength = 0
-                lastitemminlength = 0
-                pptr = (unsafe: *pptrptr)
+                branchlength__goto_9603_5 = 0
+                branchminlength__goto_9604_5 = 0
+                lastitemlength__goto_9606_10 = 0
+                lastitemminlength__goto_9607_10 = 0
+                pptr__goto_9608_11 = (unsafe: *pptrptr)
                 if (if (((unsafe: *lcptr)) = ((unsafe: *lcptr)) + 1) > 2000: 1 else: 0) != 0:
                     ((unsafe: *errcodeptr) = ERR35)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1534,24 +1581,24 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (pptr = pptr + 1) != null:
-                    group = 0
+                while (pptr__goto_9608_11 = pptr__goto_9608_11 + 1) != null:
+                    group__goto_9630_12 = 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    itemlength = 0
+                    itemlength__goto_9631_12 = 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    itemminlength = 0
+                    itemminlength__goto_9632_12 = 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (unsafe: *pptr) < 2147483648: 1 else: 0) != 0:
-                        (itemminlength = 1)
-                        (itemlength = itemminlength)
+                    if (if (unsafe: *pptr__goto_9608_11) < 2147483648: 1 else: 0) != 0:
+                        (itemminlength__goto_9632_12 = 1)
+                        (itemlength__goto_9631_12 = itemminlength__goto_9632_12)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if (2147483647 - branchlength) < (itemlength as c_int): 1 else: 0) != 0 or (if (branchlength = branchlength + itemlength) > ((65535 as c_int)): 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (if (if (2147483647 - branchlength__goto_9603_5) < (itemlength__goto_9631_12 as c_int): 1 else: 0) != 0 or (if (branchlength__goto_9603_5 = branchlength__goto_9603_5 + itemlength__goto_9631_12) > ((65535 as c_int)): 1 else: 0) != 0: 1 else: 0) != 0:
                         ((unsafe: *errcodeptr) = ERR87)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
@@ -1560,13 +1607,13 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    branchminlength = branchminlength + itemminlength
+                    branchminlength__goto_9604_5 = branchminlength__goto_9604_5 + itemminlength__goto_9632_12
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (lastitemlength = itemlength)
+                    (lastitemlength__goto_9606_10 = itemlength__goto_9631_12)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (lastitemminlength = itemminlength)
+                    (lastitemminlength__goto_9607_10 = itemminlength__goto_9632_12)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1577,13 +1624,13 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                 continue
             5 =>  // EXIT
                 (__goto_pending = 0)
-                ((unsafe: *pptrptr) = pptr)
+                ((unsafe: *pptrptr) = pptr__goto_9608_11)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((unsafe: *minptr) = branchminlength)
+                ((unsafe: *minptr) = branchminlength__goto_9604_5)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                return branchlength
+                return branchlength__goto_9603_5
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 6
@@ -1609,6 +1656,11 @@ fn set_lookbehind_lengths(pptrptr: *mut *mut c_uint, errcodeptr: *mut c_int, lcp
     (unsafe: *pptrptr) = (unsafe: *pptrptr) + 2
     if variable != 0:
         (gbptr[1] = minlength)
+        if (if (maxlength as c_ulong) > cb.max_varlookbehind: 1 else: 0) != 0:
+            ((unsafe: *errcodeptr) = ERR100)
+            (cb.erroroffset = offset)
+            return 0
+        
     else:
         (gbptr[1] = 65535)
 
@@ -1618,6 +1670,7 @@ fn check_lookbehinds(__param_pptr: *mut c_uint, retptr: *mut *mut c_uint, recurs
     var pptr = __param_pptr
     var errorcode: c_int = 0
     var nestlevel: c_int = 0
+    (cb.erroroffset = ((0 -% 1)))
     while (if (unsafe: *pptr) != 2147483648: 1 else: 0) != 0:
         if (if (unsafe: *pptr) < 2147483648: 1 else: 0) != 0:
             continue
@@ -1634,46 +1687,17 @@ var xdigitab: [256]u8 = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 
 var escapes: [75]c_short = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 58, 59, 60, 61, 62, 63, 64, -1, -4, -14, -6, -25, 0, -2, -18, 0, 0, -3, 0, 0, -12, 0, -15, -26, -17, -8, 0, 0, -20, -10, -22, 0, -23, 91, 92, 93, 94, 95, 96, 7, -5, 0, -7, 27, 12, 0, -19, 0, 0, -28, 0, 0, 10, 0, -16, 0, 13, -9, 9, 0, -21, -11, 0, 0, -24]
 type verbitem { len: c_uint = 0, meta: c_uint = 0, has_arg: c_int = 0 }
 type struct_verbitem = verbitem
-var verbnames: [43]c_char
-
-
-
-
-
-
-
-
+var verbnames: [43]c_char = "\0MARK\0ACCEPT\0F\0FAIL\0COMMIT\0PRUNE\0SKIP\0THEN"
 var verbs: [9]verbitem = [verbitem { len: 0, meta: 2150432768, has_arg: 1 }, verbitem { len: 4, meta: 2150432768, has_arg: 1 }, verbitem { len: 6, meta: 2150498304, has_arg: -1 }, verbitem { len: 1, meta: 2150563840, has_arg: -1 }, verbitem { len: 4, meta: 2150563840, has_arg: -1 }, verbitem { len: 6, meta: 2150629376, has_arg: 0 }, verbitem { len: 5, meta: 2150760448, has_arg: 0 }, verbitem { len: 4, meta: 2150891520, has_arg: 0 }, verbitem { len: 4, meta: 2151022592, has_arg: 0 }]
 let verbcount: c_int = 9
 var verbops: [11]c_uint = [156, 166, 165, 163, 164, 157, 158, 159, 160, 161, 162]
 type alasitem { len: c_uint = 0, meta: c_uint = 0 }
 type struct_alasitem = alasitem
-var alasnames: [229]c_char
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+var alasnames: [229]c_char = "pla\0plb\0napla\0naplb\0nla\0nlb\0positive_lookahead\0positive_lookbehind\0non_atomic_positive_lookahead\0non_atomic_positive_lookbehind\0negative_lookahead\0negative_lookbehind\0scs\0scan_substring\0atomic\0sr\0asr\0script_run\0atomic_script_run"
 var alasmeta: [19]alasitem = [alasitem { len: 3, meta: 2150039552 }, alasitem { len: 3, meta: 2150170624 }, alasitem { len: 5, meta: 2150301696 }, alasitem { len: 5, meta: 2150367232 }, alasitem { len: 3, meta: 2150105088 }, alasitem { len: 3, meta: 2150236160 }, alasitem { len: 18, meta: 2150039552 }, alasitem { len: 19, meta: 2150170624 }, alasitem { len: 29, meta: 2150301696 }, alasitem { len: 30, meta: 2150367232 }, alasitem { len: 18, meta: 2150105088 }, alasitem { len: 19, meta: 2150236160 }, alasitem { len: 3, meta: 2148990976 }, alasitem { len: 14, meta: 2148990976 }, alasitem { len: 6, meta: 2147614720 }, alasitem { len: 2, meta: 2149974016 }, alasitem { len: 3, meta: 2415853568 }, alasitem { len: 10, meta: 2149974016 }, alasitem { len: 17, meta: 2415853568 }]
 let alascount: c_int = 19
 var chartypeoffset: [4]c_uint = [0, 13, 26, 39]
-var posix_names: [84]c_char
-
-
-
+var posix_names: [84]c_char = "alpha\0lower\0upper\0alnum\0ascii\0blank\0cntrl\0digit\0graph\0print\0punct\0space\0word\0xdigit"
 var posix_name_lengths: [15]u8 = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 6, 0]
 let PSO_OPT: c_uint = 0
 let PSO_XOPT: c_uint = 1
@@ -1691,48 +1715,48 @@ var opcode_possessify: [120]u8 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 type static_assertion_opcode_possessify = [1]c_int
 fn read_number(ptrptr: *mut *const u8, ptrend: *const u8, allow_sign: c_int, __param_max_value: c_uint, max_error: c_uint, intptr: *mut c_int, errorcodeptr: *mut c_int) -> c_int:
     var max_value = __param_max_value
-    var sign: c_int = 0
-    var n: c_uint = 0
-    var ptr: *const u8 = null
-    var yield_: c_int = 0
+    var sign__goto_1279_5: c_int = 0
+    var n__goto_1280_10: c_uint = 0
+    var ptr__goto_1281_12: *const u8 = null
+    var yield___goto_1282_6: c_int = 0
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                sign = 0
-                n = 0
-                ptr = (unsafe: *ptrptr)
-                yield_ = 0
+                sign__goto_1279_5 = 0
+                n__goto_1280_10 = 0
+                ptr__goto_1281_12 = (unsafe: *ptrptr)
+                yield___goto_1282_6 = 0
                 ((unsafe: *errorcodeptr) = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if (if allow_sign >= 0: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0:
-                    if (if (unsafe: *ptr) == 43: 1 else: 0) != 0:
-                        (sign = 1)
+                if (if (if allow_sign >= 0: 1 else: 0) != 0 and (if ptr__goto_1281_12 < ptrend: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (if (unsafe: *ptr__goto_1281_12) == 43: 1 else: 0) != 0:
+                        (sign__goto_1279_5 = 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         max_value = max_value - allow_sign
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        (ptr = ptr + 1)
+                        (ptr__goto_1281_12 = ptr__goto_1281_12 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     else:
-                        if (if (unsafe: *ptr) == 45: 1 else: 0) != 0:
-                            (sign = -1)
+                        if (if (unsafe: *ptr__goto_1281_12) == 45: 1 else: 0) != 0:
+                            (sign__goto_1279_5 = -1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
-                            (ptr = ptr + 1)
+                            (ptr__goto_1281_12 = ptr__goto_1281_12 + 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if (if allow_sign >= 0: 1 else: 0) != 0 and (if sign != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                    if (if n == 0: 1 else: 0) != 0:
+                if (if (if allow_sign >= 0: 1 else: 0) != 0 and (if sign__goto_1279_5 != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (if n__goto_1280_10 == 0: 1 else: 0) != 0:
                         ((unsafe: *errorcodeptr) = ERR26)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
@@ -1742,118 +1766,129 @@ fn read_number(ptrptr: *mut *const u8, ptrend: *const u8, allow_sign: c_int, __p
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if sign > 0: 1 else: 0) != 0:
-                        n = n + allow_sign
+                    if (if sign__goto_1279_5 > 0: 1 else: 0) != 0:
+                        n__goto_1280_10 = n__goto_1280_10 + allow_sign
+                    else:
+                        if (if n__goto_1280_10 > (allow_sign as c_uint): 1 else: 0) != 0:
+                            ((unsafe: *errorcodeptr) = ERR15)
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                continue
+                            __pc = 1
+                            __goto_pending = 1
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                continue
+                        else:
+                            (n__goto_1280_10 = ((allow_sign + 1) -% n__goto_1280_10))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (yield_ = 1)
+                (yield___goto_1282_6 = 1)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 1
                 continue
             1 =>  // EXIT
                 (__goto_pending = 0)
-                ((unsafe: *intptr) = n)
+                ((unsafe: *intptr) = n__goto_1280_10)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((unsafe: *ptrptr) = ptr)
+                ((unsafe: *ptrptr) = ptr__goto_1281_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                return yield_
+                return yield___goto_1282_6
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
             _ => break
 
 fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_uint, maxp: *mut c_uint, errorcodeptr: *mut c_int) -> c_int:
-    var p: *const u8 = null
-    var pp: *const u8 = null
-    var yield_: c_int = 0
-    var had_minimum: c_int = 0
-    var min: c_int = 0
-    var max: c_int = 0
+    var p__goto_1369_12: *const u8 = null
+    var pp__goto_1370_12: *const u8 = null
+    var yield___goto_1371_6: c_int = 0
+    var had_minimum__goto_1372_6: c_int = 0
+    var min__goto_1373_9: c_int = 0
+    var max__goto_1374_9: c_int = 0
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                p = (unsafe: *ptrptr)
-                yield_ = 0
-                had_minimum = 0
-                min = 0
-                max = 65536
+                p__goto_1369_12 = (unsafe: *ptrptr)
+                yield___goto_1371_6 = 0
+                had_minimum__goto_1372_6 = 0
+                min__goto_1373_9 = 0
+                max__goto_1374_9 = 65536
                 ((unsafe: *errorcodeptr) = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p) == 32: 1 else: 0) != 0 or (if (unsafe: *p) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                    (p = p + 1)
+                while (if (if p__goto_1369_12 < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p__goto_1369_12) == 32: 1 else: 0) != 0 or (if (unsafe: *p__goto_1369_12) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                    (p__goto_1369_12 = p__goto_1369_12 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (pp = p)
+                (pp__goto_1370_12 = p__goto_1369_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (if (if pp < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *pp) == 32: 1 else: 0) != 0 or (if (unsafe: *pp) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                    (pp = pp + 1)
+                while (if (if pp__goto_1370_12 < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *pp__goto_1370_12) == 32: 1 else: 0) != 0 or (if (unsafe: *pp__goto_1370_12) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                    (pp__goto_1370_12 = pp__goto_1370_12 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if pp >= ptrend: 1 else: 0) != 0:
+                if (if pp__goto_1370_12 >= ptrend: 1 else: 0) != 0:
                     return 0
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if (unsafe: *pp) == 125: 1 else: 0) != 0:
-                    if (if had_minimum != 0: 0 else: 1) != 0:
+                if (if (unsafe: *pp__goto_1370_12) == 125: 1 else: 0) != 0:
+                    if (if had_minimum__goto_1372_6 != 0: 0 else: 1) != 0:
                         return 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 else:
-                    if (if (unsafe: *(pp = pp + 1)) != 44: 1 else: 0) != 0:
+                    if (if (unsafe: *(pp__goto_1370_12 = pp__goto_1370_12 + 1)) != 44: 1 else: 0) != 0:
                         return 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    while (if (if pp < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *pp) == 32: 1 else: 0) != 0 or (if (unsafe: *pp) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                        (pp = pp + 1)
+                    while (if (if pp__goto_1370_12 < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *pp__goto_1370_12) == 32: 1 else: 0) != 0 or (if (unsafe: *pp__goto_1370_12) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                        (pp__goto_1370_12 = pp__goto_1370_12 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if pp >= ptrend: 1 else: 0) != 0:
+                    if (if pp__goto_1370_12 >= ptrend: 1 else: 0) != 0:
                         return 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    while (if (if pp < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *pp) == 32: 1 else: 0) != 0 or (if (unsafe: *pp) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                        (pp = pp + 1)
+                    while (if (if pp__goto_1370_12 < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *pp__goto_1370_12) == 32: 1 else: 0) != 0 or (if (unsafe: *pp__goto_1370_12) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                        (pp__goto_1370_12 = pp__goto_1370_12 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if (if pp >= ptrend: 1 else: 0) != 0 or (if (unsafe: *pp) != 125: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (if (if pp__goto_1370_12 >= ptrend: 1 else: 0) != 0 or (if (unsafe: *pp__goto_1370_12) != 125: 1 else: 0) != 0: 1 else: 0) != 0:
                         return 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if read_number((&mut p as *mut *const u8), ptrend, -1, 65535, 105, (&mut min as *mut c_int), errorcodeptr) != 0: 0 else: 1) != 0:
+                if (if read_number((&mut p__goto_1369_12 as *mut *const u8), ptrend, -1, 65535, 105, (&mut min__goto_1373_9 as *mut c_int), errorcodeptr) != 0: 0 else: 1) != 0:
                     if (if (unsafe: *errorcodeptr) != 0: 1 else: 0) != 0:
                         __pc = 1
                         __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (p = p + 1)
+                    (p__goto_1369_12 = p__goto_1369_12 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p) == 32: 1 else: 0) != 0 or (if (unsafe: *p) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                        (p = p + 1)
+                    while (if (if p__goto_1369_12 < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p__goto_1369_12) == 32: 1 else: 0) != 0 or (if (unsafe: *p__goto_1369_12) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                        (p__goto_1369_12 = p__goto_1369_12 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if read_number((&mut p as *mut *const u8), ptrend, -1, 65535, 105, (&mut max as *mut c_int), errorcodeptr) != 0: 0 else: 1) != 0:
+                    if (if read_number((&mut p__goto_1369_12 as *mut *const u8), ptrend, -1, 65535, 105, (&mut max__goto_1374_9 as *mut c_int), errorcodeptr) != 0: 0 else: 1) != 0:
                         if (if (unsafe: *errorcodeptr) != 0: 1 else: 0) != 0:
                             __pc = 1
                             __goto_pending = 1
@@ -1862,27 +1897,27 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 else:
-                    while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p) == 32: 1 else: 0) != 0 or (if (unsafe: *p) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                        (p = p + 1)
+                    while (if (if p__goto_1369_12 < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p__goto_1369_12) == 32: 1 else: 0) != 0 or (if (unsafe: *p__goto_1369_12) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                        (p__goto_1369_12 = p__goto_1369_12 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if (unsafe: *p) == 125: 1 else: 0) != 0:
-                        (max = min)
+                    if (if (unsafe: *p__goto_1369_12) == 125: 1 else: 0) != 0:
+                        (max__goto_1374_9 = min__goto_1373_9)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     else:
-                        (p = p + 1)
+                        (p__goto_1369_12 = p__goto_1369_12 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p) == 32: 1 else: 0) != 0 or (if (unsafe: *p) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                            (p = p + 1)
+                        while (if (if p__goto_1369_12 < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p__goto_1369_12) == 32: 1 else: 0) != 0 or (if (unsafe: *p__goto_1369_12) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                            (p__goto_1369_12 = p__goto_1369_12 + 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        if (if read_number((&mut p as *mut *const u8), ptrend, -1, 65535, 105, (&mut max as *mut c_int), errorcodeptr) != 0: 0 else: 1) != 0:
+                        if (if read_number((&mut p__goto_1369_12 as *mut *const u8), ptrend, -1, 65535, 105, (&mut max__goto_1374_9 as *mut c_int), errorcodeptr) != 0: 0 else: 1) != 0:
                             if (if (unsafe: *errorcodeptr) != 0: 1 else: 0) != 0:
                                 __pc = 1
                                 __goto_pending = 1
@@ -1890,7 +1925,7 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                                 continue
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        if (if max < min: 1 else: 0) != 0:
+                        if (if max__goto_1374_9 < min__goto_1373_9: 1 else: 0) != 0:
                             ((unsafe: *errorcodeptr) = ERR4)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 continue
@@ -1904,26 +1939,34 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (if (if p < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p) == 32: 1 else: 0) != 0 or (if (unsafe: *p) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                    (p = p + 1)
+                while (if (if p__goto_1369_12 < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *p__goto_1369_12) == 32: 1 else: 0) != 0 or (if (unsafe: *p__goto_1369_12) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                    (p__goto_1369_12 = p__goto_1369_12 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (p = p + 1)
+                (p__goto_1369_12 = p__goto_1369_12 + 1)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (yield_ = 1)
+                (yield___goto_1371_6 = 1)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if minp != (null as *mut c_uint): 1 else: 0) != 0:
+                    ((unsafe: *minp) = (min__goto_1373_9 as c_uint))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if maxp != (null as *mut c_uint): 1 else: 0) != 0:
+                    ((unsafe: *maxp) = (max__goto_1374_9 as c_uint))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 1
                 continue
             1 =>  // EXIT
                 (__goto_pending = 0)
-                ((unsafe: *ptrptr) = p)
+                ((unsafe: *ptrptr) = p__goto_1369_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                return yield_
+                return yield___goto_1371_6
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
             _ => break
@@ -1960,27 +2003,27 @@ fn check_posix_name(ptr: *const u8, len: c_int) -> c_int:
     return -1
 
 fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: c_uint, offsetptr: *mut c_ulong, nameptr: *mut *const u8, namelenptr: *mut c_uint, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_int:
-    var ptr: *const u8 = null
-    var is_group: c_int = 0
-    var is_braced: c_int = 0
+    var ptr__goto_2613_12: *const u8 = null
+    var is_group__goto_2614_6: c_int = 0
+    var is_braced__goto_2615_6: c_int = 0
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                ptr = (unsafe: *ptrptr)
-                is_group = ((if (unsafe: *(ptr = ptr + 1)) != 42: 1 else: 0))
-                is_braced = (if terminator == 125: 1 else: 0)
-                if is_braced != 0:
-                    while (if (if ptr < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *ptr) == 32: 1 else: 0) != 0 or (if (unsafe: *ptr) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                        (ptr = ptr + 1)
+                ptr__goto_2613_12 = (unsafe: *ptrptr)
+                is_group__goto_2614_6 = ((if (unsafe: *(ptr__goto_2613_12 = ptr__goto_2613_12 + 1)) != 42: 1 else: 0))
+                is_braced__goto_2615_6 = (if terminator == 125: 1 else: 0)
+                if is_braced__goto_2615_6 != 0:
+                    while (if (if ptr__goto_2613_12 < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *ptr__goto_2613_12) == 32: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_2613_12) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                        (ptr__goto_2613_12 = ptr__goto_2613_12 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ptr >= ptrend: 1 else: 0) != 0:
-                    ((unsafe: *errorcodeptr) = (if is_group != 0: ERR62 else: ERR60))
+                if (if ptr__goto_2613_12 >= ptrend: 1 else: 0) != 0:
+                    ((unsafe: *errorcodeptr) = (if is_group__goto_2614_6 != 0: ERR62 else: ERR60))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     __pc = 1
@@ -1989,14 +2032,17 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((unsafe: *nameptr) = ptr)
+                ((unsafe: *nameptr) = ptr__goto_2613_12)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                ((unsafe: *offsetptr) = ((((ptr__goto_2613_12 as usize -% cb.start_pattern as usize) / sizeof[u8]())) as c_ulong))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 utf
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (if (if (if ptr < ptrend: 1 else: 0) != 0 and 1 != 0: 1 else: 0) != 0 and (if ((cb.ctypes[(unsafe: *ptr)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                    (ptr = ptr + 1)
+                while (if (if (if ptr__goto_2613_12 < ptrend: 1 else: 0) != 0 and 1 != 0: 1 else: 0) != 0 and (if ((cb.ctypes[(unsafe: *ptr__goto_2613_12)] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (ptr__goto_2613_12 = ptr__goto_2613_12 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2005,7 +2051,7 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                     continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ((ptr as usize -% (unsafe: *nameptr) as usize) / sizeof[u8]()) > 128: 1 else: 0) != 0:
+                if (if ((ptr__goto_2613_12 as usize -% (unsafe: *nameptr) as usize) / sizeof[u8]()) > 128: 1 else: 0) != 0:
                     ((unsafe: *errorcodeptr) = ERR48)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
@@ -2015,8 +2061,11 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if is_group != 0:
-                    if (if ptr == (unsafe: *nameptr): 1 else: 0) != 0:
+                ((unsafe: *namelenptr) = ((((ptr__goto_2613_12 as usize -% (unsafe: *nameptr) as usize) / sizeof[u8]())) as c_uint))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if is_group__goto_2614_6 != 0:
+                    if (if ptr__goto_2613_12 == (unsafe: *nameptr): 1 else: 0) != 0:
                         ((unsafe: *errorcodeptr) = ERR62)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
@@ -2026,22 +2075,32 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if is_braced != 0:
-                        while (if (if ptr < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *ptr) == 32: 1 else: 0) != 0 or (if (unsafe: *ptr) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                            (ptr = ptr + 1)
+                    if is_braced__goto_2615_6 != 0:
+                        while (if (if ptr__goto_2613_12 < ptrend: 1 else: 0) != 0 and ((if (if (unsafe: *ptr__goto_2613_12) == 32: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_2613_12) == 9: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                            (ptr__goto_2613_12 = ptr__goto_2613_12 + 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     if (if terminator != 0: 1 else: 0) != 0:
-                        (ptr = ptr + 1)
+                        if (if (if ptr__goto_2613_12 >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_2613_12) != (terminator as u8): 1 else: 0) != 0: 1 else: 0) != 0:
+                            ((unsafe: *errorcodeptr) = ERR42)
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                continue
+                            __pc = 1
+                            __goto_pending = 1
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                continue
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (ptr__goto_2613_12 = ptr__goto_2613_12 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((unsafe: *ptrptr) = ptr)
+                ((unsafe: *ptrptr) = ptr__goto_2613_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return 1
@@ -2051,7 +2110,7 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                 continue
             1 =>  // FAILED
                 (__goto_pending = 0)
-                ((unsafe: *ptrptr) = ptr)
+                ((unsafe: *ptrptr) = ptr__goto_2613_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return 0
@@ -2062,21 +2121,21 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
 fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __param_parsed_pattern: *mut c_uint, __param_offset: c_ulong, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> *mut c_uint:
     var parsed_pattern = __param_parsed_pattern
     var offset = __param_offset
-    var next_offset: c_ulong = 0
-    var ptr: *const u8 = null
-    var name: *const u8 = null
-    var terminator: u8 = 0
-    var meta: c_uint = 0
-    var namelen: c_uint = 0
-    var i: c_int = 0
+    var next_offset__goto_2752_12: c_ulong = 0
+    var ptr__goto_2753_12: *const u8 = null
+    var name__goto_2754_12: *const u8 = null
+    var terminator__goto_2755_13: u8 = 0
+    var meta__goto_2756_10: c_uint = 0
+    var namelen__goto_2756_16: c_uint = 0
+    var i__goto_2757_5: c_int = 0
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                ptr = (unsafe: *ptrptr)
-                if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 40: 1 else: 0) != 0: 1 else: 0) != 0:
+                ptr__goto_2753_12 = (unsafe: *ptrptr)
+                if (if (if ptr__goto_2753_12 >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr__goto_2753_12) != 40: 1 else: 0) != 0: 1 else: 0) != 0:
                     ((unsafe: *errorcodeptr) = ERR118)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
@@ -2087,10 +2146,13 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 while true:
-                    (ptr = ptr + 1)
+                    (ptr__goto_2753_12 = ptr__goto_2753_12 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if ptr >= ptrend: 1 else: 0) != 0:
+                    (next_offset__goto_2752_12 = ((((ptr__goto_2753_12 as usize -% cb.start_pattern as usize) / sizeof[u8]())) as c_ulong))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        break
+                    if (if ptr__goto_2753_12 >= ptrend: 1 else: 0) != 0:
                         ((unsafe: *errorcodeptr) = ERR117)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
@@ -2100,8 +2162,8 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if read_number((&mut ptr as *mut *const u8), ptrend, cb.bracount, 65535, 161, (&mut i as *mut c_int), errorcodeptr) != 0:
-                        if (if i <= 0: 1 else: 0) != 0:
+                    if read_number((&mut ptr__goto_2753_12 as *mut *const u8), ptrend, cb.bracount, 65535, 161, (&mut i__goto_2757_5 as *mut c_int), errorcodeptr) != 0:
+                        if (if i__goto_2757_5 <= 0: 1 else: 0) != 0:
                             ((unsafe: *errorcodeptr) = ERR15)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
@@ -2111,7 +2173,10 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (meta = (2149122048 as c_uint))
+                        (meta__goto_2756_10 = (2149122048 as c_uint))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            break
+                        (namelen__goto_2756_16 = (i__goto_2757_5 as c_uint))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     else:
@@ -2119,11 +2184,11 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                             __pc = 2
                             __goto_pending = 1
                         else:
-                            if (if (unsafe: *ptr) == 60: 1 else: 0) != 0:
-                                (terminator = 62)
+                            if (if (unsafe: *ptr__goto_2753_12) == 60: 1 else: 0) != 0:
+                                (terminator__goto_2755_13 = 62)
                             else:
-                                if (if (unsafe: *ptr) == 39: 1 else: 0) != 0:
-                                    (terminator = 39)
+                                if (if (unsafe: *ptr__goto_2753_12) == 39: 1 else: 0) != 0:
+                                    (terminator__goto_2755_13 = 39)
                                 else:
                                     ((unsafe: *errorcodeptr) = ERR117)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2134,17 +2199,17 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                                         break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if (if read_name((&mut ptr as *mut *const u8), ptrend, utf, terminator, (&mut next_offset as *mut c_ulong), (&mut name as *mut *const u8), (&mut namelen as *mut c_uint), errorcodeptr, cb) != 0: 0 else: 1) != 0:
+                            if (if read_name((&mut ptr__goto_2753_12 as *mut *const u8), ptrend, utf, terminator__goto_2755_13, (&mut next_offset__goto_2752_12 as *mut c_ulong), (&mut name__goto_2754_12 as *mut *const u8), (&mut namelen__goto_2756_16 as *mut c_uint), errorcodeptr, cb) != 0: 0 else: 1) != 0:
                                 __pc = 2
                                 __goto_pending = 1
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (meta = (2149056512 as c_uint))
+                            (meta__goto_2756_10 = (2149056512 as c_uint))
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if offset == 0: 1 else: 0) != 0 or (if ((next_offset -% offset)) >= 65536: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (if (if offset == 0: 1 else: 0) != 0 or (if ((next_offset__goto_2752_12 -% offset)) >= 65536: 1 else: 0) != 0: 1 else: 0) != 0:
                         (unsafe: *parsed_pattern = 2148925440)
                         (parsed_pattern = parsed_pattern + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2152,28 +2217,32 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                         0
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (offset = next_offset)
+                        (offset = next_offset__goto_2752_12)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (unsafe: *parsed_pattern = namelen)
+                    (unsafe: *parsed_pattern = (meta__goto_2756_10 | (((next_offset__goto_2752_12 -% offset)) as c_uint)))
                     (parsed_pattern = parsed_pattern + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (offset = next_offset)
+                    (unsafe: *parsed_pattern = namelen__goto_2756_16)
+                    (parsed_pattern = parsed_pattern + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if ptr >= ptrend: 1 else: 0) != 0:
+                    (offset = next_offset__goto_2752_12)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        break
+                    if (if ptr__goto_2753_12 >= ptrend: 1 else: 0) != 0:
                         __pc = 1
                         __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (unsafe: *ptr) == 41: 1 else: 0) != 0:
+                    if (if (unsafe: *ptr__goto_2753_12) == 41: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (unsafe: *ptr) != 44: 1 else: 0) != 0:
+                    if (if (unsafe: *ptr__goto_2753_12) != 44: 1 else: 0) != 0:
                         ((unsafe: *errorcodeptr) = ERR24)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
@@ -2187,7 +2256,7 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((unsafe: *ptrptr) = (ptr + (1 as isize as usize)))
+                ((unsafe: *ptrptr) = (ptr__goto_2753_12 + (1 as isize as usize)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return parsed_pattern
@@ -2204,7 +2273,7 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                 continue
             2 =>  // FAILED
                 (__goto_pending = 0)
-                ((unsafe: *ptrptr) = ptr)
+                ((unsafe: *ptrptr) = ptr__goto_2753_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return (null as *mut c_uint)
@@ -2215,6 +2284,9 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
 fn manage_callouts(ptr: *const u8, pcalloutptr: *mut *mut c_uint, auto_callout: c_int, __param_parsed_pattern: *mut c_uint, cb: *mut compile_block_8) -> *mut c_uint:
     var parsed_pattern = __param_parsed_pattern
     var previous_callout: *mut c_uint = (unsafe: *pcalloutptr)
+    if (if previous_callout != (null as *mut c_uint): 1 else: 0) != 0:
+        (previous_callout[2] = (((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]()) -% (previous_callout[1] as c_ulong))) as c_uint))
+
     if (if auto_callout != 0: 0 else: 1) != 0:
         (previous_callout = (null as *mut c_uint))
     else:
@@ -2225,6 +2297,7 @@ fn manage_callouts(ptr: *const u8, pcalloutptr: *mut *mut c_uint, auto_callout: 
             (previous_callout[2] = 0)
             (previous_callout[3] = 255)
         
+        (previous_callout[1] = ((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]())) as c_uint))
 
     ((unsafe: *pcalloutptr) = previous_callout)
     return parsed_pattern
@@ -2295,136 +2368,137 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
     var ptr = __param_ptr
     var options = __param_options
     var xoptions = __param_xoptions
-    var c: c_uint = 0
-    var delimiter: c_uint = 0
-    var namelen: c_uint = 0
-    var class_range_state: c_uint = 0
-    var class_op_state: c_uint = 0
-    var class_mode_state: c_uint = 0
-    var class_start: *mut c_uint = null
-    var verblengthptr: *mut c_uint = null
-    var verbstartptr: *mut c_uint = null
-    var previous_callout: *mut c_uint = null
-    var parsed_pattern: *mut c_uint = null
-    var parsed_pattern_end: *mut c_uint = null
-    var this_parsed_item: *mut c_uint = null
-    var prev_parsed_item: *mut c_uint = null
-    var meta_quantifier: c_uint = 0
-    var add_after_mark: c_uint = 0
-    var nest_depth: c_ushort = 0
-    var class_depth_m1: c_short = 0
-    var class_maxdepth_m1: c_short = 0
-    var hash: c_ushort = 0
-    var after_manual_callout: c_int = 0
-    var expect_cond_assert: c_int = 0
-    var errorcode: c_int = 0
-    var escape: c_int = 0
-    var i: c_int = 0
-    var inescq: c_int = 0
-    var inverbname: c_int = 0
-    var utf: c_int = 0
-    var auto_callout: c_int = 0
-    var is_dupname: c_int = 0
-    var negate_class: c_int = 0
-    var okquantifier: c_int = 0
-    var thisptr: *const u8 = null
-    var name: *const u8 = null
-    var ptrend: *const u8 = null
-    var verbnamestart: *const u8 = null
-    var class_range_forbid_ptr: *const u8 = null
-    var ng: *mut named_group_8 = null
-    var top_nest: *mut nest_save = null
-    var end_nests: *mut nest_save = null
-    var prev_expect_cond_assert: c_int = 0
-    var min_repeat: c_uint = 0
-    var max_repeat: c_uint = 0
-    var set: c_uint = 0
-    var unset: c_uint = 0
-    var optset: *mut c_uint = null
-    var xset: c_uint = 0
-    var xunset: c_uint = 0
-    var xoptset: *mut c_uint = null
-    var terminator: c_uint = 0
-    var prev_meta_quantifier: c_uint = 0
-    var prev_okquantifier: c_int = 0
-    var tempptr: *const u8 = null
-    var offset: c_ulong = 0
-    var verbnamelength: c_ulong = 0
-    var ok: c_int = 0
-    var p: *const u8 = null
-    var char_is_literal: c_int = 0
-    var posix_negate: c_int = 0
-    var posix_class: c_int = 0
-    var start_c: c_uint = 0
-    var new_class_mode_state: c_uint = 0
-    var vn: *const i8 = null
-    var meta: c_uint = 0
-    var hyphenok: c_int = 0
-    var oldoptions: c_uint = 0
-    var oldxoptions: c_uint = 0
-    var calloutlength: c_ulong = 0
-    var startptr: *const u8 = null
-    var n: c_int = 0
-    var ge: c_uint = 0
-    var major: c_int = 0
-    var minor: c_int = 0
-    var was_r_ampersand: c_int = 0
-    var newsize: c_uint = 0
-    var newspace: *mut named_group_8 = null
+    var c__goto_3131_10: c_uint = 0
+    var delimiter__goto_3132_10: c_uint = 0
+    var namelen__goto_3133_10: c_uint = 0
+    var class_range_state__goto_3134_10: c_uint = 0
+    var class_op_state__goto_3135_10: c_uint = 0
+    var class_mode_state__goto_3136_10: c_uint = 0
+    var class_start__goto_3137_11: *mut c_uint = null
+    var verblengthptr__goto_3138_11: *mut c_uint = null
+    var verbstartptr__goto_3139_11: *mut c_uint = null
+    var previous_callout__goto_3140_11: *mut c_uint = null
+    var parsed_pattern__goto_3141_11: *mut c_uint = null
+    var parsed_pattern_end__goto_3142_11: *mut c_uint = null
+    var this_parsed_item__goto_3143_11: *mut c_uint = null
+    var prev_parsed_item__goto_3144_11: *mut c_uint = null
+    var meta_quantifier__goto_3145_10: c_uint = 0
+    var add_after_mark__goto_3146_10: c_uint = 0
+    var nest_depth__goto_3147_10: c_ushort = 0
+    var class_depth_m1__goto_3148_9: c_short = 0
+    var class_maxdepth_m1__goto_3149_9: c_short = 0
+    var hash__goto_3150_10: c_ushort = 0
+    var after_manual_callout__goto_3151_5: c_int = 0
+    var expect_cond_assert__goto_3152_5: c_int = 0
+    var errorcode__goto_3153_5: c_int = 0
+    var escape__goto_3154_5: c_int = 0
+    var i__goto_3155_5: c_int = 0
+    var inescq__goto_3156_6: c_int = 0
+    var inverbname__goto_3157_6: c_int = 0
+    var utf__goto_3158_6: c_int = 0
+    var auto_callout__goto_3159_6: c_int = 0
+    var is_dupname__goto_3160_6: c_int = 0
+    var negate_class__goto_3161_6: c_int = 0
+    var okquantifier__goto_3162_6: c_int = 0
+    var thisptr__goto_3163_12: *const u8 = null
+    var name__goto_3164_12: *const u8 = null
+    var ptrend__goto_3165_12: *const u8 = null
+    var verbnamestart__goto_3166_12: *const u8 = null
+    var class_range_forbid_ptr__goto_3167_12: *const u8 = null
+    var ng__goto_3168_14: *mut named_group_8 = null
+    var top_nest__goto_3169_12: *mut nest_save = null
+    var end_nests__goto_3169_23: *mut nest_save = null
+    var prev_expect_cond_assert__goto_3244_7: c_int = 0
+    var min_repeat__goto_3245_12: c_uint = 0
+    var max_repeat__goto_3245_28: c_uint = 0
+    var set__goto_3246_12: c_uint = 0
+    var unset__goto_3246_17: c_uint = 0
+    var optset__goto_3246_25: *mut c_uint = null
+    var xset__goto_3247_12: c_uint = 0
+    var xunset__goto_3247_18: c_uint = 0
+    var xoptset__goto_3247_27: *mut c_uint = null
+    var terminator__goto_3248_12: c_uint = 0
+    var prev_meta_quantifier__goto_3249_12: c_uint = 0
+    var prev_okquantifier__goto_3250_8: c_int = 0
+    var tempptr__goto_3251_14: *const u8 = null
+    var offset__goto_3252_14: c_ulong = 0
+    var verbnamelength__goto_3364_16: c_ulong = 0
+    var ok__goto_3535_10: c_int = 0
+    var p__goto_3775_20: *const u8 = null
+    var p__goto_3878_17: *mut c_uint = null
+    var char_is_literal__goto_3990_12: c_int = 0
+    var posix_negate__goto_4037_14: c_int = 0
+    var posix_class__goto_4038_13: c_int = 0
+    var start_c__goto_4154_18: c_uint = 0
+    var new_class_mode_state__goto_4155_18: c_uint = 0
+    var vn__goto_4741_19: *const i8 = null
+    var meta__goto_4776_18: c_uint = 0
+    var hyphenok__goto_5041_14: c_int = 0
+    var oldoptions__goto_5042_18: c_uint = 0
+    var oldxoptions__goto_5043_18: c_uint = 0
+    var calloutlength__goto_5344_20: c_ulong = 0
+    var startptr__goto_5345_20: *const u8 = null
+    var n__goto_5393_13: c_int = 0
+    var ge__goto_5488_18: c_uint = 0
+    var major__goto_5489_13: c_int = 0
+    var minor__goto_5490_13: c_int = 0
+    var was_r_ampersand__goto_5544_14: c_int = 0
+    var newsize__goto_5787_18: c_uint = 0
+    var newspace__goto_5788_22: *mut named_group_8 = null
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                verblengthptr = (null as *mut c_uint)
-                verbstartptr = (null as *mut c_uint)
-                previous_callout = (null as *mut c_uint)
-                parsed_pattern = cb.parsed_pattern
-                parsed_pattern_end = cb.parsed_pattern_end
-                this_parsed_item = (null as *mut c_uint)
-                prev_parsed_item = (null as *mut c_uint)
-                meta_quantifier = 0
-                add_after_mark = 0
-                nest_depth = 0
-                class_depth_m1 = -1
-                class_maxdepth_m1 = -1
-                after_manual_callout = 0
-                expect_cond_assert = 0
-                errorcode = 0
-                inescq = 0
-                inverbname = 0
-                utf = (if ((options & 524288)) != 0: 1 else: 0)
-                auto_callout = (if ((options & 4)) != 0: 1 else: 0)
-                okquantifier = 0
-                ptrend = cb.end_pattern
-                verbnamestart = (null as *const u8)
-                class_range_forbid_ptr = (null as *const u8)
+                verblengthptr__goto_3138_11 = (null as *mut c_uint)
+                verbstartptr__goto_3139_11 = (null as *mut c_uint)
+                previous_callout__goto_3140_11 = (null as *mut c_uint)
+                parsed_pattern__goto_3141_11 = cb.parsed_pattern
+                parsed_pattern_end__goto_3142_11 = cb.parsed_pattern_end
+                this_parsed_item__goto_3143_11 = (null as *mut c_uint)
+                prev_parsed_item__goto_3144_11 = (null as *mut c_uint)
+                meta_quantifier__goto_3145_10 = 0
+                add_after_mark__goto_3146_10 = 0
+                nest_depth__goto_3147_10 = 0
+                class_depth_m1__goto_3148_9 = -1
+                class_maxdepth_m1__goto_3149_9 = -1
+                after_manual_callout__goto_3151_5 = 0
+                expect_cond_assert__goto_3152_5 = 0
+                errorcode__goto_3153_5 = 0
+                inescq__goto_3156_6 = 0
+                inverbname__goto_3157_6 = 0
+                utf__goto_3158_6 = (if ((options & 524288)) != 0: 1 else: 0)
+                auto_callout__goto_3159_6 = (if ((options & 4)) != 0: 1 else: 0)
+                okquantifier__goto_3162_6 = 0
+                ptrend__goto_3165_12 = cb.end_pattern
+                verbnamestart__goto_3166_12 = (null as *const u8)
+                class_range_forbid_ptr__goto_3167_12 = (null as *const u8)
                 if (if ((xoptions & 8)) != 0: 1 else: 0) != 0:
-                    (unsafe: *parsed_pattern = 2148073472)
-                    (parsed_pattern = parsed_pattern + 1)
+                    (unsafe: *parsed_pattern__goto_3141_11 = 2148073472)
+                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (unsafe: *parsed_pattern = 2149449728)
-                    (parsed_pattern = parsed_pattern + 1)
+                    (unsafe: *parsed_pattern__goto_3141_11 = 2149449728)
+                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 else:
                     if (if ((xoptions & 4)) != 0: 1 else: 0) != 0:
-                        (unsafe: *parsed_pattern = ((2149318656 as c_uint) +% 5))
-                        (parsed_pattern = parsed_pattern + 1)
+                        (unsafe: *parsed_pattern__goto_3141_11 = ((2149318656 as c_uint) +% 5))
+                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        (unsafe: *parsed_pattern = 2149449728)
-                        (parsed_pattern = parsed_pattern + 1)
+                        (unsafe: *parsed_pattern__goto_3141_11 = 2149449728)
+                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if ((options & 33554432)) != 0: 1 else: 0) != 0:
-                    while (if ptr < ptrend: 1 else: 0) != 0:
-                        if (if parsed_pattern >= parsed_pattern_end: 1 else: 0) != 0:
-                            (errorcode = ERR63)
+                    while (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0:
+                        if (if parsed_pattern__goto_3141_11 >= parsed_pattern_end__goto_3142_11: 1 else: 0) != 0:
+                            (errorcode__goto_3153_5 = ERR63)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             __pc = 19
@@ -2433,14 +2507,14 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (thisptr = ptr)
+                        (thisptr__goto_3163_12 = ptr)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         0
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if auto_callout != 0:
-                            (parsed_pattern = manage_callouts(thisptr, (&mut previous_callout as *mut *mut c_uint), auto_callout, parsed_pattern, cb))
+                        if auto_callout__goto_3159_6 != 0:
+                            (parsed_pattern__goto_3141_11 = manage_callouts(thisptr__goto_3163_12, (&mut previous_callout__goto_3140_11 as *mut *mut c_uint), auto_callout__goto_3159_6, parsed_pattern__goto_3141_11, cb))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         0
@@ -2456,20 +2530,26 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (top_nest = (null as *mut nest_save))
+                (top_nest__goto_3169_12 = (null as *mut nest_save))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (end_nests__goto_3169_23 = (((cb.start_workspace + cb.workspace_size)) as *mut nest_save))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (end_nests__goto_3169_23 = ((((end_nests__goto_3169_23 as *mut i8) - ((((cb.workspace_size *% sizeof[u8]())) % sizeof[nest_save]())))) as *mut nest_save))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if ((options & 16777216)) != 0: 1 else: 0) != 0:
                     options = options | 128
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (if ptr < ptrend: 1 else: 0) != 0:
-                    min_repeat = 0
-                    max_repeat = 0
+                while (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0:
+                    min_repeat__goto_3245_12 = 0
+                    max_repeat__goto_3245_28 = 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if nest_depth > cb.cx.parens_nest_limit: 1 else: 0) != 0:
-                        (errorcode = ERR19)
+                    if (if nest_depth__goto_3147_10 > cb.cx.parens_nest_limit: 1 else: 0) != 0:
+                        (errorcode__goto_3153_5 = ERR19)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         __pc = 19
@@ -2478,8 +2558,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if parsed_pattern >= parsed_pattern_end: 1 else: 0) != 0:
-                        (errorcode = ERR63)
+                    if (if parsed_pattern__goto_3141_11 >= parsed_pattern_end__goto_3142_11: 1 else: 0) != 0:
+                        (errorcode__goto_3153_5 = ERR63)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         __pc = 19
@@ -2488,38 +2568,38 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if this_parsed_item != parsed_pattern: 1 else: 0) != 0:
-                        (prev_parsed_item = this_parsed_item)
+                    if (if this_parsed_item__goto_3143_11 != parsed_pattern__goto_3141_11: 1 else: 0) != 0:
+                        (prev_parsed_item__goto_3144_11 = this_parsed_item__goto_3143_11)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (this_parsed_item = parsed_pattern)
+                        (this_parsed_item__goto_3143_11 = parsed_pattern__goto_3141_11)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (thisptr = ptr)
+                    (thisptr__goto_3163_12 = ptr)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if inescq != 0:
-                        if (if (if (if c == 92: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 69: 1 else: 0) != 0: 1 else: 0) != 0:
-                            (inescq = 0)
+                    if inescq__goto_3156_6 != 0:
+                        if (if (if (if c__goto_3131_10 == 92: 1 else: 0) != 0 and (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 69: 1 else: 0) != 0: 1 else: 0) != 0:
+                            (inescq__goto_3156_6 = 0)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             (ptr = ptr + 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         else:
-                            if inverbname != 0:
-                                (unsafe: *parsed_pattern = c)
-                                (parsed_pattern = parsed_pattern + 1)
+                            if inverbname__goto_3157_6 != 0:
+                                (unsafe: *parsed_pattern__goto_3141_11 = c__goto_3131_10)
+                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if (if (after_manual_callout = after_manual_callout - 1) <= 0: 1 else: 0) != 0:
-                                    (parsed_pattern = manage_callouts(thisptr, (&mut previous_callout as *mut *mut c_uint), auto_callout, parsed_pattern, cb))
+                                if (if (after_manual_callout__goto_3151_5 = after_manual_callout__goto_3151_5 - 1) <= 0: 1 else: 0) != 0:
+                                    (parsed_pattern__goto_3141_11 = manage_callouts(thisptr__goto_3163_12, (&mut previous_callout__goto_3140_11 as *mut *mut c_uint), auto_callout__goto_3159_6, parsed_pattern__goto_3141_11, cb))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 0
@@ -2527,7 +2607,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (meta_quantifier = 0)
+                            (meta_quantifier__goto_3145_10 = 0)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2537,13 +2617,13 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if c == 92: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (if (if c__goto_3131_10 == 92: 1 else: 0) != 0 and (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0: 1 else: 0) != 0:
                         if (if (if (unsafe: *ptr) == 81: 1 else: 0) != 0 or (if (unsafe: *ptr) == 69: 1 else: 0) != 0: 1 else: 0) != 0:
-                            if (if (if (if expect_cond_assert > 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 81: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((if (if (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0 and (if ptr[1] == 92: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[2] == 69: 1 else: 0) != 0: 1 else: 0)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+                            if (if (if (if expect_cond_assert__goto_3152_5 > 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 81: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((if (if (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0 and (if ptr[1] == 92: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[2] == 69: 1 else: 0) != 0: 1 else: 0)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
                                 (ptr = ptr - 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (errorcode = ERR28)
+                                (errorcode__goto_3153_5 = ERR28)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 __pc = 19
@@ -2552,7 +2632,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (inescq = (if (unsafe: *ptr) == 81: 1 else: 0))
+                            (inescq__goto_3156_6 = (if (unsafe: *ptr) == 81: 1 else: 0))
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             (ptr = ptr + 1)
@@ -2566,12 +2646,12 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if ((options & 128)) != 0: 1 else: 0) != 0:
-                        if (if (if c < 256: 1 else: 0) != 0 and (if ((cb.ctypes[c] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                        if (if (if c__goto_3131_10 < 256: 1 else: 0) != 0 and (if ((cb.ctypes[c__goto_3131_10] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
                             continue
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if c == 35: 1 else: 0) != 0:
-                            while (if ptr < ptrend: 1 else: 0) != 0:
+                        if (if c__goto_3131_10 == 35: 1 else: 0) != 0:
+                            while (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0:
                                 (ptr = ptr + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -2586,15 +2666,15 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if (if (if c == 40: 1 else: 0) != 0 and (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[0] == 63: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 35: 1 else: 0) != 0: 1 else: 0) != 0:
-                        while (if (if (ptr = ptr + 1) < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (if (if (if (if c__goto_3131_10 == 40: 1 else: 0) != 0 and (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) >= 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[0] == 63: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 35: 1 else: 0) != 0: 1 else: 0) != 0:
+                        while (if (if (ptr = ptr + 1) < ptrend__goto_3165_12: 1 else: 0) != 0 and (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                             0
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if ptr >= ptrend: 1 else: 0) != 0:
-                            (errorcode = ERR18)
+                        if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0:
+                            (errorcode__goto_3153_5 = ERR18)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             __pc = 19
@@ -2611,34 +2691,34 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if expect_cond_assert > 0: 1 else: 0) != 0:
-                        ok = (if (if (if c == 40: 1 else: 0) != 0 and (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if ptr[0] == 63: 1 else: 0) != 0 or (if ptr[0] == 42: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)
+                    if (if expect_cond_assert__goto_3152_5 > 0: 1 else: 0) != 0:
+                        ok__goto_3535_10 = (if (if (if c__goto_3131_10 == 40: 1 else: 0) != 0 and (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if ptr[0] == 63: 1 else: 0) != 0 or (if ptr[0] == 42: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if ok != 0:
+                        if ok__goto_3535_10 != 0:
                             if (if ptr[0] == 42: 1 else: 0) != 0:
-                                (ok = (if 1 != 0 and (if ((cb.ctypes[ptr[1]] & 4)) != 0: 1 else: 0) != 0: 1 else: 0))
+                                (ok__goto_3535_10 = (if 1 != 0 and (if ((cb.ctypes[ptr[1]] & 4)) != 0: 1 else: 0) != 0: 1 else: 0))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
                                 match ptr[1]
                                     67 =>
-                                        (ok = (if expect_cond_assert == 2: 1 else: 0))
+                                        (ok__goto_3535_10 = (if expect_cond_assert__goto_3152_5 == 2: 1 else: 0))
                                     61 =>
-                                        (ok = (if (if ptr[2] == 61: 1 else: 0) != 0 or (if ptr[2] == 33: 1 else: 0) != 0: 1 else: 0))
+                                        (ok__goto_3535_10 = (if (if ptr[2] == 61: 1 else: 0) != 0 or (if ptr[2] == 33: 1 else: 0) != 0: 1 else: 0))
                                     60 =>
-                                        (ok = (if (if ptr[2] == 61: 1 else: 0) != 0 or (if ptr[2] == 33: 1 else: 0) != 0: 1 else: 0))
+                                        (ok__goto_3535_10 = (if (if ptr[2] == 61: 1 else: 0) != 0 or (if ptr[2] == 33: 1 else: 0) != 0: 1 else: 0))
                                     _ =>
-                                        (ok = 0)
+                                        (ok__goto_3535_10 = 0)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if ok != 0: 0 else: 1) != 0:
-                            (errorcode = ERR28)
+                        if (if ok__goto_3535_10 != 0: 0 else: 1) != 0:
+                            (errorcode__goto_3153_5 = ERR28)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if (if expect_cond_assert == 2: 1 else: 0) != 0:
+                            if (if expect_cond_assert__goto_3152_5 == 2: 1 else: 0) != 0:
                                 __pc = 19
                                 __goto_pending = 1
                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2651,26 +2731,26 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (prev_expect_cond_assert = expect_cond_assert)
+                    (prev_expect_cond_assert__goto_3244_7 = expect_cond_assert__goto_3152_5)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (expect_cond_assert = 0)
+                    (expect_cond_assert__goto_3152_5 = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (prev_okquantifier = okquantifier)
+                    (prev_okquantifier__goto_3250_8 = okquantifier__goto_3162_6)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (prev_meta_quantifier = meta_quantifier)
+                    (prev_meta_quantifier__goto_3249_12 = meta_quantifier__goto_3145_10)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (okquantifier = 0)
+                    (okquantifier__goto_3162_6 = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (meta_quantifier = 0)
+                    (meta_quantifier__goto_3145_10 = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if prev_meta_quantifier != 0: 1 else: 0) != 0 and ((if (if c == 63: 1 else: 0) != 0 or (if c == 43: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                        (parsed_pattern[(if ((if prev_meta_quantifier == 2151743488: 1 else: 0)) != 0: -3 else: -1)] = (prev_meta_quantifier +% ((if ((if c == 63: 1 else: 0)) != 0: 131072 else: 65536))))
+                    if (if (if prev_meta_quantifier__goto_3249_12 != 0: 1 else: 0) != 0 and ((if (if c__goto_3131_10 == 63: 1 else: 0) != 0 or (if c__goto_3131_10 == 43: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                        (parsed_pattern__goto_3141_11[(if ((if prev_meta_quantifier__goto_3249_12 == 2151743488: 1 else: 0)) != 0: -3 else: -1)] = (prev_meta_quantifier__goto_3249_12 +% ((if ((if c__goto_3131_10 == 63: 1 else: 0)) != 0: 131072 else: 65536))))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         continue
@@ -2678,86 +2758,104 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    match c
+                    match c__goto_3131_10
                         92 =>
-                            (tempptr = ptr)
-                            (escape = _pcre2_check_escape_8((&mut ptr as *mut *const u8), ptrend, (&mut c as *mut c_uint), (&mut errorcode as *mut c_int), options, xoptions, cb.bracount, 0, cb))
-                            if (if errorcode != 0: 1 else: 0) != 0:
+                            (tempptr__goto_3251_14 = ptr)
+                            (escape__goto_3154_5 = _pcre2_check_escape_8((&mut ptr as *mut *const u8), ptrend__goto_3165_12, (&mut c__goto_3131_10 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int), options, xoptions, cb.bracount, 0, cb))
+                            if (if errorcode__goto_3153_5 != 0: 1 else: 0) != 0:
                                 if (if ((xoptions & 2)) == 0: 1 else: 0) != 0:
                                     __pc = 19
                                     __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (ptr = tempptr)
+                                (ptr = tempptr__goto_3251_14)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if ptr >= ptrend: 1 else: 0) != 0:
-                                    (c = 92)
+                                if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0:
+                                    (c__goto_3131_10 = 92)
                                 else:
                                     0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (escape = 0)
+                                (escape__goto_3154_5 = 0)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if escape == 0: 1 else: 0) != 0:
+                            if (if escape__goto_3154_5 == 0: 1 else: 0) != 0:
                                 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if (if escape < 0: 1 else: 0) != 0:
-                                    (escape = ((0 - escape) - 1))
+                                if (if escape__goto_3154_5 < 0: 1 else: 0) != 0:
+                                    (offset__goto_3252_14 = ((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]())) as c_ulong))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (okquantifier = 1)
+                                    (escape__goto_3154_5 = ((0 - escape__goto_3154_5) - 1))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (unsafe: *parsed_pattern__goto_3141_11 = ((2147680256 as c_uint) | (escape__goto_3154_5 as c_uint)))
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if escape__goto_3154_5 < 10: 1 else: 0) != 0:
+                                        if (if (&cb.small_ref_offset[0] as *mut c_ulong)[escape__goto_3154_5] == ((0 -% 1)): 1 else: 0) != 0:
+                                            ((&cb.small_ref_offset[0] as *mut c_ulong)[escape__goto_3154_5] = offset__goto_3252_14)
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                    else:
+                                        0
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (okquantifier__goto_3162_6 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    match escape
+                                    match escape__goto_3154_5
                                         ESC_C =>
                                             if (if ((options & 1048576)) != 0: 1 else: 0) != 0:
-                                                (errorcode = ERR83)
+                                                (errorcode__goto_3153_5 = ERR83)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 1
                                                 __goto_pending = 1
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                            (okquantifier = 1)
-                                            (unsafe: *parsed_pattern = ((2149318656 as c_uint) +% escape))
-                                            (parsed_pattern = parsed_pattern + 1)
+                                            (okquantifier__goto_3162_6 = 1)
+                                            (unsafe: *parsed_pattern__goto_3141_11 = ((2149318656 as c_uint) +% escape__goto_3154_5))
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                         ESC_ub =>
-                                            (unsafe: *parsed_pattern = 117)
-                                            (parsed_pattern = parsed_pattern + 1)
+                                            (unsafe: *parsed_pattern__goto_3141_11 = 117)
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                             0
                                         ESC_X =>
-                                            (errorcode = ERR45)
+                                            (errorcode__goto_3153_5 = ERR45)
                                             __pc = 1
                                             __goto_pending = 1
-                                            (unsafe: *parsed_pattern = ((2149318656 as c_uint) +% escape))
-                                            (parsed_pattern = parsed_pattern + 1)
+                                            (unsafe: *parsed_pattern__goto_3141_11 = ((2149318656 as c_uint) +% escape__goto_3154_5))
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                         ESC_H =>
-                                            (unsafe: *parsed_pattern = ((2149318656 as c_uint) +% escape))
-                                            (parsed_pattern = parsed_pattern + 1)
+                                            (unsafe: *parsed_pattern__goto_3141_11 = ((2149318656 as c_uint) +% escape__goto_3154_5))
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                         ESC_d =>
-                                            (parsed_pattern = handle_escdsw(escape, parsed_pattern, options, xoptions))
+                                            (parsed_pattern__goto_3141_11 = handle_escdsw(escape__goto_3154_5, parsed_pattern__goto_3141_11, options, xoptions))
                                         ESC_P =>
                                             __pc = 1
                                             __goto_pending = 1
                                         ESC_g =>
-                                            (terminator = (if ((if (unsafe: *ptr) == 60: 1 else: 0)) != 0: 62 else: (if ((if (unsafe: *ptr) == 39: 1 else: 0)) != 0: 39 else: 125)))
-                                            if (if (if escape == ESC_g: 1 else: 0) != 0 and (if terminator != 125: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                p = (ptr + (1 as isize as usize))
+                                            (terminator__goto_3248_12 = (if ((if (unsafe: *ptr) == 60: 1 else: 0)) != 0: 62 else: (if ((if (unsafe: *ptr) == 39: 1 else: 0)) != 0: 39 else: 125)))
+                                            if (if (if escape__goto_3154_5 == ESC_g: 1 else: 0) != 0 and (if terminator__goto_3248_12 != 125: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                p__goto_3775_20 = (ptr + (1 as isize as usize))
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if read_number((&mut p as *mut *const u8), ptrend, cb.bracount, 65535, 161, (&mut i as *mut c_int), (&mut errorcode as *mut c_int)) != 0:
-                                                    if (if (if p >= ptrend: 1 else: 0) != 0 or (if (unsafe: *p) != terminator: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                        (ptr = p)
+                                                if read_number((&mut p__goto_3775_20 as *mut *const u8), ptrend__goto_3165_12, cb.bracount, 65535, 161, (&mut i__goto_3155_5 as *mut c_int), (&mut errorcode__goto_3153_5 as *mut c_int)) != 0:
+                                                    if (if (if p__goto_3775_20 >= ptrend__goto_3165_12: 1 else: 0) != 0 or (if (unsafe: *p__goto_3775_20) != terminator__goto_3248_12: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (ptr = p__goto_3775_20)
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        (errorcode = ERR119)
+                                                        (errorcode__goto_3153_5 = ERR119)
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         __pc = 1
@@ -2766,7 +2864,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                             break
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    (ptr = (p + (1 as isize as usize)))
+                                                    (ptr = (p__goto_3775_20 + (1 as isize as usize)))
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                     __pc = 7
@@ -2775,45 +2873,45 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if errorcode != 0: 1 else: 0) != 0:
+                                                if (if errorcode__goto_3153_5 != 0: 1 else: 0) != 0:
                                                     __pc = 1
                                                     __goto_pending = 1
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                            if (if read_name((&mut ptr as *mut *const u8), ptrend, utf, terminator, (&mut offset as *mut c_ulong), (&mut name as *mut *const u8), (&mut namelen as *mut c_uint), (&mut errorcode as *mut c_int), cb) != 0: 0 else: 1) != 0:
+                                            if (if read_name((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, terminator__goto_3248_12, (&mut offset__goto_3252_14 as *mut c_ulong), (&mut name__goto_3164_12 as *mut *const u8), (&mut namelen__goto_3133_10 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int), cb) != 0: 0 else: 1) != 0:
                                                 __pc = 1
                                                 __goto_pending = 1
-                                            (unsafe: *parsed_pattern = (if ((if (if escape == ESC_k: 1 else: 0) != 0 or (if terminator == 125: 1 else: 0) != 0: 1 else: 0)) != 0: 2147745792 else: 2149908480))
-                                            (parsed_pattern = parsed_pattern + 1)
-                                            (unsafe: *parsed_pattern = namelen)
-                                            (parsed_pattern = parsed_pattern + 1)
+                                            (unsafe: *parsed_pattern__goto_3141_11 = (if ((if (if escape__goto_3154_5 == ESC_k: 1 else: 0) != 0 or (if terminator__goto_3248_12 == 125: 1 else: 0) != 0: 1 else: 0)) != 0: 2147745792 else: 2149908480))
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                            (unsafe: *parsed_pattern__goto_3141_11 = namelen__goto_3133_10)
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                             0
-                                            (okquantifier = 1)
+                                            (okquantifier__goto_3162_6 = 1)
                                         _ =>
-                                            (unsafe: *parsed_pattern = ((2149318656 as c_uint) +% escape))
-                                            (parsed_pattern = parsed_pattern + 1)
+                                            (unsafe: *parsed_pattern__goto_3141_11 = ((2149318656 as c_uint) +% escape__goto_3154_5))
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                         94 =>
-                            (unsafe: *parsed_pattern = 2148073472)
-                            (parsed_pattern = parsed_pattern + 1)
+                            (unsafe: *parsed_pattern__goto_3141_11 = 2148073472)
+                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                         36 =>
-                            (unsafe: *parsed_pattern = 2149187584)
-                            (parsed_pattern = parsed_pattern + 1)
+                            (unsafe: *parsed_pattern__goto_3141_11 = 2149187584)
+                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                         46 =>
-                            (unsafe: *parsed_pattern = 2149253120)
-                            (parsed_pattern = parsed_pattern + 1)
-                            (okquantifier = 1)
+                            (unsafe: *parsed_pattern__goto_3141_11 = 2149253120)
+                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                            (okquantifier__goto_3162_6 = 1)
                         42 =>
-                            (meta_quantifier = (2151153664 as c_uint))
+                            (meta_quantifier__goto_3145_10 = (2151153664 as c_uint))
                             __pc = 2
                             __goto_pending = 1
-                            (meta_quantifier = (2151350272 as c_uint))
+                            (meta_quantifier__goto_3145_10 = (2151350272 as c_uint))
                             __pc = 2
                             __goto_pending = 1
-                            (meta_quantifier = (2151546880 as c_uint))
+                            (meta_quantifier__goto_3145_10 = (2151546880 as c_uint))
                             __pc = 2
                             __goto_pending = 1
-                            if (if read_repeat_counts((&mut ptr as *mut *const u8), ptrend, (&mut min_repeat as *mut c_uint), (&mut max_repeat as *mut c_uint), (&mut errorcode as *mut c_int)) != 0: 0 else: 1) != 0:
-                                if (if errorcode != 0: 1 else: 0) != 0:
+                            if (if read_repeat_counts((&mut ptr as *mut *const u8), ptrend__goto_3165_12, (&mut min_repeat__goto_3245_12 as *mut c_uint), (&mut max_repeat__goto_3245_28 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int)) != 0: 0 else: 1) != 0:
+                                if (if errorcode__goto_3153_5 != 0: 1 else: 0) != 0:
                                     __pc = 19
                                     __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2824,53 +2922,53 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (meta_quantifier = (2151743488 as c_uint))
-                            if (if prev_okquantifier != 0: 0 else: 1) != 0:
-                                (errorcode = ERR9)
+                            (meta_quantifier__goto_3145_10 = (2151743488 as c_uint))
+                            if (if prev_okquantifier__goto_3250_8 != 0: 0 else: 1) != 0:
+                                (errorcode__goto_3153_5 = ERR9)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 __pc = 19
                                 __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if (unsafe: *prev_parsed_item) == 2150498304: 1 else: 0) != 0:
-                                (p = (parsed_pattern - (1 as isize as usize)))
-                                while (if p >= verbstartptr: 1 else: 0) != 0:
-                                    (p[1] = p[0])
-                                    (p = p - 1)
+                            if (if (unsafe: *prev_parsed_item__goto_3144_11) == 2150498304: 1 else: 0) != 0:
+                                (p__goto_3878_17 = (parsed_pattern__goto_3141_11 - (1 as isize as usize)))
+                                while (if p__goto_3878_17 >= verbstartptr__goto_3139_11: 1 else: 0) != 0:
+                                    (p__goto_3878_17[1] = p__goto_3878_17[0])
+                                    (p__goto_3878_17 = p__goto_3878_17 - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                ((unsafe: *verbstartptr) = (2149449728 as c_uint))
+                                ((unsafe: *verbstartptr__goto_3139_11) = (2149449728 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (parsed_pattern[1] = (2149384192 as c_uint))
+                                (parsed_pattern__goto_3141_11[1] = (2149384192 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                parsed_pattern = parsed_pattern + 2
+                                parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 2
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (unsafe: *parsed_pattern = meta_quantifier)
-                            (parsed_pattern = parsed_pattern + 1)
-                            if (if c == 123: 1 else: 0) != 0:
-                                (unsafe: *parsed_pattern = min_repeat)
-                                (parsed_pattern = parsed_pattern + 1)
+                            (unsafe: *parsed_pattern__goto_3141_11 = meta_quantifier__goto_3145_10)
+                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                            if (if c__goto_3131_10 == 123: 1 else: 0) != 0:
+                                (unsafe: *parsed_pattern__goto_3141_11 = min_repeat__goto_3245_12)
+                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *parsed_pattern = max_repeat)
-                                (parsed_pattern = parsed_pattern + 1)
+                                (unsafe: *parsed_pattern__goto_3141_11 = max_repeat__goto_3245_28)
+                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         43 =>
-                            (meta_quantifier = (2151350272 as c_uint))
+                            (meta_quantifier__goto_3145_10 = (2151350272 as c_uint))
                             __pc = 2
                             __goto_pending = 1
-                            (meta_quantifier = (2151546880 as c_uint))
+                            (meta_quantifier__goto_3145_10 = (2151546880 as c_uint))
                             __pc = 2
                             __goto_pending = 1
-                            if (if read_repeat_counts((&mut ptr as *mut *const u8), ptrend, (&mut min_repeat as *mut c_uint), (&mut max_repeat as *mut c_uint), (&mut errorcode as *mut c_int)) != 0: 0 else: 1) != 0:
-                                if (if errorcode != 0: 1 else: 0) != 0:
+                            if (if read_repeat_counts((&mut ptr as *mut *const u8), ptrend__goto_3165_12, (&mut min_repeat__goto_3245_12 as *mut c_uint), (&mut max_repeat__goto_3245_28 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int)) != 0: 0 else: 1) != 0:
+                                if (if errorcode__goto_3153_5 != 0: 1 else: 0) != 0:
                                     __pc = 19
                                     __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2881,50 +2979,50 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (meta_quantifier = (2151743488 as c_uint))
-                            if (if prev_okquantifier != 0: 0 else: 1) != 0:
-                                (errorcode = ERR9)
+                            (meta_quantifier__goto_3145_10 = (2151743488 as c_uint))
+                            if (if prev_okquantifier__goto_3250_8 != 0: 0 else: 1) != 0:
+                                (errorcode__goto_3153_5 = ERR9)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 __pc = 19
                                 __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if (unsafe: *prev_parsed_item) == 2150498304: 1 else: 0) != 0:
-                                (p = (parsed_pattern - (1 as isize as usize)))
-                                while (if p >= verbstartptr: 1 else: 0) != 0:
-                                    (p[1] = p[0])
-                                    (p = p - 1)
+                            if (if (unsafe: *prev_parsed_item__goto_3144_11) == 2150498304: 1 else: 0) != 0:
+                                (p__goto_3878_17 = (parsed_pattern__goto_3141_11 - (1 as isize as usize)))
+                                while (if p__goto_3878_17 >= verbstartptr__goto_3139_11: 1 else: 0) != 0:
+                                    (p__goto_3878_17[1] = p__goto_3878_17[0])
+                                    (p__goto_3878_17 = p__goto_3878_17 - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                ((unsafe: *verbstartptr) = (2149449728 as c_uint))
+                                ((unsafe: *verbstartptr__goto_3139_11) = (2149449728 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (parsed_pattern[1] = (2149384192 as c_uint))
+                                (parsed_pattern__goto_3141_11[1] = (2149384192 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                parsed_pattern = parsed_pattern + 2
+                                parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 2
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (unsafe: *parsed_pattern = meta_quantifier)
-                            (parsed_pattern = parsed_pattern + 1)
-                            if (if c == 123: 1 else: 0) != 0:
-                                (unsafe: *parsed_pattern = min_repeat)
-                                (parsed_pattern = parsed_pattern + 1)
+                            (unsafe: *parsed_pattern__goto_3141_11 = meta_quantifier__goto_3145_10)
+                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                            if (if c__goto_3131_10 == 123: 1 else: 0) != 0:
+                                (unsafe: *parsed_pattern__goto_3141_11 = min_repeat__goto_3245_12)
+                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *parsed_pattern = max_repeat)
-                                (parsed_pattern = parsed_pattern + 1)
+                                (unsafe: *parsed_pattern__goto_3141_11 = max_repeat__goto_3245_28)
+                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         63 =>
-                            (meta_quantifier = (2151546880 as c_uint))
+                            (meta_quantifier__goto_3145_10 = (2151546880 as c_uint))
                             __pc = 2
                             __goto_pending = 1
-                            if (if read_repeat_counts((&mut ptr as *mut *const u8), ptrend, (&mut min_repeat as *mut c_uint), (&mut max_repeat as *mut c_uint), (&mut errorcode as *mut c_int)) != 0: 0 else: 1) != 0:
-                                if (if errorcode != 0: 1 else: 0) != 0:
+                            if (if read_repeat_counts((&mut ptr as *mut *const u8), ptrend__goto_3165_12, (&mut min_repeat__goto_3245_12 as *mut c_uint), (&mut max_repeat__goto_3245_28 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int)) != 0: 0 else: 1) != 0:
+                                if (if errorcode__goto_3153_5 != 0: 1 else: 0) != 0:
                                     __pc = 19
                                     __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2935,47 +3033,47 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (meta_quantifier = (2151743488 as c_uint))
-                            if (if prev_okquantifier != 0: 0 else: 1) != 0:
-                                (errorcode = ERR9)
+                            (meta_quantifier__goto_3145_10 = (2151743488 as c_uint))
+                            if (if prev_okquantifier__goto_3250_8 != 0: 0 else: 1) != 0:
+                                (errorcode__goto_3153_5 = ERR9)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 __pc = 19
                                 __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if (unsafe: *prev_parsed_item) == 2150498304: 1 else: 0) != 0:
-                                (p = (parsed_pattern - (1 as isize as usize)))
-                                while (if p >= verbstartptr: 1 else: 0) != 0:
-                                    (p[1] = p[0])
-                                    (p = p - 1)
+                            if (if (unsafe: *prev_parsed_item__goto_3144_11) == 2150498304: 1 else: 0) != 0:
+                                (p__goto_3878_17 = (parsed_pattern__goto_3141_11 - (1 as isize as usize)))
+                                while (if p__goto_3878_17 >= verbstartptr__goto_3139_11: 1 else: 0) != 0:
+                                    (p__goto_3878_17[1] = p__goto_3878_17[0])
+                                    (p__goto_3878_17 = p__goto_3878_17 - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                ((unsafe: *verbstartptr) = (2149449728 as c_uint))
+                                ((unsafe: *verbstartptr__goto_3139_11) = (2149449728 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (parsed_pattern[1] = (2149384192 as c_uint))
+                                (parsed_pattern__goto_3141_11[1] = (2149384192 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                parsed_pattern = parsed_pattern + 2
+                                parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 2
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (unsafe: *parsed_pattern = meta_quantifier)
-                            (parsed_pattern = parsed_pattern + 1)
-                            if (if c == 123: 1 else: 0) != 0:
-                                (unsafe: *parsed_pattern = min_repeat)
-                                (parsed_pattern = parsed_pattern + 1)
+                            (unsafe: *parsed_pattern__goto_3141_11 = meta_quantifier__goto_3145_10)
+                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                            if (if c__goto_3131_10 == 123: 1 else: 0) != 0:
+                                (unsafe: *parsed_pattern__goto_3141_11 = min_repeat__goto_3245_12)
+                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *parsed_pattern = max_repeat)
-                                (parsed_pattern = parsed_pattern + 1)
+                                (unsafe: *parsed_pattern__goto_3141_11 = max_repeat__goto_3245_28)
+                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         123 =>
-                            if (if read_repeat_counts((&mut ptr as *mut *const u8), ptrend, (&mut min_repeat as *mut c_uint), (&mut max_repeat as *mut c_uint), (&mut errorcode as *mut c_int)) != 0: 0 else: 1) != 0:
-                                if (if errorcode != 0: 1 else: 0) != 0:
+                            if (if read_repeat_counts((&mut ptr as *mut *const u8), ptrend__goto_3165_12, (&mut min_repeat__goto_3245_12 as *mut c_uint), (&mut max_repeat__goto_3245_28 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int)) != 0: 0 else: 1) != 0:
+                                if (if errorcode__goto_3153_5 != 0: 1 else: 0) != 0:
                                     __pc = 19
                                     __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -2986,58 +3084,58 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (meta_quantifier = (2151743488 as c_uint))
-                            if (if prev_okquantifier != 0: 0 else: 1) != 0:
-                                (errorcode = ERR9)
+                            (meta_quantifier__goto_3145_10 = (2151743488 as c_uint))
+                            if (if prev_okquantifier__goto_3250_8 != 0: 0 else: 1) != 0:
+                                (errorcode__goto_3153_5 = ERR9)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 __pc = 19
                                 __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if (unsafe: *prev_parsed_item) == 2150498304: 1 else: 0) != 0:
-                                (p = (parsed_pattern - (1 as isize as usize)))
-                                while (if p >= verbstartptr: 1 else: 0) != 0:
-                                    (p[1] = p[0])
-                                    (p = p - 1)
+                            if (if (unsafe: *prev_parsed_item__goto_3144_11) == 2150498304: 1 else: 0) != 0:
+                                (p__goto_3878_17 = (parsed_pattern__goto_3141_11 - (1 as isize as usize)))
+                                while (if p__goto_3878_17 >= verbstartptr__goto_3139_11: 1 else: 0) != 0:
+                                    (p__goto_3878_17[1] = p__goto_3878_17[0])
+                                    (p__goto_3878_17 = p__goto_3878_17 - 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                ((unsafe: *verbstartptr) = (2149449728 as c_uint))
+                                ((unsafe: *verbstartptr__goto_3139_11) = (2149449728 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (parsed_pattern[1] = (2149384192 as c_uint))
+                                (parsed_pattern__goto_3141_11[1] = (2149384192 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                parsed_pattern = parsed_pattern + 2
+                                parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 2
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (unsafe: *parsed_pattern = meta_quantifier)
-                            (parsed_pattern = parsed_pattern + 1)
-                            if (if c == 123: 1 else: 0) != 0:
-                                (unsafe: *parsed_pattern = min_repeat)
-                                (parsed_pattern = parsed_pattern + 1)
+                            (unsafe: *parsed_pattern__goto_3141_11 = meta_quantifier__goto_3145_10)
+                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                            if (if c__goto_3131_10 == 123: 1 else: 0) != 0:
+                                (unsafe: *parsed_pattern__goto_3141_11 = min_repeat__goto_3245_12)
+                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *parsed_pattern = max_repeat)
-                                (parsed_pattern = parsed_pattern + 1)
+                                (unsafe: *parsed_pattern__goto_3141_11 = max_repeat__goto_3245_28)
+                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         91 =>
-                            if (if (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 6: 1 else: 0) != 0 and ((if (if _pcre2_strncmp_c8_8(ptr, ((&STRING_WEIRD_STARTWORD[0] as *mut c_char) as *const i8), 6) == 0: 1 else: 0) != 0 or (if _pcre2_strncmp_c8_8(ptr, ((&STRING_WEIRD_ENDWORD[0] as *mut c_char) as *const i8), 6) == 0: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                (unsafe: *parsed_pattern = ((2149318656 as c_uint) +% 5))
-                                (parsed_pattern = parsed_pattern + 1)
+                            if (if (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) >= 6: 1 else: 0) != 0 and ((if (if _pcre2_strncmp_c8_8(ptr, "[:<:]]", 6) == 0: 1 else: 0) != 0 or (if _pcre2_strncmp_c8_8(ptr, "[:>:]]", 6) == 0: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                (unsafe: *parsed_pattern__goto_3141_11 = ((2149318656 as c_uint) +% 5))
+                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if ptr[2] == 60: 1 else: 0) != 0:
-                                    (unsafe: *parsed_pattern = 2150039552)
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2150039552)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    (unsafe: *parsed_pattern = 2150170624)
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2150170624)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     ((unsafe: *has_lookbehind) = 1)
@@ -3049,57 +3147,57 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if ((options & 131072)) == 0: 1 else: 0) != 0:
-                                    (unsafe: *parsed_pattern = ((2149318656 as c_uint) +% 11))
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = ((2149318656 as c_uint) +% 11))
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                 else:
-                                    (unsafe: *parsed_pattern = ((2149318656 as c_uint) +% 16))
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = ((2149318656 as c_uint) +% 16))
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (unsafe: *parsed_pattern = 524288)
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 524288)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *parsed_pattern = 2149384192)
-                                (parsed_pattern = parsed_pattern + 1)
+                                (unsafe: *parsed_pattern__goto_3141_11 = 2149384192)
+                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 ptr = ptr + 6
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (okquantifier = 1)
+                                (okquantifier__goto_3162_6 = 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if (if (if ptr < ptrend: 1 else: 0) != 0 and ((if (if (if (unsafe: *ptr) == 58: 1 else: 0) != 0 or (if (unsafe: *ptr) == 46: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *ptr) == 61: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and check_posix_syntax(ptr, ptrend, (&mut tempptr as *mut *const u8)) != 0: 1 else: 0) != 0:
-                                (errorcode = (if ((if (unsafe: *(ptr = ptr - 1)) == 58: 1 else: 0)) != 0: ERR12 else: ERR13))
+                            if (if (if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0 and ((if (if (if (unsafe: *ptr) == 58: 1 else: 0) != 0 or (if (unsafe: *ptr) == 46: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *ptr) == 61: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and check_posix_syntax(ptr, ptrend__goto_3165_12, (&mut tempptr__goto_3251_14 as *mut *const u8)) != 0: 1 else: 0) != 0:
+                                (errorcode__goto_3153_5 = (if ((if (unsafe: *(ptr = ptr - 1)) == 58: 1 else: 0)) != 0: ERR12 else: ERR13))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (ptr = (tempptr + (2 as isize as usize)))
+                                (ptr = (tempptr__goto_3251_14 + (2 as isize as usize)))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 __pc = 19
                                 __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (class_mode_state = (if ((if ((options & 134217728)) != 0: 1 else: 0)) != 0: CLASS_MODE_ALT_EXT else: CLASS_MODE_NORMAL))
-                            (okquantifier = 1)
-                            (class_depth_m1 = -1)
-                            (class_maxdepth_m1 = -1)
-                            (class_range_state = 0)
-                            (class_op_state = 0)
-                            (class_start = (null as *mut c_uint))
+                            (class_mode_state__goto_3136_10 = (if ((if ((options & 134217728)) != 0: 1 else: 0)) != 0: CLASS_MODE_ALT_EXT else: CLASS_MODE_NORMAL))
+                            (okquantifier__goto_3162_6 = 1)
+                            (class_depth_m1__goto_3148_9 = -1)
+                            (class_maxdepth_m1__goto_3149_9 = -1)
+                            (class_range_state__goto_3134_10 = 0)
+                            (class_op_state__goto_3135_10 = 0)
+                            (class_start__goto_3137_11 = (null as *mut c_uint))
                             while true:
-                                char_is_literal = 1
+                                char_is_literal__goto_3990_12 = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if inescq != 0:
-                                    if (if (if (if c == 92: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 69: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (inescq = 0)
+                                if inescq__goto_3156_6 != 0:
+                                    if (if (if (if c__goto_3131_10 == 92: 1 else: 0) != 0 and (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == 69: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (inescq__goto_3156_6 = 0)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         (ptr = ptr + 1)
@@ -3111,8 +3209,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if class_mode_state == 2: 1 else: 0) != 0:
-                                        (errorcode = ERR116)
+                                    if (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0:
+                                        (errorcode__goto_3153_5 = ERR116)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 19
@@ -3127,20 +3225,20 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if ((if (if c == 32: 1 else: 0) != 0 or (if c == 9: 1 else: 0) != 0: 1 else: 0)) != 0 and ((if (if ((options & 16777216)) != 0: 1 else: 0) != 0 or (if class_mode_state >= 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                if (if ((if (if c__goto_3131_10 == 32: 1 else: 0) != 0 or (if c__goto_3131_10 == 9: 1 else: 0) != 0: 1 else: 0)) != 0 and ((if (if ((options & 16777216)) != 0: 1 else: 0) != 0 or (if class_mode_state__goto_3136_10 >= 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
                                     __pc = 5
                                     __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if (if (if (if (if class_depth_m1 >= 0: 1 else: 0) != 0 and (if c == 91: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (if (unsafe: *ptr) == 58: 1 else: 0) != 0 or (if (unsafe: *ptr) == 46: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *ptr) == 61: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and check_posix_syntax(ptr, ptrend, (&mut tempptr as *mut *const u8)) != 0: 1 else: 0) != 0:
-                                    posix_negate = 0
+                                if (if (if (if (if (if class_depth_m1__goto_3148_9 >= 0: 1 else: 0) != 0 and (if c__goto_3131_10 == 91: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (if (unsafe: *ptr) == 58: 1 else: 0) != 0 or (if (unsafe: *ptr) == 46: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *ptr) == 61: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and check_posix_syntax(ptr, ptrend__goto_3165_12, (&mut tempptr__goto_3251_14 as *mut *const u8)) != 0: 1 else: 0) != 0:
+                                    posix_negate__goto_4037_14 = 0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if class_range_state == 1: 1 else: 0) != 0:
-                                        (ptr = (tempptr + (2 as isize as usize)))
+                                    if (if class_range_state__goto_3134_10 == 1: 1 else: 0) != 0:
+                                        (ptr = (tempptr__goto_3251_14 + (2 as isize as usize)))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (errorcode = ERR50)
+                                        (errorcode__goto_3153_5 = ERR50)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 19
@@ -3149,11 +3247,11 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if class_range_state == 3: 1 else: 0) != 0:
-                                        (ptr = class_range_forbid_ptr)
+                                    if (if class_range_state__goto_3134_10 == 3: 1 else: 0) != 0:
+                                        (ptr = class_range_forbid_ptr__goto_3167_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (errorcode = ERR50)
+                                        (errorcode__goto_3153_5 = ERR50)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 19
@@ -3162,11 +3260,11 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if class_op_state == 1: 1 else: 0) != 0 and (if class_mode_state == 2: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (ptr = (tempptr + (2 as isize as usize)))
+                                    if (if (if class_op_state__goto_3135_10 == 1: 1 else: 0) != 0 and (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (ptr = (tempptr__goto_3251_14 + (2 as isize as usize)))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (errorcode = ERR113)
+                                        (errorcode__goto_3153_5 = ERR113)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 19
@@ -3176,10 +3274,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (unsafe: *ptr) != 58: 1 else: 0) != 0:
-                                        (ptr = (tempptr + (2 as isize as usize)))
+                                        (ptr = (tempptr__goto_3251_14 + (2 as isize as usize)))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (errorcode = ERR13)
+                                        (errorcode__goto_3153_5 = ERR13)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 19
@@ -3189,7 +3287,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if (unsafe: *((ptr = ptr + 1))) == 94: 1 else: 0) != 0:
-                                        (posix_negate = 1)
+                                        (posix_negate__goto_4037_14 = 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         (ptr = ptr + 1)
@@ -3197,14 +3295,14 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (posix_class = check_posix_name(ptr, ((((tempptr as usize -% ptr as usize) / sizeof[u8]())) as c_int)))
+                                    (posix_class__goto_4038_13 = check_posix_name(ptr, ((((tempptr__goto_3251_14 as usize -% ptr as usize) / sizeof[u8]())) as c_int)))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (ptr = (tempptr + (2 as isize as usize)))
+                                    (ptr = (tempptr__goto_3251_14 + (2 as isize as usize)))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if posix_class < 0: 1 else: 0) != 0:
-                                        (errorcode = ERR30)
+                                    if (if posix_class__goto_4038_13 < 0: 1 else: 0) != 0:
+                                        (errorcode__goto_3153_5 = ERR30)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 19
@@ -3213,37 +3311,37 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (class_range_state = 2)
+                                    (class_range_state__goto_3134_10 = 2)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (class_op_state = 1)
+                                    (class_op_state__goto_3135_10 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (unsafe: *parsed_pattern = (if posix_negate != 0: 2149646336 else: 2149580800))
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = (if posix_negate__goto_4037_14 != 0: 2149646336 else: 2149580800))
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (unsafe: *parsed_pattern = posix_class)
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = posix_class__goto_4038_13)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if ((if (if c == 91: 1 else: 0) != 0 and ((if (if (if class_depth_m1 < 0: 1 else: 0) != 0 or (if class_mode_state == 1: 1 else: 0) != 0: 1 else: 0) != 0 or (if class_mode_state == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0 or ((if (if c == 40: 1 else: 0) != 0 and (if class_mode_state == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                        start_c = c
+                                    if (if ((if (if c__goto_3131_10 == 91: 1 else: 0) != 0 and ((if (if (if class_depth_m1__goto_3148_9 < 0: 1 else: 0) != 0 or (if class_mode_state__goto_3136_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0 or (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0 or ((if (if c__goto_3131_10 == 40: 1 else: 0) != 0 and (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        start_c__goto_4154_18 = c__goto_3131_10
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if (if start_c == 91: 1 else: 0) != 0 and (if class_mode_state == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if class_depth_m1 >= 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (new_class_mode_state = 3)
+                                        if (if (if (if start_c__goto_4154_18 == 91: 1 else: 0) != 0 and (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if class_depth_m1__goto_3148_9 >= 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (new_class_mode_state__goto_4155_18 = 3)
                                         else:
-                                            (new_class_mode_state = class_mode_state)
+                                            (new_class_mode_state__goto_4155_18 = class_mode_state__goto_3136_10)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if class_range_state == 1: 1 else: 0) != 0:
-                                            (parsed_pattern[-1] = 45)
+                                        if (if class_range_state__goto_3134_10 == 1: 1 else: 0) != 0:
+                                            (parsed_pattern__goto_3141_11[-1] = 45)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if class_op_state == 1: 1 else: 0) != 0 and (if class_mode_state == 2: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (errorcode = ERR113)
+                                        if (if (if class_op_state__goto_3135_10 == 1: 1 else: 0) != 0 and (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (errorcode__goto_3153_5 = ERR113)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             __pc = 19
@@ -3252,11 +3350,11 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if class_depth_m1 >= (15 - 1): 1 else: 0) != 0:
+                                        if (if class_depth_m1__goto_3148_9 >= (15 - 1): 1 else: 0) != 0:
                                             (ptr = ptr - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (errorcode = ERR107)
+                                            (errorcode__goto_3153_5 = ERR107)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             __pc = 19
@@ -3265,15 +3363,15 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (negate_class = 0)
+                                        (negate_class__goto_3161_6 = 0)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         while true:
-                                            if (if ptr >= ptrend: 1 else: 0) != 0:
-                                                if (if start_c == 40: 1 else: 0) != 0:
-                                                    (errorcode = ERR14)
+                                            if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0:
+                                                if (if start_c__goto_4154_18 == 40: 1 else: 0) != 0:
+                                                    (errorcode__goto_3153_5 = ERR14)
                                                 else:
-                                                    (errorcode = ERR6)
+                                                    (errorcode__goto_3153_5 = ERR6)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 19
@@ -3285,14 +3383,14 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             0
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if new_class_mode_state == 2: 1 else: 0) != 0:
+                                            if (if new_class_mode_state__goto_4155_18 == 2: 1 else: 0) != 0:
                                                 break
                                             else:
-                                                if (if c == 92: 1 else: 0) != 0:
-                                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 69: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                if (if c__goto_3131_10 == 92: 1 else: 0) != 0:
+                                                    if (if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0 and (if (unsafe: *ptr) == 69: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (ptr = ptr + 1)
                                                     else:
-                                                        if (if (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(ptr, "Q\\E", 3) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        if (if (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) >= 3: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(ptr, "Q\\E", 3) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                             ptr = ptr + 3
                                                         else:
                                                             break
@@ -3304,28 +3402,28 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if (if c == 93: 1 else: 0) != 0 and (if ((cb.external_options & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if new_class_mode_state < 2: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            if (if class_start != (null as *mut c_uint): 1 else: 0) != 0:
-                                                (unsafe: *class_start) = (unsafe: *class_start) | 1
+                                        if (if (if (if c__goto_3131_10 == 93: 1 else: 0) != 0 and (if ((cb.external_options & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if new_class_mode_state__goto_4155_18 < 2: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            if (if class_start__goto_3137_11 != (null as *mut c_uint): 1 else: 0) != 0:
+                                                (unsafe: *class_start__goto_3137_11) = (unsafe: *class_start__goto_3137_11) | 1
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (class_start = (null as *mut c_uint))
+                                                (class_start__goto_3137_11 = (null as *mut c_uint))
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (unsafe: *parsed_pattern = (if negate_class != 0: 2148270080 else: 2148204544))
-                                            (parsed_pattern = parsed_pattern + 1)
+                                            (unsafe: *parsed_pattern__goto_3141_11 = (if negate_class__goto_3161_6 != 0: 2148270080 else: 2148204544))
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if class_depth_m1 < 0: 1 else: 0) != 0:
+                                            if (if class_depth_m1__goto_3148_9 < 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (class_range_state = 0)
+                                            (class_range_state__goto_3134_10 = 0)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (class_op_state = 1)
+                                            (class_op_state__goto_3135_10 = 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             __pc = 5
@@ -3334,46 +3432,46 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if class_start != (null as *mut c_uint): 1 else: 0) != 0:
-                                            (unsafe: *class_start) = (unsafe: *class_start) | 1
+                                        if (if class_start__goto_3137_11 != (null as *mut c_uint): 1 else: 0) != 0:
+                                            (unsafe: *class_start__goto_3137_11) = (unsafe: *class_start__goto_3137_11) | 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (class_start = (null as *mut c_uint))
+                                            (class_start__goto_3137_11 = (null as *mut c_uint))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (class_start = parsed_pattern)
+                                        (class_start__goto_3137_11 = parsed_pattern__goto_3141_11)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *parsed_pattern = (if negate_class != 0: 2148401152 else: 2148139008))
-                                        (parsed_pattern = parsed_pattern + 1)
+                                        (unsafe: *parsed_pattern__goto_3141_11 = (if negate_class__goto_3161_6 != 0: 2148401152 else: 2148139008))
+                                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (class_range_state = 0)
+                                        (class_range_state__goto_3134_10 = 0)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (class_op_state = 0)
+                                        (class_op_state__goto_3135_10 = 0)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (class_mode_state = new_class_mode_state)
+                                        (class_mode_state__goto_3136_10 = new_class_mode_state__goto_4155_18)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (class_depth_m1 = class_depth_m1 + 1)
+                                        (class_depth_m1__goto_3148_9 = class_depth_m1__goto_3148_9 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if class_maxdepth_m1 < class_depth_m1: 1 else: 0) != 0:
-                                            (class_maxdepth_m1 = class_depth_m1)
+                                        if (if class_maxdepth_m1__goto_3149_9 < class_depth_m1__goto_3148_9: 1 else: 0) != 0:
+                                            (class_maxdepth_m1__goto_3149_9 = class_depth_m1__goto_3148_9)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        ((&cb.class_op_used[0] as *mut u8)[class_depth_m1] = 0)
+                                        ((&cb.class_op_used[0] as *mut u8)[class_depth_m1__goto_3148_9] = 0)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if c == 93: 1 else: 0) != 0 and (if new_class_mode_state != 2: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (class_range_state = 5)
+                                        if (if (if c__goto_3131_10 == 93: 1 else: 0) != 0 and (if new_class_mode_state__goto_4155_18 != 2: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (class_range_state__goto_3134_10 = 5)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (class_op_state = 1)
+                                            (class_op_state__goto_3135_10 = 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             0
@@ -3389,10 +3487,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        if (if (if c == 93: 1 else: 0) != 0 or ((if (if c == 41: 1 else: 0) != 0 and (if class_mode_state == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                            if (if class_mode_state == 2: 1 else: 0) != 0:
-                                                if (if (if c == 93: 1 else: 0) != 0 and (if class_depth_m1 != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                    (errorcode = ERR14)
+                                        if (if (if c__goto_3131_10 == 93: 1 else: 0) != 0 or ((if (if c__goto_3131_10 == 41: 1 else: 0) != 0 and (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                            if (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0:
+                                                if (if (if c__goto_3131_10 == 93: 1 else: 0) != 0 and (if class_depth_m1__goto_3148_9 != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    (errorcode__goto_3153_5 = ERR14)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                     (ptr = ptr - 1)
@@ -3404,8 +3502,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if (if c == 41: 1 else: 0) != 0 and (if class_depth_m1 < 1: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                    (errorcode = ERR22)
+                                                if (if (if c__goto_3131_10 == 41: 1 else: 0) != 0 and (if class_depth_m1__goto_3148_9 < 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    (errorcode__goto_3153_5 = ERR22)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                     __pc = 19
@@ -3416,8 +3514,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if class_op_state == 2: 1 else: 0) != 0:
-                                                (errorcode = ERR110)
+                                            if (if class_op_state__goto_3135_10 == 2: 1 else: 0) != 0:
+                                                (errorcode__goto_3153_5 = ERR110)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 19
@@ -3426,8 +3524,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if class_mode_state == 2: 1 else: 0) != 0 and (if class_op_state == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                (errorcode = ERR114)
+                                            if (if (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0 and (if class_op_state__goto_3135_10 == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (errorcode__goto_3153_5 = ERR114)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 19
@@ -3436,18 +3534,18 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if class_range_state == 1: 1 else: 0) != 0:
-                                                (parsed_pattern[-1] = 45)
+                                            if (if class_range_state__goto_3134_10 == 1: 1 else: 0) != 0:
+                                                (parsed_pattern__goto_3141_11[-1] = 45)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (unsafe: *parsed_pattern = 2148335616)
-                                            (parsed_pattern = parsed_pattern + 1)
+                                            (unsafe: *parsed_pattern__goto_3141_11 = 2148335616)
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (class_depth_m1 = class_depth_m1 - 1) < 0: 1 else: 0) != 0:
-                                                if (if class_mode_state == 2: 1 else: 0) != 0:
-                                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                        (errorcode = ERR115)
+                                            if (if (class_depth_m1__goto_3148_9 = class_depth_m1__goto_3148_9 - 1) < 0: 1 else: 0) != 0:
+                                                if (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0:
+                                                    if (if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (errorcode__goto_3153_5 = ERR115)
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         __pc = 19
@@ -3466,23 +3564,23 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (class_range_state = 0)
+                                            (class_range_state__goto_3134_10 = 0)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (class_op_state = 1)
+                                            (class_op_state__goto_3135_10 = 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if class_mode_state == 3: 1 else: 0) != 0:
-                                                (class_mode_state = 2)
+                                            if (if class_mode_state__goto_3136_10 == 3: 1 else: 0) != 0:
+                                                (class_mode_state__goto_3136_10 = 2)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (class_start = (null as *mut c_uint))
+                                            (class_start__goto_3137_11 = (null as *mut c_uint))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         else:
-                                            if (if (if class_mode_state == 2: 1 else: 0) != 0 and ((if (if (if (if (if c == 43: 1 else: 0) != 0 or (if c == 124: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 45: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 38: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 94: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                                if (if class_op_state != 1: 1 else: 0) != 0:
-                                                    (errorcode = ERR109)
+                                            if (if (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0 and ((if (if (if (if (if c__goto_3131_10 == 43: 1 else: 0) != 0 or (if c__goto_3131_10 == 124: 1 else: 0) != 0: 1 else: 0) != 0 or (if c__goto_3131_10 == 45: 1 else: 0) != 0: 1 else: 0) != 0 or (if c__goto_3131_10 == 38: 1 else: 0) != 0: 1 else: 0) != 0 or (if c__goto_3131_10 == 94: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                                if (if class_op_state__goto_3135_10 != 1: 1 else: 0) != 0:
+                                                    (errorcode__goto_3153_5 = ERR109)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                     __pc = 19
@@ -3491,29 +3589,29 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if class_start != (null as *mut c_uint): 1 else: 0) != 0:
-                                                    (unsafe: *class_start) = (unsafe: *class_start) | 1
+                                                if (if class_start__goto_3137_11 != (null as *mut c_uint): 1 else: 0) != 0:
+                                                    (unsafe: *class_start__goto_3137_11) = (unsafe: *class_start__goto_3137_11) | 1
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    (class_start = (null as *mut c_uint))
+                                                    (class_start__goto_3137_11 = (null as *mut c_uint))
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (unsafe: *parsed_pattern = (if (if c == 43: 1 else: 0) != 0: 2152005632 else: (if (if c == 124: 1 else: 0) != 0: 2152005632 else: (if (if c == 45: 1 else: 0) != 0: 2152071168 else: (if (if c == 38: 1 else: 0) != 0: 2151940096 else: 2152136704)))))
-                                                (parsed_pattern = parsed_pattern + 1)
+                                                (unsafe: *parsed_pattern__goto_3141_11 = (if (if c__goto_3131_10 == 43: 1 else: 0) != 0: 2152005632 else: (if (if c__goto_3131_10 == 124: 1 else: 0) != 0: 2152005632 else: (if (if c__goto_3131_10 == 45: 1 else: 0) != 0: 2152071168 else: (if (if c__goto_3131_10 == 38: 1 else: 0) != 0: 2151940096 else: 2152136704)))))
+                                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (class_range_state = 0)
+                                                (class_range_state__goto_3134_10 = 0)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (class_op_state = 2)
+                                                (class_op_state__goto_3135_10 = 2)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                             else:
-                                                if (if (if class_mode_state == 2: 1 else: 0) != 0 and (if c == 33: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                    if (if class_op_state == 1: 1 else: 0) != 0:
-                                                        (errorcode = ERR113)
+                                                if (if (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0 and (if c__goto_3131_10 == 33: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if class_op_state__goto_3135_10 == 1: 1 else: 0) != 0:
+                                                        (errorcode__goto_3153_5 = ERR113)
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         __pc = 19
@@ -3522,38 +3620,38 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                             break
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    if (if class_start != (null as *mut c_uint): 1 else: 0) != 0:
-                                                        (unsafe: *class_start) = (unsafe: *class_start) | 1
+                                                    if (if class_start__goto_3137_11 != (null as *mut c_uint): 1 else: 0) != 0:
+                                                        (unsafe: *class_start__goto_3137_11) = (unsafe: *class_start__goto_3137_11) | 1
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        (class_start = (null as *mut c_uint))
+                                                        (class_start__goto_3137_11 = (null as *mut c_uint))
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    (unsafe: *parsed_pattern = 2152202240)
-                                                    (parsed_pattern = parsed_pattern + 1)
+                                                    (unsafe: *parsed_pattern__goto_3141_11 = 2152202240)
+                                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    (class_range_state = 0)
+                                                    (class_range_state__goto_3134_10 = 0)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    (class_op_state = 2)
+                                                    (class_op_state__goto_3135_10 = 2)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                 else:
-                                                    if (if (if (if (if class_mode_state == 1: 1 else: 0) != 0 and ((if (if (if (if c == 124: 1 else: 0) != 0 or (if c == 45: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 38: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == 126: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and (if ptr < ptrend: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == c: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if (if (if (if class_mode_state__goto_3136_10 == 1: 1 else: 0) != 0 and ((if (if (if (if c__goto_3131_10 == 124: 1 else: 0) != 0 or (if c__goto_3131_10 == 45: 1 else: 0) != 0: 1 else: 0) != 0 or (if c__goto_3131_10 == 38: 1 else: 0) != 0: 1 else: 0) != 0 or (if c__goto_3131_10 == 126: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) == c__goto_3131_10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                         (ptr = ptr + 1)
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == c: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                            while (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == c: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        if (if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0 and (if (unsafe: *ptr) == c__goto_3131_10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                            while (if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0 and (if (unsafe: *ptr) == c__goto_3131_10: 1 else: 0) != 0: 1 else: 0) != 0:
                                                                 (ptr = ptr + 1)
                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                     break
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
-                                                            (errorcode = ERR108)
+                                                            (errorcode__goto_3153_5 = ERR108)
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             __pc = 19
@@ -3562,8 +3660,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                 break
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        if (if class_op_state != 1: 1 else: 0) != 0:
-                                                            (errorcode = ERR109)
+                                                        if (if class_op_state__goto_3135_10 != 1: 1 else: 0) != 0:
+                                                            (errorcode__goto_3153_5 = ERR109)
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             __pc = 19
@@ -3572,125 +3670,138 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                 break
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        if (if class_start != (null as *mut c_uint): 1 else: 0) != 0:
-                                                            (unsafe: *class_start) = (unsafe: *class_start) | 1
+                                                        if (if (if (&cb.class_op_used[0] as *mut u8)[class_depth_m1__goto_3148_9] != 0: 1 else: 0) != 0 and (if (&cb.class_op_used[0] as *mut u8)[class_depth_m1__goto_3148_9] != (c__goto_3131_10 as u8): 1 else: 0) != 0: 1 else: 0) != 0:
+                                                            (errorcode__goto_3153_5 = ERR111)
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
-                                                            (class_start = (null as *mut c_uint))
+                                                            __pc = 19
+                                                            __goto_pending = 1
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        if (if class_range_state == 1: 1 else: 0) != 0:
-                                                            (parsed_pattern[-1] = 45)
+                                                        if (if class_start__goto_3137_11 != (null as *mut c_uint): 1 else: 0) != 0:
+                                                            (unsafe: *class_start__goto_3137_11) = (unsafe: *class_start__goto_3137_11) | 1
+                                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                                break
+                                                            (class_start__goto_3137_11 = (null as *mut c_uint))
+                                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                                break
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        (unsafe: *parsed_pattern = (if (if c == 124: 1 else: 0) != 0: 2152005632 else: (if (if c == 45: 1 else: 0) != 0: 2152071168 else: (if (if c == 38: 1 else: 0) != 0: 2151940096 else: 2152136704))))
-                                                        (parsed_pattern = parsed_pattern + 1)
+                                                        if (if class_range_state__goto_3134_10 == 1: 1 else: 0) != 0:
+                                                            (parsed_pattern__goto_3141_11[-1] = 45)
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        (class_range_state = 0)
+                                                        (unsafe: *parsed_pattern__goto_3141_11 = (if (if c__goto_3131_10 == 124: 1 else: 0) != 0: 2152005632 else: (if (if c__goto_3131_10 == 45: 1 else: 0) != 0: 2152071168 else: (if (if c__goto_3131_10 == 38: 1 else: 0) != 0: 2151940096 else: 2152136704))))
+                                                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                        (class_op_state = 2)
+                                                        (class_range_state__goto_3134_10 = 0)
+                                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                            break
+                                                        (class_op_state__goto_3135_10 = 2)
+                                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                            break
+                                                        ((&cb.class_op_used[0] as *mut u8)[class_depth_m1__goto_3148_9] = (c__goto_3131_10 as u8))
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                     else:
-                                                        if (if c == 92: 1 else: 0) != 0:
-                                                            (tempptr = ptr)
+                                                        if (if c__goto_3131_10 == 92: 1 else: 0) != 0:
+                                                            (tempptr__goto_3251_14 = ptr)
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
-                                                            (escape = _pcre2_check_escape_8((&mut ptr as *mut *const u8), ptrend, (&mut c as *mut c_uint), (&mut errorcode as *mut c_int), options, xoptions, cb.bracount, 1, cb))
+                                                            (escape__goto_3154_5 = _pcre2_check_escape_8((&mut ptr as *mut *const u8), ptrend__goto_3165_12, (&mut c__goto_3131_10 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int), options, xoptions, cb.bracount, 1, cb))
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
-                                                            if (if errorcode != 0: 1 else: 0) != 0:
-                                                                if (if (if ((xoptions & 2)) == 0: 1 else: 0) != 0 or (if class_mode_state >= 2: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                            if (if errorcode__goto_3153_5 != 0: 1 else: 0) != 0:
+                                                                if (if (if ((xoptions & 2)) == 0: 1 else: 0) != 0 or (if class_mode_state__goto_3136_10 >= 2: 1 else: 0) != 0: 1 else: 0) != 0:
                                                                     __pc = 19
                                                                     __goto_pending = 1
                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                     break
-                                                                (ptr = tempptr)
+                                                                (ptr = tempptr__goto_3251_14)
                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                     break
-                                                                if (if ptr >= ptrend: 1 else: 0) != 0:
-                                                                    (c = 92)
+                                                                if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0:
+                                                                    (c__goto_3131_10 = 92)
                                                                 else:
                                                                     0
                                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                         break
                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                     break
-                                                                (escape = 0)
+                                                                (escape__goto_3154_5 = 0)
                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                     break
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
-                                                            match escape
+                                                            match escape__goto_3154_5
                                                                 0 =>
-                                                                    (char_is_literal = 0)
+                                                                    (char_is_literal__goto_3990_12 = 0)
                                                                     __pc = 4
                                                                     __goto_pending = 1
-                                                                    (c = 8)
-                                                                    (char_is_literal = 0)
+                                                                    (c__goto_3131_10 = 8)
+                                                                    (char_is_literal__goto_3990_12 = 0)
                                                                     __pc = 4
                                                                     __goto_pending = 1
-                                                                    (c = 107)
-                                                                    (char_is_literal = 0)
+                                                                    (c__goto_3131_10 = 107)
+                                                                    (char_is_literal__goto_3990_12 = 0)
                                                                     __pc = 4
                                                                     __goto_pending = 1
-                                                                    (inescq = 1)
+                                                                    (inescq__goto_3156_6 = 1)
                                                                     __pc = 5
                                                                     __goto_pending = 1
                                                                     __pc = 5
                                                                     __goto_pending = 1
                                                                     __pc = 19
                                                                     __goto_pending = 1
-                                                                    (errorcode = ERR71)
+                                                                    (errorcode__goto_3153_5 = ERR71)
                                                                     __pc = 19
                                                                     __goto_pending = 1
                                                                 ESC_b =>
-                                                                    (c = 8)
-                                                                    (char_is_literal = 0)
+                                                                    (c__goto_3131_10 = 8)
+                                                                    (char_is_literal__goto_3990_12 = 0)
                                                                     __pc = 4
                                                                     __goto_pending = 1
-                                                                    (c = 107)
-                                                                    (char_is_literal = 0)
+                                                                    (c__goto_3131_10 = 107)
+                                                                    (char_is_literal__goto_3990_12 = 0)
                                                                     __pc = 4
                                                                     __goto_pending = 1
-                                                                    (inescq = 1)
+                                                                    (inescq__goto_3156_6 = 1)
                                                                     __pc = 5
                                                                     __goto_pending = 1
                                                                     __pc = 5
                                                                     __goto_pending = 1
                                                                     __pc = 19
                                                                     __goto_pending = 1
-                                                                    (errorcode = ERR71)
+                                                                    (errorcode__goto_3153_5 = ERR71)
                                                                     __pc = 19
                                                                     __goto_pending = 1
                                                                 ESC_k =>
-                                                                    (c = 107)
-                                                                    (char_is_literal = 0)
+                                                                    (c__goto_3131_10 = 107)
+                                                                    (char_is_literal__goto_3990_12 = 0)
                                                                     __pc = 4
                                                                     __goto_pending = 1
-                                                                    (inescq = 1)
+                                                                    (inescq__goto_3156_6 = 1)
                                                                     __pc = 5
                                                                     __goto_pending = 1
                                                                     __pc = 5
                                                                     __goto_pending = 1
                                                                     __pc = 19
                                                                     __goto_pending = 1
-                                                                    (errorcode = ERR71)
+                                                                    (errorcode__goto_3153_5 = ERR71)
                                                                     __pc = 19
                                                                     __goto_pending = 1
                                                                 ESC_Q =>
-                                                                    (inescq = 1)
+                                                                    (inescq__goto_3156_6 = 1)
                                                                     __pc = 5
                                                                     __goto_pending = 1
                                                                     __pc = 5
                                                                     __goto_pending = 1
                                                                     __pc = 19
                                                                     __goto_pending = 1
-                                                                    (errorcode = ERR71)
+                                                                    (errorcode__goto_3153_5 = ERR71)
                                                                     __pc = 19
                                                                     __goto_pending = 1
                                                                 ESC_E =>
@@ -3698,17 +3809,17 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                     __goto_pending = 1
                                                                     __pc = 19
                                                                     __goto_pending = 1
-                                                                    (errorcode = ERR71)
+                                                                    (errorcode__goto_3153_5 = ERR71)
                                                                     __pc = 19
                                                                     __goto_pending = 1
                                                                 ESC_B =>
                                                                     __pc = 19
                                                                     __goto_pending = 1
-                                                                    (errorcode = ERR71)
+                                                                    (errorcode__goto_3153_5 = ERR71)
                                                                     __pc = 19
                                                                     __goto_pending = 1
                                                                 ESC_N =>
-                                                                    (errorcode = ERR71)
+                                                                    (errorcode__goto_3153_5 = ERR71)
                                                                     __pc = 19
                                                                     __goto_pending = 1
                                                                 ESC_H => 0
@@ -3724,8 +3835,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                     __goto_pending = 1
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
-                                                            if (if class_range_state == 1: 1 else: 0) != 0:
-                                                                (errorcode = ERR50)
+                                                            if (if class_range_state__goto_3134_10 == 1: 1 else: 0) != 0:
+                                                                (errorcode__goto_3153_5 = ERR50)
                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                     break
                                                                 __pc = 19
@@ -3734,21 +3845,11 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                     break
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
-                                                            if (if class_range_state == 3: 1 else: 0) != 0:
-                                                                (ptr = class_range_forbid_ptr)
+                                                            if (if class_range_state__goto_3134_10 == 3: 1 else: 0) != 0:
+                                                                (ptr = class_range_forbid_ptr__goto_3167_12)
                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                     break
-                                                                (errorcode = ERR50)
-                                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                                    break
-                                                                __pc = 19
-                                                                __goto_pending = 1
-                                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                                    break
-                                                            if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                                break
-                                                            if (if (if class_op_state == 1: 1 else: 0) != 0 and (if class_mode_state == 2: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                                (errorcode = ERR113)
+                                                                (errorcode__goto_3153_5 = ERR50)
                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                     break
                                                                 __pc = 19
@@ -3757,15 +3858,25 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                     break
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
-                                                            (class_range_state = 2)
+                                                            if (if (if class_op_state__goto_3135_10 == 1: 1 else: 0) != 0 and (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                                (errorcode__goto_3153_5 = ERR113)
+                                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                                    break
+                                                                __pc = 19
+                                                                __goto_pending = 1
+                                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                                    break
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
-                                                            (class_op_state = 1)
+                                                            (class_range_state__goto_3134_10 = 2)
+                                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                                break
+                                                            (class_op_state__goto_3135_10 = 1)
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                         else:
-                                                            if (if class_mode_state == 2: 1 else: 0) != 0:
-                                                                (errorcode = ERR116)
+                                                            if (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0:
+                                                                (errorcode__goto_3153_5 = ERR116)
                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                     break
                                                                 __pc = 19
@@ -3773,29 +3884,29 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                     break
                                                             else:
-                                                                if (if (if c == 45: 1 else: 0) != 0 and (if class_range_state >= 4: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                                    (unsafe: *parsed_pattern = (if ((if class_range_state == 5: 1 else: 0)) != 0: 2149777408 else: 2149711872))
-                                                                    (parsed_pattern = parsed_pattern + 1)
+                                                                if (if (if c__goto_3131_10 == 45: 1 else: 0) != 0 and (if class_range_state__goto_3134_10 >= 4: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                                    (unsafe: *parsed_pattern__goto_3141_11 = (if ((if class_range_state__goto_3134_10 == 5: 1 else: 0)) != 0: 2149777408 else: 2149711872))
+                                                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                         break
-                                                                    (class_range_state = 1)
+                                                                    (class_range_state__goto_3134_10 = 1)
                                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                         break
                                                                 else:
-                                                                    if (if (if c == 45: 1 else: 0) != 0 and (if class_range_state == 2: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                                        (unsafe: *parsed_pattern = 45)
-                                                                        (parsed_pattern = parsed_pattern + 1)
+                                                                    if (if (if c__goto_3131_10 == 45: 1 else: 0) != 0 and (if class_range_state__goto_3134_10 == 2: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                                        (unsafe: *parsed_pattern__goto_3141_11 = 45)
+                                                                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                             break
-                                                                        (class_range_state = 3)
+                                                                        (class_range_state__goto_3134_10 = 3)
                                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                             break
-                                                                        (class_range_forbid_ptr = ptr)
+                                                                        (class_range_forbid_ptr__goto_3167_12 = ptr)
                                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                             break
                                                                     else:
-                                                                        if (if (if class_op_state == 1: 1 else: 0) != 0 and (if class_mode_state == 2: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                                            (errorcode = ERR113)
+                                                                        if (if (if class_op_state__goto_3135_10 == 1: 1 else: 0) != 0 and (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                                            (errorcode__goto_3153_5 = ERR113)
                                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                                 break
                                                                             __pc = 19
@@ -3804,12 +3915,12 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                                 break
                                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                             break
-                                                                        if (if class_range_state == 1: 1 else: 0) != 0:
-                                                                            if (if c == parsed_pattern[-2]: 1 else: 0) != 0:
-                                                                                (parsed_pattern = parsed_pattern - 1)
+                                                                        if (if class_range_state__goto_3134_10 == 1: 1 else: 0) != 0:
+                                                                            if (if c__goto_3131_10 == parsed_pattern__goto_3141_11[-2]: 1 else: 0) != 0:
+                                                                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 - 1)
                                                                             else:
-                                                                                if (if parsed_pattern[-2] > c: 1 else: 0) != 0:
-                                                                                    (errorcode = ERR8)
+                                                                                if (if parsed_pattern__goto_3141_11[-2] > c__goto_3131_10: 1 else: 0) != 0:
+                                                                                    (errorcode__goto_3153_5 = ERR8)
                                                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                                         break
                                                                                     __pc = 19
@@ -3817,8 +3928,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                                         break
                                                                                 else:
-                                                                                    if (if (if char_is_literal != 0: 0 else: 1) != 0 and (if parsed_pattern[-1] == 2149777408: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                                                        (parsed_pattern[-1] = (2149711872 as c_uint))
+                                                                                    if (if (if char_is_literal__goto_3990_12 != 0: 0 else: 1) != 0 and (if parsed_pattern__goto_3141_11[-1] == 2149777408: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                                                        (parsed_pattern__goto_3141_11[-1] = (2149711872 as c_uint))
                                                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                                         break
                                                                                     0
@@ -3826,18 +3937,18 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                                         break
                                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                                 break
-                                                                            (class_range_state = 0)
+                                                                            (class_range_state__goto_3134_10 = 0)
                                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                                 break
-                                                                            (class_op_state = 1)
+                                                                            (class_op_state__goto_3135_10 = 1)
                                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                                 break
                                                                         else:
-                                                                            if (if class_range_state == 3: 1 else: 0) != 0:
-                                                                                (ptr = class_range_forbid_ptr)
+                                                                            if (if class_range_state__goto_3134_10 == 3: 1 else: 0) != 0:
+                                                                                (ptr = class_range_forbid_ptr__goto_3167_12)
                                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                                     break
-                                                                                (errorcode = ERR50)
+                                                                                (errorcode__goto_3153_5 = ERR50)
                                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                                     break
                                                                                 __pc = 19
@@ -3845,10 +3956,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                                     break
                                                                             else:
-                                                                                (class_range_state = (if char_is_literal != 0: RANGE_OK_LITERAL else: RANGE_OK_ESCAPED))
+                                                                                (class_range_state__goto_3134_10 = (if char_is_literal__goto_3990_12 != 0: RANGE_OK_LITERAL else: RANGE_OK_ESCAPED))
                                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                                     break
-                                                                                (class_op_state = 1)
+                                                                                (class_op_state__goto_3135_10 = 1)
                                                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                                     break
                                                                                 0
@@ -3858,15 +3969,15 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if ptr >= ptrend: 1 else: 0) != 0:
-                                    if (if (if class_mode_state == 2: 1 else: 0) != 0 and (if class_depth_m1 > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (errorcode = ERR14)
+                                if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0:
+                                    if (if (if class_mode_state__goto_3136_10 == 2: 1 else: 0) != 0 and (if class_depth_m1__goto_3148_9 > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (errorcode__goto_3153_5 = ERR14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if (if class_mode_state == 1: 1 else: 0) != 0 and (if class_depth_m1 == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if class_maxdepth_m1 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (errorcode = ERR112)
+                                    if (if (if (if class_mode_state__goto_3136_10 == 1: 1 else: 0) != 0 and (if class_depth_m1__goto_3148_9 == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if class_maxdepth_m1__goto_3149_9 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (errorcode__goto_3153_5 = ERR112)
                                     else:
-                                        (errorcode = ERR6)
+                                        (errorcode__goto_3153_5 = ERR6)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 19
@@ -3881,17 +3992,17 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         40 =>
-                            if (if ptr >= ptrend: 1 else: 0) != 0:
+                            if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0:
                                 __pc = 18
                                 __goto_pending = 1
                             if (if (unsafe: *ptr) != 63: 1 else: 0) != 0:
                                 if (if (unsafe: *ptr) != 42: 1 else: 0) != 0:
-                                    (nest_depth = nest_depth + 1)
+                                    (nest_depth__goto_3147_10 = nest_depth__goto_3147_10 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if ((options & 8192)) == 0: 1 else: 0) != 0:
                                         if (if cb.bracount >= 65535: 1 else: 0) != 0:
-                                            (errorcode = ERR97)
+                                            (errorcode__goto_3153_5 = ERR97)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             __pc = 19
@@ -3903,35 +4014,35 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         (cb.bracount = cb.bracount + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *parsed_pattern = ((2148007936 as c_uint) | cb.bracount))
-                                        (parsed_pattern = parsed_pattern + 1)
+                                        (unsafe: *parsed_pattern__goto_3141_11 = ((2148007936 as c_uint) | cb.bracount))
+                                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (unsafe: *parsed_pattern = 2149449728)
-                                        (parsed_pattern = parsed_pattern + 1)
+                                        (unsafe: *parsed_pattern__goto_3141_11 = 2149449728)
+                                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) <= 1: 1 else: 0) != 0 or (if ((c = ptr[1])) == 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) <= 1: 1 else: 0) != 0 or (if ((c__goto_3131_10 = ptr[1])) == 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                         break
                                     else:
-                                        if (if 1 != 0 and (if ((cb.ctypes[c] & 4)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (vn = (&alasnames[0] as *mut c_char))
+                                        if (if 1 != 0 and (if ((cb.ctypes[c__goto_3131_10] & 4)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (vn__goto_4741_19 = (&alasnames[0] as *mut c_char))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if read_name((&mut ptr as *mut *const u8), ptrend, utf, 0, (&mut offset as *mut c_ulong), (&mut name as *mut *const u8), (&mut namelen as *mut c_uint), (&mut errorcode as *mut c_int), cb) != 0: 0 else: 1) != 0:
+                                            if (if read_name((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, 0, (&mut offset__goto_3252_14 as *mut c_ulong), (&mut name__goto_3164_12 as *mut *const u8), (&mut namelen__goto_3133_10 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int), cb) != 0: 0 else: 1) != 0:
                                                 __pc = 19
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if ptr >= ptrend: 1 else: 0) != 0:
+                                            if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0:
                                                 __pc = 18
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             if (if (unsafe: *ptr) != 58: 1 else: 0) != 0:
-                                                (errorcode = ERR95)
+                                                (errorcode__goto_3153_5 = ERR95)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 21
@@ -3940,22 +4051,22 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (i = 0)
-                                            while (if i < 19: 1 else: 0) != 0:
-                                                if (if (if namelen == (&alasmeta[0] as *mut alasitem)[i].len: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(name, vn, namelen) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (i__goto_3155_5 = 0)
+                                            while (if i__goto_3155_5 < 19: 1 else: 0) != 0:
+                                                if (if (if namelen__goto_3133_10 == (&alasmeta[0] as *mut alasitem)[i__goto_3155_5].len: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(name__goto_3164_12, vn__goto_4741_19, namelen__goto_3133_10) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                                     break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                vn = vn + ((&alasmeta[0] as *mut alasitem)[i].len +% 1)
+                                                vn__goto_4741_19 = vn__goto_4741_19 + ((&alasmeta[0] as *mut alasitem)[i__goto_3155_5].len +% 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (i = i + 1)
+                                                (i__goto_3155_5 = i__goto_3155_5 + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if i >= 19: 1 else: 0) != 0:
-                                                (errorcode = ERR95)
+                                            if (if i__goto_3155_5 >= 19: 1 else: 0) != 0:
+                                                (errorcode__goto_3153_5 = ERR95)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 19
@@ -3964,11 +4075,11 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (meta = (&alasmeta[0] as *mut alasitem)[i].meta)
+                                            (meta__goto_4776_18 = (&alasmeta[0] as *mut alasitem)[i__goto_3155_5].meta)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if prev_expect_cond_assert > 0: 1 else: 0) != 0 and ((if (if meta < 2150039552: 1 else: 0) != 0 or (if meta > 2150236160: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                                (errorcode = ERR28)
+                                            if (if (if prev_expect_cond_assert__goto_3244_7 > 0: 1 else: 0) != 0 and ((if (if meta__goto_4776_18 < 2150039552: 1 else: 0) != 0 or (if meta__goto_4776_18 > 2150236160: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                                (errorcode__goto_3153_5 = ERR28)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 19
@@ -3977,7 +4088,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            match meta
+                                            match meta__goto_4776_18
                                                 2147614720 =>
                                                     __pc = 10
                                                     __goto_pending = 1
@@ -3988,10 +4099,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     __pc = 13
                                                     __goto_pending = 1
                                                     (ptr = ptr + 1)
-                                                    (unsafe: *parsed_pattern = 2148990976)
-                                                    (parsed_pattern = parsed_pattern + 1)
-                                                    (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, 0, (&mut errorcode as *mut c_int), cb))
-                                                    if (if parsed_pattern == (null as *mut c_uint): 1 else: 0) != 0:
+                                                    (unsafe: *parsed_pattern__goto_3141_11 = 2148990976)
+                                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                                    (parsed_pattern__goto_3141_11 = parse_capture_list((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, parsed_pattern__goto_3141_11, 0, (&mut errorcode__goto_3153_5 as *mut c_int), cb))
+                                                    if (if parsed_pattern__goto_3141_11 == (null as *mut c_uint): 1 else: 0) != 0:
                                                         __pc = 19
                                                         __goto_pending = 1
                                                     __pc = 15
@@ -4009,10 +4120,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     __pc = 13
                                                     __goto_pending = 1
                                                     (ptr = ptr + 1)
-                                                    (unsafe: *parsed_pattern = 2148990976)
-                                                    (parsed_pattern = parsed_pattern + 1)
-                                                    (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, 0, (&mut errorcode as *mut c_int), cb))
-                                                    if (if parsed_pattern == (null as *mut c_uint): 1 else: 0) != 0:
+                                                    (unsafe: *parsed_pattern__goto_3141_11 = 2148990976)
+                                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                                    (parsed_pattern__goto_3141_11 = parse_capture_list((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, parsed_pattern__goto_3141_11, 0, (&mut errorcode__goto_3153_5 as *mut c_int), cb))
+                                                    if (if parsed_pattern__goto_3141_11 == (null as *mut c_uint): 1 else: 0) != 0:
                                                         __pc = 19
                                                         __goto_pending = 1
                                                     __pc = 15
@@ -4028,10 +4139,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     __pc = 13
                                                     __goto_pending = 1
                                                     (ptr = ptr + 1)
-                                                    (unsafe: *parsed_pattern = 2148990976)
-                                                    (parsed_pattern = parsed_pattern + 1)
-                                                    (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, 0, (&mut errorcode as *mut c_int), cb))
-                                                    if (if parsed_pattern == (null as *mut c_uint): 1 else: 0) != 0:
+                                                    (unsafe: *parsed_pattern__goto_3141_11 = 2148990976)
+                                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                                    (parsed_pattern__goto_3141_11 = parse_capture_list((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, parsed_pattern__goto_3141_11, 0, (&mut errorcode__goto_3153_5 as *mut c_int), cb))
+                                                    if (if parsed_pattern__goto_3141_11 == (null as *mut c_uint): 1 else: 0) != 0:
                                                         __pc = 19
                                                         __goto_pending = 1
                                                     __pc = 15
@@ -4045,10 +4156,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     __pc = 13
                                                     __goto_pending = 1
                                                     (ptr = ptr + 1)
-                                                    (unsafe: *parsed_pattern = 2148990976)
-                                                    (parsed_pattern = parsed_pattern + 1)
-                                                    (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, 0, (&mut errorcode as *mut c_int), cb))
-                                                    if (if parsed_pattern == (null as *mut c_uint): 1 else: 0) != 0:
+                                                    (unsafe: *parsed_pattern__goto_3141_11 = 2148990976)
+                                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                                    (parsed_pattern__goto_3141_11 = parse_capture_list((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, parsed_pattern__goto_3141_11, 0, (&mut errorcode__goto_3153_5 as *mut c_int), cb))
+                                                    if (if parsed_pattern__goto_3141_11 == (null as *mut c_uint): 1 else: 0) != 0:
                                                         __pc = 19
                                                         __goto_pending = 1
                                                     __pc = 15
@@ -4060,10 +4171,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     __goto_pending = 1
                                                 2148990976 =>
                                                     (ptr = ptr + 1)
-                                                    (unsafe: *parsed_pattern = 2148990976)
-                                                    (parsed_pattern = parsed_pattern + 1)
-                                                    (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, 0, (&mut errorcode as *mut c_int), cb))
-                                                    if (if parsed_pattern == (null as *mut c_uint): 1 else: 0) != 0:
+                                                    (unsafe: *parsed_pattern__goto_3141_11 = 2148990976)
+                                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                                    (parsed_pattern__goto_3141_11 = parse_capture_list((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, parsed_pattern__goto_3141_11, 0, (&mut errorcode__goto_3153_5 as *mut c_int), cb))
+                                                    if (if parsed_pattern__goto_3141_11 == (null as *mut c_uint): 1 else: 0) != 0:
                                                         __pc = 19
                                                         __goto_pending = 1
                                                     __pc = 15
@@ -4083,7 +4194,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     __pc = 19
                                                     __goto_pending = 1
                                                 _ =>
-                                                    (errorcode = ERR89)
+                                                    (errorcode__goto_3153_5 = ERR89)
                                                     __pc = 19
                                                     __goto_pending = 1
                                                     __pc = 10
@@ -4095,10 +4206,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     __pc = 13
                                                     __goto_pending = 1
                                                     (ptr = ptr + 1)
-                                                    (unsafe: *parsed_pattern = 2148990976)
-                                                    (parsed_pattern = parsed_pattern + 1)
-                                                    (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, 0, (&mut errorcode as *mut c_int), cb))
-                                                    if (if parsed_pattern == (null as *mut c_uint): 1 else: 0) != 0:
+                                                    (unsafe: *parsed_pattern__goto_3141_11 = 2148990976)
+                                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                                    (parsed_pattern__goto_3141_11 = parse_capture_list((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, parsed_pattern__goto_3141_11, 0, (&mut errorcode__goto_3153_5 as *mut c_int), cb))
+                                                    if (if parsed_pattern__goto_3141_11 == (null as *mut c_uint): 1 else: 0) != 0:
                                                         __pc = 19
                                                         __goto_pending = 1
                                                     __pc = 15
@@ -4111,40 +4222,16 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         else:
-                                            (vn = (&verbnames[0] as *mut c_char))
+                                            (vn__goto_4741_19 = (&verbnames[0] as *mut c_char))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if read_name((&mut ptr as *mut *const u8), ptrend, utf, 0, (&mut offset as *mut c_ulong), (&mut name as *mut *const u8), (&mut namelen as *mut c_uint), (&mut errorcode as *mut c_int), cb) != 0: 0 else: 1) != 0:
+                                            if (if read_name((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, 0, (&mut offset__goto_3252_14 as *mut c_ulong), (&mut name__goto_3164_12 as *mut *const u8), (&mut namelen__goto_3133_10 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int), cb) != 0: 0 else: 1) != 0:
                                                 __pc = 19
                                                 __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if ptr >= ptrend: 1 else: 0) != 0 or ((if (if (unsafe: *ptr) != 58: 1 else: 0) != 0 and (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                                (errorcode = ERR60)
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                    break
-                                                __pc = 19
-                                                __goto_pending = 1
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                    break
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                break
-                                            (i = 0)
-                                            while (if i < 9: 1 else: 0) != 0:
-                                                if (if (if namelen == (&verbs[0] as *mut verbitem)[i].len: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(name, vn, namelen) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                    break
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                    break
-                                                vn = vn + ((&verbs[0] as *mut verbitem)[i].len +% 1)
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                    break
-                                                (i = i + 1)
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                    break
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                break
-                                            if (if i >= 9: 1 else: 0) != 0:
-                                                (errorcode = ERR60)
+                                            if (if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0 or ((if (if (unsafe: *ptr) != 58: 1 else: 0) != 0 and (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                                (errorcode__goto_3153_5 = ERR60)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 19
@@ -4153,12 +4240,36 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if (if (unsafe: *ptr) == 58: 1 else: 0) != 0 and (if (ptr + (1 as isize as usize)) < ptrend: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (i__goto_3155_5 = 0)
+                                            while (if i__goto_3155_5 < 9: 1 else: 0) != 0:
+                                                if (if (if namelen__goto_3133_10 == (&verbs[0] as *mut verbitem)[i__goto_3155_5].len: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(name__goto_3164_12, vn__goto_4741_19, namelen__goto_3133_10) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    break
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
+                                                vn__goto_4741_19 = vn__goto_4741_19 + ((&verbs[0] as *mut verbitem)[i__goto_3155_5].len +% 1)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
+                                                (i__goto_3155_5 = i__goto_3155_5 + 1)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            if (if i__goto_3155_5 >= 9: 1 else: 0) != 0:
+                                                (errorcode__goto_3153_5 = ERR60)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
+                                                __pc = 19
+                                                __goto_pending = 1
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            if (if (if (if (unsafe: *ptr) == 58: 1 else: 0) != 0 and (if (ptr + (1 as isize as usize)) < ptrend__goto_3165_12: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                                 (ptr = ptr + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if (if (&verbs[0] as *mut verbitem)[i].has_arg > 0: 1 else: 0) != 0 and (if (unsafe: *ptr) != 58: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                (errorcode = ERR66)
+                                            if (if (if (&verbs[0] as *mut verbitem)[i__goto_3155_5].has_arg > 0: 1 else: 0) != 0 and (if (unsafe: *ptr) != 58: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (errorcode__goto_3153_5 = ERR66)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 __pc = 19
@@ -4167,41 +4278,41 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (verbstartptr = parsed_pattern)
+                                            (verbstartptr__goto_3139_11 = parsed_pattern__goto_3141_11)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (okquantifier = ((if (&verbs[0] as *mut verbitem)[i].meta == 2150498304: 1 else: 0)))
+                                            (okquantifier__goto_3162_6 = ((if (&verbs[0] as *mut verbitem)[i__goto_3155_5].meta == 2150498304: 1 else: 0)))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             if (if (unsafe: *(ptr = ptr + 1)) == 58: 1 else: 0) != 0:
-                                                if (if (&verbs[0] as *mut verbitem)[i].has_arg < 0: 1 else: 0) != 0:
-                                                    (add_after_mark = (&verbs[0] as *mut verbitem)[i].meta)
+                                                if (if (&verbs[0] as *mut verbitem)[i__goto_3155_5].has_arg < 0: 1 else: 0) != 0:
+                                                    (add_after_mark__goto_3146_10 = (&verbs[0] as *mut verbitem)[i__goto_3155_5].meta)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    (unsafe: *parsed_pattern = 2150432768)
-                                                    (parsed_pattern = parsed_pattern + 1)
+                                                    (unsafe: *parsed_pattern__goto_3141_11 = 2150432768)
+                                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                 else:
-                                                    (unsafe: *parsed_pattern = ((&verbs[0] as *mut verbitem)[i].meta +% ((if ((if (&verbs[0] as *mut verbitem)[i].meta != 2150432768: 1 else: 0)) != 0: 65536 else: 0))))
-                                                    (parsed_pattern = parsed_pattern + 1)
+                                                    (unsafe: *parsed_pattern__goto_3141_11 = ((&verbs[0] as *mut verbitem)[i__goto_3155_5].meta +% ((if ((if (&verbs[0] as *mut verbitem)[i__goto_3155_5].meta != 2150432768: 1 else: 0)) != 0: 65536 else: 0))))
+                                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (verblengthptr = parsed_pattern)
-                                                (parsed_pattern = parsed_pattern + 1)
+                                                (verblengthptr__goto_3138_11 = parsed_pattern__goto_3141_11)
+                                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (verbnamestart = ptr)
+                                                (verbnamestart__goto_3166_12 = ptr)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (inverbname = 1)
+                                                (inverbname__goto_3157_6 = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                             else:
-                                                (unsafe: *parsed_pattern = (&verbs[0] as *mut verbitem)[i].meta)
-                                                (parsed_pattern = parsed_pattern + 1)
+                                                (unsafe: *parsed_pattern__goto_3141_11 = (&verbs[0] as *mut verbitem)[i__goto_3155_5].meta)
+                                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -4211,16 +4322,16 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if (ptr = ptr + 1) >= ptrend: 1 else: 0) != 0:
+                            if (if (ptr = ptr + 1) >= ptrend__goto_3165_12: 1 else: 0) != 0:
                                 __pc = 18
                                 __goto_pending = 1
                             match (unsafe: *ptr)
                                 80 =>
-                                    if (if (ptr = ptr + 1) >= ptrend: 1 else: 0) != 0:
+                                    if (if (ptr = ptr + 1) >= ptrend__goto_3165_12: 1 else: 0) != 0:
                                         __pc = 18
                                         __goto_pending = 1
                                     if (if (unsafe: *ptr) == 60: 1 else: 0) != 0:
-                                        (terminator = 62)
+                                        (terminator__goto_3248_12 = 62)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 16
@@ -4231,37 +4342,37 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         __pc = 8
                                         __goto_pending = 1
                                     if (if (unsafe: *ptr) != 61: 1 else: 0) != 0:
-                                        (errorcode = ERR41)
+                                        (errorcode__goto_3153_5 = ERR41)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 21
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if read_name((&mut ptr as *mut *const u8), ptrend, utf, 41, (&mut offset as *mut c_ulong), (&mut name as *mut *const u8), (&mut namelen as *mut c_uint), (&mut errorcode as *mut c_int), cb) != 0: 0 else: 1) != 0:
+                                    if (if read_name((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, 41, (&mut offset__goto_3252_14 as *mut c_ulong), (&mut name__goto_3164_12 as *mut *const u8), (&mut namelen__goto_3133_10 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int), cb) != 0: 0 else: 1) != 0:
                                         __pc = 19
                                         __goto_pending = 1
-                                    (unsafe: *parsed_pattern = 2147745792)
-                                    (parsed_pattern = parsed_pattern + 1)
-                                    (unsafe: *parsed_pattern = namelen)
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2147745792)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = namelen__goto_3133_10)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     0
-                                    (okquantifier = 1)
+                                    (okquantifier__goto_3162_6 = 1)
                                 82 =>
-                                    (i = 0)
+                                    (i__goto_3155_5 = 0)
                                     (ptr = ptr + 1)
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or ((if (if (unsafe: *ptr) != 41: 1 else: 0) != 0 and (if (unsafe: *ptr) != 40: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                        (errorcode = ERR58)
+                                    if (if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0 or ((if (if (unsafe: *ptr) != 41: 1 else: 0) != 0 and (if (unsafe: *ptr) != 40: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (errorcode__goto_3153_5 = ERR58)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 19
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    (terminator = 0)
+                                    (terminator__goto_3248_12 = 0)
                                     __pc = 7
                                     __goto_pending = 1
-                                    if (if (ptr + (1 as isize as usize)) >= ptrend: 1 else: 0) != 0:
+                                    if (if (ptr + (1 as isize as usize)) >= ptrend__goto_3165_12: 1 else: 0) != 0:
                                         (ptr = ptr + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -4269,36 +4380,39 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    (terminator = 0)
+                                    (terminator__goto_3248_12 = 0)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = ((2149842944 as c_uint) | (i__goto_3155_5 as c_uint)))
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (offset__goto_3252_14 = ((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]())) as c_ulong))
                                     __pc = 9
                                     __goto_pending = 1
-                                    if (if read_name((&mut ptr as *mut *const u8), ptrend, utf, 0, (&mut offset as *mut c_ulong), (&mut name as *mut *const u8), (&mut namelen as *mut c_uint), (&mut errorcode as *mut c_int), cb) != 0: 0 else: 1) != 0:
+                                    if (if read_name((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, 0, (&mut offset__goto_3252_14 as *mut c_ulong), (&mut name__goto_3164_12 as *mut *const u8), (&mut namelen__goto_3133_10 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int), cb) != 0: 0 else: 1) != 0:
                                         __pc = 19
                                         __goto_pending = 1
-                                    (unsafe: *parsed_pattern = 2149908480)
-                                    (parsed_pattern = parsed_pattern + 1)
-                                    (unsafe: *parsed_pattern = namelen)
-                                    (parsed_pattern = parsed_pattern + 1)
-                                    (terminator = 0)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2149908480)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = namelen__goto_3133_10)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (terminator__goto_3248_12 = 0)
                                     0
-                                    (okquantifier = 1)
-                                    if (if terminator != 0: 1 else: 0) != 0:
+                                    (okquantifier__goto_3162_6 = 1)
+                                    if (if terminator__goto_3248_12 != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, offset, (&mut errorcode as *mut c_int), cb))
+                                    if (if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0 and (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (parsed_pattern__goto_3141_11 = parse_capture_list((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, parsed_pattern__goto_3141_11, offset__goto_3252_14, (&mut errorcode__goto_3153_5 as *mut c_int), cb))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if parsed_pattern == (null as *mut c_uint): 1 else: 0) != 0:
+                                        if (if parsed_pattern__goto_3141_11 == (null as *mut c_uint): 1 else: 0) != 0:
                                             __pc = 19
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 18
                                         __goto_pending = 1
                                     (ptr = ptr + 1)
                                 43 =>
-                                    if (if (ptr + (1 as isize as usize)) >= ptrend: 1 else: 0) != 0:
+                                    if (if (ptr + (1 as isize as usize)) >= ptrend__goto_3165_12: 1 else: 0) != 0:
                                         (ptr = ptr + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -4306,86 +4420,92 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    (terminator = 0)
+                                    (terminator__goto_3248_12 = 0)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = ((2149842944 as c_uint) | (i__goto_3155_5 as c_uint)))
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (offset__goto_3252_14 = ((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]())) as c_ulong))
                                     __pc = 9
                                     __goto_pending = 1
-                                    if (if read_name((&mut ptr as *mut *const u8), ptrend, utf, 0, (&mut offset as *mut c_ulong), (&mut name as *mut *const u8), (&mut namelen as *mut c_uint), (&mut errorcode as *mut c_int), cb) != 0: 0 else: 1) != 0:
+                                    if (if read_name((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, 0, (&mut offset__goto_3252_14 as *mut c_ulong), (&mut name__goto_3164_12 as *mut *const u8), (&mut namelen__goto_3133_10 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int), cb) != 0: 0 else: 1) != 0:
                                         __pc = 19
                                         __goto_pending = 1
-                                    (unsafe: *parsed_pattern = 2149908480)
-                                    (parsed_pattern = parsed_pattern + 1)
-                                    (unsafe: *parsed_pattern = namelen)
-                                    (parsed_pattern = parsed_pattern + 1)
-                                    (terminator = 0)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2149908480)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = namelen__goto_3133_10)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (terminator__goto_3248_12 = 0)
                                     0
-                                    (okquantifier = 1)
-                                    if (if terminator != 0: 1 else: 0) != 0:
+                                    (okquantifier__goto_3162_6 = 1)
+                                    if (if terminator__goto_3248_12 != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, offset, (&mut errorcode as *mut c_int), cb))
+                                    if (if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0 and (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (parsed_pattern__goto_3141_11 = parse_capture_list((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, parsed_pattern__goto_3141_11, offset__goto_3252_14, (&mut errorcode__goto_3153_5 as *mut c_int), cb))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if parsed_pattern == (null as *mut c_uint): 1 else: 0) != 0:
+                                        if (if parsed_pattern__goto_3141_11 == (null as *mut c_uint): 1 else: 0) != 0:
                                             __pc = 19
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 18
                                         __goto_pending = 1
                                     (ptr = ptr + 1)
                                 48 =>
-                                    (terminator = 0)
+                                    (terminator__goto_3248_12 = 0)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = ((2149842944 as c_uint) | (i__goto_3155_5 as c_uint)))
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (offset__goto_3252_14 = ((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]())) as c_ulong))
                                     __pc = 9
                                     __goto_pending = 1
-                                    if (if read_name((&mut ptr as *mut *const u8), ptrend, utf, 0, (&mut offset as *mut c_ulong), (&mut name as *mut *const u8), (&mut namelen as *mut c_uint), (&mut errorcode as *mut c_int), cb) != 0: 0 else: 1) != 0:
+                                    if (if read_name((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, 0, (&mut offset__goto_3252_14 as *mut c_ulong), (&mut name__goto_3164_12 as *mut *const u8), (&mut namelen__goto_3133_10 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int), cb) != 0: 0 else: 1) != 0:
                                         __pc = 19
                                         __goto_pending = 1
-                                    (unsafe: *parsed_pattern = 2149908480)
-                                    (parsed_pattern = parsed_pattern + 1)
-                                    (unsafe: *parsed_pattern = namelen)
-                                    (parsed_pattern = parsed_pattern + 1)
-                                    (terminator = 0)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2149908480)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = namelen__goto_3133_10)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (terminator__goto_3248_12 = 0)
                                     0
-                                    (okquantifier = 1)
-                                    if (if terminator != 0: 1 else: 0) != 0:
+                                    (okquantifier__goto_3162_6 = 1)
+                                    if (if terminator__goto_3248_12 != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, offset, (&mut errorcode as *mut c_int), cb))
+                                    if (if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0 and (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (parsed_pattern__goto_3141_11 = parse_capture_list((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, parsed_pattern__goto_3141_11, offset__goto_3252_14, (&mut errorcode__goto_3153_5 as *mut c_int), cb))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if parsed_pattern == (null as *mut c_uint): 1 else: 0) != 0:
+                                        if (if parsed_pattern__goto_3141_11 == (null as *mut c_uint): 1 else: 0) != 0:
                                             __pc = 19
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 18
                                         __goto_pending = 1
                                     (ptr = ptr + 1)
                                 38 =>
-                                    if (if read_name((&mut ptr as *mut *const u8), ptrend, utf, 0, (&mut offset as *mut c_ulong), (&mut name as *mut *const u8), (&mut namelen as *mut c_uint), (&mut errorcode as *mut c_int), cb) != 0: 0 else: 1) != 0:
+                                    if (if read_name((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, 0, (&mut offset__goto_3252_14 as *mut c_ulong), (&mut name__goto_3164_12 as *mut *const u8), (&mut namelen__goto_3133_10 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int), cb) != 0: 0 else: 1) != 0:
                                         __pc = 19
                                         __goto_pending = 1
-                                    (unsafe: *parsed_pattern = 2149908480)
-                                    (parsed_pattern = parsed_pattern + 1)
-                                    (unsafe: *parsed_pattern = namelen)
-                                    (parsed_pattern = parsed_pattern + 1)
-                                    (terminator = 0)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2149908480)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = namelen__goto_3133_10)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (terminator__goto_3248_12 = 0)
                                     0
-                                    (okquantifier = 1)
-                                    if (if terminator != 0: 1 else: 0) != 0:
+                                    (okquantifier__goto_3162_6 = 1)
+                                    if (if terminator__goto_3248_12 != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (parsed_pattern = parse_capture_list((&mut ptr as *mut *const u8), ptrend, utf, parsed_pattern, offset, (&mut errorcode as *mut c_int), cb))
+                                    if (if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0 and (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (parsed_pattern__goto_3141_11 = parse_capture_list((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, parsed_pattern__goto_3141_11, offset__goto_3252_14, (&mut errorcode__goto_3153_5 as *mut c_int), cb))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if parsed_pattern == (null as *mut c_uint): 1 else: 0) != 0:
+                                        if (if parsed_pattern__goto_3141_11 == (null as *mut c_uint): 1 else: 0) != 0:
                                             __pc = 19
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 18
                                         __goto_pending = 1
                                     (ptr = ptr + 1)
@@ -4394,23 +4514,23 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         (ptr = ptr + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (errorcode = ERR103)
+                                        (errorcode__goto_3153_5 = ERR103)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 19
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (ptr = ptr + 1) >= ptrend: 1 else: 0) != 0:
+                                    if (if (ptr = ptr + 1) >= ptrend__goto_3165_12: 1 else: 0) != 0:
                                         __pc = 18
                                         __goto_pending = 1
-                                    (expect_cond_assert = (prev_expect_cond_assert - 1))
-                                    if (if (if (if (if previous_callout != (null as *mut c_uint): 1 else: 0) != 0 and (if ((options & 4)) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if previous_callout == (parsed_pattern - (4 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if parsed_pattern[-1] == 255: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (parsed_pattern = previous_callout)
-                                    (previous_callout = parsed_pattern)
-                                    (after_manual_callout = 1)
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (errorcode = ERR39)
+                                    (expect_cond_assert__goto_3152_5 = (prev_expect_cond_assert__goto_3244_7 - 1))
+                                    if (if (if (if (if previous_callout__goto_3140_11 != (null as *mut c_uint): 1 else: 0) != 0 and (if ((options & 4)) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if previous_callout__goto_3140_11 == (parsed_pattern__goto_3141_11 - (4 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if parsed_pattern__goto_3141_11[-1] == 255: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (parsed_pattern__goto_3141_11 = previous_callout__goto_3140_11)
+                                    (previous_callout__goto_3140_11 = parsed_pattern__goto_3141_11)
+                                    (after_manual_callout__goto_3151_5 = 1)
+                                    if (if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (errorcode__goto_3153_5 = ERR39)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 19
@@ -4418,29 +4538,30 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     (ptr = ptr + 1)
-                                    (previous_callout[2] = 0)
+                                    (previous_callout__goto_3140_11[1] = ((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]())) as c_uint))
+                                    (previous_callout__goto_3140_11[2] = 0)
                                 40 =>
-                                    if (if (ptr = ptr + 1) >= ptrend: 1 else: 0) != 0:
+                                    if (if (ptr = ptr + 1) >= ptrend__goto_3165_12: 1 else: 0) != 0:
                                         __pc = 18
                                         __goto_pending = 1
-                                    (nest_depth = nest_depth + 1)
+                                    (nest_depth__goto_3147_10 = nest_depth__goto_3147_10 + 1)
                                     if (if (if (unsafe: *ptr) == 63: 1 else: 0) != 0 or (if (unsafe: *ptr) == 42: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (unsafe: *parsed_pattern = 2148466688)
-                                        (parsed_pattern = parsed_pattern + 1)
+                                        (unsafe: *parsed_pattern__goto_3141_11 = 2148466688)
+                                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         (ptr = ptr - 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (expect_cond_assert = 2)
+                                        (expect_cond_assert__goto_3152_5 = 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if read_number((&mut ptr as *mut *const u8), ptrend, cb.bracount, 65535, 161, (&mut i as *mut c_int), (&mut errorcode as *mut c_int)) != 0:
-                                        if (if i <= 0: 1 else: 0) != 0:
-                                            (errorcode = ERR15)
+                                    if read_number((&mut ptr as *mut *const u8), ptrend__goto_3165_12, cb.bracount, 65535, 161, (&mut i__goto_3155_5 as *mut c_int), (&mut errorcode__goto_3153_5 as *mut c_int)) != 0:
+                                        if (if i__goto_3155_5 <= 0: 1 else: 0) != 0:
+                                            (errorcode__goto_3153_5 = ERR15)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             __pc = 19
@@ -4449,37 +4570,40 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *parsed_pattern = 2148663296)
-                                        (parsed_pattern = parsed_pattern + 1)
+                                        (unsafe: *parsed_pattern__goto_3141_11 = 2148663296)
+                                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        (offset__goto_3252_14 = (((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]()) - 2)) as c_ulong))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         0
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *parsed_pattern = i)
-                                        (parsed_pattern = parsed_pattern + 1)
+                                        (unsafe: *parsed_pattern__goto_3141_11 = i__goto_3155_5)
+                                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        if (if errorcode != 0: 1 else: 0) != 0:
+                                        if (if errorcode__goto_3153_5 != 0: 1 else: 0) != 0:
                                             __pc = 19
                                             __goto_pending = 1
                                         else:
-                                            if (if (if (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 10: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(ptr, ((&STRING_VERSION[0] as *mut c_char) as *const i8), 7) == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[7] != 41: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                ge = 0
+                                            if (if (if (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) >= 10: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(ptr, "VERSION", 7) == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[7] != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                ge__goto_5488_18 = 0
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                major = 0
+                                                major__goto_5489_13 = 0
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                minor = 0
+                                                minor__goto_5490_13 = 0
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 ptr = ptr + 7
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 if (if (unsafe: *ptr) == 62: 1 else: 0) != 0:
-                                                    (ge = 1)
+                                                    (ge__goto_5488_18 = 1)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                     (ptr = ptr + 1)
@@ -4487,24 +4611,24 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if read_number((&mut ptr as *mut *const u8), ptrend, -1, 1000, 179, (&mut major as *mut c_int), (&mut errorcode as *mut c_int)) != 0: 0 else: 1) != 0:
+                                                if (if read_number((&mut ptr as *mut *const u8), ptrend__goto_3165_12, -1, 1000, 179, (&mut major__goto_5489_13 as *mut c_int), (&mut errorcode__goto_3153_5 as *mut c_int)) != 0: 0 else: 1) != 0:
                                                     __pc = 19
                                                     __goto_pending = 1
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 46: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                    if (if read_number((&mut ptr as *mut *const u8), ptrend, -1, 1000, 179, (&mut minor as *mut c_int), (&mut errorcode as *mut c_int)) != 0: 0 else: 1) != 0:
+                                                if (if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0 and (if (unsafe: *ptr) == 46: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    if (if read_number((&mut ptr as *mut *const u8), ptrend__goto_3165_12, -1, 1000, 179, (&mut minor__goto_5490_13 as *mut c_int), (&mut errorcode__goto_3153_5 as *mut c_int)) != 0: 0 else: 1) != 0:
                                                         __pc = 19
                                                         __goto_pending = 1
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                    (errorcode = ERR79)
+                                                if (if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    (errorcode__goto_3153_5 = ERR79)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    if (if ptr < ptrend: 1 else: 0) != 0:
+                                                    if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0:
                                                         __pc = 21
                                                         __goto_pending = 1
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -4515,31 +4639,31 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (unsafe: *parsed_pattern = 2148859904)
-                                                (parsed_pattern = parsed_pattern + 1)
+                                                (unsafe: *parsed_pattern__goto_3141_11 = 2148859904)
+                                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (unsafe: *parsed_pattern = ge)
-                                                (parsed_pattern = parsed_pattern + 1)
+                                                (unsafe: *parsed_pattern__goto_3141_11 = ge__goto_5488_18)
+                                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (unsafe: *parsed_pattern = major)
-                                                (parsed_pattern = parsed_pattern + 1)
+                                                (unsafe: *parsed_pattern__goto_3141_11 = major__goto_5489_13)
+                                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (unsafe: *parsed_pattern = minor)
-                                                (parsed_pattern = parsed_pattern + 1)
+                                                (unsafe: *parsed_pattern__goto_3141_11 = minor__goto_5490_13)
+                                                (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                             else:
-                                                was_r_ampersand = 0
+                                                was_r_ampersand__goto_5544_14 = 0
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if (if (if (unsafe: *ptr) == 82: 1 else: 0) != 0 and (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) > 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 38: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                    (terminator = 41)
+                                                if (if (if (if (unsafe: *ptr) == 82: 1 else: 0) != 0 and (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) > 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] == 38: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                    (terminator__goto_3248_12 = 41)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
-                                                    (was_r_ampersand = 1)
+                                                    (was_r_ampersand__goto_5544_14 = 1)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                     (ptr = ptr + 1)
@@ -4547,12 +4671,12 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         break
                                                 else:
                                                     if (if (unsafe: *ptr) == 60: 1 else: 0) != 0:
-                                                        (terminator = 62)
+                                                        (terminator__goto_3248_12 = 62)
                                                     else:
                                                         if (if (unsafe: *ptr) == 39: 1 else: 0) != 0:
-                                                            (terminator = 39)
+                                                            (terminator__goto_3248_12 = 39)
                                                         else:
-                                                            (terminator = 41)
+                                                            (terminator__goto_3248_12 = 41)
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             (ptr = ptr - 1)
@@ -4560,24 +4684,24 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                 break
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if read_name((&mut ptr as *mut *const u8), ptrend, utf, terminator, (&mut offset as *mut c_ulong), (&mut name as *mut *const u8), (&mut namelen as *mut c_uint), (&mut errorcode as *mut c_int), cb) != 0: 0 else: 1) != 0:
+                                                if (if read_name((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, terminator__goto_3248_12, (&mut offset__goto_3252_14 as *mut c_ulong), (&mut name__goto_3164_12 as *mut *const u8), (&mut namelen__goto_3133_10 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int), cb) != 0: 0 else: 1) != 0:
                                                     __pc = 19
                                                     __goto_pending = 1
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if was_r_ampersand != 0:
-                                                    ((unsafe: *parsed_pattern) = (2148728832 as c_uint))
+                                                if was_r_ampersand__goto_5544_14 != 0:
+                                                    ((unsafe: *parsed_pattern__goto_3141_11) = (2148728832 as c_uint))
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                     (ptr = ptr - 1)
                                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                                         break
                                                 else:
-                                                    if (if terminator == 41: 1 else: 0) != 0:
-                                                        if (if (if namelen == 6: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(name, ((&STRING_DEFINE[0] as *mut c_char) as *const i8), 6) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                            ((unsafe: *parsed_pattern) = (2148532224 as c_uint))
+                                                    if (if terminator__goto_3248_12 == 41: 1 else: 0) != 0:
+                                                        if (if (if namelen__goto_3133_10 == 6: 1 else: 0) != 0 and (if _pcre2_strncmp_c8_8(name__goto_3164_12, "DEFINE", 6) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                            ((unsafe: *parsed_pattern__goto_3141_11) = (2148532224 as c_uint))
                                                         else:
-                                                            ((unsafe: *parsed_pattern) = (if ((if (if (unsafe: *name) == 82: 1 else: 0) != 0 and (if i >= (namelen as c_int): 1 else: 0) != 0: 1 else: 0)) != 0: 2148794368 else: 2148597760))
+                                                            ((unsafe: *parsed_pattern__goto_3141_11) = (if ((if (if (unsafe: *name__goto_3164_12) == 82: 1 else: 0) != 0 and (if i__goto_3155_5 >= (namelen__goto_3133_10 as c_int): 1 else: 0) != 0: 1 else: 0)) != 0: 2148794368 else: 2148597760))
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -4586,19 +4710,19 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                     else:
-                                                        ((unsafe: *parsed_pattern) = (2148597760 as c_uint))
+                                                        ((unsafe: *parsed_pattern__goto_3141_11) = (2148597760 as c_uint))
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                if (if (unsafe: *(parsed_pattern = parsed_pattern + 1)) != 2148532224: 1 else: 0) != 0:
-                                                    (unsafe: *parsed_pattern = namelen)
-                                                    (parsed_pattern = parsed_pattern + 1)
+                                                if (if (unsafe: *(parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)) != 2148532224: 1 else: 0) != 0:
+                                                    (unsafe: *parsed_pattern__goto_3141_11 = namelen__goto_3133_10)
+                                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 0
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                    if (if (if ptr >= ptrend: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (errorcode = ERR24)
+                                    if (if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0 or (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (errorcode__goto_3153_5 = ERR24)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 19
@@ -4607,135 +4731,191 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                     (ptr = ptr + 1)
                                 62 =>
-                                    (unsafe: *parsed_pattern = 2147614720)
-                                    (parsed_pattern = parsed_pattern + 1)
-                                    (nest_depth = nest_depth + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2147614720)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (nest_depth__goto_3147_10 = nest_depth__goto_3147_10 + 1)
                                     (ptr = ptr + 1)
                                 61 =>
-                                    (unsafe: *parsed_pattern = 2150039552)
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2150039552)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     (ptr = ptr + 1)
                                     __pc = 15
                                     __goto_pending = 1
-                                    (unsafe: *parsed_pattern = 2150301696)
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2150301696)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     (ptr = ptr + 1)
                                     __pc = 15
                                     __goto_pending = 1
-                                    (unsafe: *parsed_pattern = 2150105088)
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2150105088)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     (ptr = ptr + 1)
                                     __pc = 15
                                     __goto_pending = 1
-                                    if (if (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) <= 1: 1 else: 0) != 0 or ((if (if (if ptr[1] != 61: 1 else: 0) != 0 and (if ptr[1] != 33: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] != 42: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                        (terminator = 62)
+                                    if (if (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) <= 1: 1 else: 0) != 0 or ((if (if (if ptr[1] != 61: 1 else: 0) != 0 and (if ptr[1] != 33: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] != 42: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (terminator__goto_3248_12 = 62)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 16
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    (unsafe: *parsed_pattern = (if ((if ptr[1] == 61: 1 else: 0)) != 0: 2150170624 else: (if ((if ptr[1] == 33: 1 else: 0)) != 0: 2150236160 else: 2150367232)))
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = (if ((if ptr[1] == 61: 1 else: 0)) != 0: 2150170624 else: (if ((if ptr[1] == 33: 1 else: 0)) != 0: 2150236160 else: 2150367232)))
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     ((unsafe: *has_lookbehind) = 1)
+                                    (offset__goto_3252_14 = (((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]()) - 2)) as c_ulong))
                                     0
                                     ptr = ptr + 2
-                                    (nest_depth = nest_depth + 1)
-                                    if (if prev_expect_cond_assert > 0: 1 else: 0) != 0:
-                                        (top_nest.nest_depth = nest_depth)
+                                    (nest_depth__goto_3147_10 = nest_depth__goto_3147_10 + 1)
+                                    if (if prev_expect_cond_assert__goto_3244_7 > 0: 1 else: 0) != 0:
+                                        if (if top_nest__goto_3169_12 == (null as *mut nest_save): 1 else: 0) != 0:
+                                            (top_nest__goto_3169_12 = ((cb.start_workspace) as *mut nest_save))
+                                        else:
+                                            if (if (top_nest__goto_3169_12 = top_nest__goto_3169_12 + 1) >= end_nests__goto_3169_23: 1 else: 0) != 0:
+                                                (errorcode__goto_3153_5 = ERR84)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
+                                                __pc = 19
+                                                __goto_pending = 1
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (top_nest.flags = 2)
+                                        (top_nest__goto_3169_12.nest_depth = nest_depth__goto_3147_10)
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        (top_nest__goto_3169_12.flags = 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                 42 =>
-                                    (unsafe: *parsed_pattern = 2150301696)
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2150301696)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     (ptr = ptr + 1)
                                     __pc = 15
                                     __goto_pending = 1
-                                    (unsafe: *parsed_pattern = 2150105088)
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2150105088)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     (ptr = ptr + 1)
                                     __pc = 15
                                     __goto_pending = 1
-                                    if (if (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) <= 1: 1 else: 0) != 0 or ((if (if (if ptr[1] != 61: 1 else: 0) != 0 and (if ptr[1] != 33: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] != 42: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                        (terminator = 62)
+                                    if (if (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) <= 1: 1 else: 0) != 0 or ((if (if (if ptr[1] != 61: 1 else: 0) != 0 and (if ptr[1] != 33: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] != 42: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (terminator__goto_3248_12 = 62)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 16
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    (unsafe: *parsed_pattern = (if ((if ptr[1] == 61: 1 else: 0)) != 0: 2150170624 else: (if ((if ptr[1] == 33: 1 else: 0)) != 0: 2150236160 else: 2150367232)))
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = (if ((if ptr[1] == 61: 1 else: 0)) != 0: 2150170624 else: (if ((if ptr[1] == 33: 1 else: 0)) != 0: 2150236160 else: 2150367232)))
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     ((unsafe: *has_lookbehind) = 1)
+                                    (offset__goto_3252_14 = (((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]()) - 2)) as c_ulong))
                                     0
                                     ptr = ptr + 2
-                                    (nest_depth = nest_depth + 1)
-                                    if (if prev_expect_cond_assert > 0: 1 else: 0) != 0:
-                                        (top_nest.nest_depth = nest_depth)
+                                    (nest_depth__goto_3147_10 = nest_depth__goto_3147_10 + 1)
+                                    if (if prev_expect_cond_assert__goto_3244_7 > 0: 1 else: 0) != 0:
+                                        if (if top_nest__goto_3169_12 == (null as *mut nest_save): 1 else: 0) != 0:
+                                            (top_nest__goto_3169_12 = ((cb.start_workspace) as *mut nest_save))
+                                        else:
+                                            if (if (top_nest__goto_3169_12 = top_nest__goto_3169_12 + 1) >= end_nests__goto_3169_23: 1 else: 0) != 0:
+                                                (errorcode__goto_3153_5 = ERR84)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
+                                                __pc = 19
+                                                __goto_pending = 1
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (top_nest.flags = 2)
+                                        (top_nest__goto_3169_12.nest_depth = nest_depth__goto_3147_10)
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        (top_nest__goto_3169_12.flags = 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                 33 =>
-                                    (unsafe: *parsed_pattern = 2150105088)
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2150105088)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     (ptr = ptr + 1)
                                     __pc = 15
                                     __goto_pending = 1
-                                    if (if (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) <= 1: 1 else: 0) != 0 or ((if (if (if ptr[1] != 61: 1 else: 0) != 0 and (if ptr[1] != 33: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] != 42: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                        (terminator = 62)
+                                    if (if (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) <= 1: 1 else: 0) != 0 or ((if (if (if ptr[1] != 61: 1 else: 0) != 0 and (if ptr[1] != 33: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] != 42: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (terminator__goto_3248_12 = 62)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 16
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    (unsafe: *parsed_pattern = (if ((if ptr[1] == 61: 1 else: 0)) != 0: 2150170624 else: (if ((if ptr[1] == 33: 1 else: 0)) != 0: 2150236160 else: 2150367232)))
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = (if ((if ptr[1] == 61: 1 else: 0)) != 0: 2150170624 else: (if ((if ptr[1] == 33: 1 else: 0)) != 0: 2150236160 else: 2150367232)))
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     ((unsafe: *has_lookbehind) = 1)
+                                    (offset__goto_3252_14 = (((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]()) - 2)) as c_ulong))
                                     0
                                     ptr = ptr + 2
-                                    (nest_depth = nest_depth + 1)
-                                    if (if prev_expect_cond_assert > 0: 1 else: 0) != 0:
-                                        (top_nest.nest_depth = nest_depth)
+                                    (nest_depth__goto_3147_10 = nest_depth__goto_3147_10 + 1)
+                                    if (if prev_expect_cond_assert__goto_3244_7 > 0: 1 else: 0) != 0:
+                                        if (if top_nest__goto_3169_12 == (null as *mut nest_save): 1 else: 0) != 0:
+                                            (top_nest__goto_3169_12 = ((cb.start_workspace) as *mut nest_save))
+                                        else:
+                                            if (if (top_nest__goto_3169_12 = top_nest__goto_3169_12 + 1) >= end_nests__goto_3169_23: 1 else: 0) != 0:
+                                                (errorcode__goto_3153_5 = ERR84)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
+                                                __pc = 19
+                                                __goto_pending = 1
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (top_nest.flags = 2)
+                                        (top_nest__goto_3169_12.nest_depth = nest_depth__goto_3147_10)
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        (top_nest__goto_3169_12.flags = 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                 60 =>
-                                    if (if (if ((ptrend as usize -% ptr as usize) / sizeof[u8]()) <= 1: 1 else: 0) != 0 or ((if (if (if ptr[1] != 61: 1 else: 0) != 0 and (if ptr[1] != 33: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] != 42: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                        (terminator = 62)
+                                    if (if (if ((ptrend__goto_3165_12 as usize -% ptr as usize) / sizeof[u8]()) <= 1: 1 else: 0) != 0 or ((if (if (if ptr[1] != 61: 1 else: 0) != 0 and (if ptr[1] != 33: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr[1] != 42: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (terminator__goto_3248_12 = 62)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 16
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    (unsafe: *parsed_pattern = (if ((if ptr[1] == 61: 1 else: 0)) != 0: 2150170624 else: (if ((if ptr[1] == 33: 1 else: 0)) != 0: 2150236160 else: 2150367232)))
-                                    (parsed_pattern = parsed_pattern + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = (if ((if ptr[1] == 61: 1 else: 0)) != 0: 2150170624 else: (if ((if ptr[1] == 33: 1 else: 0)) != 0: 2150236160 else: 2150367232)))
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     ((unsafe: *has_lookbehind) = 1)
+                                    (offset__goto_3252_14 = (((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]()) - 2)) as c_ulong))
                                     0
                                     ptr = ptr + 2
-                                    (nest_depth = nest_depth + 1)
-                                    if (if prev_expect_cond_assert > 0: 1 else: 0) != 0:
-                                        (top_nest.nest_depth = nest_depth)
+                                    (nest_depth__goto_3147_10 = nest_depth__goto_3147_10 + 1)
+                                    if (if prev_expect_cond_assert__goto_3244_7 > 0: 1 else: 0) != 0:
+                                        if (if top_nest__goto_3169_12 == (null as *mut nest_save): 1 else: 0) != 0:
+                                            (top_nest__goto_3169_12 = ((cb.start_workspace) as *mut nest_save))
+                                        else:
+                                            if (if (top_nest__goto_3169_12 = top_nest__goto_3169_12 + 1) >= end_nests__goto_3169_23: 1 else: 0) != 0:
+                                                (errorcode__goto_3153_5 = ERR84)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
+                                                __pc = 19
+                                                __goto_pending = 1
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (top_nest.flags = 2)
+                                        (top_nest__goto_3169_12.nest_depth = nest_depth__goto_3147_10)
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        (top_nest__goto_3169_12.flags = 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                 39 =>
-                                    (terminator = 39)
-                                    if (if read_name((&mut ptr as *mut *const u8), ptrend, utf, terminator, (&mut offset as *mut c_ulong), (&mut name as *mut *const u8), (&mut namelen as *mut c_uint), (&mut errorcode as *mut c_int), cb) != 0: 0 else: 1) != 0:
+                                    (terminator__goto_3248_12 = 39)
+                                    if (if read_name((&mut ptr as *mut *const u8), ptrend__goto_3165_12, utf__goto_3158_6, terminator__goto_3248_12, (&mut offset__goto_3252_14 as *mut c_ulong), (&mut name__goto_3164_12 as *mut *const u8), (&mut namelen__goto_3133_10 as *mut c_uint), (&mut errorcode__goto_3153_5 as *mut c_int), cb) != 0: 0 else: 1) != 0:
                                         __pc = 19
                                         __goto_pending = 1
                                     if (if cb.bracount >= 65535: 1 else: 0) != 0:
-                                        (errorcode = ERR97)
+                                        (errorcode__goto_3153_5 = ERR97)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 19
@@ -4743,31 +4923,33 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     (cb.bracount = cb.bracount + 1)
-                                    (unsafe: *parsed_pattern = ((2148007936 as c_uint) | cb.bracount))
-                                    (parsed_pattern = parsed_pattern + 1)
-                                    (nest_depth = nest_depth + 1)
+                                    (unsafe: *parsed_pattern__goto_3141_11 = ((2148007936 as c_uint) | cb.bracount))
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
+                                    (nest_depth__goto_3147_10 = nest_depth__goto_3147_10 + 1)
                                     if (if cb.names_found >= 10000: 1 else: 0) != 0:
-                                        (errorcode = ERR49)
+                                        (errorcode__goto_3153_5 = ERR49)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         __pc = 19
                                         __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    (is_dupname = 0)
-                                    (hash = _pcre2_compile_get_hash_from_name8(name, namelen))
-                                    (ng = cb.named_groups)
-                                    if (if i < cb.names_found: 1 else: 0) != 0:
+                                    if (if ((namelen__goto_3133_10 +% 2) +% 1) > cb.name_entry_size: 1 else: 0) != 0:
+                                        (cb.name_entry_size = ((((namelen__goto_3133_10 +% 2) +% 1)) as c_ushort))
+                                    (is_dupname__goto_3160_6 = 0)
+                                    (hash__goto_3150_10 = _pcre2_compile_get_hash_from_name8(name__goto_3164_12, namelen__goto_3133_10))
+                                    (ng__goto_3168_14 = cb.named_groups)
+                                    if (if i__goto_3155_5 < cb.names_found: 1 else: 0) != 0:
                                         break
                                     if (if cb.names_found >= cb.named_group_list_size: 1 else: 0) != 0:
-                                        newsize = (cb.named_group_list_size *% 2)
+                                        newsize__goto_5787_18 = (cb.named_group_list_size *% 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        newspace = (cb.cx.memctl.malloc((newsize *% sizeof[named_group_8]()), cb.cx.memctl.memory_data) as *mut named_group_8)
+                                        newspace__goto_5788_22 = (cb.cx.memctl.malloc((newsize__goto_5787_18 *% sizeof[named_group_8]()), cb.cx.memctl.memory_data) as *mut named_group_8)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if newspace == (null as *mut named_group_8): 1 else: 0) != 0:
-                                            (errorcode = ERR21)
+                                        if (if newspace__goto_5788_22 == (null as *mut named_group_8): 1 else: 0) != 0:
+                                            (errorcode__goto_3153_5 = ERR21)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             __pc = 19
@@ -4776,86 +4958,104 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        with_memcpy((newspace as *mut c_void) as *i8, (cb.named_groups as *const c_void) as *i8, (cb.named_group_list_size *% sizeof[named_group_8]()) as i64)
+                                        with_memcpy((newspace__goto_5788_22 as *mut c_void) as *i8, (cb.named_groups as *const c_void) as *i8, (cb.named_group_list_size *% sizeof[named_group_8]()) as i64)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if cb.named_group_list_size > 20: 1 else: 0) != 0:
                                             cb.cx.memctl.free((cb.named_groups as *mut c_void), cb.cx.memctl.memory_data)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cb.named_groups = newspace)
+                                        (cb.named_groups = newspace__goto_5788_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cb.named_group_list_size = newsize)
+                                        (cb.named_group_list_size = newsize__goto_5787_18)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if is_dupname != 0:
-                                        hash = hash | 32768
-                                    (cb.named_groups[cb.names_found].name = name)
+                                    if is_dupname__goto_3160_6 != 0:
+                                        hash__goto_3150_10 = hash__goto_3150_10 | 32768
+                                    (cb.named_groups[cb.names_found].name = name__goto_3164_12)
+                                    (cb.named_groups[cb.names_found].length = (namelen__goto_3133_10 as c_ushort))
                                     (cb.named_groups[cb.names_found].number = cb.bracount)
-                                    (cb.named_groups[cb.names_found].hash_dup = hash)
+                                    (cb.named_groups[cb.names_found].hash_dup = hash__goto_3150_10)
                                     (cb.names_found = cb.names_found + 1)
                                 91 =>
-                                    (class_mode_state = 2)
-                                    (c = (unsafe: *(ptr = ptr + 1)))
+                                    (class_mode_state__goto_3136_10 = 2)
+                                    (c__goto_3131_10 = (unsafe: *(ptr = ptr + 1)))
                                     __pc = 3
                                     __goto_pending = 1
                                 _ =>
-                                    (nest_depth = nest_depth + 1)
-                                    (top_nest.nest_depth = nest_depth)
-                                    (top_nest.flags = 0)
+                                    (nest_depth__goto_3147_10 = nest_depth__goto_3147_10 + 1)
+                                    if (if top_nest__goto_3169_12 == (null as *mut nest_save): 1 else: 0) != 0:
+                                        (top_nest__goto_3169_12 = ((cb.start_workspace) as *mut nest_save))
+                                    else:
+                                        if (if (top_nest__goto_3169_12 = top_nest__goto_3169_12 + 1) >= end_nests__goto_3169_23: 1 else: 0) != 0:
+                                            (errorcode__goto_3153_5 = ERR84)
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            __pc = 19
+                                            __goto_pending = 1
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                    (top_nest__goto_3169_12.nest_depth = nest_depth__goto_3147_10)
+                                    (top_nest__goto_3169_12.flags = 0)
                                     if (if (unsafe: *ptr) == 124: 1 else: 0) != 0:
-                                        top_nest.flags = top_nest.flags | 1
+                                        (top_nest__goto_3169_12.reset_group = (cb.bracount as c_ushort))
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        (top_nest__goto_3169_12.max_group = (cb.bracount as c_ushort))
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        top_nest__goto_3169_12.flags = top_nest__goto_3169_12.flags | 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         cb.external_flags = cb.external_flags | 2097152
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *parsed_pattern = 2149449728)
-                                        (parsed_pattern = parsed_pattern + 1)
+                                        (unsafe: *parsed_pattern__goto_3141_11 = 2149449728)
+                                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         (ptr = ptr + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        hyphenok = 1
+                                        hyphenok__goto_5041_14 = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        oldoptions = options
+                                        oldoptions__goto_5042_18 = options
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        oldxoptions = xoptions
+                                        oldxoptions__goto_5043_18 = xoptions
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (top_nest.reset_group = 0)
+                                        (top_nest__goto_3169_12.reset_group = 0)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (top_nest.max_group = 0)
+                                        (top_nest__goto_3169_12.max_group = 0)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unset = 0)
-                                        (set = unset)
+                                        (unset__goto_3246_17 = 0)
+                                        (set__goto_3246_12 = unset__goto_3246_17)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (optset = (&mut set as *mut c_uint))
+                                        (optset__goto_3246_25 = (&mut set__goto_3246_12 as *mut c_uint))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (xunset = 0)
-                                        (xset = xunset)
+                                        (xunset__goto_3247_18 = 0)
+                                        (xset__goto_3247_12 = xunset__goto_3247_18)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (xoptset = (&mut xset as *mut c_uint))
+                                        (xoptset__goto_3247_27 = (&mut xset__goto_3247_12 as *mut c_uint))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 94: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0 and (if (unsafe: *ptr) == 94: 1 else: 0) != 0: 1 else: 0) != 0:
                                             options = options & (0 - ((((((8 | 1024) | 8192) | 32) | 128) | 16777216)) - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             xoptions = xoptions & (0 - (128) - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (hyphenok = 0)
+                                            (hyphenok__goto_5041_14 = 0)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             (ptr = ptr + 1)
@@ -4863,24 +5063,24 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        while (if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) != 58: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        while (if (if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0 and (if (unsafe: *ptr) != 41: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *ptr) != 58: 1 else: 0) != 0: 1 else: 0) != 0:
                                             match (unsafe: *(ptr = ptr + 1))
                                                 45 =>
-                                                    if (if hyphenok != 0: 0 else: 1) != 0:
-                                                        (errorcode = ERR94)
+                                                    if (if hyphenok__goto_5041_14 != 0: 0 else: 1) != 0:
+                                                        (errorcode__goto_3153_5 = ERR94)
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         __pc = 19
                                                         __goto_pending = 1
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                    (optset = (&mut unset as *mut c_uint))
-                                                    (xoptset = (&mut xunset as *mut c_uint))
-                                                    (hyphenok = 0)
+                                                    (optset__goto_3246_25 = (&mut unset__goto_3246_17 as *mut c_uint))
+                                                    (xoptset__goto_3247_27 = (&mut xunset__goto_3247_18 as *mut c_uint))
+                                                    (hyphenok__goto_5041_14 = 0)
                                                 97 =>
-                                                    if (if ptr < ptrend: 1 else: 0) != 0:
+                                                    if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0:
                                                         if (if (unsafe: *ptr) == 68: 1 else: 0) != 0:
-                                                            (unsafe: *xoptset) = (unsafe: *xoptset) | 256
+                                                            (unsafe: *xoptset__goto_3247_27) = (unsafe: *xoptset__goto_3247_27) | 256
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             (ptr = ptr + 1)
@@ -4892,7 +5092,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         if (if (unsafe: *ptr) == 80: 1 else: 0) != 0:
-                                                            (unsafe: *xoptset) = (unsafe: *xoptset) | ((2048 | 4096))
+                                                            (unsafe: *xoptset__goto_3247_27) = (unsafe: *xoptset__goto_3247_27) | ((2048 | 4096))
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             (ptr = ptr + 1)
@@ -4904,7 +5104,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         if (if (unsafe: *ptr) == 83: 1 else: 0) != 0:
-                                                            (unsafe: *xoptset) = (unsafe: *xoptset) | 512
+                                                            (unsafe: *xoptset__goto_3247_27) = (unsafe: *xoptset__goto_3247_27) | 512
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             (ptr = ptr + 1)
@@ -4916,7 +5116,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         if (if (unsafe: *ptr) == 84: 1 else: 0) != 0:
-                                                            (unsafe: *xoptset) = (unsafe: *xoptset) | 4096
+                                                            (unsafe: *xoptset__goto_3247_27) = (unsafe: *xoptset__goto_3247_27) | 4096
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             (ptr = ptr + 1)
@@ -4928,7 +5128,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         if (if (unsafe: *ptr) == 87: 1 else: 0) != 0:
-                                                            (unsafe: *xoptset) = (unsafe: *xoptset) | 1024
+                                                            (unsafe: *xoptset__goto_3247_27) = (unsafe: *xoptset__goto_3247_27) | 1024
                                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                                 break
                                                             (ptr = ptr + 1)
@@ -4939,33 +5139,33 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                 break
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
-                                                    (unsafe: *xoptset) = (unsafe: *xoptset) | ((((256 | 512) | 1024) | 4096) | 2048)
+                                                    (unsafe: *xoptset__goto_3247_27) = (unsafe: *xoptset__goto_3247_27) | ((((256 | 512) | 1024) | 4096) | 2048)
                                                 74 =>
-                                                    (unsafe: *optset) = (unsafe: *optset) | 64
+                                                    (unsafe: *optset__goto_3246_25) = (unsafe: *optset__goto_3246_25) | 64
                                                     cb.external_flags = cb.external_flags | 1024
                                                 105 =>
-                                                    (unsafe: *optset) = (unsafe: *optset) | 8
+                                                    (unsafe: *optset__goto_3246_25) = (unsafe: *optset__goto_3246_25) | 8
                                                 109 =>
-                                                    (unsafe: *optset) = (unsafe: *optset) | 1024
+                                                    (unsafe: *optset__goto_3246_25) = (unsafe: *optset__goto_3246_25) | 1024
                                                 110 =>
-                                                    (unsafe: *optset) = (unsafe: *optset) | 8192
+                                                    (unsafe: *optset__goto_3246_25) = (unsafe: *optset__goto_3246_25) | 8192
                                                 114 =>
-                                                    (unsafe: *xoptset) = (unsafe: *xoptset) | 128
+                                                    (unsafe: *xoptset__goto_3247_27) = (unsafe: *xoptset__goto_3247_27) | 128
                                                 115 =>
-                                                    (unsafe: *optset) = (unsafe: *optset) | 32
+                                                    (unsafe: *optset__goto_3246_25) = (unsafe: *optset__goto_3246_25) | 32
                                                 85 =>
-                                                    (unsafe: *optset) = (unsafe: *optset) | 262144
+                                                    (unsafe: *optset__goto_3246_25) = (unsafe: *optset__goto_3246_25) | 262144
                                                 120 =>
-                                                    (unsafe: *optset) = (unsafe: *optset) | 128
-                                                    if (if (if ptr < ptrend: 1 else: 0) != 0 and (if (unsafe: *ptr) == 120: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                        (unsafe: *optset) = (unsafe: *optset) | 16777216
+                                                    (unsafe: *optset__goto_3246_25) = (unsafe: *optset__goto_3246_25) | 128
+                                                    if (if (if ptr < ptrend__goto_3165_12: 1 else: 0) != 0 and (if (unsafe: *ptr) == 120: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                        (unsafe: *optset__goto_3246_25) = (unsafe: *optset__goto_3246_25) | 16777216
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                         (ptr = ptr + 1)
                                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                                             break
                                                 _ =>
-                                                    (errorcode = ERR11)
+                                                    (errorcode__goto_3153_5 = ERR11)
                                                     __pc = 19
                                                     __goto_pending = 1
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -4974,81 +5174,97 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if ((set & ((128 | 16777216)))) == 128: 1 else: 0) != 0 or (if ((unset & 128)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            unset = unset | 16777216
+                                        if (if (if ((set__goto_3246_12 & ((128 | 16777216)))) == 128: 1 else: 0) != 0 or (if ((unset__goto_3246_17 & 128)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            unset__goto_3246_17 = unset__goto_3246_17 | 16777216
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (options = (((options | set)) & ((0 - unset - 1))))
+                                        (options = (((options | set__goto_3246_12)) & ((0 - unset__goto_3246_17 - 1))))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (xoptions = (((xoptions | xset)) & ((0 - xunset - 1))))
+                                        (xoptions = (((xoptions | xset__goto_3247_12)) & ((0 - xunset__goto_3247_18 - 1))))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if ptr >= ptrend: 1 else: 0) != 0:
+                                        if (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0:
                                             __pc = 18
                                             __goto_pending = 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         if (if (unsafe: *(ptr = ptr + 1)) == 41: 1 else: 0) != 0:
-                                            (nest_depth = nest_depth - 1)
+                                            (nest_depth__goto_3147_10 = nest_depth__goto_3147_10 - 1)
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            if (if (if top_nest__goto_3169_12 > ((cb.start_workspace) as *mut nest_save): 1 else: 0) != 0 and (if ((top_nest__goto_3169_12 - (1 as isize as usize))).nest_depth == nest_depth__goto_3147_10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (top_nest__goto_3169_12 = top_nest__goto_3169_12 - 1)
+                                            else:
+                                                (top_nest__goto_3169_12.nest_depth = nest_depth__goto_3147_10)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         else:
-                                            (unsafe: *parsed_pattern = 2149449728)
-                                            (parsed_pattern = parsed_pattern + 1)
+                                            (unsafe: *parsed_pattern__goto_3141_11 = 2149449728)
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if options != oldoptions: 1 else: 0) != 0 or (if xoptions != oldxoptions: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (unsafe: *parsed_pattern = 2149515264)
-                                            (parsed_pattern = parsed_pattern + 1)
+                                        if (if (if options != oldoptions__goto_5042_18: 1 else: 0) != 0 or (if xoptions != oldxoptions__goto_5043_18: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (unsafe: *parsed_pattern__goto_3141_11 = 2149515264)
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (unsafe: *parsed_pattern = options)
-                                            (parsed_pattern = parsed_pattern + 1)
+                                            (unsafe: *parsed_pattern__goto_3141_11 = options)
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (unsafe: *parsed_pattern = xoptions)
-                                            (parsed_pattern = parsed_pattern + 1)
+                                            (unsafe: *parsed_pattern__goto_3141_11 = xoptions)
+                                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                         124 =>
-                            if (if (if (if top_nest != (null as *mut nest_save): 1 else: 0) != 0 and (if top_nest.nest_depth == nest_depth: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((top_nest.flags & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (cb.bracount = top_nest.reset_group)
+                            if (if (if (if top_nest__goto_3169_12 != (null as *mut nest_save): 1 else: 0) != 0 and (if top_nest__goto_3169_12.nest_depth == nest_depth__goto_3147_10: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((top_nest__goto_3169_12.flags & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if cb.bracount > top_nest__goto_3169_12.max_group: 1 else: 0) != 0:
+                                    (top_nest__goto_3169_12.max_group = (cb.bracount as c_ushort))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (unsafe: *parsed_pattern = 2147549184)
-                            (parsed_pattern = parsed_pattern + 1)
+                                (cb.bracount = top_nest__goto_3169_12.reset_group)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                            (unsafe: *parsed_pattern__goto_3141_11 = 2147549184)
+                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                         41 =>
-                            (okquantifier = 1)
-                            if (if (if top_nest != (null as *mut nest_save): 1 else: 0) != 0 and (if top_nest.nest_depth == nest_depth: 1 else: 0) != 0: 1 else: 0) != 0:
-                                if (if (if ((top_nest.flags & 1)) != 0: 1 else: 0) != 0 and (if top_nest.max_group > cb.bracount: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (cb.bracount = top_nest.max_group)
+                            (okquantifier__goto_3162_6 = 1)
+                            if (if (if top_nest__goto_3169_12 != (null as *mut nest_save): 1 else: 0) != 0 and (if top_nest__goto_3169_12.nest_depth == nest_depth__goto_3147_10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if (if ((top_nest__goto_3169_12.flags & 1)) != 0: 1 else: 0) != 0 and (if top_nest__goto_3169_12.max_group > cb.bracount: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (cb.bracount = top_nest__goto_3169_12.max_group)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if ((top_nest.flags & 2)) != 0: 1 else: 0) != 0:
-                                    (okquantifier = 0)
+                                if (if ((top_nest__goto_3169_12.flags & 2)) != 0: 1 else: 0) != 0:
+                                    (okquantifier__goto_3162_6 = 0)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if ((top_nest.flags & 4)) != 0: 1 else: 0) != 0:
-                                    (unsafe: *parsed_pattern = 2149384192)
-                                    (parsed_pattern = parsed_pattern + 1)
+                                if (if ((top_nest__goto_3169_12.flags & 4)) != 0: 1 else: 0) != 0:
+                                    (unsafe: *parsed_pattern__goto_3141_11 = 2149384192)
+                                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if nest_depth == 0: 1 else: 0) != 0:
-                                (errorcode = ERR22)
+                                if (if top_nest__goto_3169_12 == ((cb.start_workspace) as *mut nest_save): 1 else: 0) != 0:
+                                    (top_nest__goto_3169_12 = (null as *mut nest_save))
+                                else:
+                                    (top_nest__goto_3169_12 = top_nest__goto_3169_12 - 1)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                            if (if nest_depth__goto_3147_10 == 0: 1 else: 0) != 0:
+                                (errorcode__goto_3153_5 = ERR22)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 __pc = 19
                                 __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (nest_depth = nest_depth - 1)
-                            (unsafe: *parsed_pattern = 2149384192)
-                            (parsed_pattern = parsed_pattern + 1)
+                            (nest_depth__goto_3147_10 = nest_depth__goto_3147_10 - 1)
+                            (unsafe: *parsed_pattern__goto_3141_11 = 2149384192)
+                            (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                         _ =>
                             0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -5057,8 +5273,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if inverbname != 0 and (if ptr >= ptrend: 1 else: 0) != 0: 1 else: 0) != 0:
-                    (errorcode = ERR60)
+                if (if inverbname__goto_3157_6 != 0 and (if ptr >= ptrend__goto_3165_12: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (errorcode__goto_3153_5 = ERR60)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     __pc = 19
@@ -5071,32 +5287,32 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                 continue
             17 =>  // PARSED_END
                 (__goto_pending = 0)
-                (parsed_pattern = manage_callouts(ptr, (&mut previous_callout as *mut *mut c_uint), auto_callout, parsed_pattern, cb))
+                (parsed_pattern__goto_3141_11 = manage_callouts(ptr, (&mut previous_callout__goto_3140_11 as *mut *mut c_uint), auto_callout__goto_3159_6, parsed_pattern__goto_3141_11, cb))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if ((xoptions & 8)) != 0: 1 else: 0) != 0:
-                    (unsafe: *parsed_pattern = 2149384192)
-                    (parsed_pattern = parsed_pattern + 1)
+                    (unsafe: *parsed_pattern__goto_3141_11 = 2149384192)
+                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (unsafe: *parsed_pattern = 2149187584)
-                    (parsed_pattern = parsed_pattern + 1)
+                    (unsafe: *parsed_pattern__goto_3141_11 = 2149187584)
+                    (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 else:
                     if (if ((xoptions & 4)) != 0: 1 else: 0) != 0:
-                        (unsafe: *parsed_pattern = 2149384192)
-                        (parsed_pattern = parsed_pattern + 1)
+                        (unsafe: *parsed_pattern__goto_3141_11 = 2149384192)
+                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        (unsafe: *parsed_pattern = ((2149318656 as c_uint) +% 5))
-                        (parsed_pattern = parsed_pattern + 1)
+                        (unsafe: *parsed_pattern__goto_3141_11 = ((2149318656 as c_uint) +% 5))
+                        (parsed_pattern__goto_3141_11 = parsed_pattern__goto_3141_11 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if parsed_pattern >= parsed_pattern_end: 1 else: 0) != 0:
-                    (errorcode = ERR63)
+                if (if parsed_pattern__goto_3141_11 >= parsed_pattern_end__goto_3142_11: 1 else: 0) != 0:
+                    (errorcode__goto_3153_5 = ERR63)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     __pc = 19
@@ -5105,10 +5321,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((unsafe: *parsed_pattern) = (2147483648 as c_uint))
+                ((unsafe: *parsed_pattern__goto_3141_11) = (2147483648 as c_uint))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if nest_depth == 0: 1 else: 0) != 0:
+                if (if nest_depth__goto_3147_10 == 0: 1 else: 0) != 0:
                     return 0
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
@@ -5116,14 +5332,17 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                 continue
             18 =>  // UNCLOSED_PARENTHESIS
                 (__goto_pending = 0)
-                (errorcode = ERR14)
+                (errorcode__goto_3153_5 = ERR14)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 19
                 continue
             19 =>  // FAILED
                 (__goto_pending = 0)
-                return errorcode
+                (cb.erroroffset = ((((ptr as usize -% cb.start_pattern as usize) / sizeof[u8]())) as c_ulong))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                return errorcode__goto_3153_5
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 20
@@ -5164,140 +5383,161 @@ fn first_significant_code(__param_code: *const u8, skipassert: c_int) -> *const 
 
 
 fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *mut *mut u8, pptrptr: *mut *mut c_uint, errorcodeptr: *mut c_int, firstcuptr: *mut c_uint, firstcuflagsptr: *mut c_uint, reqcuptr: *mut c_uint, reqcuflagsptr: *mut c_uint, bcptr: *mut branch_chain_8, open_caps: *mut open_capitem, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> c_int:
-    var bravalue: c_int = 0
-    var okreturn: c_int = 0
-    var group_return: c_int = 0
-    var repeat_min: c_uint = 0
-    var repeat_max: c_uint = 0
-    var greedy_default: c_uint = 0
-    var greedy_non_default: c_uint = 0
-    var repeat_type: c_uint = 0
-    var op_type: c_uint = 0
-    var options: c_uint = 0
-    var xoptions: c_uint = 0
-    var firstcu: c_uint = 0
-    var reqcu: c_uint = 0
-    var zeroreqcu: c_uint = 0
-    var zerofirstcu: c_uint = 0
-    var pptr: *mut c_uint = null
-    var meta: c_uint = 0
-    var meta_arg: c_uint = 0
-    var firstcuflags: c_uint = 0
-    var reqcuflags: c_uint = 0
-    var zeroreqcuflags: c_uint = 0
-    var zerofirstcuflags: c_uint = 0
-    var req_caseopt: c_uint = 0
-    var reqvary: c_uint = 0
-    var tempreqvary: c_uint = 0
-    var offset: c_ulong = 0
-    var length_prevgroup: c_ulong = 0
-    var code: *mut u8 = null
-    var last_code: *mut u8 = null
-    var orig_code: *mut u8 = null
-    var tempcode: *mut u8 = null
-    var previous: *mut u8 = null
-    var op_previous: u8 = 0
-    var groupsetfirstcu: c_int = 0
-    var had_accept: c_int = 0
-    var matched_char: c_int = 0
-    var previous_matched_char: c_int = 0
-    var reset_caseful: c_int = 0
-    var utf: c_int = 0
-    var possessive_quantifier: c_int = 0
-    var note_group_empty: c_int = 0
-    var mclength: c_uint = 0
-    var skipunits: c_uint = 0
-    var subreqcu: c_uint = 0
-    var subfirstcu: c_uint = 0
-    var groupnumber: c_uint = 0
-    var verbarglen: c_uint = 0
-    var verbculen: c_uint = 0
-    var subreqcuflags: c_uint = 0
-    var subfirstcuflags: c_uint = 0
-    var oc: *mut open_capitem = null
-    var mcbuffer: [8]u8 = [0 as u8; 8]
-    var c: c_uint = 0
-    var d: c_uint = 0
-    var i: c_int = 0
-    var count: c_int = 0
-    var index: c_int = 0
-    var ng: *mut named_group_8 = null
-    var name: *const u8 = null
-    var start_pptr: *mut c_uint = null
-    var length: c_uint = 0
-    var tc: *mut u8 = null
-    var condcount: c_int = 0
-    var pp: *const u8 = null
-    var delimiter: c_uint = 0
-    var callout_string: *mut u8 = null
-    var replicate: c_int = 0
-    var delta: c_ulong = 0
-    var len: c_int = 0
-    var bralink: *mut u8 = null
-    var brazeroptr: *mut u8 = null
-    var linkoffset: c_int = 0
-    var oldlinkoffset: c_int = 0
-    var bra: *mut u8 = null
-    var ketcode: *mut u8 = null
-    var bracode: *mut u8 = null
-    var nlen: c_int = 0
-    var prop_type: c_int = 0
-    var prop_value: c_int = 0
-    var oldcode: *mut u8 = null
-    var repcode: c_uint = 0
-    var args: *mut recurse_arguments = null
-    var current: *mut c_ushort = null
-    var end: *mut c_ushort = null
+    var bravalue__goto_6090_5: c_int = 0
+    var okreturn__goto_6091_5: c_int = 0
+    var group_return__goto_6092_5: c_int = 0
+    var repeat_min__goto_6093_10: c_uint = 0
+    var repeat_max__goto_6093_26: c_uint = 0
+    var greedy_default__goto_6094_10: c_uint = 0
+    var greedy_non_default__goto_6094_26: c_uint = 0
+    var repeat_type__goto_6095_10: c_uint = 0
+    var op_type__goto_6095_23: c_uint = 0
+    var options__goto_6096_10: c_uint = 0
+    var xoptions__goto_6097_10: c_uint = 0
+    var firstcu__goto_6098_10: c_uint = 0
+    var reqcu__goto_6098_19: c_uint = 0
+    var zeroreqcu__goto_6099_10: c_uint = 0
+    var zerofirstcu__goto_6099_21: c_uint = 0
+    var pptr__goto_6100_11: *mut c_uint = null
+    var meta__goto_6101_10: c_uint = 0
+    var meta_arg__goto_6101_16: c_uint = 0
+    var firstcuflags__goto_6102_10: c_uint = 0
+    var reqcuflags__goto_6102_24: c_uint = 0
+    var zeroreqcuflags__goto_6103_10: c_uint = 0
+    var zerofirstcuflags__goto_6103_26: c_uint = 0
+    var req_caseopt__goto_6104_10: c_uint = 0
+    var reqvary__goto_6104_23: c_uint = 0
+    var tempreqvary__goto_6104_32: c_uint = 0
+    var offset__goto_6107_12: c_ulong = 0
+    var length_prevgroup__goto_6108_12: c_ulong = 0
+    var code__goto_6109_14: *mut u8 = null
+    var last_code__goto_6110_14: *mut u8 = null
+    var orig_code__goto_6111_14: *mut u8 = null
+    var tempcode__goto_6112_14: *mut u8 = null
+    var previous__goto_6113_14: *mut u8 = null
+    var op_previous__goto_6114_13: u8 = 0
+    var groupsetfirstcu__goto_6115_6: c_int = 0
+    var had_accept__goto_6116_6: c_int = 0
+    var matched_char__goto_6117_6: c_int = 0
+    var previous_matched_char__goto_6118_6: c_int = 0
+    var reset_caseful__goto_6119_6: c_int = 0
+    var utf__goto_6129_6: c_int = 0
+    var possessive_quantifier__goto_6161_8: c_int = 0
+    var note_group_empty__goto_6162_8: c_int = 0
+    var mclength__goto_6163_12: c_uint = 0
+    var skipunits__goto_6164_12: c_uint = 0
+    var subreqcu__goto_6165_12: c_uint = 0
+    var subfirstcu__goto_6165_22: c_uint = 0
+    var groupnumber__goto_6166_12: c_uint = 0
+    var verbarglen__goto_6167_12: c_uint = 0
+    var verbculen__goto_6167_24: c_uint = 0
+    var subreqcuflags__goto_6168_12: c_uint = 0
+    var subfirstcuflags__goto_6168_27: c_uint = 0
+    var oc__goto_6169_17: *mut open_capitem = null
+    var mcbuffer__goto_6170_15: [8]u8 = [0 as u8; 8]
+    var c__goto_6366_16: c_uint = 0
+    var c__goto_6435_16: c_uint = 0
+    var d__goto_6446_18: c_uint = 0
+    var i__goto_6561_14: c_int = 0
+    var count__goto_6613_11: c_int = 0
+    var index__goto_6613_18: c_int = 0
+    var ng__goto_6614_20: *mut named_group_8 = null
+    var i__goto_6676_16: c_uint = 0
+    var name__goto_6677_18: *const u8 = null
+    var ng__goto_6678_20: *mut named_group_8 = null
+    var start_pptr__goto_6679_17: *mut c_uint = null
+    var length__goto_6680_16: c_uint = 0
+    var count__goto_6763_11: c_int = 0
+    var index__goto_6763_18: c_int = 0
+    var ng__goto_6764_20: *mut named_group_8 = null
+    var tc__goto_6989_20: *mut u8 = null
+    var condcount__goto_6990_11: c_int = 0
+    var count__goto_7141_11: c_int = 0
+    var index__goto_7141_18: c_int = 0
+    var name__goto_7142_18: *const u8 = null
+    var ng__goto_7143_20: *mut named_group_8 = null
+    var length__goto_7144_16: c_uint = 0
+    var pp__goto_7248_18: *const u8 = null
+    var delimiter__goto_7249_16: c_uint = 0
+    var length__goto_7250_16: c_uint = 0
+    var callout_string__goto_7251_20: *mut u8 = null
+    var replicate__goto_7482_13: c_int = 0
+    var delta__goto_7492_22: c_ulong = 0
+    var i__goto_7501_23: c_int = 0
+    var length__goto_7518_20: c_ulong = 0
+    var len__goto_7553_13: c_int = 0
+    var bralink__goto_7554_22: *mut u8 = null
+    var brazeroptr__goto_7555_22: *mut u8 = null
+    var linkoffset__goto_7631_17: c_int = 0
+    var delta__goto_7662_26: c_ulong = 0
+    var i__goto_7684_29: c_uint = 0
+    var delta__goto_7712_24: c_ulong = 0
+    var i__goto_7726_30: c_uint = 0
+    var linkoffset__goto_7735_19: c_int = 0
+    var oldlinkoffset__goto_7751_17: c_int = 0
+    var linkoffset__goto_7752_17: c_int = 0
+    var bra__goto_7753_26: *mut u8 = null
+    var ketcode__goto_7790_24: *mut u8 = null
+    var bracode__goto_7791_24: *mut u8 = null
+    var nlen__goto_7830_21: c_int = 0
+    var prop_type__goto_7882_13: c_int = 0
+    var prop_value__goto_7882_24: c_int = 0
+    var oldcode__goto_7883_22: *mut u8 = null
+    var len__goto_8038_11: c_int = 0
+    var repcode__goto_8103_22: c_uint = 0
+    var args__goto_8218_26: *mut recurse_arguments = null
+    var current__goto_8232_19: *mut c_ushort = null
+    var end__goto_8232_29: *mut c_ushort = null
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                bravalue = 0
-                okreturn = -1
-                group_return = 0
-                repeat_min = 0
-                repeat_max = 0
-                options = (unsafe: *optionsptr)
-                xoptions = (unsafe: *xoptionsptr)
-                pptr = (unsafe: *pptrptr)
-                offset = 0
-                length_prevgroup = 0
-                code = (unsafe: *codeptr)
-                last_code = code
-                orig_code = code
-                previous = (null as *mut u8)
-                groupsetfirstcu = 0
-                had_accept = 0
-                matched_char = 0
-                previous_matched_char = 0
-                reset_caseful = 0
-                utf = 0
-                (greedy_default = ((if ((options & 262144)) != 0: 1 else: 0)))
+                bravalue__goto_6090_5 = 0
+                okreturn__goto_6091_5 = -1
+                group_return__goto_6092_5 = 0
+                repeat_min__goto_6093_10 = 0
+                repeat_max__goto_6093_26 = 0
+                options__goto_6096_10 = (unsafe: *optionsptr)
+                xoptions__goto_6097_10 = (unsafe: *xoptionsptr)
+                pptr__goto_6100_11 = (unsafe: *pptrptr)
+                offset__goto_6107_12 = 0
+                length_prevgroup__goto_6108_12 = 0
+                code__goto_6109_14 = (unsafe: *codeptr)
+                last_code__goto_6110_14 = code__goto_6109_14
+                orig_code__goto_6111_14 = code__goto_6109_14
+                previous__goto_6113_14 = (null as *mut u8)
+                groupsetfirstcu__goto_6115_6 = 0
+                had_accept__goto_6116_6 = 0
+                matched_char__goto_6117_6 = 0
+                previous_matched_char__goto_6118_6 = 0
+                reset_caseful__goto_6119_6 = 0
+                utf__goto_6129_6 = 0
+                (greedy_default__goto_6094_10 = ((if ((options__goto_6096_10 & 262144)) != 0: 1 else: 0)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (greedy_non_default = (greedy_default ^ 1))
+                (greedy_non_default__goto_6094_26 = (greedy_default__goto_6094_10 ^ 1))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (zeroreqcu = 0)
-                (zerofirstcu = zeroreqcu)
-                (reqcu = zerofirstcu)
-                (firstcu = reqcu)
+                (zeroreqcu__goto_6099_10 = 0)
+                (zerofirstcu__goto_6099_21 = zeroreqcu__goto_6099_10)
+                (reqcu__goto_6098_19 = zerofirstcu__goto_6099_21)
+                (firstcu__goto_6098_10 = reqcu__goto_6098_19)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (zeroreqcuflags = (4294967295 as c_uint))
-                (zerofirstcuflags = zeroreqcuflags)
-                (reqcuflags = zerofirstcuflags)
-                (firstcuflags = reqcuflags)
+                (zeroreqcuflags__goto_6103_10 = (4294967295 as c_uint))
+                (zerofirstcuflags__goto_6103_26 = zeroreqcuflags__goto_6103_10)
+                (reqcuflags__goto_6102_24 = zerofirstcuflags__goto_6103_26)
+                (firstcuflags__goto_6102_10 = reqcuflags__goto_6102_24)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (req_caseopt = (if ((if ((options & 8)) != 0: 1 else: 0)) != 0: 1 else: 0))
+                (req_caseopt__goto_6104_10 = (if ((if ((options__goto_6096_10 & 8)) != 0: 1 else: 0)) != 0: 1 else: 0))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                while (pptr = pptr + 1) != null:
+                while (pptr__goto_6100_11 = pptr__goto_6100_11 + 1) != null:
                     if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                        if (if code >= (cb.start_workspace + cb.workspace_size): 1 else: 0) != 0:
+                        if (if code__goto_6109_14 >= (cb.start_workspace + cb.workspace_size): 1 else: 0) != 0:
                             ((unsafe: *errorcodeptr) = ERR52)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
@@ -5309,7 +5549,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if code > ((cb.start_workspace + cb.workspace_size) - ((100) as isize as usize)): 1 else: 0) != 0:
+                        if (if code__goto_6109_14 > ((cb.start_workspace + cb.workspace_size) - ((100) as isize as usize)): 1 else: 0) != 0:
                             ((unsafe: *errorcodeptr) = ERR86)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
@@ -5321,11 +5561,26 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if code < last_code: 1 else: 0) != 0:
-                            (code = last_code)
+                        if (if code__goto_6109_14 < last_code__goto_6110_14: 1 else: 0) != 0:
+                            (code__goto_6109_14 = last_code__goto_6110_14)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if (if meta < 2151153664: 1 else: 0) != 0 or (if meta > 2151874560: 1 else: 0) != 0: 1 else: 0) != 0:
+                        if (if (if meta__goto_6101_10 < 2151153664: 1 else: 0) != 0 or (if meta__goto_6101_10 > 2151874560: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (2147483627 -% (unsafe: *lengthptr)) < ((((code__goto_6109_14 as usize -% orig_code__goto_6111_14 as usize) / sizeof[u8]())) as c_ulong): 1 else: 0) != 0:
+                                ((unsafe: *errorcodeptr) = ERR20)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (cb.erroroffset = 0)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                return 0
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
+                            (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((((code__goto_6109_14 as usize -% orig_code__goto_6111_14 as usize) / sizeof[u8]())) as c_ulong)
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
                             if (if (unsafe: *lengthptr) > 65536: 1 else: 0) != 0:
                                 ((unsafe: *errorcodeptr) = ERR20)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -5338,95 +5593,95 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (code = orig_code)
+                            (code__goto_6109_14 = orig_code__goto_6111_14)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (last_code = code)
+                        (last_code__goto_6110_14 = code__goto_6109_14)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if meta < 2151153664: 1 else: 0) != 0 or (if meta > 2151874560: 1 else: 0) != 0: 1 else: 0) != 0:
-                        (previous = code)
+                    if (if (if meta__goto_6101_10 < 2151153664: 1 else: 0) != 0 or (if meta__goto_6101_10 > 2151874560: 1 else: 0) != 0: 1 else: 0) != 0:
+                        (previous__goto_6113_14 = code__goto_6109_14)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if matched_char != 0 and (if had_accept != 0: 0 else: 1) != 0: 1 else: 0) != 0:
-                            (okreturn = 1)
+                        if (if matched_char__goto_6117_6 != 0 and (if had_accept__goto_6116_6 != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+                            (okreturn__goto_6091_5 = 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (previous_matched_char = matched_char)
+                    (previous_matched_char__goto_6118_6 = matched_char__goto_6117_6)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (matched_char = 0)
+                    (matched_char__goto_6117_6 = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (note_group_empty = 0)
+                    (note_group_empty__goto_6162_8 = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (skipunits = 0)
+                    (skipunits__goto_6164_12 = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    match meta
+                    match meta__goto_6101_10
                         2147483648 =>
-                            ((unsafe: *firstcuflagsptr) = firstcuflags)
-                            ((unsafe: *reqcuptr) = reqcu)
-                            ((unsafe: *reqcuflagsptr) = reqcuflags)
-                            ((unsafe: *codeptr) = code)
-                            ((unsafe: *pptrptr) = pptr)
-                            return okreturn
+                            ((unsafe: *firstcuflagsptr) = firstcuflags__goto_6102_10)
+                            ((unsafe: *reqcuptr) = reqcu__goto_6098_19)
+                            ((unsafe: *reqcuflagsptr) = reqcuflags__goto_6102_24)
+                            ((unsafe: *codeptr) = code__goto_6109_14)
+                            ((unsafe: *pptrptr) = pptr__goto_6100_11)
+                            return okreturn__goto_6091_5
                         2148073472 =>
-                            if (if ((options & 1024)) != 0: 1 else: 0) != 0:
-                                if (if firstcuflags == 4294967295: 1 else: 0) != 0:
-                                    (firstcuflags = (4294967294 as c_uint))
-                                    (zerofirstcuflags = firstcuflags)
+                            if (if ((options__goto_6096_10 & 1024)) != 0: 1 else: 0) != 0:
+                                if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0:
+                                    (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
+                                    (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *code = 28)
-                                (code = code + 1)
+                                (unsafe: *code__goto_6109_14 = 28)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (unsafe: *code = 27)
-                                (code = code + 1)
+                                (unsafe: *code__goto_6109_14 = 27)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                         2149187584 =>
-                            (unsafe: *code = (if ((if ((options & 1024)) != 0: 1 else: 0)) != 0: OP_DOLLM else: OP_DOLL))
-                            (code = code + 1)
+                            (unsafe: *code__goto_6109_14 = (if ((if ((options__goto_6096_10 & 1024)) != 0: 1 else: 0)) != 0: OP_DOLLM else: OP_DOLL))
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                         2149253120 =>
-                            (matched_char = 1)
-                            if (if firstcuflags == 4294967295: 1 else: 0) != 0:
-                                (firstcuflags = (4294967294 as c_uint))
-                            (zerofirstcu = firstcu)
-                            (zerofirstcuflags = firstcuflags)
-                            (zeroreqcu = reqcu)
-                            (zeroreqcuflags = reqcuflags)
-                            (unsafe: *code = (if ((if ((options & 32)) != 0: 1 else: 0)) != 0: OP_ALLANY else: OP_ANY))
-                            (code = code + 1)
+                            (matched_char__goto_6117_6 = 1)
+                            if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0:
+                                (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
+                            (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
+                            (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
+                            (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
+                            (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
+                            (unsafe: *code__goto_6109_14 = (if ((if ((options__goto_6096_10 & 32)) != 0: 1 else: 0)) != 0: OP_ALLANY else: OP_ANY))
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                         2148204544 =>
-                            if (if meta == 2148270080: 1 else: 0) != 0:
-                                (unsafe: *code = 13)
-                                (code = code + 1)
+                            if (if meta__goto_6101_10 == 2148270080: 1 else: 0) != 0:
+                                (unsafe: *code__goto_6109_14 = 13)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                             else:
-                                (unsafe: *code = 110)
-                                (code = code + 1)
+                                (unsafe: *code__goto_6109_14 = 110)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                with_memset((code as *mut c_void) as *i8, 0, 32 as i64)
+                                with_memset((code__goto_6109_14 as *mut c_void) as *i8, 0, 32 as i64)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                code = code + (32 / sizeof[u8]())
+                                code__goto_6109_14 = code__goto_6109_14 + (32 / sizeof[u8]())
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if firstcuflags == 4294967295: 1 else: 0) != 0:
-                                (firstcuflags = (4294967294 as c_uint))
-                            (zerofirstcu = firstcu)
-                            (zerofirstcuflags = firstcuflags)
+                            if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0:
+                                (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
+                            (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
+                            (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
                         2148401152 =>
-                            if (if (((unsafe: *pptr) & 1)) != 0: 1 else: 0) != 0:
-                                if (if _pcre2_compile_class_nested_8(options, xoptions, (&mut pptr as *mut *mut c_uint), (&mut code as *mut *mut u8), errorcodeptr, cb, lengthptr) != 0: 0 else: 1) != 0:
+                            if (if (((unsafe: *pptr__goto_6100_11) & 1)) != 0: 1 else: 0) != 0:
+                                if (if _pcre2_compile_class_nested_8(options__goto_6096_10, xoptions__goto_6097_10, (&mut pptr__goto_6100_11 as *mut *mut c_uint), (&mut code__goto_6109_14 as *mut *mut u8), errorcodeptr, cb, lengthptr) != 0: 0 else: 1) != 0:
                                     return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -5434,15 +5689,15 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 __goto_pending = 1
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if (if pptr[1] < 2147483648: 1 else: 0) != 0 and (if pptr[2] == 2148335616: 1 else: 0) != 0: 1 else: 0) != 0:
-                                c = pptr[1]
+                            if (if (if pptr__goto_6100_11[1] < 2147483648: 1 else: 0) != 0 and (if pptr__goto_6100_11[2] == 2148335616: 1 else: 0) != 0: 1 else: 0) != 0:
+                                c__goto_6366_16 = pptr__goto_6100_11[1]
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                pptr = pptr + 2
+                                pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if meta == 2148139008: 1 else: 0) != 0:
-                                    (meta = c)
+                                if (if meta__goto_6101_10 == 2148139008: 1 else: 0) != 0:
+                                    (meta__goto_6101_10 = c__goto_6366_16)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 11
@@ -5451,53 +5706,53 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (zeroreqcu = reqcu)
+                                (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (zeroreqcuflags = reqcuflags)
+                                (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if firstcuflags == 4294967295: 1 else: 0) != 0:
-                                    (firstcuflags = (4294967294 as c_uint))
+                                if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0:
+                                    (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (zerofirstcu = firstcu)
+                                (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (zerofirstcuflags = firstcuflags)
+                                (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *code = (if ((if ((options & 8)) != 0: 1 else: 0)) != 0: OP_NOTI else: OP_NOT))
-                                (code = code + 1)
+                                (unsafe: *code__goto_6109_14 = (if ((if ((options__goto_6096_10 & 8)) != 0: 1 else: 0)) != 0: OP_NOTI else: OP_NOT))
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if (if (if (if meta == 2148139008: 1 else: 0) != 0 and (if pptr[1] < 2147483648: 1 else: 0) != 0: 1 else: 0) != 0 and (if pptr[2] < 2147483648: 1 else: 0) != 0: 1 else: 0) != 0 and (if pptr[3] == 2148335616: 1 else: 0) != 0: 1 else: 0) != 0:
-                                c = pptr[1]
+                            if (if (if (if (if meta__goto_6101_10 == 2148139008: 1 else: 0) != 0 and (if pptr__goto_6100_11[1] < 2147483648: 1 else: 0) != 0: 1 else: 0) != 0 and (if pptr__goto_6100_11[2] < 2147483648: 1 else: 0) != 0: 1 else: 0) != 0 and (if pptr__goto_6100_11[3] == 2148335616: 1 else: 0) != 0: 1 else: 0) != 0:
+                                c__goto_6435_16 = pptr__goto_6100_11[1]
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (d = ((cb.fcc)[c]))
+                                (d__goto_6446_18 = ((cb.fcc)[c__goto_6435_16]))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if (if c != d: 1 else: 0) != 0 and (if pptr[2] == d: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    pptr = pptr + 3
+                                if (if (if c__goto_6435_16 != d__goto_6446_18: 1 else: 0) != 0 and (if pptr__goto_6100_11[2] == d__goto_6446_18: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    pptr__goto_6100_11 = pptr__goto_6100_11 + 3
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (meta = c)
+                                    (meta__goto_6101_10 = c__goto_6435_16)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if ((options & 8)) == 0: 1 else: 0) != 0:
-                                        (reset_caseful = 1)
+                                    if (if ((options__goto_6096_10 & 8)) == 0: 1 else: 0) != 0:
+                                        (reset_caseful__goto_6119_6 = 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        options = options | 8
+                                        options__goto_6096_10 = options__goto_6096_10 | 8
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (req_caseopt = 1)
+                                        (req_caseopt__goto_6104_10 = 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -5510,166 +5765,166 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (pptr = _pcre2_compile_class_not_nested_8(options, xoptions, (pptr + (1 as isize as usize)), (&mut code as *mut *mut u8), (if meta == 2148401152: 1 else: 0), (null as *mut c_int), errorcodeptr, cb, lengthptr))
-                            if (if pptr == (null as *mut c_uint): 1 else: 0) != 0:
+                            (pptr__goto_6100_11 = _pcre2_compile_class_not_nested_8(options__goto_6096_10, xoptions__goto_6097_10, (pptr__goto_6100_11 + (1 as isize as usize)), (&mut code__goto_6109_14 as *mut *mut u8), (if meta__goto_6101_10 == 2148401152: 1 else: 0), (null as *mut c_int), errorcodeptr, cb, lengthptr))
+                            if (if pptr__goto_6100_11 == (null as *mut c_uint): 1 else: 0) != 0:
                                 return 0
-                            if (if firstcuflags == 4294967295: 1 else: 0) != 0:
-                                (firstcuflags = (4294967294 as c_uint))
-                            (zerofirstcu = firstcu)
-                            (zerofirstcuflags = firstcuflags)
-                            (zeroreqcu = reqcu)
-                            (zeroreqcuflags = reqcuflags)
+                            if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0:
+                                (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
+                            (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
+                            (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
+                            (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
+                            (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
                         2150498304 =>
-                            (had_accept = 1)
-                            (cb.had_accept = had_accept)
-                            (oc = open_caps)
-                            while (if (if oc != (null as *mut open_capitem): 1 else: 0) != 0 and (if oc.assert_depth >= cb.assert_depth: 1 else: 0) != 0: 1 else: 0) != 0:
+                            (had_accept__goto_6116_6 = 1)
+                            (cb.had_accept = had_accept__goto_6116_6)
+                            (oc__goto_6169_17 = open_caps)
+                            while (if (if oc__goto_6169_17 != (null as *mut open_capitem): 1 else: 0) != 0 and (if oc__goto_6169_17.assert_depth >= cb.assert_depth: 1 else: 0) != 0: 1 else: 0) != 0:
                                 if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
                                     (unsafe: *lengthptr) = (unsafe: *lengthptr) + 3
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    (unsafe: *code = 168)
-                                    (code = code + 1)
+                                    (unsafe: *code__goto_6109_14 = 168)
+                                    (code__goto_6109_14 = code__goto_6109_14 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (oc = oc.next)
+                                (oc__goto_6169_17 = oc__goto_6169_17.next)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (unsafe: *code = (if ((if cb.assert_depth > 0: 1 else: 0)) != 0: OP_ASSERT_ACCEPT else: OP_ACCEPT))
-                            (code = code + 1)
-                            if (if firstcuflags == 4294967295: 1 else: 0) != 0:
-                                (firstcuflags = (4294967294 as c_uint))
+                            (unsafe: *code__goto_6109_14 = (if ((if cb.assert_depth > 0: 1 else: 0)) != 0: OP_ASSERT_ACCEPT else: OP_ACCEPT))
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
+                            if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0:
+                                (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
                         2150760448 => 0
                         2150629376 => 0
                         2151022592 =>
                             cb.external_flags = cb.external_flags | 4096
-                            (unsafe: *code = 161)
-                            (code = code + 1)
+                            (unsafe: *code__goto_6109_14 = 161)
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                         2151088128 =>
                             cb.external_flags = cb.external_flags | 4096
                             __pc = 2
                             __goto_pending = 1
-                            (verbarglen = (unsafe: *((pptr = pptr + 1))))
-                            (verbculen = 0)
-                            (tempcode = code)
-                            (code = code + 1)
-                            i = 0
-                            while (if i < (verbarglen as c_int): 1 else: 0) != 0:
-                                (meta = (unsafe: *((pptr = pptr + 1))))
+                            (verbarglen__goto_6167_12 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
+                            (verbculen__goto_6167_24 = 0)
+                            (tempcode__goto_6112_14 = code__goto_6109_14)
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
+                            i__goto_6561_14 = 0
+                            while (if i__goto_6561_14 < (verbarglen__goto_6167_12 as c_int): 1 else: 0) != 0:
+                                (meta__goto_6101_10 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (mclength = 1)
+                                (mclength__goto_6163_12 = 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                ((&mcbuffer[0] as *mut u8)[0] = meta)
+                                ((&mcbuffer__goto_6170_15[0] as *mut u8)[0] = meta__goto_6101_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + mclength
+                                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + mclength__goto_6163_12
                                 else:
-                                    code = code + mclength
+                                    code__goto_6109_14 = code__goto_6109_14 + mclength__goto_6163_12
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    verbculen = verbculen + mclength
+                                    verbculen__goto_6167_24 = verbculen__goto_6167_24 + mclength__goto_6163_12
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (i = i + 1)
+                                (i__goto_6561_14 = i__goto_6561_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            ((unsafe: *tempcode) = verbculen)
-                            (unsafe: *code = 0)
-                            (code = code + 1)
+                            ((unsafe: *tempcode__goto_6112_14) = verbculen__goto_6167_24)
+                            (unsafe: *code__goto_6109_14 = 0)
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                         2150825984 =>
-                            (verbarglen = (unsafe: *((pptr = pptr + 1))))
-                            (verbculen = 0)
-                            (tempcode = code)
-                            (code = code + 1)
-                            i = 0
-                            while (if i < (verbarglen as c_int): 1 else: 0) != 0:
-                                (meta = (unsafe: *((pptr = pptr + 1))))
+                            (verbarglen__goto_6167_12 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
+                            (verbculen__goto_6167_24 = 0)
+                            (tempcode__goto_6112_14 = code__goto_6109_14)
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
+                            i__goto_6561_14 = 0
+                            while (if i__goto_6561_14 < (verbarglen__goto_6167_12 as c_int): 1 else: 0) != 0:
+                                (meta__goto_6101_10 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (mclength = 1)
+                                (mclength__goto_6163_12 = 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                ((&mcbuffer[0] as *mut u8)[0] = meta)
+                                ((&mcbuffer__goto_6170_15[0] as *mut u8)[0] = meta__goto_6101_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + mclength
+                                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + mclength__goto_6163_12
                                 else:
-                                    code = code + mclength
+                                    code__goto_6109_14 = code__goto_6109_14 + mclength__goto_6163_12
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    verbculen = verbculen + mclength
+                                    verbculen__goto_6167_24 = verbculen__goto_6167_24 + mclength__goto_6163_12
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (i = i + 1)
+                                (i__goto_6561_14 = i__goto_6561_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            ((unsafe: *tempcode) = verbculen)
-                            (unsafe: *code = 0)
-                            (code = code + 1)
+                            ((unsafe: *tempcode__goto_6112_14) = verbculen__goto_6167_24)
+                            (unsafe: *code__goto_6109_14 = 0)
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                         2150432768 =>
-                            (verbarglen = (unsafe: *((pptr = pptr + 1))))
-                            (verbculen = 0)
-                            (tempcode = code)
-                            (code = code + 1)
-                            i = 0
-                            while (if i < (verbarglen as c_int): 1 else: 0) != 0:
-                                (meta = (unsafe: *((pptr = pptr + 1))))
+                            (verbarglen__goto_6167_12 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
+                            (verbculen__goto_6167_24 = 0)
+                            (tempcode__goto_6112_14 = code__goto_6109_14)
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
+                            i__goto_6561_14 = 0
+                            while (if i__goto_6561_14 < (verbarglen__goto_6167_12 as c_int): 1 else: 0) != 0:
+                                (meta__goto_6101_10 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (mclength = 1)
+                                (mclength__goto_6163_12 = 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                ((&mcbuffer[0] as *mut u8)[0] = meta)
+                                ((&mcbuffer__goto_6170_15[0] as *mut u8)[0] = meta__goto_6101_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + mclength
+                                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + mclength__goto_6163_12
                                 else:
-                                    code = code + mclength
+                                    code__goto_6109_14 = code__goto_6109_14 + mclength__goto_6163_12
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    verbculen = verbculen + mclength
+                                    verbculen__goto_6167_24 = verbculen__goto_6167_24 + mclength__goto_6163_12
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (i = i + 1)
+                                (i__goto_6561_14 = i__goto_6561_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            ((unsafe: *tempcode) = verbculen)
-                            (unsafe: *code = 0)
-                            (code = code + 1)
+                            ((unsafe: *tempcode__goto_6112_14) = verbculen__goto_6167_24)
+                            (unsafe: *code__goto_6109_14 = 0)
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                         2149515264 =>
-                            (options = (unsafe: *((pptr = pptr + 1))))
-                            ((unsafe: *optionsptr) = options)
-                            (xoptions = (unsafe: *((pptr = pptr + 1))))
-                            ((unsafe: *xoptionsptr) = xoptions)
-                            (greedy_default = ((if ((options & 262144)) != 0: 1 else: 0)))
-                            (greedy_non_default = (greedy_default ^ 1))
-                            (req_caseopt = (if ((if ((options & 8)) != 0: 1 else: 0)) != 0: 1 else: 0))
+                            (options__goto_6096_10 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
+                            ((unsafe: *optionsptr) = options__goto_6096_10)
+                            (xoptions__goto_6097_10 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
+                            ((unsafe: *xoptionsptr) = xoptions__goto_6097_10)
+                            (greedy_default__goto_6094_10 = ((if ((options__goto_6096_10 & 262144)) != 0: 1 else: 0)))
+                            (greedy_non_default__goto_6094_26 = (greedy_default__goto_6094_10 ^ 1))
+                            (req_caseopt__goto_6104_10 = (if ((if ((options__goto_6096_10 & 8)) != 0: 1 else: 0)) != 0: 1 else: 0))
                         2148925440 =>
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                (pptr = _pcre2_compile_parse_scan_substr_args8(pptr, errorcodeptr, cb, lengthptr))
+                                (pptr__goto_6100_11 = _pcre2_compile_parse_scan_substr_args8(pptr__goto_6100_11, errorcodeptr, cb, lengthptr))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if pptr == (null as *mut c_uint): 1 else: 0) != 0:
+                                if (if pptr__goto_6100_11 == (null as *mut c_uint): 1 else: 0) != 0:
                                     return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -5682,20 +5937,20 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (pptr = pptr - 1)
+                            (pptr__goto_6100_11 = pptr__goto_6100_11 - 1)
                         2148990976 =>
-                            (bravalue = OP_ASSERT_SCS)
+                            (bravalue__goto_6090_5 = OP_ASSERT_SCS)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                start_pptr = pptr
+                                start_pptr__goto_6679_17 = pptr__goto_6100_11
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                length = (unsafe: *((pptr = pptr + 1)))
+                                length__goto_6680_16 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1)))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                pptr = pptr + 2
+                                pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -5703,27 +5958,26 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (name = (cb.start_pattern + offset))
+                                (name__goto_6677_18 = (cb.start_pattern + offset__goto_6107_12))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (ng = _pcre2_compile_find_named_group8(name, length, cb))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if ng == (null as *mut named_group_8): 1 else: 0) != 0:
-                                    (groupnumber = 0)
+                                if (if ng__goto_6678_20 == (null as *mut named_group_8): 1 else: 0) != 0:
+                                    (groupnumber__goto_6166_12 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if meta == 2148794368: 1 else: 0) != 0:
-                                        (i = 1)
-                                        while (if i < length: 1 else: 0) != 0:
-                                            (groupnumber = ((groupnumber *% 10) +% ((name[i] - 48))))
+                                    if (if meta__goto_6101_10 == 2148794368: 1 else: 0) != 0:
+                                        (i__goto_6676_16 = 1)
+                                        while (if i__goto_6676_16 < length__goto_6680_16: 1 else: 0) != 0:
+                                            (groupnumber__goto_6166_12 = ((groupnumber__goto_6166_12 *% 10) +% ((name__goto_6677_18[i__goto_6676_16] - 48))))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if groupnumber > 65535: 1 else: 0) != 0:
+                                            if (if groupnumber__goto_6166_12 > 65535: 1 else: 0) != 0:
                                                 ((unsafe: *errorcodeptr) = ERR61)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (cb.erroroffset = (offset +% i))
+                                                (cb.erroroffset = (offset__goto_6107_12 +% i__goto_6676_16))
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 return 0
@@ -5731,18 +5985,18 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (i = i + 1)
+                                            (i__goto_6676_16 = i__goto_6676_16 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if meta != 2148794368: 1 else: 0) != 0 or (if groupnumber > cb.bracount: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if meta__goto_6101_10 != 2148794368: 1 else: 0) != 0 or (if groupnumber__goto_6166_12 > cb.bracount: 1 else: 0) != 0: 1 else: 0) != 0:
                                         ((unsafe: *errorcodeptr) = ERR15)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cb.erroroffset = offset)
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -5750,38 +6004,14 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if groupnumber == 0: 1 else: 0) != 0:
-                                        (groupnumber = 65535)
+                                    if (if groupnumber__goto_6166_12 == 0: 1 else: 0) != 0:
+                                        (groupnumber__goto_6166_12 = 65535)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (start_pptr[1] = groupnumber)
+                                    (start_pptr__goto_6679_17[1] = groupnumber__goto_6166_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (skipunits = 3)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    __pc = 3
-                                    __goto_pending = 1
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                                if (if meta == 2148794368: 1 else: 0) != 0:
-                                    (meta = (2148597760 as c_uint))
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                                if (if ((ng.hash_dup & 32768)) == 0: 1 else: 0) != 0:
-                                    if (if ng.number > cb.top_backref: 1 else: 0) != 0:
-                                        (cb.top_backref = ng.number)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    (start_pptr[0] = meta)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    (start_pptr[1] = ng.number)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    (skipunits = 3)
+                                    (skipunits__goto_6164_12 = 3)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 3
@@ -5790,37 +6020,48 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (start_pptr[0] = (meta | 1))
+                                if (if meta__goto_6101_10 == 2148794368: 1 else: 0) != 0:
+                                    (meta__goto_6101_10 = (2148597760 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (skipunits = 5)
+                                if (if ((ng__goto_6678_20.hash_dup & 32768)) == 0: 1 else: 0) != 0:
+                                    if (if ng__goto_6678_20.number > cb.top_backref: 1 else: 0) != 0:
+                                        (cb.top_backref = ng__goto_6678_20.number)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (start_pptr__goto_6679_17[0] = meta__goto_6101_10)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (start_pptr__goto_6679_17[1] = ng__goto_6678_20.number)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (skipunits__goto_6164_12 = 3)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    __pc = 3
+                                    __goto_pending = 1
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (start_pptr__goto_6679_17[0] = (meta__goto_6101_10 | 1))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (start_pptr__goto_6679_17[1] = ((((ng__goto_6678_20 as usize -% cb.named_groups as usize) / sizeof[named_group_8]())) as c_uint))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (skipunits__goto_6164_12 = 5)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if (if meta == 2148794368: 1 else: 0) != 0:
-                                    (code[(1 + 2)] = 149)
+                                if (if meta__goto_6101_10 == 2148794368: 1 else: 0) != 0:
+                                    (code__goto_6109_14[(1 + 2)] = 149)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (skipunits = 3)
+                                    (skipunits__goto_6164_12 = 3)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    pptr = pptr + (1 + 2)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    __pc = 3
-                                    __goto_pending = 1
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                                if (if meta_arg == 0: 1 else: 0) != 0:
-                                    (code[(1 + 2)] = (if ((if meta == 2148728832: 1 else: 0)) != 0: OP_RREF else: OP_CREF))
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    (skipunits = 3)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    pptr = pptr + (1 + 2)
+                                    pptr__goto_6100_11 = pptr__goto_6100_11 + (1 + 2)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 3
@@ -5829,92 +6070,108 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (ng = (cb.named_groups + pptr[1]))
+                                if (if meta_arg__goto_6101_16 == 0: 1 else: 0) != 0:
+                                    (code__goto_6109_14[(1 + 2)] = (if ((if meta__goto_6101_10 == 2148728832: 1 else: 0)) != 0: OP_RREF else: OP_CREF))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (skipunits__goto_6164_12 = 3)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    pptr__goto_6100_11 = pptr__goto_6100_11 + (1 + 2)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    __pc = 3
+                                    __goto_pending = 1
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (count = 0)
+                                (ng__goto_6764_20 = (cb.named_groups + pptr__goto_6100_11[1]))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (index = 0)
+                                (count__goto_6763_11 = 0)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if _pcre2_compile_find_dupname_details8(ng.name, ng.length, (&mut index as *mut c_int), (&mut count as *mut c_int), errorcodeptr, cb) != 0: 0 else: 1) != 0:
+                                (index__goto_6763_18 = 0)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if _pcre2_compile_find_dupname_details8(ng__goto_6764_20.name, ng__goto_6764_20.length, (&mut index__goto_6763_18 as *mut c_int), (&mut count__goto_6763_11 as *mut c_int), errorcodeptr, cb) != 0: 0 else: 1) != 0:
                                     return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (code[(1 + 2)] = (if ((if meta == 2148728832: 1 else: 0)) != 0: OP_DNRREF else: OP_DNCREF))
+                                (code__goto_6109_14[(1 + 2)] = (if ((if meta__goto_6101_10 == 2148728832: 1 else: 0)) != 0: OP_DNRREF else: OP_DNCREF))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (skipunits = 5)
+                                (skipunits__goto_6164_12 = 5)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                pptr = pptr + (1 + 2)
+                                pptr__goto_6100_11 = pptr__goto_6100_11 + (1 + 2)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_COND)
-                            pptr = pptr + 2
+                            (bravalue__goto_6090_5 = OP_COND)
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
-                            (code[(1 + 2)] = 170)
-                            (skipunits = 1)
+                            (code__goto_6109_14[(1 + 2)] = 170)
+                            (skipunits__goto_6164_12 = 1)
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_COND)
-                            pptr = pptr + 2
+                            (bravalue__goto_6090_5 = OP_COND)
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
-                            (groupnumber = (unsafe: *((pptr = pptr + 1))))
-                            if (if groupnumber > cb.bracount: 1 else: 0) != 0:
+                            (groupnumber__goto_6166_12 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
+                            if (if groupnumber__goto_6166_12 > cb.bracount: 1 else: 0) != 0:
                                 ((unsafe: *errorcodeptr) = ERR15)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (cb.erroroffset = offset)
+                                (cb.erroroffset = offset__goto_6107_12)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if groupnumber > cb.top_backref: 1 else: 0) != 0:
-                                (cb.top_backref = groupnumber)
-                            offset = offset - 2
-                            (code[(1 + 2)] = 147)
-                            (skipunits = 3)
+                            if (if groupnumber__goto_6166_12 > cb.top_backref: 1 else: 0) != 0:
+                                (cb.top_backref = groupnumber__goto_6166_12)
+                            offset__goto_6107_12 = offset__goto_6107_12 - 2
+                            (code__goto_6109_14[(1 + 2)] = 147)
+                            (skipunits__goto_6164_12 = 3)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_COND)
-                            if (if pptr[1] > 0: 1 else: 0) != 0:
-                                (code[(1 + 2)] = (if ((if ((if 10 > pptr[2]: 1 else: 0)) != 0 or ((if (if 10 == pptr[2]: 1 else: 0) != 0 and (if 48 >= pptr[3]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
+                            (bravalue__goto_6090_5 = OP_COND)
+                            if (if pptr__goto_6100_11[1] > 0: 1 else: 0) != 0:
+                                (code__goto_6109_14[(1 + 2)] = (if ((if ((if 10 > pptr__goto_6100_11[2]: 1 else: 0)) != 0 or ((if (if 10 == pptr__goto_6100_11[2]: 1 else: 0) != 0 and (if 48 >= pptr__goto_6100_11[3]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
                             else:
-                                (code[(1 + 2)] = (if ((if (if 10 == pptr[2]: 1 else: 0) != 0 and (if 48 == pptr[3]: 1 else: 0) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
-                            (skipunits = 1)
-                            pptr = pptr + 3
+                                (code__goto_6109_14[(1 + 2)] = (if ((if (if 10 == pptr__goto_6100_11[2]: 1 else: 0) != 0 and (if 48 == pptr__goto_6100_11[3]: 1 else: 0) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
+                            (skipunits__goto_6164_12 = 1)
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 3
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_COND)
+                            (bravalue__goto_6090_5 = OP_COND)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT)
+                            (bravalue__goto_6090_5 = OP_ASSERT)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT_NA)
+                            (bravalue__goto_6090_5 = OP_ASSERT_NA)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            if (if (if pptr[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr[2] < 2151153664: 1 else: 0) != 0 or (if pptr[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                (unsafe: *code = 165)
-                                (code = code + 1)
+                            if (if (if pptr__goto_6100_11[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr__goto_6100_11[2] < 2151153664: 1 else: 0) != 0 or (if pptr__goto_6100_11[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                (unsafe: *code__goto_6109_14 = 165)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (pptr = pptr + 1)
+                                (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (bravalue = OP_ASSERT_NOT)
+                                (bravalue__goto_6090_5 = OP_ASSERT_NOT)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 cb.assert_depth = cb.assert_depth + 1
@@ -5926,13 +6183,13 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                         2148794368 =>
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                start_pptr = pptr
+                                start_pptr__goto_6679_17 = pptr__goto_6100_11
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                length = (unsafe: *((pptr = pptr + 1)))
+                                length__goto_6680_16 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1)))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                pptr = pptr + 2
+                                pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -5940,27 +6197,26 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (name = (cb.start_pattern + offset))
+                                (name__goto_6677_18 = (cb.start_pattern + offset__goto_6107_12))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (ng = _pcre2_compile_find_named_group8(name, length, cb))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if ng == (null as *mut named_group_8): 1 else: 0) != 0:
-                                    (groupnumber = 0)
+                                if (if ng__goto_6678_20 == (null as *mut named_group_8): 1 else: 0) != 0:
+                                    (groupnumber__goto_6166_12 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if meta == 2148794368: 1 else: 0) != 0:
-                                        (i = 1)
-                                        while (if i < length: 1 else: 0) != 0:
-                                            (groupnumber = ((groupnumber *% 10) +% ((name[i] - 48))))
+                                    if (if meta__goto_6101_10 == 2148794368: 1 else: 0) != 0:
+                                        (i__goto_6676_16 = 1)
+                                        while (if i__goto_6676_16 < length__goto_6680_16: 1 else: 0) != 0:
+                                            (groupnumber__goto_6166_12 = ((groupnumber__goto_6166_12 *% 10) +% ((name__goto_6677_18[i__goto_6676_16] - 48))))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if groupnumber > 65535: 1 else: 0) != 0:
+                                            if (if groupnumber__goto_6166_12 > 65535: 1 else: 0) != 0:
                                                 ((unsafe: *errorcodeptr) = ERR61)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
-                                                (cb.erroroffset = (offset +% i))
+                                                (cb.erroroffset = (offset__goto_6107_12 +% i__goto_6676_16))
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                                 return 0
@@ -5968,18 +6224,18 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (i = i + 1)
+                                            (i__goto_6676_16 = i__goto_6676_16 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if meta != 2148794368: 1 else: 0) != 0 or (if groupnumber > cb.bracount: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if meta__goto_6101_10 != 2148794368: 1 else: 0) != 0 or (if groupnumber__goto_6166_12 > cb.bracount: 1 else: 0) != 0: 1 else: 0) != 0:
                                         ((unsafe: *errorcodeptr) = ERR15)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (cb.erroroffset = offset)
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
@@ -5987,38 +6243,14 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if groupnumber == 0: 1 else: 0) != 0:
-                                        (groupnumber = 65535)
+                                    if (if groupnumber__goto_6166_12 == 0: 1 else: 0) != 0:
+                                        (groupnumber__goto_6166_12 = 65535)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (start_pptr[1] = groupnumber)
+                                    (start_pptr__goto_6679_17[1] = groupnumber__goto_6166_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (skipunits = 3)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    __pc = 3
-                                    __goto_pending = 1
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                                if (if meta == 2148794368: 1 else: 0) != 0:
-                                    (meta = (2148597760 as c_uint))
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                                if (if ((ng.hash_dup & 32768)) == 0: 1 else: 0) != 0:
-                                    if (if ng.number > cb.top_backref: 1 else: 0) != 0:
-                                        (cb.top_backref = ng.number)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    (start_pptr[0] = meta)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    (start_pptr[1] = ng.number)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    (skipunits = 3)
+                                    (skipunits__goto_6164_12 = 3)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 3
@@ -6027,37 +6259,48 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (start_pptr[0] = (meta | 1))
+                                if (if meta__goto_6101_10 == 2148794368: 1 else: 0) != 0:
+                                    (meta__goto_6101_10 = (2148597760 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (skipunits = 5)
+                                if (if ((ng__goto_6678_20.hash_dup & 32768)) == 0: 1 else: 0) != 0:
+                                    if (if ng__goto_6678_20.number > cb.top_backref: 1 else: 0) != 0:
+                                        (cb.top_backref = ng__goto_6678_20.number)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (start_pptr__goto_6679_17[0] = meta__goto_6101_10)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (start_pptr__goto_6679_17[1] = ng__goto_6678_20.number)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (skipunits__goto_6164_12 = 3)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    __pc = 3
+                                    __goto_pending = 1
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (start_pptr__goto_6679_17[0] = (meta__goto_6101_10 | 1))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (start_pptr__goto_6679_17[1] = ((((ng__goto_6678_20 as usize -% cb.named_groups as usize) / sizeof[named_group_8]())) as c_uint))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (skipunits__goto_6164_12 = 5)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if (if meta == 2148794368: 1 else: 0) != 0:
-                                    (code[(1 + 2)] = 149)
+                                if (if meta__goto_6101_10 == 2148794368: 1 else: 0) != 0:
+                                    (code__goto_6109_14[(1 + 2)] = 149)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (skipunits = 3)
+                                    (skipunits__goto_6164_12 = 3)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    pptr = pptr + (1 + 2)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    __pc = 3
-                                    __goto_pending = 1
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                                if (if meta_arg == 0: 1 else: 0) != 0:
-                                    (code[(1 + 2)] = (if ((if meta == 2148728832: 1 else: 0)) != 0: OP_RREF else: OP_CREF))
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    (skipunits = 3)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    pptr = pptr + (1 + 2)
+                                    pptr__goto_6100_11 = pptr__goto_6100_11 + (1 + 2)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 3
@@ -6066,92 +6309,108 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (ng = (cb.named_groups + pptr[1]))
+                                if (if meta_arg__goto_6101_16 == 0: 1 else: 0) != 0:
+                                    (code__goto_6109_14[(1 + 2)] = (if ((if meta__goto_6101_10 == 2148728832: 1 else: 0)) != 0: OP_RREF else: OP_CREF))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (skipunits__goto_6164_12 = 3)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    pptr__goto_6100_11 = pptr__goto_6100_11 + (1 + 2)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    __pc = 3
+                                    __goto_pending = 1
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (count = 0)
+                                (ng__goto_6764_20 = (cb.named_groups + pptr__goto_6100_11[1]))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (index = 0)
+                                (count__goto_6763_11 = 0)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if _pcre2_compile_find_dupname_details8(ng.name, ng.length, (&mut index as *mut c_int), (&mut count as *mut c_int), errorcodeptr, cb) != 0: 0 else: 1) != 0:
+                                (index__goto_6763_18 = 0)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if _pcre2_compile_find_dupname_details8(ng__goto_6764_20.name, ng__goto_6764_20.length, (&mut index__goto_6763_18 as *mut c_int), (&mut count__goto_6763_11 as *mut c_int), errorcodeptr, cb) != 0: 0 else: 1) != 0:
                                     return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (code[(1 + 2)] = (if ((if meta == 2148728832: 1 else: 0)) != 0: OP_DNRREF else: OP_DNCREF))
+                                (code__goto_6109_14[(1 + 2)] = (if ((if meta__goto_6101_10 == 2148728832: 1 else: 0)) != 0: OP_DNRREF else: OP_DNCREF))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (skipunits = 5)
+                                (skipunits__goto_6164_12 = 5)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                pptr = pptr + (1 + 2)
+                                pptr__goto_6100_11 = pptr__goto_6100_11 + (1 + 2)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_COND)
-                            pptr = pptr + 2
+                            (bravalue__goto_6090_5 = OP_COND)
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
-                            (code[(1 + 2)] = 170)
-                            (skipunits = 1)
+                            (code__goto_6109_14[(1 + 2)] = 170)
+                            (skipunits__goto_6164_12 = 1)
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_COND)
-                            pptr = pptr + 2
+                            (bravalue__goto_6090_5 = OP_COND)
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
-                            (groupnumber = (unsafe: *((pptr = pptr + 1))))
-                            if (if groupnumber > cb.bracount: 1 else: 0) != 0:
+                            (groupnumber__goto_6166_12 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
+                            if (if groupnumber__goto_6166_12 > cb.bracount: 1 else: 0) != 0:
                                 ((unsafe: *errorcodeptr) = ERR15)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (cb.erroroffset = offset)
+                                (cb.erroroffset = offset__goto_6107_12)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if groupnumber > cb.top_backref: 1 else: 0) != 0:
-                                (cb.top_backref = groupnumber)
-                            offset = offset - 2
-                            (code[(1 + 2)] = 147)
-                            (skipunits = 3)
+                            if (if groupnumber__goto_6166_12 > cb.top_backref: 1 else: 0) != 0:
+                                (cb.top_backref = groupnumber__goto_6166_12)
+                            offset__goto_6107_12 = offset__goto_6107_12 - 2
+                            (code__goto_6109_14[(1 + 2)] = 147)
+                            (skipunits__goto_6164_12 = 3)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_COND)
-                            if (if pptr[1] > 0: 1 else: 0) != 0:
-                                (code[(1 + 2)] = (if ((if ((if 10 > pptr[2]: 1 else: 0)) != 0 or ((if (if 10 == pptr[2]: 1 else: 0) != 0 and (if 48 >= pptr[3]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
+                            (bravalue__goto_6090_5 = OP_COND)
+                            if (if pptr__goto_6100_11[1] > 0: 1 else: 0) != 0:
+                                (code__goto_6109_14[(1 + 2)] = (if ((if ((if 10 > pptr__goto_6100_11[2]: 1 else: 0)) != 0 or ((if (if 10 == pptr__goto_6100_11[2]: 1 else: 0) != 0 and (if 48 >= pptr__goto_6100_11[3]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
                             else:
-                                (code[(1 + 2)] = (if ((if (if 10 == pptr[2]: 1 else: 0) != 0 and (if 48 == pptr[3]: 1 else: 0) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
-                            (skipunits = 1)
-                            pptr = pptr + 3
+                                (code__goto_6109_14[(1 + 2)] = (if ((if (if 10 == pptr__goto_6100_11[2]: 1 else: 0) != 0 and (if 48 == pptr__goto_6100_11[3]: 1 else: 0) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
+                            (skipunits__goto_6164_12 = 1)
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 3
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_COND)
+                            (bravalue__goto_6090_5 = OP_COND)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT)
+                            (bravalue__goto_6090_5 = OP_ASSERT)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT_NA)
+                            (bravalue__goto_6090_5 = OP_ASSERT_NA)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            if (if (if pptr[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr[2] < 2151153664: 1 else: 0) != 0 or (if pptr[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                (unsafe: *code = 165)
-                                (code = code + 1)
+                            if (if (if pptr__goto_6100_11[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr__goto_6100_11[2] < 2151153664: 1 else: 0) != 0 or (if pptr__goto_6100_11[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                (unsafe: *code__goto_6109_14 = 165)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (pptr = pptr + 1)
+                                (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (bravalue = OP_ASSERT_NOT)
+                                (bravalue__goto_6090_5 = OP_ASSERT_NOT)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 cb.assert_depth = cb.assert_depth + 1
@@ -6162,68 +6421,68 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         2148532224 =>
-                            (bravalue = OP_COND)
-                            pptr = pptr + 2
+                            (bravalue__goto_6090_5 = OP_COND)
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
-                            (code[(1 + 2)] = 170)
-                            (skipunits = 1)
+                            (code__goto_6109_14[(1 + 2)] = 170)
+                            (skipunits__goto_6164_12 = 1)
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_COND)
-                            pptr = pptr + 2
+                            (bravalue__goto_6090_5 = OP_COND)
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
-                            (groupnumber = (unsafe: *((pptr = pptr + 1))))
-                            if (if groupnumber > cb.bracount: 1 else: 0) != 0:
+                            (groupnumber__goto_6166_12 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
+                            if (if groupnumber__goto_6166_12 > cb.bracount: 1 else: 0) != 0:
                                 ((unsafe: *errorcodeptr) = ERR15)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (cb.erroroffset = offset)
+                                (cb.erroroffset = offset__goto_6107_12)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if groupnumber > cb.top_backref: 1 else: 0) != 0:
-                                (cb.top_backref = groupnumber)
-                            offset = offset - 2
-                            (code[(1 + 2)] = 147)
-                            (skipunits = 3)
+                            if (if groupnumber__goto_6166_12 > cb.top_backref: 1 else: 0) != 0:
+                                (cb.top_backref = groupnumber__goto_6166_12)
+                            offset__goto_6107_12 = offset__goto_6107_12 - 2
+                            (code__goto_6109_14[(1 + 2)] = 147)
+                            (skipunits__goto_6164_12 = 3)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_COND)
-                            if (if pptr[1] > 0: 1 else: 0) != 0:
-                                (code[(1 + 2)] = (if ((if ((if 10 > pptr[2]: 1 else: 0)) != 0 or ((if (if 10 == pptr[2]: 1 else: 0) != 0 and (if 48 >= pptr[3]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
+                            (bravalue__goto_6090_5 = OP_COND)
+                            if (if pptr__goto_6100_11[1] > 0: 1 else: 0) != 0:
+                                (code__goto_6109_14[(1 + 2)] = (if ((if ((if 10 > pptr__goto_6100_11[2]: 1 else: 0)) != 0 or ((if (if 10 == pptr__goto_6100_11[2]: 1 else: 0) != 0 and (if 48 >= pptr__goto_6100_11[3]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
                             else:
-                                (code[(1 + 2)] = (if ((if (if 10 == pptr[2]: 1 else: 0) != 0 and (if 48 == pptr[3]: 1 else: 0) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
-                            (skipunits = 1)
-                            pptr = pptr + 3
+                                (code__goto_6109_14[(1 + 2)] = (if ((if (if 10 == pptr__goto_6100_11[2]: 1 else: 0) != 0 and (if 48 == pptr__goto_6100_11[3]: 1 else: 0) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
+                            (skipunits__goto_6164_12 = 1)
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 3
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_COND)
+                            (bravalue__goto_6090_5 = OP_COND)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT)
+                            (bravalue__goto_6090_5 = OP_ASSERT)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT_NA)
+                            (bravalue__goto_6090_5 = OP_ASSERT_NA)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            if (if (if pptr[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr[2] < 2151153664: 1 else: 0) != 0 or (if pptr[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                (unsafe: *code = 165)
-                                (code = code + 1)
+                            if (if (if pptr__goto_6100_11[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr__goto_6100_11[2] < 2151153664: 1 else: 0) != 0 or (if pptr__goto_6100_11[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                (unsafe: *code__goto_6109_14 = 165)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (pptr = pptr + 1)
+                                (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (bravalue = OP_ASSERT_NOT)
+                                (bravalue__goto_6090_5 = OP_ASSERT_NOT)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 cb.assert_depth = cb.assert_depth + 1
@@ -6234,59 +6493,59 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         2148663296 =>
-                            (bravalue = OP_COND)
-                            pptr = pptr + 2
+                            (bravalue__goto_6090_5 = OP_COND)
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
-                            (groupnumber = (unsafe: *((pptr = pptr + 1))))
-                            if (if groupnumber > cb.bracount: 1 else: 0) != 0:
+                            (groupnumber__goto_6166_12 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
+                            if (if groupnumber__goto_6166_12 > cb.bracount: 1 else: 0) != 0:
                                 ((unsafe: *errorcodeptr) = ERR15)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (cb.erroroffset = offset)
+                                (cb.erroroffset = offset__goto_6107_12)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if groupnumber > cb.top_backref: 1 else: 0) != 0:
-                                (cb.top_backref = groupnumber)
-                            offset = offset - 2
-                            (code[(1 + 2)] = 147)
-                            (skipunits = 3)
+                            if (if groupnumber__goto_6166_12 > cb.top_backref: 1 else: 0) != 0:
+                                (cb.top_backref = groupnumber__goto_6166_12)
+                            offset__goto_6107_12 = offset__goto_6107_12 - 2
+                            (code__goto_6109_14[(1 + 2)] = 147)
+                            (skipunits__goto_6164_12 = 3)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_COND)
-                            if (if pptr[1] > 0: 1 else: 0) != 0:
-                                (code[(1 + 2)] = (if ((if ((if 10 > pptr[2]: 1 else: 0)) != 0 or ((if (if 10 == pptr[2]: 1 else: 0) != 0 and (if 48 >= pptr[3]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
+                            (bravalue__goto_6090_5 = OP_COND)
+                            if (if pptr__goto_6100_11[1] > 0: 1 else: 0) != 0:
+                                (code__goto_6109_14[(1 + 2)] = (if ((if ((if 10 > pptr__goto_6100_11[2]: 1 else: 0)) != 0 or ((if (if 10 == pptr__goto_6100_11[2]: 1 else: 0) != 0 and (if 48 >= pptr__goto_6100_11[3]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
                             else:
-                                (code[(1 + 2)] = (if ((if (if 10 == pptr[2]: 1 else: 0) != 0 and (if 48 == pptr[3]: 1 else: 0) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
-                            (skipunits = 1)
-                            pptr = pptr + 3
+                                (code__goto_6109_14[(1 + 2)] = (if ((if (if 10 == pptr__goto_6100_11[2]: 1 else: 0) != 0 and (if 48 == pptr__goto_6100_11[3]: 1 else: 0) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
+                            (skipunits__goto_6164_12 = 1)
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 3
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_COND)
+                            (bravalue__goto_6090_5 = OP_COND)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT)
+                            (bravalue__goto_6090_5 = OP_ASSERT)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT_NA)
+                            (bravalue__goto_6090_5 = OP_ASSERT_NA)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            if (if (if pptr[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr[2] < 2151153664: 1 else: 0) != 0 or (if pptr[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                (unsafe: *code = 165)
-                                (code = code + 1)
+                            if (if (if pptr__goto_6100_11[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr__goto_6100_11[2] < 2151153664: 1 else: 0) != 0 or (if pptr__goto_6100_11[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                (unsafe: *code__goto_6109_14 = 165)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (pptr = pptr + 1)
+                                (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (bravalue = OP_ASSERT_NOT)
+                                (bravalue__goto_6090_5 = OP_ASSERT_NOT)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 cb.assert_depth = cb.assert_depth + 1
@@ -6297,36 +6556,36 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         2148859904 =>
-                            (bravalue = OP_COND)
-                            if (if pptr[1] > 0: 1 else: 0) != 0:
-                                (code[(1 + 2)] = (if ((if ((if 10 > pptr[2]: 1 else: 0)) != 0 or ((if (if 10 == pptr[2]: 1 else: 0) != 0 and (if 48 >= pptr[3]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
+                            (bravalue__goto_6090_5 = OP_COND)
+                            if (if pptr__goto_6100_11[1] > 0: 1 else: 0) != 0:
+                                (code__goto_6109_14[(1 + 2)] = (if ((if ((if 10 > pptr__goto_6100_11[2]: 1 else: 0)) != 0 or ((if (if 10 == pptr__goto_6100_11[2]: 1 else: 0) != 0 and (if 48 >= pptr__goto_6100_11[3]: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
                             else:
-                                (code[(1 + 2)] = (if ((if (if 10 == pptr[2]: 1 else: 0) != 0 and (if 48 == pptr[3]: 1 else: 0) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
-                            (skipunits = 1)
-                            pptr = pptr + 3
+                                (code__goto_6109_14[(1 + 2)] = (if ((if (if 10 == pptr__goto_6100_11[2]: 1 else: 0) != 0 and (if 48 == pptr__goto_6100_11[3]: 1 else: 0) != 0: 1 else: 0)) != 0: OP_TRUE else: OP_FALSE))
+                            (skipunits__goto_6164_12 = 1)
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 3
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_COND)
+                            (bravalue__goto_6090_5 = OP_COND)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT)
+                            (bravalue__goto_6090_5 = OP_ASSERT)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT_NA)
+                            (bravalue__goto_6090_5 = OP_ASSERT_NA)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            if (if (if pptr[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr[2] < 2151153664: 1 else: 0) != 0 or (if pptr[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                (unsafe: *code = 165)
-                                (code = code + 1)
+                            if (if (if pptr__goto_6100_11[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr__goto_6100_11[2] < 2151153664: 1 else: 0) != 0 or (if pptr__goto_6100_11[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                (unsafe: *code__goto_6109_14 = 165)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (pptr = pptr + 1)
+                                (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (bravalue = OP_ASSERT_NOT)
+                                (bravalue__goto_6090_5 = OP_ASSERT_NOT)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 cb.assert_depth = cb.assert_depth + 1
@@ -6337,27 +6596,27 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         2148466688 =>
-                            (bravalue = OP_COND)
+                            (bravalue__goto_6090_5 = OP_COND)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT)
+                            (bravalue__goto_6090_5 = OP_ASSERT)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT_NA)
+                            (bravalue__goto_6090_5 = OP_ASSERT_NA)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            if (if (if pptr[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr[2] < 2151153664: 1 else: 0) != 0 or (if pptr[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                (unsafe: *code = 165)
-                                (code = code + 1)
+                            if (if (if pptr__goto_6100_11[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr__goto_6100_11[2] < 2151153664: 1 else: 0) != 0 or (if pptr__goto_6100_11[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                (unsafe: *code__goto_6109_14 = 165)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (pptr = pptr + 1)
+                                (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (bravalue = OP_ASSERT_NOT)
+                                (bravalue__goto_6090_5 = OP_ASSERT_NOT)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 cb.assert_depth = cb.assert_depth + 1
@@ -6368,24 +6627,24 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         2150039552 =>
-                            (bravalue = OP_ASSERT)
+                            (bravalue__goto_6090_5 = OP_ASSERT)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ASSERT_NA)
+                            (bravalue__goto_6090_5 = OP_ASSERT_NA)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            if (if (if pptr[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr[2] < 2151153664: 1 else: 0) != 0 or (if pptr[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                (unsafe: *code = 165)
-                                (code = code + 1)
+                            if (if (if pptr__goto_6100_11[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr__goto_6100_11[2] < 2151153664: 1 else: 0) != 0 or (if pptr__goto_6100_11[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                (unsafe: *code__goto_6109_14 = 165)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (pptr = pptr + 1)
+                                (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (bravalue = OP_ASSERT_NOT)
+                                (bravalue__goto_6090_5 = OP_ASSERT_NOT)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 cb.assert_depth = cb.assert_depth + 1
@@ -6396,20 +6655,20 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         2150301696 =>
-                            (bravalue = OP_ASSERT_NA)
+                            (bravalue__goto_6090_5 = OP_ASSERT_NA)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            if (if (if pptr[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr[2] < 2151153664: 1 else: 0) != 0 or (if pptr[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                (unsafe: *code = 165)
-                                (code = code + 1)
+                            if (if (if pptr__goto_6100_11[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr__goto_6100_11[2] < 2151153664: 1 else: 0) != 0 or (if pptr__goto_6100_11[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                (unsafe: *code__goto_6109_14 = 165)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (pptr = pptr + 1)
+                                (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (bravalue = OP_ASSERT_NOT)
+                                (bravalue__goto_6090_5 = OP_ASSERT_NOT)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 cb.assert_depth = cb.assert_depth + 1
@@ -6420,16 +6679,16 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         2150105088 =>
-                            if (if (if pptr[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr[2] < 2151153664: 1 else: 0) != 0 or (if pptr[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                (unsafe: *code = 165)
-                                (code = code + 1)
+                            if (if (if pptr__goto_6100_11[1] == 2149384192: 1 else: 0) != 0 and ((if (if pptr__goto_6100_11[2] < 2151153664: 1 else: 0) != 0 or (if pptr__goto_6100_11[2] > 2151874560: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                (unsafe: *code__goto_6109_14 = 165)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (pptr = pptr + 1)
+                                (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (bravalue = OP_ASSERT_NOT)
+                                (bravalue__goto_6090_5 = OP_ASSERT_NOT)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 cb.assert_depth = cb.assert_depth + 1
@@ -6440,59 +6699,59 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         2150170624 =>
-                            (bravalue = OP_ASSERTBACK)
+                            (bravalue__goto_6090_5 = OP_ASSERTBACK)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ASSERTBACK_NOT)
+                            (bravalue__goto_6090_5 = OP_ASSERTBACK_NOT)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ASSERTBACK_NA)
+                            (bravalue__goto_6090_5 = OP_ASSERTBACK_NA)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ONCE)
+                            (bravalue__goto_6090_5 = OP_ONCE)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_SCRIPT_RUN)
+                            (bravalue__goto_6090_5 = OP_SCRIPT_RUN)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_BRA)
-                            (note_group_empty = 1)
+                            (bravalue__goto_6090_5 = OP_BRA)
+                            (note_group_empty__goto_6162_8 = 1)
                             cb.parens_depth = cb.parens_depth + 1
-                            ((unsafe: *code) = bravalue)
-                            (pptr = pptr + 1)
-                            (tempcode = code)
-                            (tempreqvary = cb.req_varyopt)
-                            (length_prevgroup = 0)
-                            if (if ((group_return = compile_regex(options, xoptions, (&mut tempcode as *mut *mut u8), (&mut pptr as *mut *mut c_uint), errorcodeptr, skipunits, (&mut subfirstcu as *mut c_uint), (&mut subfirstcuflags as *mut c_uint), (&mut subreqcu as *mut c_uint), (&mut subreqcuflags as *mut c_uint), bcptr, open_caps, cb, (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: (null as *mut c_ulong) else: (&mut length_prevgroup as *mut c_ulong))))) == 0: 1 else: 0) != 0:
+                            ((unsafe: *code__goto_6109_14) = bravalue__goto_6090_5)
+                            (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
+                            (tempcode__goto_6112_14 = code__goto_6109_14)
+                            (tempreqvary__goto_6104_32 = cb.req_varyopt)
+                            (length_prevgroup__goto_6108_12 = 0)
+                            if (if ((group_return__goto_6092_5 = compile_regex(options__goto_6096_10, xoptions__goto_6097_10, (&mut tempcode__goto_6112_14 as *mut *mut u8), (&mut pptr__goto_6100_11 as *mut *mut c_uint), errorcodeptr, skipunits__goto_6164_12, (&mut subfirstcu__goto_6165_22 as *mut c_uint), (&mut subfirstcuflags__goto_6168_27 as *mut c_uint), (&mut subreqcu__goto_6165_12 as *mut c_uint), (&mut subreqcuflags__goto_6168_12 as *mut c_uint), bcptr, open_caps, cb, (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: (null as *mut c_ulong) else: (&mut length_prevgroup__goto_6108_12 as *mut c_ulong))))) == 0: 1 else: 0) != 0:
                                 return 0
                             cb.parens_depth = cb.parens_depth - 1
-                            if (if (if note_group_empty != 0 and (if bravalue != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0 and (if group_return > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (matched_char = 1)
-                            if (if (if bravalue >= OP_ASSERT: 1 else: 0) != 0 and (if bravalue <= OP_ASSERT_SCS: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if note_group_empty__goto_6162_8 != 0 and (if bravalue__goto_6090_5 != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0 and (if group_return__goto_6092_5 > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (matched_char__goto_6117_6 = 1)
+                            if (if (if bravalue__goto_6090_5 >= OP_ASSERT: 1 else: 0) != 0 and (if bravalue__goto_6090_5 <= OP_ASSERT_SCS: 1 else: 0) != 0: 1 else: 0) != 0:
                                 cb.assert_depth = cb.assert_depth - 1
-                            if (if (if bravalue == OP_COND: 1 else: 0) != 0 and (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
-                                tc = code
+                            if (if (if bravalue__goto_6090_5 == OP_COND: 1 else: 0) != 0 and (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+                                tc__goto_6989_20 = code__goto_6109_14
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                condcount = 0
+                                condcount__goto_6990_11 = 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 while true:
-                                    (condcount = condcount + 1)
+                                    (condcount__goto_6990_11 = condcount__goto_6990_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if not ((if (unsafe: *tc) != OP_KET: 1 else: 0) != 0):
+                                    if not ((if (unsafe: *tc__goto_6989_20) != OP_KET: 1 else: 0) != 0):
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if code[(2 + 1)] == OP_DEFINE: 1 else: 0) != 0:
-                                    if (if condcount > 1: 1 else: 0) != 0:
-                                        (cb.erroroffset = offset)
+                                if (if code__goto_6109_14[(2 + 1)] == OP_DEFINE: 1 else: 0) != 0:
+                                    if (if condcount__goto_6990_11 > 1: 1 else: 0) != 0:
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         ((unsafe: *errorcodeptr) = ERR54)
@@ -6503,15 +6762,15 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (code[(2 + 1)] = 151)
+                                    (code__goto_6109_14[(2 + 1)] = 151)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (bravalue = OP_DEFINE)
+                                    (bravalue__goto_6090_5 = OP_DEFINE)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if condcount > 2: 1 else: 0) != 0:
-                                        (cb.erroroffset = offset)
+                                    if (if condcount__goto_6990_11 > 2: 1 else: 0) != 0:
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         ((unsafe: *errorcodeptr) = ERR27)
@@ -6522,18 +6781,18 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if condcount == 1: 1 else: 0) != 0:
-                                        (subreqcuflags = (4294967294 as c_uint))
-                                        (subfirstcuflags = subreqcuflags)
+                                    if (if condcount__goto_6990_11 == 1: 1 else: 0) != 0:
+                                        (subreqcuflags__goto_6168_12 = (4294967294 as c_uint))
+                                        (subfirstcuflags__goto_6168_27 = subreqcuflags__goto_6168_12)
                                     else:
-                                        if (if group_return > 0: 1 else: 0) != 0:
-                                            (matched_char = 1)
+                                        if (if group_return__goto_6092_5 > 0: 1 else: 0) != 0:
+                                            (matched_char__goto_6117_6 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
+                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup__goto_6108_12 -% 2) -% 4): 1 else: 0) != 0:
                                     ((unsafe: *errorcodeptr) = ERR20)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -6542,123 +6801,123 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup -% 2) -% 4)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup__goto_6108_12 -% 2) -% 4)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (code = code + 1)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *code = 122)
-                                (code = code + 1)
+                                (unsafe: *code__goto_6109_14 = 122)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (code = tempcode)
-                            if (if bravalue == OP_DEFINE: 1 else: 0) != 0:
+                            (code__goto_6109_14 = tempcode__goto_6112_14)
+                            if (if bravalue__goto_6090_5 == OP_DEFINE: 1 else: 0) != 0:
                                 break
-                            (zeroreqcu = reqcu)
-                            (zeroreqcuflags = reqcuflags)
-                            (zerofirstcu = firstcu)
-                            (zerofirstcuflags = firstcuflags)
-                            (groupsetfirstcu = 0)
-                            if (if bravalue >= OP_ONCE: 1 else: 0) != 0:
-                                if (if (if firstcuflags == 4294967295: 1 else: 0) != 0 and (if subfirstcuflags != 4294967295: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    if (if subfirstcuflags < 4294967294: 1 else: 0) != 0:
-                                        (firstcu = subfirstcu)
+                            (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
+                            (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
+                            (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
+                            (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
+                            (groupsetfirstcu__goto_6115_6 = 0)
+                            if (if bravalue__goto_6090_5 >= OP_ONCE: 1 else: 0) != 0:
+                                if (if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0 and (if subfirstcuflags__goto_6168_27 != 4294967295: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0:
+                                        (firstcu__goto_6098_10 = subfirstcu__goto_6165_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (firstcuflags = subfirstcuflags)
+                                        (firstcuflags__goto_6102_10 = subfirstcuflags__goto_6168_27)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (groupsetfirstcu = 1)
+                                        (groupsetfirstcu__goto_6115_6 = 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (firstcuflags = (4294967294 as c_uint))
+                                        (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (zerofirstcuflags = (4294967294 as c_uint))
+                                    (zerofirstcuflags__goto_6103_26 = (4294967294 as c_uint))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if (if subfirstcuflags < 4294967294: 1 else: 0) != 0 and (if subreqcuflags >= 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (subreqcu = subfirstcu)
+                                    if (if (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0 and (if subreqcuflags__goto_6168_12 >= 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (subreqcu__goto_6165_12 = subfirstcu__goto_6165_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (subreqcuflags = (subfirstcuflags | tempreqvary))
+                                        (subreqcuflags__goto_6168_12 = (subfirstcuflags__goto_6168_27 | tempreqvary__goto_6104_32))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if subreqcuflags < 4294967294: 1 else: 0) != 0:
-                                    (reqcu = subreqcu)
+                                if (if subreqcuflags__goto_6168_12 < 4294967294: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = subreqcu__goto_6165_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = subreqcuflags)
+                                    (reqcuflags__goto_6102_24 = subreqcuflags__goto_6168_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if (if (if ((if (if bravalue == OP_ASSERT: 1 else: 0) != 0 or (if bravalue == OP_ASSERT_NA: 1 else: 0) != 0: 1 else: 0)) != 0 and (if subreqcuflags < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0 and (if subfirstcuflags < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (reqcu = subreqcu)
+                                if (if (if ((if (if bravalue__goto_6090_5 == OP_ASSERT: 1 else: 0) != 0 or (if bravalue__goto_6090_5 == OP_ASSERT_NA: 1 else: 0) != 0: 1 else: 0)) != 0 and (if subreqcuflags__goto_6168_12 < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0 and (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = subreqcu__goto_6165_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = subreqcuflags)
+                                    (reqcuflags__goto_6102_24 = subreqcuflags__goto_6168_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                         2150236160 =>
-                            (bravalue = OP_ASSERTBACK_NOT)
+                            (bravalue__goto_6090_5 = OP_ASSERTBACK_NOT)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ASSERTBACK_NA)
+                            (bravalue__goto_6090_5 = OP_ASSERTBACK_NA)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ONCE)
+                            (bravalue__goto_6090_5 = OP_ONCE)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_SCRIPT_RUN)
+                            (bravalue__goto_6090_5 = OP_SCRIPT_RUN)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_BRA)
-                            (note_group_empty = 1)
+                            (bravalue__goto_6090_5 = OP_BRA)
+                            (note_group_empty__goto_6162_8 = 1)
                             cb.parens_depth = cb.parens_depth + 1
-                            ((unsafe: *code) = bravalue)
-                            (pptr = pptr + 1)
-                            (tempcode = code)
-                            (tempreqvary = cb.req_varyopt)
-                            (length_prevgroup = 0)
-                            if (if ((group_return = compile_regex(options, xoptions, (&mut tempcode as *mut *mut u8), (&mut pptr as *mut *mut c_uint), errorcodeptr, skipunits, (&mut subfirstcu as *mut c_uint), (&mut subfirstcuflags as *mut c_uint), (&mut subreqcu as *mut c_uint), (&mut subreqcuflags as *mut c_uint), bcptr, open_caps, cb, (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: (null as *mut c_ulong) else: (&mut length_prevgroup as *mut c_ulong))))) == 0: 1 else: 0) != 0:
+                            ((unsafe: *code__goto_6109_14) = bravalue__goto_6090_5)
+                            (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
+                            (tempcode__goto_6112_14 = code__goto_6109_14)
+                            (tempreqvary__goto_6104_32 = cb.req_varyopt)
+                            (length_prevgroup__goto_6108_12 = 0)
+                            if (if ((group_return__goto_6092_5 = compile_regex(options__goto_6096_10, xoptions__goto_6097_10, (&mut tempcode__goto_6112_14 as *mut *mut u8), (&mut pptr__goto_6100_11 as *mut *mut c_uint), errorcodeptr, skipunits__goto_6164_12, (&mut subfirstcu__goto_6165_22 as *mut c_uint), (&mut subfirstcuflags__goto_6168_27 as *mut c_uint), (&mut subreqcu__goto_6165_12 as *mut c_uint), (&mut subreqcuflags__goto_6168_12 as *mut c_uint), bcptr, open_caps, cb, (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: (null as *mut c_ulong) else: (&mut length_prevgroup__goto_6108_12 as *mut c_ulong))))) == 0: 1 else: 0) != 0:
                                 return 0
                             cb.parens_depth = cb.parens_depth - 1
-                            if (if (if note_group_empty != 0 and (if bravalue != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0 and (if group_return > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (matched_char = 1)
-                            if (if (if bravalue >= OP_ASSERT: 1 else: 0) != 0 and (if bravalue <= OP_ASSERT_SCS: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if note_group_empty__goto_6162_8 != 0 and (if bravalue__goto_6090_5 != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0 and (if group_return__goto_6092_5 > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (matched_char__goto_6117_6 = 1)
+                            if (if (if bravalue__goto_6090_5 >= OP_ASSERT: 1 else: 0) != 0 and (if bravalue__goto_6090_5 <= OP_ASSERT_SCS: 1 else: 0) != 0: 1 else: 0) != 0:
                                 cb.assert_depth = cb.assert_depth - 1
-                            if (if (if bravalue == OP_COND: 1 else: 0) != 0 and (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
-                                tc = code
+                            if (if (if bravalue__goto_6090_5 == OP_COND: 1 else: 0) != 0 and (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+                                tc__goto_6989_20 = code__goto_6109_14
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                condcount = 0
+                                condcount__goto_6990_11 = 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 while true:
-                                    (condcount = condcount + 1)
+                                    (condcount__goto_6990_11 = condcount__goto_6990_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if not ((if (unsafe: *tc) != OP_KET: 1 else: 0) != 0):
+                                    if not ((if (unsafe: *tc__goto_6989_20) != OP_KET: 1 else: 0) != 0):
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if code[(2 + 1)] == OP_DEFINE: 1 else: 0) != 0:
-                                    if (if condcount > 1: 1 else: 0) != 0:
-                                        (cb.erroroffset = offset)
+                                if (if code__goto_6109_14[(2 + 1)] == OP_DEFINE: 1 else: 0) != 0:
+                                    if (if condcount__goto_6990_11 > 1: 1 else: 0) != 0:
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         ((unsafe: *errorcodeptr) = ERR54)
@@ -6669,15 +6928,15 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (code[(2 + 1)] = 151)
+                                    (code__goto_6109_14[(2 + 1)] = 151)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (bravalue = OP_DEFINE)
+                                    (bravalue__goto_6090_5 = OP_DEFINE)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if condcount > 2: 1 else: 0) != 0:
-                                        (cb.erroroffset = offset)
+                                    if (if condcount__goto_6990_11 > 2: 1 else: 0) != 0:
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         ((unsafe: *errorcodeptr) = ERR27)
@@ -6688,18 +6947,18 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if condcount == 1: 1 else: 0) != 0:
-                                        (subreqcuflags = (4294967294 as c_uint))
-                                        (subfirstcuflags = subreqcuflags)
+                                    if (if condcount__goto_6990_11 == 1: 1 else: 0) != 0:
+                                        (subreqcuflags__goto_6168_12 = (4294967294 as c_uint))
+                                        (subfirstcuflags__goto_6168_27 = subreqcuflags__goto_6168_12)
                                     else:
-                                        if (if group_return > 0: 1 else: 0) != 0:
-                                            (matched_char = 1)
+                                        if (if group_return__goto_6092_5 > 0: 1 else: 0) != 0:
+                                            (matched_char__goto_6117_6 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
+                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup__goto_6108_12 -% 2) -% 4): 1 else: 0) != 0:
                                     ((unsafe: *errorcodeptr) = ERR20)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -6708,119 +6967,119 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup -% 2) -% 4)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup__goto_6108_12 -% 2) -% 4)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (code = code + 1)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *code = 122)
-                                (code = code + 1)
+                                (unsafe: *code__goto_6109_14 = 122)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (code = tempcode)
-                            if (if bravalue == OP_DEFINE: 1 else: 0) != 0:
+                            (code__goto_6109_14 = tempcode__goto_6112_14)
+                            if (if bravalue__goto_6090_5 == OP_DEFINE: 1 else: 0) != 0:
                                 break
-                            (zeroreqcu = reqcu)
-                            (zeroreqcuflags = reqcuflags)
-                            (zerofirstcu = firstcu)
-                            (zerofirstcuflags = firstcuflags)
-                            (groupsetfirstcu = 0)
-                            if (if bravalue >= OP_ONCE: 1 else: 0) != 0:
-                                if (if (if firstcuflags == 4294967295: 1 else: 0) != 0 and (if subfirstcuflags != 4294967295: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    if (if subfirstcuflags < 4294967294: 1 else: 0) != 0:
-                                        (firstcu = subfirstcu)
+                            (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
+                            (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
+                            (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
+                            (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
+                            (groupsetfirstcu__goto_6115_6 = 0)
+                            if (if bravalue__goto_6090_5 >= OP_ONCE: 1 else: 0) != 0:
+                                if (if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0 and (if subfirstcuflags__goto_6168_27 != 4294967295: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0:
+                                        (firstcu__goto_6098_10 = subfirstcu__goto_6165_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (firstcuflags = subfirstcuflags)
+                                        (firstcuflags__goto_6102_10 = subfirstcuflags__goto_6168_27)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (groupsetfirstcu = 1)
+                                        (groupsetfirstcu__goto_6115_6 = 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (firstcuflags = (4294967294 as c_uint))
+                                        (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (zerofirstcuflags = (4294967294 as c_uint))
+                                    (zerofirstcuflags__goto_6103_26 = (4294967294 as c_uint))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if (if subfirstcuflags < 4294967294: 1 else: 0) != 0 and (if subreqcuflags >= 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (subreqcu = subfirstcu)
+                                    if (if (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0 and (if subreqcuflags__goto_6168_12 >= 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (subreqcu__goto_6165_12 = subfirstcu__goto_6165_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (subreqcuflags = (subfirstcuflags | tempreqvary))
+                                        (subreqcuflags__goto_6168_12 = (subfirstcuflags__goto_6168_27 | tempreqvary__goto_6104_32))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if subreqcuflags < 4294967294: 1 else: 0) != 0:
-                                    (reqcu = subreqcu)
+                                if (if subreqcuflags__goto_6168_12 < 4294967294: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = subreqcu__goto_6165_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = subreqcuflags)
+                                    (reqcuflags__goto_6102_24 = subreqcuflags__goto_6168_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if (if (if ((if (if bravalue == OP_ASSERT: 1 else: 0) != 0 or (if bravalue == OP_ASSERT_NA: 1 else: 0) != 0: 1 else: 0)) != 0 and (if subreqcuflags < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0 and (if subfirstcuflags < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (reqcu = subreqcu)
+                                if (if (if ((if (if bravalue__goto_6090_5 == OP_ASSERT: 1 else: 0) != 0 or (if bravalue__goto_6090_5 == OP_ASSERT_NA: 1 else: 0) != 0: 1 else: 0)) != 0 and (if subreqcuflags__goto_6168_12 < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0 and (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = subreqcu__goto_6165_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = subreqcuflags)
+                                    (reqcuflags__goto_6102_24 = subreqcuflags__goto_6168_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                         2150367232 =>
-                            (bravalue = OP_ASSERTBACK_NA)
+                            (bravalue__goto_6090_5 = OP_ASSERTBACK_NA)
                             cb.assert_depth = cb.assert_depth + 1
                             __pc = 4
                             __goto_pending = 1
-                            (bravalue = OP_ONCE)
+                            (bravalue__goto_6090_5 = OP_ONCE)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_SCRIPT_RUN)
+                            (bravalue__goto_6090_5 = OP_SCRIPT_RUN)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_BRA)
-                            (note_group_empty = 1)
+                            (bravalue__goto_6090_5 = OP_BRA)
+                            (note_group_empty__goto_6162_8 = 1)
                             cb.parens_depth = cb.parens_depth + 1
-                            ((unsafe: *code) = bravalue)
-                            (pptr = pptr + 1)
-                            (tempcode = code)
-                            (tempreqvary = cb.req_varyopt)
-                            (length_prevgroup = 0)
-                            if (if ((group_return = compile_regex(options, xoptions, (&mut tempcode as *mut *mut u8), (&mut pptr as *mut *mut c_uint), errorcodeptr, skipunits, (&mut subfirstcu as *mut c_uint), (&mut subfirstcuflags as *mut c_uint), (&mut subreqcu as *mut c_uint), (&mut subreqcuflags as *mut c_uint), bcptr, open_caps, cb, (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: (null as *mut c_ulong) else: (&mut length_prevgroup as *mut c_ulong))))) == 0: 1 else: 0) != 0:
+                            ((unsafe: *code__goto_6109_14) = bravalue__goto_6090_5)
+                            (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
+                            (tempcode__goto_6112_14 = code__goto_6109_14)
+                            (tempreqvary__goto_6104_32 = cb.req_varyopt)
+                            (length_prevgroup__goto_6108_12 = 0)
+                            if (if ((group_return__goto_6092_5 = compile_regex(options__goto_6096_10, xoptions__goto_6097_10, (&mut tempcode__goto_6112_14 as *mut *mut u8), (&mut pptr__goto_6100_11 as *mut *mut c_uint), errorcodeptr, skipunits__goto_6164_12, (&mut subfirstcu__goto_6165_22 as *mut c_uint), (&mut subfirstcuflags__goto_6168_27 as *mut c_uint), (&mut subreqcu__goto_6165_12 as *mut c_uint), (&mut subreqcuflags__goto_6168_12 as *mut c_uint), bcptr, open_caps, cb, (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: (null as *mut c_ulong) else: (&mut length_prevgroup__goto_6108_12 as *mut c_ulong))))) == 0: 1 else: 0) != 0:
                                 return 0
                             cb.parens_depth = cb.parens_depth - 1
-                            if (if (if note_group_empty != 0 and (if bravalue != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0 and (if group_return > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (matched_char = 1)
-                            if (if (if bravalue >= OP_ASSERT: 1 else: 0) != 0 and (if bravalue <= OP_ASSERT_SCS: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if note_group_empty__goto_6162_8 != 0 and (if bravalue__goto_6090_5 != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0 and (if group_return__goto_6092_5 > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (matched_char__goto_6117_6 = 1)
+                            if (if (if bravalue__goto_6090_5 >= OP_ASSERT: 1 else: 0) != 0 and (if bravalue__goto_6090_5 <= OP_ASSERT_SCS: 1 else: 0) != 0: 1 else: 0) != 0:
                                 cb.assert_depth = cb.assert_depth - 1
-                            if (if (if bravalue == OP_COND: 1 else: 0) != 0 and (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
-                                tc = code
+                            if (if (if bravalue__goto_6090_5 == OP_COND: 1 else: 0) != 0 and (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+                                tc__goto_6989_20 = code__goto_6109_14
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                condcount = 0
+                                condcount__goto_6990_11 = 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 while true:
-                                    (condcount = condcount + 1)
+                                    (condcount__goto_6990_11 = condcount__goto_6990_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if not ((if (unsafe: *tc) != OP_KET: 1 else: 0) != 0):
+                                    if not ((if (unsafe: *tc__goto_6989_20) != OP_KET: 1 else: 0) != 0):
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if code[(2 + 1)] == OP_DEFINE: 1 else: 0) != 0:
-                                    if (if condcount > 1: 1 else: 0) != 0:
-                                        (cb.erroroffset = offset)
+                                if (if code__goto_6109_14[(2 + 1)] == OP_DEFINE: 1 else: 0) != 0:
+                                    if (if condcount__goto_6990_11 > 1: 1 else: 0) != 0:
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         ((unsafe: *errorcodeptr) = ERR54)
@@ -6831,15 +7090,15 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (code[(2 + 1)] = 151)
+                                    (code__goto_6109_14[(2 + 1)] = 151)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (bravalue = OP_DEFINE)
+                                    (bravalue__goto_6090_5 = OP_DEFINE)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if condcount > 2: 1 else: 0) != 0:
-                                        (cb.erroroffset = offset)
+                                    if (if condcount__goto_6990_11 > 2: 1 else: 0) != 0:
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         ((unsafe: *errorcodeptr) = ERR27)
@@ -6850,18 +7109,18 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if condcount == 1: 1 else: 0) != 0:
-                                        (subreqcuflags = (4294967294 as c_uint))
-                                        (subfirstcuflags = subreqcuflags)
+                                    if (if condcount__goto_6990_11 == 1: 1 else: 0) != 0:
+                                        (subreqcuflags__goto_6168_12 = (4294967294 as c_uint))
+                                        (subfirstcuflags__goto_6168_27 = subreqcuflags__goto_6168_12)
                                     else:
-                                        if (if group_return > 0: 1 else: 0) != 0:
-                                            (matched_char = 1)
+                                        if (if group_return__goto_6092_5 > 0: 1 else: 0) != 0:
+                                            (matched_char__goto_6117_6 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
+                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup__goto_6108_12 -% 2) -% 4): 1 else: 0) != 0:
                                     ((unsafe: *errorcodeptr) = ERR20)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -6870,115 +7129,115 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup -% 2) -% 4)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup__goto_6108_12 -% 2) -% 4)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (code = code + 1)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *code = 122)
-                                (code = code + 1)
+                                (unsafe: *code__goto_6109_14 = 122)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (code = tempcode)
-                            if (if bravalue == OP_DEFINE: 1 else: 0) != 0:
+                            (code__goto_6109_14 = tempcode__goto_6112_14)
+                            if (if bravalue__goto_6090_5 == OP_DEFINE: 1 else: 0) != 0:
                                 break
-                            (zeroreqcu = reqcu)
-                            (zeroreqcuflags = reqcuflags)
-                            (zerofirstcu = firstcu)
-                            (zerofirstcuflags = firstcuflags)
-                            (groupsetfirstcu = 0)
-                            if (if bravalue >= OP_ONCE: 1 else: 0) != 0:
-                                if (if (if firstcuflags == 4294967295: 1 else: 0) != 0 and (if subfirstcuflags != 4294967295: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    if (if subfirstcuflags < 4294967294: 1 else: 0) != 0:
-                                        (firstcu = subfirstcu)
+                            (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
+                            (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
+                            (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
+                            (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
+                            (groupsetfirstcu__goto_6115_6 = 0)
+                            if (if bravalue__goto_6090_5 >= OP_ONCE: 1 else: 0) != 0:
+                                if (if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0 and (if subfirstcuflags__goto_6168_27 != 4294967295: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0:
+                                        (firstcu__goto_6098_10 = subfirstcu__goto_6165_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (firstcuflags = subfirstcuflags)
+                                        (firstcuflags__goto_6102_10 = subfirstcuflags__goto_6168_27)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (groupsetfirstcu = 1)
+                                        (groupsetfirstcu__goto_6115_6 = 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (firstcuflags = (4294967294 as c_uint))
+                                        (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (zerofirstcuflags = (4294967294 as c_uint))
+                                    (zerofirstcuflags__goto_6103_26 = (4294967294 as c_uint))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if (if subfirstcuflags < 4294967294: 1 else: 0) != 0 and (if subreqcuflags >= 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (subreqcu = subfirstcu)
+                                    if (if (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0 and (if subreqcuflags__goto_6168_12 >= 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (subreqcu__goto_6165_12 = subfirstcu__goto_6165_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (subreqcuflags = (subfirstcuflags | tempreqvary))
+                                        (subreqcuflags__goto_6168_12 = (subfirstcuflags__goto_6168_27 | tempreqvary__goto_6104_32))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if subreqcuflags < 4294967294: 1 else: 0) != 0:
-                                    (reqcu = subreqcu)
+                                if (if subreqcuflags__goto_6168_12 < 4294967294: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = subreqcu__goto_6165_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = subreqcuflags)
+                                    (reqcuflags__goto_6102_24 = subreqcuflags__goto_6168_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if (if (if ((if (if bravalue == OP_ASSERT: 1 else: 0) != 0 or (if bravalue == OP_ASSERT_NA: 1 else: 0) != 0: 1 else: 0)) != 0 and (if subreqcuflags < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0 and (if subfirstcuflags < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (reqcu = subreqcu)
+                                if (if (if ((if (if bravalue__goto_6090_5 == OP_ASSERT: 1 else: 0) != 0 or (if bravalue__goto_6090_5 == OP_ASSERT_NA: 1 else: 0) != 0: 1 else: 0)) != 0 and (if subreqcuflags__goto_6168_12 < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0 and (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = subreqcu__goto_6165_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = subreqcuflags)
+                                    (reqcuflags__goto_6102_24 = subreqcuflags__goto_6168_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                         2147614720 =>
-                            (bravalue = OP_ONCE)
+                            (bravalue__goto_6090_5 = OP_ONCE)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_SCRIPT_RUN)
+                            (bravalue__goto_6090_5 = OP_SCRIPT_RUN)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_BRA)
-                            (note_group_empty = 1)
+                            (bravalue__goto_6090_5 = OP_BRA)
+                            (note_group_empty__goto_6162_8 = 1)
                             cb.parens_depth = cb.parens_depth + 1
-                            ((unsafe: *code) = bravalue)
-                            (pptr = pptr + 1)
-                            (tempcode = code)
-                            (tempreqvary = cb.req_varyopt)
-                            (length_prevgroup = 0)
-                            if (if ((group_return = compile_regex(options, xoptions, (&mut tempcode as *mut *mut u8), (&mut pptr as *mut *mut c_uint), errorcodeptr, skipunits, (&mut subfirstcu as *mut c_uint), (&mut subfirstcuflags as *mut c_uint), (&mut subreqcu as *mut c_uint), (&mut subreqcuflags as *mut c_uint), bcptr, open_caps, cb, (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: (null as *mut c_ulong) else: (&mut length_prevgroup as *mut c_ulong))))) == 0: 1 else: 0) != 0:
+                            ((unsafe: *code__goto_6109_14) = bravalue__goto_6090_5)
+                            (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
+                            (tempcode__goto_6112_14 = code__goto_6109_14)
+                            (tempreqvary__goto_6104_32 = cb.req_varyopt)
+                            (length_prevgroup__goto_6108_12 = 0)
+                            if (if ((group_return__goto_6092_5 = compile_regex(options__goto_6096_10, xoptions__goto_6097_10, (&mut tempcode__goto_6112_14 as *mut *mut u8), (&mut pptr__goto_6100_11 as *mut *mut c_uint), errorcodeptr, skipunits__goto_6164_12, (&mut subfirstcu__goto_6165_22 as *mut c_uint), (&mut subfirstcuflags__goto_6168_27 as *mut c_uint), (&mut subreqcu__goto_6165_12 as *mut c_uint), (&mut subreqcuflags__goto_6168_12 as *mut c_uint), bcptr, open_caps, cb, (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: (null as *mut c_ulong) else: (&mut length_prevgroup__goto_6108_12 as *mut c_ulong))))) == 0: 1 else: 0) != 0:
                                 return 0
                             cb.parens_depth = cb.parens_depth - 1
-                            if (if (if note_group_empty != 0 and (if bravalue != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0 and (if group_return > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (matched_char = 1)
-                            if (if (if bravalue >= OP_ASSERT: 1 else: 0) != 0 and (if bravalue <= OP_ASSERT_SCS: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if note_group_empty__goto_6162_8 != 0 and (if bravalue__goto_6090_5 != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0 and (if group_return__goto_6092_5 > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (matched_char__goto_6117_6 = 1)
+                            if (if (if bravalue__goto_6090_5 >= OP_ASSERT: 1 else: 0) != 0 and (if bravalue__goto_6090_5 <= OP_ASSERT_SCS: 1 else: 0) != 0: 1 else: 0) != 0:
                                 cb.assert_depth = cb.assert_depth - 1
-                            if (if (if bravalue == OP_COND: 1 else: 0) != 0 and (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
-                                tc = code
+                            if (if (if bravalue__goto_6090_5 == OP_COND: 1 else: 0) != 0 and (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+                                tc__goto_6989_20 = code__goto_6109_14
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                condcount = 0
+                                condcount__goto_6990_11 = 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 while true:
-                                    (condcount = condcount + 1)
+                                    (condcount__goto_6990_11 = condcount__goto_6990_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if not ((if (unsafe: *tc) != OP_KET: 1 else: 0) != 0):
+                                    if not ((if (unsafe: *tc__goto_6989_20) != OP_KET: 1 else: 0) != 0):
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if code[(2 + 1)] == OP_DEFINE: 1 else: 0) != 0:
-                                    if (if condcount > 1: 1 else: 0) != 0:
-                                        (cb.erroroffset = offset)
+                                if (if code__goto_6109_14[(2 + 1)] == OP_DEFINE: 1 else: 0) != 0:
+                                    if (if condcount__goto_6990_11 > 1: 1 else: 0) != 0:
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         ((unsafe: *errorcodeptr) = ERR54)
@@ -6989,15 +7248,15 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (code[(2 + 1)] = 151)
+                                    (code__goto_6109_14[(2 + 1)] = 151)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (bravalue = OP_DEFINE)
+                                    (bravalue__goto_6090_5 = OP_DEFINE)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if condcount > 2: 1 else: 0) != 0:
-                                        (cb.erroroffset = offset)
+                                    if (if condcount__goto_6990_11 > 2: 1 else: 0) != 0:
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         ((unsafe: *errorcodeptr) = ERR27)
@@ -7008,18 +7267,18 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if condcount == 1: 1 else: 0) != 0:
-                                        (subreqcuflags = (4294967294 as c_uint))
-                                        (subfirstcuflags = subreqcuflags)
+                                    if (if condcount__goto_6990_11 == 1: 1 else: 0) != 0:
+                                        (subreqcuflags__goto_6168_12 = (4294967294 as c_uint))
+                                        (subfirstcuflags__goto_6168_27 = subreqcuflags__goto_6168_12)
                                     else:
-                                        if (if group_return > 0: 1 else: 0) != 0:
-                                            (matched_char = 1)
+                                        if (if group_return__goto_6092_5 > 0: 1 else: 0) != 0:
+                                            (matched_char__goto_6117_6 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
+                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup__goto_6108_12 -% 2) -% 4): 1 else: 0) != 0:
                                     ((unsafe: *errorcodeptr) = ERR20)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -7028,112 +7287,112 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup -% 2) -% 4)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup__goto_6108_12 -% 2) -% 4)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (code = code + 1)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *code = 122)
-                                (code = code + 1)
+                                (unsafe: *code__goto_6109_14 = 122)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (code = tempcode)
-                            if (if bravalue == OP_DEFINE: 1 else: 0) != 0:
+                            (code__goto_6109_14 = tempcode__goto_6112_14)
+                            if (if bravalue__goto_6090_5 == OP_DEFINE: 1 else: 0) != 0:
                                 break
-                            (zeroreqcu = reqcu)
-                            (zeroreqcuflags = reqcuflags)
-                            (zerofirstcu = firstcu)
-                            (zerofirstcuflags = firstcuflags)
-                            (groupsetfirstcu = 0)
-                            if (if bravalue >= OP_ONCE: 1 else: 0) != 0:
-                                if (if (if firstcuflags == 4294967295: 1 else: 0) != 0 and (if subfirstcuflags != 4294967295: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    if (if subfirstcuflags < 4294967294: 1 else: 0) != 0:
-                                        (firstcu = subfirstcu)
+                            (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
+                            (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
+                            (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
+                            (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
+                            (groupsetfirstcu__goto_6115_6 = 0)
+                            if (if bravalue__goto_6090_5 >= OP_ONCE: 1 else: 0) != 0:
+                                if (if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0 and (if subfirstcuflags__goto_6168_27 != 4294967295: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0:
+                                        (firstcu__goto_6098_10 = subfirstcu__goto_6165_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (firstcuflags = subfirstcuflags)
+                                        (firstcuflags__goto_6102_10 = subfirstcuflags__goto_6168_27)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (groupsetfirstcu = 1)
+                                        (groupsetfirstcu__goto_6115_6 = 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (firstcuflags = (4294967294 as c_uint))
+                                        (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (zerofirstcuflags = (4294967294 as c_uint))
+                                    (zerofirstcuflags__goto_6103_26 = (4294967294 as c_uint))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if (if subfirstcuflags < 4294967294: 1 else: 0) != 0 and (if subreqcuflags >= 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (subreqcu = subfirstcu)
+                                    if (if (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0 and (if subreqcuflags__goto_6168_12 >= 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (subreqcu__goto_6165_12 = subfirstcu__goto_6165_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (subreqcuflags = (subfirstcuflags | tempreqvary))
+                                        (subreqcuflags__goto_6168_12 = (subfirstcuflags__goto_6168_27 | tempreqvary__goto_6104_32))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if subreqcuflags < 4294967294: 1 else: 0) != 0:
-                                    (reqcu = subreqcu)
+                                if (if subreqcuflags__goto_6168_12 < 4294967294: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = subreqcu__goto_6165_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = subreqcuflags)
+                                    (reqcuflags__goto_6102_24 = subreqcuflags__goto_6168_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if (if (if ((if (if bravalue == OP_ASSERT: 1 else: 0) != 0 or (if bravalue == OP_ASSERT_NA: 1 else: 0) != 0: 1 else: 0)) != 0 and (if subreqcuflags < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0 and (if subfirstcuflags < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (reqcu = subreqcu)
+                                if (if (if ((if (if bravalue__goto_6090_5 == OP_ASSERT: 1 else: 0) != 0 or (if bravalue__goto_6090_5 == OP_ASSERT_NA: 1 else: 0) != 0: 1 else: 0)) != 0 and (if subreqcuflags__goto_6168_12 < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0 and (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = subreqcu__goto_6165_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = subreqcuflags)
+                                    (reqcuflags__goto_6102_24 = subreqcuflags__goto_6168_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                         2149974016 =>
-                            (bravalue = OP_SCRIPT_RUN)
+                            (bravalue__goto_6090_5 = OP_SCRIPT_RUN)
                             __pc = 3
                             __goto_pending = 1
-                            (bravalue = OP_BRA)
-                            (note_group_empty = 1)
+                            (bravalue__goto_6090_5 = OP_BRA)
+                            (note_group_empty__goto_6162_8 = 1)
                             cb.parens_depth = cb.parens_depth + 1
-                            ((unsafe: *code) = bravalue)
-                            (pptr = pptr + 1)
-                            (tempcode = code)
-                            (tempreqvary = cb.req_varyopt)
-                            (length_prevgroup = 0)
-                            if (if ((group_return = compile_regex(options, xoptions, (&mut tempcode as *mut *mut u8), (&mut pptr as *mut *mut c_uint), errorcodeptr, skipunits, (&mut subfirstcu as *mut c_uint), (&mut subfirstcuflags as *mut c_uint), (&mut subreqcu as *mut c_uint), (&mut subreqcuflags as *mut c_uint), bcptr, open_caps, cb, (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: (null as *mut c_ulong) else: (&mut length_prevgroup as *mut c_ulong))))) == 0: 1 else: 0) != 0:
+                            ((unsafe: *code__goto_6109_14) = bravalue__goto_6090_5)
+                            (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
+                            (tempcode__goto_6112_14 = code__goto_6109_14)
+                            (tempreqvary__goto_6104_32 = cb.req_varyopt)
+                            (length_prevgroup__goto_6108_12 = 0)
+                            if (if ((group_return__goto_6092_5 = compile_regex(options__goto_6096_10, xoptions__goto_6097_10, (&mut tempcode__goto_6112_14 as *mut *mut u8), (&mut pptr__goto_6100_11 as *mut *mut c_uint), errorcodeptr, skipunits__goto_6164_12, (&mut subfirstcu__goto_6165_22 as *mut c_uint), (&mut subfirstcuflags__goto_6168_27 as *mut c_uint), (&mut subreqcu__goto_6165_12 as *mut c_uint), (&mut subreqcuflags__goto_6168_12 as *mut c_uint), bcptr, open_caps, cb, (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: (null as *mut c_ulong) else: (&mut length_prevgroup__goto_6108_12 as *mut c_ulong))))) == 0: 1 else: 0) != 0:
                                 return 0
                             cb.parens_depth = cb.parens_depth - 1
-                            if (if (if note_group_empty != 0 and (if bravalue != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0 and (if group_return > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (matched_char = 1)
-                            if (if (if bravalue >= OP_ASSERT: 1 else: 0) != 0 and (if bravalue <= OP_ASSERT_SCS: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if note_group_empty__goto_6162_8 != 0 and (if bravalue__goto_6090_5 != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0 and (if group_return__goto_6092_5 > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (matched_char__goto_6117_6 = 1)
+                            if (if (if bravalue__goto_6090_5 >= OP_ASSERT: 1 else: 0) != 0 and (if bravalue__goto_6090_5 <= OP_ASSERT_SCS: 1 else: 0) != 0: 1 else: 0) != 0:
                                 cb.assert_depth = cb.assert_depth - 1
-                            if (if (if bravalue == OP_COND: 1 else: 0) != 0 and (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
-                                tc = code
+                            if (if (if bravalue__goto_6090_5 == OP_COND: 1 else: 0) != 0 and (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+                                tc__goto_6989_20 = code__goto_6109_14
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                condcount = 0
+                                condcount__goto_6990_11 = 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 while true:
-                                    (condcount = condcount + 1)
+                                    (condcount__goto_6990_11 = condcount__goto_6990_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if not ((if (unsafe: *tc) != OP_KET: 1 else: 0) != 0):
+                                    if not ((if (unsafe: *tc__goto_6989_20) != OP_KET: 1 else: 0) != 0):
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if code[(2 + 1)] == OP_DEFINE: 1 else: 0) != 0:
-                                    if (if condcount > 1: 1 else: 0) != 0:
-                                        (cb.erroroffset = offset)
+                                if (if code__goto_6109_14[(2 + 1)] == OP_DEFINE: 1 else: 0) != 0:
+                                    if (if condcount__goto_6990_11 > 1: 1 else: 0) != 0:
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         ((unsafe: *errorcodeptr) = ERR54)
@@ -7144,15 +7403,15 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (code[(2 + 1)] = 151)
+                                    (code__goto_6109_14[(2 + 1)] = 151)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (bravalue = OP_DEFINE)
+                                    (bravalue__goto_6090_5 = OP_DEFINE)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if condcount > 2: 1 else: 0) != 0:
-                                        (cb.erroroffset = offset)
+                                    if (if condcount__goto_6990_11 > 2: 1 else: 0) != 0:
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         ((unsafe: *errorcodeptr) = ERR27)
@@ -7163,18 +7422,18 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if condcount == 1: 1 else: 0) != 0:
-                                        (subreqcuflags = (4294967294 as c_uint))
-                                        (subfirstcuflags = subreqcuflags)
+                                    if (if condcount__goto_6990_11 == 1: 1 else: 0) != 0:
+                                        (subreqcuflags__goto_6168_12 = (4294967294 as c_uint))
+                                        (subfirstcuflags__goto_6168_27 = subreqcuflags__goto_6168_12)
                                     else:
-                                        if (if group_return > 0: 1 else: 0) != 0:
-                                            (matched_char = 1)
+                                        if (if group_return__goto_6092_5 > 0: 1 else: 0) != 0:
+                                            (matched_char__goto_6117_6 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
+                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup__goto_6108_12 -% 2) -% 4): 1 else: 0) != 0:
                                     ((unsafe: *errorcodeptr) = ERR20)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -7183,109 +7442,109 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup -% 2) -% 4)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup__goto_6108_12 -% 2) -% 4)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (code = code + 1)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *code = 122)
-                                (code = code + 1)
+                                (unsafe: *code__goto_6109_14 = 122)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (code = tempcode)
-                            if (if bravalue == OP_DEFINE: 1 else: 0) != 0:
+                            (code__goto_6109_14 = tempcode__goto_6112_14)
+                            if (if bravalue__goto_6090_5 == OP_DEFINE: 1 else: 0) != 0:
                                 break
-                            (zeroreqcu = reqcu)
-                            (zeroreqcuflags = reqcuflags)
-                            (zerofirstcu = firstcu)
-                            (zerofirstcuflags = firstcuflags)
-                            (groupsetfirstcu = 0)
-                            if (if bravalue >= OP_ONCE: 1 else: 0) != 0:
-                                if (if (if firstcuflags == 4294967295: 1 else: 0) != 0 and (if subfirstcuflags != 4294967295: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    if (if subfirstcuflags < 4294967294: 1 else: 0) != 0:
-                                        (firstcu = subfirstcu)
+                            (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
+                            (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
+                            (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
+                            (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
+                            (groupsetfirstcu__goto_6115_6 = 0)
+                            if (if bravalue__goto_6090_5 >= OP_ONCE: 1 else: 0) != 0:
+                                if (if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0 and (if subfirstcuflags__goto_6168_27 != 4294967295: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0:
+                                        (firstcu__goto_6098_10 = subfirstcu__goto_6165_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (firstcuflags = subfirstcuflags)
+                                        (firstcuflags__goto_6102_10 = subfirstcuflags__goto_6168_27)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (groupsetfirstcu = 1)
+                                        (groupsetfirstcu__goto_6115_6 = 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (firstcuflags = (4294967294 as c_uint))
+                                        (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (zerofirstcuflags = (4294967294 as c_uint))
+                                    (zerofirstcuflags__goto_6103_26 = (4294967294 as c_uint))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if (if subfirstcuflags < 4294967294: 1 else: 0) != 0 and (if subreqcuflags >= 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (subreqcu = subfirstcu)
+                                    if (if (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0 and (if subreqcuflags__goto_6168_12 >= 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (subreqcu__goto_6165_12 = subfirstcu__goto_6165_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (subreqcuflags = (subfirstcuflags | tempreqvary))
+                                        (subreqcuflags__goto_6168_12 = (subfirstcuflags__goto_6168_27 | tempreqvary__goto_6104_32))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if subreqcuflags < 4294967294: 1 else: 0) != 0:
-                                    (reqcu = subreqcu)
+                                if (if subreqcuflags__goto_6168_12 < 4294967294: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = subreqcu__goto_6165_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = subreqcuflags)
+                                    (reqcuflags__goto_6102_24 = subreqcuflags__goto_6168_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if (if (if ((if (if bravalue == OP_ASSERT: 1 else: 0) != 0 or (if bravalue == OP_ASSERT_NA: 1 else: 0) != 0: 1 else: 0)) != 0 and (if subreqcuflags < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0 and (if subfirstcuflags < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (reqcu = subreqcu)
+                                if (if (if ((if (if bravalue__goto_6090_5 == OP_ASSERT: 1 else: 0) != 0 or (if bravalue__goto_6090_5 == OP_ASSERT_NA: 1 else: 0) != 0: 1 else: 0)) != 0 and (if subreqcuflags__goto_6168_12 < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0 and (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = subreqcu__goto_6165_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = subreqcuflags)
+                                    (reqcuflags__goto_6102_24 = subreqcuflags__goto_6168_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                         2149449728 =>
-                            (bravalue = OP_BRA)
-                            (note_group_empty = 1)
+                            (bravalue__goto_6090_5 = OP_BRA)
+                            (note_group_empty__goto_6162_8 = 1)
                             cb.parens_depth = cb.parens_depth + 1
-                            ((unsafe: *code) = bravalue)
-                            (pptr = pptr + 1)
-                            (tempcode = code)
-                            (tempreqvary = cb.req_varyopt)
-                            (length_prevgroup = 0)
-                            if (if ((group_return = compile_regex(options, xoptions, (&mut tempcode as *mut *mut u8), (&mut pptr as *mut *mut c_uint), errorcodeptr, skipunits, (&mut subfirstcu as *mut c_uint), (&mut subfirstcuflags as *mut c_uint), (&mut subreqcu as *mut c_uint), (&mut subreqcuflags as *mut c_uint), bcptr, open_caps, cb, (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: (null as *mut c_ulong) else: (&mut length_prevgroup as *mut c_ulong))))) == 0: 1 else: 0) != 0:
+                            ((unsafe: *code__goto_6109_14) = bravalue__goto_6090_5)
+                            (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
+                            (tempcode__goto_6112_14 = code__goto_6109_14)
+                            (tempreqvary__goto_6104_32 = cb.req_varyopt)
+                            (length_prevgroup__goto_6108_12 = 0)
+                            if (if ((group_return__goto_6092_5 = compile_regex(options__goto_6096_10, xoptions__goto_6097_10, (&mut tempcode__goto_6112_14 as *mut *mut u8), (&mut pptr__goto_6100_11 as *mut *mut c_uint), errorcodeptr, skipunits__goto_6164_12, (&mut subfirstcu__goto_6165_22 as *mut c_uint), (&mut subfirstcuflags__goto_6168_27 as *mut c_uint), (&mut subreqcu__goto_6165_12 as *mut c_uint), (&mut subreqcuflags__goto_6168_12 as *mut c_uint), bcptr, open_caps, cb, (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: (null as *mut c_ulong) else: (&mut length_prevgroup__goto_6108_12 as *mut c_ulong))))) == 0: 1 else: 0) != 0:
                                 return 0
                             cb.parens_depth = cb.parens_depth - 1
-                            if (if (if note_group_empty != 0 and (if bravalue != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0 and (if group_return > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (matched_char = 1)
-                            if (if (if bravalue >= OP_ASSERT: 1 else: 0) != 0 and (if bravalue <= OP_ASSERT_SCS: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if (if note_group_empty__goto_6162_8 != 0 and (if bravalue__goto_6090_5 != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0 and (if group_return__goto_6092_5 > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (matched_char__goto_6117_6 = 1)
+                            if (if (if bravalue__goto_6090_5 >= OP_ASSERT: 1 else: 0) != 0 and (if bravalue__goto_6090_5 <= OP_ASSERT_SCS: 1 else: 0) != 0: 1 else: 0) != 0:
                                 cb.assert_depth = cb.assert_depth - 1
-                            if (if (if bravalue == OP_COND: 1 else: 0) != 0 and (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
-                                tc = code
+                            if (if (if bravalue__goto_6090_5 == OP_COND: 1 else: 0) != 0 and (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0: 1 else: 0) != 0:
+                                tc__goto_6989_20 = code__goto_6109_14
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                condcount = 0
+                                condcount__goto_6990_11 = 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 while true:
-                                    (condcount = condcount + 1)
+                                    (condcount__goto_6990_11 = condcount__goto_6990_11 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if not ((if (unsafe: *tc) != OP_KET: 1 else: 0) != 0):
+                                    if not ((if (unsafe: *tc__goto_6989_20) != OP_KET: 1 else: 0) != 0):
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if code[(2 + 1)] == OP_DEFINE: 1 else: 0) != 0:
-                                    if (if condcount > 1: 1 else: 0) != 0:
-                                        (cb.erroroffset = offset)
+                                if (if code__goto_6109_14[(2 + 1)] == OP_DEFINE: 1 else: 0) != 0:
+                                    if (if condcount__goto_6990_11 > 1: 1 else: 0) != 0:
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         ((unsafe: *errorcodeptr) = ERR54)
@@ -7296,15 +7555,15 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (code[(2 + 1)] = 151)
+                                    (code__goto_6109_14[(2 + 1)] = 151)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (bravalue = OP_DEFINE)
+                                    (bravalue__goto_6090_5 = OP_DEFINE)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if condcount > 2: 1 else: 0) != 0:
-                                        (cb.erroroffset = offset)
+                                    if (if condcount__goto_6990_11 > 2: 1 else: 0) != 0:
+                                        (cb.erroroffset = offset__goto_6107_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         ((unsafe: *errorcodeptr) = ERR27)
@@ -7315,18 +7574,18 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if condcount == 1: 1 else: 0) != 0:
-                                        (subreqcuflags = (4294967294 as c_uint))
-                                        (subfirstcuflags = subreqcuflags)
+                                    if (if condcount__goto_6990_11 == 1: 1 else: 0) != 0:
+                                        (subreqcuflags__goto_6168_12 = (4294967294 as c_uint))
+                                        (subfirstcuflags__goto_6168_27 = subreqcuflags__goto_6168_12)
                                     else:
-                                        if (if group_return > 0: 1 else: 0) != 0:
-                                            (matched_char = 1)
+                                        if (if group_return__goto_6092_5 > 0: 1 else: 0) != 0:
+                                            (matched_char__goto_6117_6 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup -% 2) -% 4): 1 else: 0) != 0:
+                                if (if (2147483627 -% (unsafe: *lengthptr)) < ((length_prevgroup__goto_6108_12 -% 2) -% 4): 1 else: 0) != 0:
                                     ((unsafe: *errorcodeptr) = ERR20)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -7335,104 +7594,104 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup -% 2) -% 4)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((length_prevgroup__goto_6108_12 -% 2) -% 4)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (code = code + 1)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *code = 122)
-                                (code = code + 1)
+                                (unsafe: *code__goto_6109_14 = 122)
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (code = tempcode)
-                            if (if bravalue == OP_DEFINE: 1 else: 0) != 0:
+                            (code__goto_6109_14 = tempcode__goto_6112_14)
+                            if (if bravalue__goto_6090_5 == OP_DEFINE: 1 else: 0) != 0:
                                 break
-                            (zeroreqcu = reqcu)
-                            (zeroreqcuflags = reqcuflags)
-                            (zerofirstcu = firstcu)
-                            (zerofirstcuflags = firstcuflags)
-                            (groupsetfirstcu = 0)
-                            if (if bravalue >= OP_ONCE: 1 else: 0) != 0:
-                                if (if (if firstcuflags == 4294967295: 1 else: 0) != 0 and (if subfirstcuflags != 4294967295: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    if (if subfirstcuflags < 4294967294: 1 else: 0) != 0:
-                                        (firstcu = subfirstcu)
+                            (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
+                            (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
+                            (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
+                            (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
+                            (groupsetfirstcu__goto_6115_6 = 0)
+                            if (if bravalue__goto_6090_5 >= OP_ONCE: 1 else: 0) != 0:
+                                if (if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0 and (if subfirstcuflags__goto_6168_27 != 4294967295: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0:
+                                        (firstcu__goto_6098_10 = subfirstcu__goto_6165_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (firstcuflags = subfirstcuflags)
+                                        (firstcuflags__goto_6102_10 = subfirstcuflags__goto_6168_27)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (groupsetfirstcu = 1)
+                                        (groupsetfirstcu__goto_6115_6 = 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (firstcuflags = (4294967294 as c_uint))
+                                        (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (zerofirstcuflags = (4294967294 as c_uint))
+                                    (zerofirstcuflags__goto_6103_26 = (4294967294 as c_uint))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if (if subfirstcuflags < 4294967294: 1 else: 0) != 0 and (if subreqcuflags >= 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (subreqcu = subfirstcu)
+                                    if (if (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0 and (if subreqcuflags__goto_6168_12 >= 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (subreqcu__goto_6165_12 = subfirstcu__goto_6165_22)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (subreqcuflags = (subfirstcuflags | tempreqvary))
+                                        (subreqcuflags__goto_6168_12 = (subfirstcuflags__goto_6168_27 | tempreqvary__goto_6104_32))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if subreqcuflags < 4294967294: 1 else: 0) != 0:
-                                    (reqcu = subreqcu)
+                                if (if subreqcuflags__goto_6168_12 < 4294967294: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = subreqcu__goto_6165_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = subreqcuflags)
+                                    (reqcuflags__goto_6102_24 = subreqcuflags__goto_6168_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if (if (if ((if (if bravalue == OP_ASSERT: 1 else: 0) != 0 or (if bravalue == OP_ASSERT_NA: 1 else: 0) != 0: 1 else: 0)) != 0 and (if subreqcuflags < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0 and (if subfirstcuflags < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (reqcu = subreqcu)
+                                if (if (if ((if (if bravalue__goto_6090_5 == OP_ASSERT: 1 else: 0) != 0 or (if bravalue__goto_6090_5 == OP_ASSERT_NA: 1 else: 0) != 0: 1 else: 0)) != 0 and (if subreqcuflags__goto_6168_12 < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0 and (if subfirstcuflags__goto_6168_27 < 4294967294: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = subreqcu__goto_6165_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = subreqcuflags)
+                                    (reqcuflags__goto_6102_24 = subreqcuflags__goto_6168_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                         2147745792 => 0
                         2147876864 =>
-                            (code[0] = 119)
-                            (code[(1 + (2 * 2))] = pptr[3])
-                            pptr = pptr + 3
-                            code = code + _pcre2_OP_lengths_8[OP_CALLOUT]
+                            (code__goto_6109_14[0] = 119)
+                            (code__goto_6109_14[(1 + (2 * 2))] = pptr__goto_6100_11[3])
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 3
+                            code__goto_6109_14 = code__goto_6109_14 + _pcre2_OP_lengths_8[OP_CALLOUT]
                         2147942400 =>
                             if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + (pptr[3] +% 9)
+                                (unsafe: *lengthptr) = (unsafe: *lengthptr) + (pptr__goto_6100_11[3] +% 9)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                pptr = pptr + 3
+                                pptr__goto_6100_11 = pptr__goto_6100_11 + 3
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                pptr = pptr + 2
+                                pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                length = pptr[3]
+                                length__goto_7250_16 = pptr__goto_6100_11[3]
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                callout_string = (code + (((1 + (4 * 2))) as isize as usize))
+                                callout_string__goto_7251_20 = (code__goto_6109_14 + (((1 + (4 * 2))) as isize as usize))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (code[0] = 120)
+                                (code__goto_6109_14[0] = 120)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                pptr = pptr + 3
+                                pptr__goto_6100_11 = pptr__goto_6100_11 + 3
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                pptr = pptr + 2
+                                pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -7440,808 +7699,808 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (pp = (cb.start_pattern + offset))
+                                (pp__goto_7248_18 = (cb.start_pattern + offset__goto_6107_12))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *callout_string = (unsafe: *(pp = pp + 1)))
-                                (callout_string = callout_string + 1)
-                                (delimiter = (unsafe: *(callout_string = callout_string + 1)))
+                                (unsafe: *callout_string__goto_7251_20 = (unsafe: *(pp__goto_7248_18 = pp__goto_7248_18 + 1)))
+                                (callout_string__goto_7251_20 = callout_string__goto_7251_20 + 1)
+                                (delimiter__goto_7249_16 = (unsafe: *(callout_string__goto_7251_20 = callout_string__goto_7251_20 + 1)))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if delimiter == 123: 1 else: 0) != 0:
-                                    (delimiter = 125)
+                                if (if delimiter__goto_7249_16 == 123: 1 else: 0) != 0:
+                                    (delimiter__goto_7249_16 = 125)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                while (if (length = length - 1) > 1: 1 else: 0) != 0:
-                                    if (if (if (unsafe: *pp) == delimiter: 1 else: 0) != 0 and (if pp[1] == delimiter: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (unsafe: *callout_string = delimiter)
-                                        (callout_string = callout_string + 1)
+                                while (if (length__goto_7250_16 = length__goto_7250_16 - 1) > 1: 1 else: 0) != 0:
+                                    if (if (if (unsafe: *pp__goto_7248_18) == delimiter__goto_7249_16: 1 else: 0) != 0 and (if pp__goto_7248_18[1] == delimiter__goto_7249_16: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (unsafe: *callout_string__goto_7251_20 = delimiter__goto_7249_16)
+                                        (callout_string__goto_7251_20 = callout_string__goto_7251_20 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        pp = pp + 2
+                                        pp__goto_7248_18 = pp__goto_7248_18 + 2
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (length = length - 1)
+                                        (length__goto_7250_16 = length__goto_7250_16 - 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (unsafe: *callout_string = (unsafe: *(pp = pp + 1)))
-                                        (callout_string = callout_string + 1)
+                                        (unsafe: *callout_string__goto_7251_20 = (unsafe: *(pp__goto_7248_18 = pp__goto_7248_18 + 1)))
+                                        (callout_string__goto_7251_20 = callout_string__goto_7251_20 + 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (unsafe: *callout_string = 0)
-                                (callout_string = callout_string + 1)
+                                (unsafe: *callout_string__goto_7251_20 = 0)
+                                (callout_string__goto_7251_20 = callout_string__goto_7251_20 + 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (code = callout_string)
+                                (code__goto_6109_14 = callout_string__goto_7251_20)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         2151809024 =>
-                            (repeat_max = (unsafe: *((pptr = pptr + 1))))
+                            (repeat_max__goto_6093_26 = (unsafe: *((pptr__goto_6100_11 = pptr__goto_6100_11 + 1))))
                             __pc = 5
                             __goto_pending = 1
                             __pc = 5
                             __goto_pending = 1
                             __pc = 5
                             __goto_pending = 1
-                            (repeat_max = 1)
-                            if (if previous_matched_char != 0 and (if repeat_min > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (matched_char = 1)
-                            (reqvary = (if ((if repeat_min == repeat_max: 1 else: 0)) != 0: 0 else: 2))
-                            if (if repeat_min == 0: 1 else: 0) != 0:
-                                (firstcu = zerofirstcu)
+                            (repeat_max__goto_6093_26 = 1)
+                            if (if previous_matched_char__goto_6118_6 != 0 and (if repeat_min__goto_6093_10 > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (matched_char__goto_6117_6 = 1)
+                            (reqvary__goto_6104_23 = (if ((if repeat_min__goto_6093_10 == repeat_max__goto_6093_26: 1 else: 0)) != 0: 0 else: 2))
+                            if (if repeat_min__goto_6093_10 == 0: 1 else: 0) != 0:
+                                (firstcu__goto_6098_10 = zerofirstcu__goto_6099_21)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (firstcuflags = zerofirstcuflags)
+                                (firstcuflags__goto_6102_10 = zerofirstcuflags__goto_6103_26)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (reqcu = zeroreqcu)
+                                (reqcu__goto_6098_19 = zeroreqcu__goto_6099_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (reqcuflags = zeroreqcuflags)
+                                (reqcuflags__goto_6102_24 = zeroreqcuflags__goto_6103_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            match meta
+                            match meta__goto_6101_10
                                 2151809024 =>
-                                    (possessive_quantifier = 1)
+                                    (possessive_quantifier__goto_6161_8 = 1)
                                 2151874560 =>
-                                    (possessive_quantifier = 0)
+                                    (possessive_quantifier__goto_6161_8 = 0)
                                 _ =>
-                                    (repeat_type = greedy_default)
-                                    (possessive_quantifier = 0)
-                            (tempcode = previous)
-                            (op_previous = (unsafe: *previous))
-                            match op_previous
+                                    (repeat_type__goto_6095_10 = greedy_default__goto_6094_10)
+                                    (possessive_quantifier__goto_6161_8 = 0)
+                            (tempcode__goto_6112_14 = previous__goto_6113_14)
+                            (op_previous__goto_6114_13 = (unsafe: *previous__goto_6113_14))
+                            match op_previous__goto_6114_13
                                 OP_CHAR =>
-                                    (op_type = (&chartypeoffset[0] as *mut c_uint)[(op_previous - OP_CHAR)])
-                                    ((&mcbuffer[0] as *mut u8)[0] = code[-1])
+                                    (op_type__goto_6095_23 = (&chartypeoffset[0] as *mut c_uint)[(op_previous__goto_6114_13 - OP_CHAR)])
+                                    ((&mcbuffer__goto_6170_15[0] as *mut u8)[0] = code__goto_6109_14[-1])
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (mclength = 1)
+                                    (mclength__goto_6163_12 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if op_previous <= OP_CHARI: 1 else: 0) != 0 and (if repeat_min > 1: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (reqcu = (&mcbuffer[0] as *mut u8)[0])
+                                    if (if (if op_previous__goto_6114_13 <= OP_CHARI: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 > 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (reqcu__goto_6098_19 = (&mcbuffer__goto_6170_15[0] as *mut u8)[0])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (reqcuflags = cb.req_varyopt)
+                                        (reqcuflags__goto_6102_24 = cb.req_varyopt)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if op_previous == OP_CHARI: 1 else: 0) != 0:
-                                            reqcuflags = reqcuflags | 1
+                                        if (if op_previous__goto_6114_13 == OP_CHARI: 1 else: 0) != 0:
+                                            reqcuflags__goto_6102_24 = reqcuflags__goto_6102_24 | 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 6
                                     __goto_pending = 1
-                                    if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                 OP_CLASS =>
-                                    if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                 OP_RECURSE =>
-                                    if (if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if possessive_quantifier != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+                                    if (if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if possessive_quantifier__goto_6161_8 != 0: 0 else: 1) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
-                                    length = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: 3 else: length_prevgroup)
+                                    length__goto_7518_20 = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: 3 else: length_prevgroup__goto_6108_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    ((unsafe: *previous) = 137)
-                                    (op_previous = (unsafe: *previous))
+                                    ((unsafe: *previous__goto_6113_14) = 137)
+                                    (op_previous__goto_6114_13 = (unsafe: *previous__goto_6113_14))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (previous[(3 +% length)] = 122)
+                                    (previous__goto_6113_14[(3 +% length__goto_7518_20)] = 122)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    code = code + (2 + (2 * 2))
-                                    length_prevgroup = length_prevgroup + 6
-                                    (group_return = -1)
+                                    code__goto_6109_14 = code__goto_6109_14 + (2 + (2 * 2))
+                                    length_prevgroup__goto_6108_12 = length_prevgroup__goto_6108_12 + 6
+                                    (group_return__goto_6092_5 = -1)
                                 OP_ASSERT => 0
                                 _ =>
-                                    if (if (if op_previous >= OP_EODN: 1 else: 0) != 0 or (if op_previous <= OP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if op_previous__goto_6114_13 >= OP_EODN: 1 else: 0) != 0 or (if op_previous__goto_6114_13 <= OP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0) != 0:
                                         ((unsafe: *errorcodeptr) = ERR10)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (op_type = 52)
+                                    (op_type__goto_6095_23 = 52)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (mclength = 0)
+                                    (mclength__goto_6163_12 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if op_previous == OP_PROP: 1 else: 0) != 0 or (if op_previous == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (prop_type = previous[1])
+                                    if (if (if op_previous__goto_6114_13 == OP_PROP: 1 else: 0) != 0 or (if op_previous__goto_6114_13 == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (prop_type__goto_7882_13 = previous__goto_6113_14[1])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (prop_value = previous[2])
+                                        (prop_value__goto_7882_24 = previous__goto_6113_14[2])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (prop_value = -1)
-                                        (prop_type = prop_value)
+                                        (prop_value__goto_7882_24 = -1)
+                                        (prop_type__goto_7882_13 = prop_value__goto_7882_24)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (oldcode = code)
+                                    (oldcode__goto_7883_22 = code__goto_6109_14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (code = previous)
+                                    (code__goto_6109_14 = previous__goto_6113_14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if repeat_max == 0: 1 else: 0) != 0:
+                                    if (if repeat_max__goto_6093_26 == 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    repeat_type = repeat_type + op_type
+                                    repeat_type__goto_6095_10 = repeat_type__goto_6095_10 + op_type__goto_6095_23
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if mclength > 0: 1 else: 0) != 0:
-                                        code = code + mclength
+                                    if (if mclength__goto_6163_12 > 0: 1 else: 0) != 0:
+                                        code__goto_6109_14 = code__goto_6109_14 + mclength__goto_6163_12
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (unsafe: *code = op_previous)
-                                        (code = code + 1)
+                                        (unsafe: *code__goto_6109_14 = op_previous__goto_6114_13)
+                                        (code__goto_6109_14 = code__goto_6109_14 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if prop_type >= 0: 1 else: 0) != 0:
-                                            (unsafe: *code = prop_type)
-                                            (code = code + 1)
+                                        if (if prop_type__goto_7882_13 >= 0: 1 else: 0) != 0:
+                                            (unsafe: *code__goto_6109_14 = prop_type__goto_7882_13)
+                                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (unsafe: *code = prop_value)
-                                            (code = code + 1)
+                                            (unsafe: *code__goto_6109_14 = prop_value__goto_7882_24)
+                                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                            if possessive_quantifier != 0:
-                                match (unsafe: *tempcode)
+                            if possessive_quantifier__goto_6161_8 != 0:
+                                match (unsafe: *tempcode__goto_6112_14)
                                     OP_TYPEEXACT =>
-                                        tempcode = tempcode + (_pcre2_OP_lengths_8[(unsafe: *tempcode)] + ((if ((if (if tempcode[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
+                                        tempcode__goto_6112_14 = tempcode__goto_6112_14 + (_pcre2_OP_lengths_8[(unsafe: *tempcode__goto_6112_14)] + ((if ((if (if tempcode__goto_6112_14[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode__goto_6112_14[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
                                     OP_CHAR => 0
                                     OP_CLASS => 0
                                     OP_REF => 0
                                     _ => 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (len = ((((code as usize -% tempcode as usize) / sizeof[u8]())) as c_int))
+                                (len__goto_8038_11 = ((((code__goto_6109_14 as usize -% tempcode__goto_6112_14 as usize) / sizeof[u8]())) as c_int))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if len > 0: 1 else: 0) != 0:
-                                    repcode = (unsafe: *tempcode)
+                                if (if len__goto_8038_11 > 0: 1 else: 0) != 0:
+                                    repcode__goto_8103_22 = (unsafe: *tempcode__goto_6112_14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if repcode < 119: 1 else: 0) != 0 and (if (&opcode_possessify[0] as *mut u8)[repcode] > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        ((unsafe: *tempcode) = (&opcode_possessify[0] as *mut u8)[repcode])
+                                    if (if (if repcode__goto_8103_22 < 119: 1 else: 0) != 0 and (if (&opcode_possessify[0] as *mut u8)[repcode__goto_8103_22] > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        ((unsafe: *tempcode__goto_6112_14) = (&opcode_possessify[0] as *mut u8)[repcode__goto_8103_22])
                                     else:
-                                        code = code + (1 + 2)
+                                        code__goto_6109_14 = code__goto_6109_14 + (1 + 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        len = len + (1 + 2)
+                                        len__goto_8038_11 = len__goto_8038_11 + (1 + 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (tempcode[0] = 135)
+                                        (tempcode__goto_6112_14[0] = 135)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *code = 122)
-                                        (code = code + 1)
+                                        (unsafe: *code__goto_6109_14 = 122)
+                                        (code__goto_6109_14 = code__goto_6109_14 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            cb.req_varyopt = cb.req_varyopt | reqvary
+                            cb.req_varyopt = cb.req_varyopt | reqvary__goto_6104_23
                         2151153664 =>
                             __pc = 5
                             __goto_pending = 1
                             __pc = 5
                             __goto_pending = 1
-                            (repeat_max = 1)
-                            if (if previous_matched_char != 0 and (if repeat_min > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (matched_char = 1)
-                            (reqvary = (if ((if repeat_min == repeat_max: 1 else: 0)) != 0: 0 else: 2))
-                            if (if repeat_min == 0: 1 else: 0) != 0:
-                                (firstcu = zerofirstcu)
+                            (repeat_max__goto_6093_26 = 1)
+                            if (if previous_matched_char__goto_6118_6 != 0 and (if repeat_min__goto_6093_10 > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (matched_char__goto_6117_6 = 1)
+                            (reqvary__goto_6104_23 = (if ((if repeat_min__goto_6093_10 == repeat_max__goto_6093_26: 1 else: 0)) != 0: 0 else: 2))
+                            if (if repeat_min__goto_6093_10 == 0: 1 else: 0) != 0:
+                                (firstcu__goto_6098_10 = zerofirstcu__goto_6099_21)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (firstcuflags = zerofirstcuflags)
+                                (firstcuflags__goto_6102_10 = zerofirstcuflags__goto_6103_26)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (reqcu = zeroreqcu)
+                                (reqcu__goto_6098_19 = zeroreqcu__goto_6099_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (reqcuflags = zeroreqcuflags)
+                                (reqcuflags__goto_6102_24 = zeroreqcuflags__goto_6103_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            match meta
+                            match meta__goto_6101_10
                                 2151809024 =>
-                                    (possessive_quantifier = 1)
+                                    (possessive_quantifier__goto_6161_8 = 1)
                                 2151874560 =>
-                                    (possessive_quantifier = 0)
+                                    (possessive_quantifier__goto_6161_8 = 0)
                                 _ =>
-                                    (repeat_type = greedy_default)
-                                    (possessive_quantifier = 0)
-                            (tempcode = previous)
-                            (op_previous = (unsafe: *previous))
-                            match op_previous
+                                    (repeat_type__goto_6095_10 = greedy_default__goto_6094_10)
+                                    (possessive_quantifier__goto_6161_8 = 0)
+                            (tempcode__goto_6112_14 = previous__goto_6113_14)
+                            (op_previous__goto_6114_13 = (unsafe: *previous__goto_6113_14))
+                            match op_previous__goto_6114_13
                                 OP_CHAR =>
-                                    (op_type = (&chartypeoffset[0] as *mut c_uint)[(op_previous - OP_CHAR)])
-                                    ((&mcbuffer[0] as *mut u8)[0] = code[-1])
+                                    (op_type__goto_6095_23 = (&chartypeoffset[0] as *mut c_uint)[(op_previous__goto_6114_13 - OP_CHAR)])
+                                    ((&mcbuffer__goto_6170_15[0] as *mut u8)[0] = code__goto_6109_14[-1])
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (mclength = 1)
+                                    (mclength__goto_6163_12 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if op_previous <= OP_CHARI: 1 else: 0) != 0 and (if repeat_min > 1: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (reqcu = (&mcbuffer[0] as *mut u8)[0])
+                                    if (if (if op_previous__goto_6114_13 <= OP_CHARI: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 > 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (reqcu__goto_6098_19 = (&mcbuffer__goto_6170_15[0] as *mut u8)[0])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (reqcuflags = cb.req_varyopt)
+                                        (reqcuflags__goto_6102_24 = cb.req_varyopt)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if op_previous == OP_CHARI: 1 else: 0) != 0:
-                                            reqcuflags = reqcuflags | 1
+                                        if (if op_previous__goto_6114_13 == OP_CHARI: 1 else: 0) != 0:
+                                            reqcuflags__goto_6102_24 = reqcuflags__goto_6102_24 | 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 6
                                     __goto_pending = 1
-                                    if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                 OP_CLASS =>
-                                    if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                 OP_RECURSE =>
-                                    if (if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if possessive_quantifier != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+                                    if (if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if possessive_quantifier__goto_6161_8 != 0: 0 else: 1) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
-                                    length = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: 3 else: length_prevgroup)
+                                    length__goto_7518_20 = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: 3 else: length_prevgroup__goto_6108_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    ((unsafe: *previous) = 137)
-                                    (op_previous = (unsafe: *previous))
+                                    ((unsafe: *previous__goto_6113_14) = 137)
+                                    (op_previous__goto_6114_13 = (unsafe: *previous__goto_6113_14))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (previous[(3 +% length)] = 122)
+                                    (previous__goto_6113_14[(3 +% length__goto_7518_20)] = 122)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    code = code + (2 + (2 * 2))
-                                    length_prevgroup = length_prevgroup + 6
-                                    (group_return = -1)
+                                    code__goto_6109_14 = code__goto_6109_14 + (2 + (2 * 2))
+                                    length_prevgroup__goto_6108_12 = length_prevgroup__goto_6108_12 + 6
+                                    (group_return__goto_6092_5 = -1)
                                 OP_ASSERT => 0
                                 _ =>
-                                    if (if (if op_previous >= OP_EODN: 1 else: 0) != 0 or (if op_previous <= OP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if op_previous__goto_6114_13 >= OP_EODN: 1 else: 0) != 0 or (if op_previous__goto_6114_13 <= OP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0) != 0:
                                         ((unsafe: *errorcodeptr) = ERR10)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (op_type = 52)
+                                    (op_type__goto_6095_23 = 52)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (mclength = 0)
+                                    (mclength__goto_6163_12 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if op_previous == OP_PROP: 1 else: 0) != 0 or (if op_previous == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (prop_type = previous[1])
+                                    if (if (if op_previous__goto_6114_13 == OP_PROP: 1 else: 0) != 0 or (if op_previous__goto_6114_13 == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (prop_type__goto_7882_13 = previous__goto_6113_14[1])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (prop_value = previous[2])
+                                        (prop_value__goto_7882_24 = previous__goto_6113_14[2])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (prop_value = -1)
-                                        (prop_type = prop_value)
+                                        (prop_value__goto_7882_24 = -1)
+                                        (prop_type__goto_7882_13 = prop_value__goto_7882_24)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (oldcode = code)
+                                    (oldcode__goto_7883_22 = code__goto_6109_14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (code = previous)
+                                    (code__goto_6109_14 = previous__goto_6113_14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if repeat_max == 0: 1 else: 0) != 0:
+                                    if (if repeat_max__goto_6093_26 == 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    repeat_type = repeat_type + op_type
+                                    repeat_type__goto_6095_10 = repeat_type__goto_6095_10 + op_type__goto_6095_23
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if mclength > 0: 1 else: 0) != 0:
-                                        code = code + mclength
+                                    if (if mclength__goto_6163_12 > 0: 1 else: 0) != 0:
+                                        code__goto_6109_14 = code__goto_6109_14 + mclength__goto_6163_12
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (unsafe: *code = op_previous)
-                                        (code = code + 1)
+                                        (unsafe: *code__goto_6109_14 = op_previous__goto_6114_13)
+                                        (code__goto_6109_14 = code__goto_6109_14 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if prop_type >= 0: 1 else: 0) != 0:
-                                            (unsafe: *code = prop_type)
-                                            (code = code + 1)
+                                        if (if prop_type__goto_7882_13 >= 0: 1 else: 0) != 0:
+                                            (unsafe: *code__goto_6109_14 = prop_type__goto_7882_13)
+                                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (unsafe: *code = prop_value)
-                                            (code = code + 1)
+                                            (unsafe: *code__goto_6109_14 = prop_value__goto_7882_24)
+                                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                            if possessive_quantifier != 0:
-                                match (unsafe: *tempcode)
+                            if possessive_quantifier__goto_6161_8 != 0:
+                                match (unsafe: *tempcode__goto_6112_14)
                                     OP_TYPEEXACT =>
-                                        tempcode = tempcode + (_pcre2_OP_lengths_8[(unsafe: *tempcode)] + ((if ((if (if tempcode[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
+                                        tempcode__goto_6112_14 = tempcode__goto_6112_14 + (_pcre2_OP_lengths_8[(unsafe: *tempcode__goto_6112_14)] + ((if ((if (if tempcode__goto_6112_14[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode__goto_6112_14[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
                                     OP_CHAR => 0
                                     OP_CLASS => 0
                                     OP_REF => 0
                                     _ => 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (len = ((((code as usize -% tempcode as usize) / sizeof[u8]())) as c_int))
+                                (len__goto_8038_11 = ((((code__goto_6109_14 as usize -% tempcode__goto_6112_14 as usize) / sizeof[u8]())) as c_int))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if len > 0: 1 else: 0) != 0:
-                                    repcode = (unsafe: *tempcode)
+                                if (if len__goto_8038_11 > 0: 1 else: 0) != 0:
+                                    repcode__goto_8103_22 = (unsafe: *tempcode__goto_6112_14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if repcode < 119: 1 else: 0) != 0 and (if (&opcode_possessify[0] as *mut u8)[repcode] > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        ((unsafe: *tempcode) = (&opcode_possessify[0] as *mut u8)[repcode])
+                                    if (if (if repcode__goto_8103_22 < 119: 1 else: 0) != 0 and (if (&opcode_possessify[0] as *mut u8)[repcode__goto_8103_22] > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        ((unsafe: *tempcode__goto_6112_14) = (&opcode_possessify[0] as *mut u8)[repcode__goto_8103_22])
                                     else:
-                                        code = code + (1 + 2)
+                                        code__goto_6109_14 = code__goto_6109_14 + (1 + 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        len = len + (1 + 2)
+                                        len__goto_8038_11 = len__goto_8038_11 + (1 + 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (tempcode[0] = 135)
+                                        (tempcode__goto_6112_14[0] = 135)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *code = 122)
-                                        (code = code + 1)
+                                        (unsafe: *code__goto_6109_14 = 122)
+                                        (code__goto_6109_14 = code__goto_6109_14 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            cb.req_varyopt = cb.req_varyopt | reqvary
+                            cb.req_varyopt = cb.req_varyopt | reqvary__goto_6104_23
                         2151350272 =>
                             __pc = 5
                             __goto_pending = 1
-                            (repeat_max = 1)
-                            if (if previous_matched_char != 0 and (if repeat_min > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (matched_char = 1)
-                            (reqvary = (if ((if repeat_min == repeat_max: 1 else: 0)) != 0: 0 else: 2))
-                            if (if repeat_min == 0: 1 else: 0) != 0:
-                                (firstcu = zerofirstcu)
+                            (repeat_max__goto_6093_26 = 1)
+                            if (if previous_matched_char__goto_6118_6 != 0 and (if repeat_min__goto_6093_10 > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (matched_char__goto_6117_6 = 1)
+                            (reqvary__goto_6104_23 = (if ((if repeat_min__goto_6093_10 == repeat_max__goto_6093_26: 1 else: 0)) != 0: 0 else: 2))
+                            if (if repeat_min__goto_6093_10 == 0: 1 else: 0) != 0:
+                                (firstcu__goto_6098_10 = zerofirstcu__goto_6099_21)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (firstcuflags = zerofirstcuflags)
+                                (firstcuflags__goto_6102_10 = zerofirstcuflags__goto_6103_26)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (reqcu = zeroreqcu)
+                                (reqcu__goto_6098_19 = zeroreqcu__goto_6099_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (reqcuflags = zeroreqcuflags)
+                                (reqcuflags__goto_6102_24 = zeroreqcuflags__goto_6103_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            match meta
+                            match meta__goto_6101_10
                                 2151809024 =>
-                                    (possessive_quantifier = 1)
+                                    (possessive_quantifier__goto_6161_8 = 1)
                                 2151874560 =>
-                                    (possessive_quantifier = 0)
+                                    (possessive_quantifier__goto_6161_8 = 0)
                                 _ =>
-                                    (repeat_type = greedy_default)
-                                    (possessive_quantifier = 0)
-                            (tempcode = previous)
-                            (op_previous = (unsafe: *previous))
-                            match op_previous
+                                    (repeat_type__goto_6095_10 = greedy_default__goto_6094_10)
+                                    (possessive_quantifier__goto_6161_8 = 0)
+                            (tempcode__goto_6112_14 = previous__goto_6113_14)
+                            (op_previous__goto_6114_13 = (unsafe: *previous__goto_6113_14))
+                            match op_previous__goto_6114_13
                                 OP_CHAR =>
-                                    (op_type = (&chartypeoffset[0] as *mut c_uint)[(op_previous - OP_CHAR)])
-                                    ((&mcbuffer[0] as *mut u8)[0] = code[-1])
+                                    (op_type__goto_6095_23 = (&chartypeoffset[0] as *mut c_uint)[(op_previous__goto_6114_13 - OP_CHAR)])
+                                    ((&mcbuffer__goto_6170_15[0] as *mut u8)[0] = code__goto_6109_14[-1])
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (mclength = 1)
+                                    (mclength__goto_6163_12 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if op_previous <= OP_CHARI: 1 else: 0) != 0 and (if repeat_min > 1: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (reqcu = (&mcbuffer[0] as *mut u8)[0])
+                                    if (if (if op_previous__goto_6114_13 <= OP_CHARI: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 > 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (reqcu__goto_6098_19 = (&mcbuffer__goto_6170_15[0] as *mut u8)[0])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (reqcuflags = cb.req_varyopt)
+                                        (reqcuflags__goto_6102_24 = cb.req_varyopt)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if op_previous == OP_CHARI: 1 else: 0) != 0:
-                                            reqcuflags = reqcuflags | 1
+                                        if (if op_previous__goto_6114_13 == OP_CHARI: 1 else: 0) != 0:
+                                            reqcuflags__goto_6102_24 = reqcuflags__goto_6102_24 | 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 6
                                     __goto_pending = 1
-                                    if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                 OP_CLASS =>
-                                    if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                 OP_RECURSE =>
-                                    if (if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if possessive_quantifier != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+                                    if (if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if possessive_quantifier__goto_6161_8 != 0: 0 else: 1) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
-                                    length = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: 3 else: length_prevgroup)
+                                    length__goto_7518_20 = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: 3 else: length_prevgroup__goto_6108_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    ((unsafe: *previous) = 137)
-                                    (op_previous = (unsafe: *previous))
+                                    ((unsafe: *previous__goto_6113_14) = 137)
+                                    (op_previous__goto_6114_13 = (unsafe: *previous__goto_6113_14))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (previous[(3 +% length)] = 122)
+                                    (previous__goto_6113_14[(3 +% length__goto_7518_20)] = 122)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    code = code + (2 + (2 * 2))
-                                    length_prevgroup = length_prevgroup + 6
-                                    (group_return = -1)
+                                    code__goto_6109_14 = code__goto_6109_14 + (2 + (2 * 2))
+                                    length_prevgroup__goto_6108_12 = length_prevgroup__goto_6108_12 + 6
+                                    (group_return__goto_6092_5 = -1)
                                 OP_ASSERT => 0
                                 _ =>
-                                    if (if (if op_previous >= OP_EODN: 1 else: 0) != 0 or (if op_previous <= OP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if op_previous__goto_6114_13 >= OP_EODN: 1 else: 0) != 0 or (if op_previous__goto_6114_13 <= OP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0) != 0:
                                         ((unsafe: *errorcodeptr) = ERR10)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (op_type = 52)
+                                    (op_type__goto_6095_23 = 52)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (mclength = 0)
+                                    (mclength__goto_6163_12 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if op_previous == OP_PROP: 1 else: 0) != 0 or (if op_previous == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (prop_type = previous[1])
+                                    if (if (if op_previous__goto_6114_13 == OP_PROP: 1 else: 0) != 0 or (if op_previous__goto_6114_13 == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (prop_type__goto_7882_13 = previous__goto_6113_14[1])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (prop_value = previous[2])
+                                        (prop_value__goto_7882_24 = previous__goto_6113_14[2])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (prop_value = -1)
-                                        (prop_type = prop_value)
+                                        (prop_value__goto_7882_24 = -1)
+                                        (prop_type__goto_7882_13 = prop_value__goto_7882_24)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (oldcode = code)
+                                    (oldcode__goto_7883_22 = code__goto_6109_14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (code = previous)
+                                    (code__goto_6109_14 = previous__goto_6113_14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if repeat_max == 0: 1 else: 0) != 0:
+                                    if (if repeat_max__goto_6093_26 == 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    repeat_type = repeat_type + op_type
+                                    repeat_type__goto_6095_10 = repeat_type__goto_6095_10 + op_type__goto_6095_23
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if mclength > 0: 1 else: 0) != 0:
-                                        code = code + mclength
+                                    if (if mclength__goto_6163_12 > 0: 1 else: 0) != 0:
+                                        code__goto_6109_14 = code__goto_6109_14 + mclength__goto_6163_12
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (unsafe: *code = op_previous)
-                                        (code = code + 1)
+                                        (unsafe: *code__goto_6109_14 = op_previous__goto_6114_13)
+                                        (code__goto_6109_14 = code__goto_6109_14 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if prop_type >= 0: 1 else: 0) != 0:
-                                            (unsafe: *code = prop_type)
-                                            (code = code + 1)
+                                        if (if prop_type__goto_7882_13 >= 0: 1 else: 0) != 0:
+                                            (unsafe: *code__goto_6109_14 = prop_type__goto_7882_13)
+                                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (unsafe: *code = prop_value)
-                                            (code = code + 1)
+                                            (unsafe: *code__goto_6109_14 = prop_value__goto_7882_24)
+                                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                            if possessive_quantifier != 0:
-                                match (unsafe: *tempcode)
+                            if possessive_quantifier__goto_6161_8 != 0:
+                                match (unsafe: *tempcode__goto_6112_14)
                                     OP_TYPEEXACT =>
-                                        tempcode = tempcode + (_pcre2_OP_lengths_8[(unsafe: *tempcode)] + ((if ((if (if tempcode[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
+                                        tempcode__goto_6112_14 = tempcode__goto_6112_14 + (_pcre2_OP_lengths_8[(unsafe: *tempcode__goto_6112_14)] + ((if ((if (if tempcode__goto_6112_14[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode__goto_6112_14[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
                                     OP_CHAR => 0
                                     OP_CLASS => 0
                                     OP_REF => 0
                                     _ => 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (len = ((((code as usize -% tempcode as usize) / sizeof[u8]())) as c_int))
+                                (len__goto_8038_11 = ((((code__goto_6109_14 as usize -% tempcode__goto_6112_14 as usize) / sizeof[u8]())) as c_int))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if len > 0: 1 else: 0) != 0:
-                                    repcode = (unsafe: *tempcode)
+                                if (if len__goto_8038_11 > 0: 1 else: 0) != 0:
+                                    repcode__goto_8103_22 = (unsafe: *tempcode__goto_6112_14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if repcode < 119: 1 else: 0) != 0 and (if (&opcode_possessify[0] as *mut u8)[repcode] > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        ((unsafe: *tempcode) = (&opcode_possessify[0] as *mut u8)[repcode])
+                                    if (if (if repcode__goto_8103_22 < 119: 1 else: 0) != 0 and (if (&opcode_possessify[0] as *mut u8)[repcode__goto_8103_22] > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        ((unsafe: *tempcode__goto_6112_14) = (&opcode_possessify[0] as *mut u8)[repcode__goto_8103_22])
                                     else:
-                                        code = code + (1 + 2)
+                                        code__goto_6109_14 = code__goto_6109_14 + (1 + 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        len = len + (1 + 2)
+                                        len__goto_8038_11 = len__goto_8038_11 + (1 + 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (tempcode[0] = 135)
+                                        (tempcode__goto_6112_14[0] = 135)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *code = 122)
-                                        (code = code + 1)
+                                        (unsafe: *code__goto_6109_14 = 122)
+                                        (code__goto_6109_14 = code__goto_6109_14 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            cb.req_varyopt = cb.req_varyopt | reqvary
+                            cb.req_varyopt = cb.req_varyopt | reqvary__goto_6104_23
                         2151546880 =>
-                            (repeat_max = 1)
-                            if (if previous_matched_char != 0 and (if repeat_min > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (matched_char = 1)
-                            (reqvary = (if ((if repeat_min == repeat_max: 1 else: 0)) != 0: 0 else: 2))
-                            if (if repeat_min == 0: 1 else: 0) != 0:
-                                (firstcu = zerofirstcu)
+                            (repeat_max__goto_6093_26 = 1)
+                            if (if previous_matched_char__goto_6118_6 != 0 and (if repeat_min__goto_6093_10 > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (matched_char__goto_6117_6 = 1)
+                            (reqvary__goto_6104_23 = (if ((if repeat_min__goto_6093_10 == repeat_max__goto_6093_26: 1 else: 0)) != 0: 0 else: 2))
+                            if (if repeat_min__goto_6093_10 == 0: 1 else: 0) != 0:
+                                (firstcu__goto_6098_10 = zerofirstcu__goto_6099_21)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (firstcuflags = zerofirstcuflags)
+                                (firstcuflags__goto_6102_10 = zerofirstcuflags__goto_6103_26)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (reqcu = zeroreqcu)
+                                (reqcu__goto_6098_19 = zeroreqcu__goto_6099_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (reqcuflags = zeroreqcuflags)
+                                (reqcuflags__goto_6102_24 = zeroreqcuflags__goto_6103_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            match meta
+                            match meta__goto_6101_10
                                 2151809024 =>
-                                    (possessive_quantifier = 1)
+                                    (possessive_quantifier__goto_6161_8 = 1)
                                 2151874560 =>
-                                    (possessive_quantifier = 0)
+                                    (possessive_quantifier__goto_6161_8 = 0)
                                 _ =>
-                                    (repeat_type = greedy_default)
-                                    (possessive_quantifier = 0)
-                            (tempcode = previous)
-                            (op_previous = (unsafe: *previous))
-                            match op_previous
+                                    (repeat_type__goto_6095_10 = greedy_default__goto_6094_10)
+                                    (possessive_quantifier__goto_6161_8 = 0)
+                            (tempcode__goto_6112_14 = previous__goto_6113_14)
+                            (op_previous__goto_6114_13 = (unsafe: *previous__goto_6113_14))
+                            match op_previous__goto_6114_13
                                 OP_CHAR =>
-                                    (op_type = (&chartypeoffset[0] as *mut c_uint)[(op_previous - OP_CHAR)])
-                                    ((&mcbuffer[0] as *mut u8)[0] = code[-1])
+                                    (op_type__goto_6095_23 = (&chartypeoffset[0] as *mut c_uint)[(op_previous__goto_6114_13 - OP_CHAR)])
+                                    ((&mcbuffer__goto_6170_15[0] as *mut u8)[0] = code__goto_6109_14[-1])
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (mclength = 1)
+                                    (mclength__goto_6163_12 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if op_previous <= OP_CHARI: 1 else: 0) != 0 and (if repeat_min > 1: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (reqcu = (&mcbuffer[0] as *mut u8)[0])
+                                    if (if (if op_previous__goto_6114_13 <= OP_CHARI: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 > 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (reqcu__goto_6098_19 = (&mcbuffer__goto_6170_15[0] as *mut u8)[0])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (reqcuflags = cb.req_varyopt)
+                                        (reqcuflags__goto_6102_24 = cb.req_varyopt)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if op_previous == OP_CHARI: 1 else: 0) != 0:
-                                            reqcuflags = reqcuflags | 1
+                                        if (if op_previous__goto_6114_13 == OP_CHARI: 1 else: 0) != 0:
+                                            reqcuflags__goto_6102_24 = reqcuflags__goto_6102_24 | 1
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     __pc = 6
                                     __goto_pending = 1
-                                    if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                 OP_CLASS =>
-                                    if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                 OP_RECURSE =>
-                                    if (if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if possessive_quantifier != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+                                    if (if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0 and (if possessive_quantifier__goto_6161_8 != 0: 0 else: 1) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
-                                    length = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: 3 else: length_prevgroup)
+                                    length__goto_7518_20 = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: 3 else: length_prevgroup__goto_6108_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    ((unsafe: *previous) = 137)
-                                    (op_previous = (unsafe: *previous))
+                                    ((unsafe: *previous__goto_6113_14) = 137)
+                                    (op_previous__goto_6114_13 = (unsafe: *previous__goto_6113_14))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (previous[(3 +% length)] = 122)
+                                    (previous__goto_6113_14[(3 +% length__goto_7518_20)] = 122)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    code = code + (2 + (2 * 2))
-                                    length_prevgroup = length_prevgroup + 6
-                                    (group_return = -1)
+                                    code__goto_6109_14 = code__goto_6109_14 + (2 + (2 * 2))
+                                    length_prevgroup__goto_6108_12 = length_prevgroup__goto_6108_12 + 6
+                                    (group_return__goto_6092_5 = -1)
                                 OP_ASSERT => 0
                                 _ =>
-                                    if (if (if op_previous >= OP_EODN: 1 else: 0) != 0 or (if op_previous <= OP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if op_previous__goto_6114_13 >= OP_EODN: 1 else: 0) != 0 or (if op_previous__goto_6114_13 <= OP_WORD_BOUNDARY: 1 else: 0) != 0: 1 else: 0) != 0:
                                         ((unsafe: *errorcodeptr) = ERR10)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         return 0
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                    if (if (if repeat_max == 1: 1 else: 0) != 0 and (if repeat_min == 1: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if repeat_max__goto_6093_26 == 1: 1 else: 0) != 0 and (if repeat_min__goto_6093_10 == 1: 1 else: 0) != 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (op_type = 52)
+                                    (op_type__goto_6095_23 = 52)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (mclength = 0)
+                                    (mclength__goto_6163_12 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if op_previous == OP_PROP: 1 else: 0) != 0 or (if op_previous == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (prop_type = previous[1])
+                                    if (if (if op_previous__goto_6114_13 == OP_PROP: 1 else: 0) != 0 or (if op_previous__goto_6114_13 == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (prop_type__goto_7882_13 = previous__goto_6113_14[1])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (prop_value = previous[2])
+                                        (prop_value__goto_7882_24 = previous__goto_6113_14[2])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (prop_value = -1)
-                                        (prop_type = prop_value)
+                                        (prop_value__goto_7882_24 = -1)
+                                        (prop_type__goto_7882_13 = prop_value__goto_7882_24)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (oldcode = code)
+                                    (oldcode__goto_7883_22 = code__goto_6109_14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (code = previous)
+                                    (code__goto_6109_14 = previous__goto_6113_14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if repeat_max == 0: 1 else: 0) != 0:
+                                    if (if repeat_max__goto_6093_26 == 0: 1 else: 0) != 0:
                                         __pc = 7
                                         __goto_pending = 1
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    repeat_type = repeat_type + op_type
+                                    repeat_type__goto_6095_10 = repeat_type__goto_6095_10 + op_type__goto_6095_23
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if mclength > 0: 1 else: 0) != 0:
-                                        code = code + mclength
+                                    if (if mclength__goto_6163_12 > 0: 1 else: 0) != 0:
+                                        code__goto_6109_14 = code__goto_6109_14 + mclength__goto_6163_12
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (unsafe: *code = op_previous)
-                                        (code = code + 1)
+                                        (unsafe: *code__goto_6109_14 = op_previous__goto_6114_13)
+                                        (code__goto_6109_14 = code__goto_6109_14 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if prop_type >= 0: 1 else: 0) != 0:
-                                            (unsafe: *code = prop_type)
-                                            (code = code + 1)
+                                        if (if prop_type__goto_7882_13 >= 0: 1 else: 0) != 0:
+                                            (unsafe: *code__goto_6109_14 = prop_type__goto_7882_13)
+                                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (unsafe: *code = prop_value)
-                                            (code = code + 1)
+                                            (unsafe: *code__goto_6109_14 = prop_value__goto_7882_24)
+                                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                            if possessive_quantifier != 0:
-                                match (unsafe: *tempcode)
+                            if possessive_quantifier__goto_6161_8 != 0:
+                                match (unsafe: *tempcode__goto_6112_14)
                                     OP_TYPEEXACT =>
-                                        tempcode = tempcode + (_pcre2_OP_lengths_8[(unsafe: *tempcode)] + ((if ((if (if tempcode[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
+                                        tempcode__goto_6112_14 = tempcode__goto_6112_14 + (_pcre2_OP_lengths_8[(unsafe: *tempcode__goto_6112_14)] + ((if ((if (if tempcode__goto_6112_14[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if tempcode__goto_6112_14[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
                                     OP_CHAR => 0
                                     OP_CLASS => 0
                                     OP_REF => 0
                                     _ => 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (len = ((((code as usize -% tempcode as usize) / sizeof[u8]())) as c_int))
+                                (len__goto_8038_11 = ((((code__goto_6109_14 as usize -% tempcode__goto_6112_14 as usize) / sizeof[u8]())) as c_int))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if len > 0: 1 else: 0) != 0:
-                                    repcode = (unsafe: *tempcode)
+                                if (if len__goto_8038_11 > 0: 1 else: 0) != 0:
+                                    repcode__goto_8103_22 = (unsafe: *tempcode__goto_6112_14)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if repcode < 119: 1 else: 0) != 0 and (if (&opcode_possessify[0] as *mut u8)[repcode] > 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        ((unsafe: *tempcode) = (&opcode_possessify[0] as *mut u8)[repcode])
+                                    if (if (if repcode__goto_8103_22 < 119: 1 else: 0) != 0 and (if (&opcode_possessify[0] as *mut u8)[repcode__goto_8103_22] > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        ((unsafe: *tempcode__goto_6112_14) = (&opcode_possessify[0] as *mut u8)[repcode__goto_8103_22])
                                     else:
-                                        code = code + (1 + 2)
+                                        code__goto_6109_14 = code__goto_6109_14 + (1 + 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        len = len + (1 + 2)
+                                        len__goto_8038_11 = len__goto_8038_11 + (1 + 2)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (tempcode[0] = 135)
+                                        (tempcode__goto_6112_14[0] = 135)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (unsafe: *code = 122)
-                                        (code = code + 1)
+                                        (unsafe: *code__goto_6109_14 = 122)
+                                        (code__goto_6109_14 = code__goto_6109_14 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            cb.req_varyopt = cb.req_varyopt | reqvary
+                            cb.req_varyopt = cb.req_varyopt | reqvary__goto_6104_23
                         2147811328 =>
-                            (pptr = pptr + 1)
+                            (pptr__goto_6100_11 = pptr__goto_6100_11 + 1)
                             __pc = 10
                             __goto_pending = 1
-                            if (if meta_arg < 10: 1 else: 0) != 0:
-                                (offset = (&cb.small_ref_offset[0] as *mut c_ulong)[meta_arg])
+                            if (if meta_arg__goto_6101_16 < 10: 1 else: 0) != 0:
+                                (offset__goto_6107_12 = (&cb.small_ref_offset[0] as *mut c_ulong)[meta_arg__goto_6101_16])
                             else:
-                                pptr = pptr + 2
+                                pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             0
-                            if (if meta_arg > cb.bracount: 1 else: 0) != 0:
-                                (cb.erroroffset = offset)
+                            if (if meta_arg__goto_6101_16 > cb.bracount: 1 else: 0) != 0:
+                                (cb.erroroffset = offset__goto_6107_12)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 ((unsafe: *errorcodeptr) = ERR15)
@@ -8250,27 +8509,27 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if firstcuflags == 4294967295: 1 else: 0) != 0:
-                                (firstcuflags = (4294967294 as c_uint))
-                                (zerofirstcuflags = firstcuflags)
-                            (unsafe: *code = (if ((if ((options & 8)) != 0: 1 else: 0)) != 0: OP_REFI else: OP_REF))
-                            (code = code + 1)
-                            if (if ((options & 8)) != 0: 1 else: 0) != 0:
-                                (unsafe: *code = (((if ((if ((xoptions & 128)) != 0: 1 else: 0)) != 0: 1 else: 0)) | ((if ((if ((xoptions & 65536)) != 0: 1 else: 0)) != 0: 2 else: 0))))
-                                (code = code + 1)
-                            cb.backref_map = cb.backref_map | (if ((if meta_arg < 32: 1 else: 0)) != 0: ((1 << meta_arg)) else: 1)
-                            if (if meta_arg > cb.top_backref: 1 else: 0) != 0:
-                                (cb.top_backref = meta_arg)
+                            if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0:
+                                (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
+                                (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
+                            (unsafe: *code__goto_6109_14 = (if ((if ((options__goto_6096_10 & 8)) != 0: 1 else: 0)) != 0: OP_REFI else: OP_REF))
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
+                            if (if ((options__goto_6096_10 & 8)) != 0: 1 else: 0) != 0:
+                                (unsafe: *code__goto_6109_14 = (((if ((if ((xoptions__goto_6097_10 & 128)) != 0: 1 else: 0)) != 0: 1 else: 0)) | ((if ((if ((xoptions__goto_6097_10 & 65536)) != 0: 1 else: 0)) != 0: 2 else: 0))))
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
+                            cb.backref_map = cb.backref_map | (if ((if meta_arg__goto_6101_16 < 32: 1 else: 0)) != 0: ((1 << meta_arg__goto_6101_16)) else: 1)
+                            if (if meta_arg__goto_6101_16 > cb.top_backref: 1 else: 0) != 0:
+                                (cb.top_backref = meta_arg__goto_6101_16)
                         2147680256 =>
-                            if (if meta_arg < 10: 1 else: 0) != 0:
-                                (offset = (&cb.small_ref_offset[0] as *mut c_ulong)[meta_arg])
+                            if (if meta_arg__goto_6101_16 < 10: 1 else: 0) != 0:
+                                (offset__goto_6107_12 = (&cb.small_ref_offset[0] as *mut c_ulong)[meta_arg__goto_6101_16])
                             else:
-                                pptr = pptr + 2
+                                pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             0
-                            if (if meta_arg > cb.bracount: 1 else: 0) != 0:
-                                (cb.erroroffset = offset)
+                            if (if meta_arg__goto_6101_16 > cb.bracount: 1 else: 0) != 0:
+                                (cb.erroroffset = offset__goto_6107_12)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 ((unsafe: *errorcodeptr) = ERR15)
@@ -8279,24 +8538,24 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if (if firstcuflags == 4294967295: 1 else: 0) != 0:
-                                (firstcuflags = (4294967294 as c_uint))
-                                (zerofirstcuflags = firstcuflags)
-                            (unsafe: *code = (if ((if ((options & 8)) != 0: 1 else: 0)) != 0: OP_REFI else: OP_REF))
-                            (code = code + 1)
-                            if (if ((options & 8)) != 0: 1 else: 0) != 0:
-                                (unsafe: *code = (((if ((if ((xoptions & 128)) != 0: 1 else: 0)) != 0: 1 else: 0)) | ((if ((if ((xoptions & 65536)) != 0: 1 else: 0)) != 0: 2 else: 0))))
-                                (code = code + 1)
-                            cb.backref_map = cb.backref_map | (if ((if meta_arg < 32: 1 else: 0)) != 0: ((1 << meta_arg)) else: 1)
-                            if (if meta_arg > cb.top_backref: 1 else: 0) != 0:
-                                (cb.top_backref = meta_arg)
+                            if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0:
+                                (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
+                                (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
+                            (unsafe: *code__goto_6109_14 = (if ((if ((options__goto_6096_10 & 8)) != 0: 1 else: 0)) != 0: OP_REFI else: OP_REF))
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
+                            if (if ((options__goto_6096_10 & 8)) != 0: 1 else: 0) != 0:
+                                (unsafe: *code__goto_6109_14 = (((if ((if ((xoptions__goto_6097_10 & 128)) != 0: 1 else: 0)) != 0: 1 else: 0)) | ((if ((if ((xoptions__goto_6097_10 & 65536)) != 0: 1 else: 0)) != 0: 2 else: 0))))
+                                (code__goto_6109_14 = code__goto_6109_14 + 1)
+                            cb.backref_map = cb.backref_map | (if ((if meta_arg__goto_6101_16 < 32: 1 else: 0)) != 0: ((1 << meta_arg__goto_6101_16)) else: 1)
+                            if (if meta_arg__goto_6101_16 > cb.top_backref: 1 else: 0) != 0:
+                                (cb.top_backref = meta_arg__goto_6101_16)
                         2149842944 =>
-                            pptr = pptr + 2
+                            pptr__goto_6100_11 = pptr__goto_6100_11 + 2
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             0
-                            if (if meta_arg > cb.bracount: 1 else: 0) != 0:
-                                (cb.erroroffset = offset)
+                            if (if meta_arg__goto_6101_16 > cb.bracount: 1 else: 0) != 0:
+                                (cb.erroroffset = offset__goto_6107_12)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 ((unsafe: *errorcodeptr) = ERR15)
@@ -8305,45 +8564,45 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            ((unsafe: *code) = 118)
-                            code = code + (1 + 2)
-                            (length_prevgroup = 3)
-                            (groupsetfirstcu = 0)
+                            ((unsafe: *code__goto_6109_14) = 118)
+                            code__goto_6109_14 = code__goto_6109_14 + (1 + 2)
+                            (length_prevgroup__goto_6108_12 = 3)
+                            (groupsetfirstcu__goto_6115_6 = 0)
                             (cb.had_recurse = 1)
-                            if (if firstcuflags == 4294967295: 1 else: 0) != 0:
-                                (firstcuflags = (4294967294 as c_uint))
-                            (zerofirstcu = firstcu)
-                            (zerofirstcuflags = firstcuflags)
+                            if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0:
+                                (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
+                            (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
+                            (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
                         2148007936 =>
-                            (bravalue = OP_CBRA)
-                            (skipunits = 2)
-                            (cb.lastcapture = meta_arg)
+                            (bravalue__goto_6090_5 = OP_CBRA)
+                            (skipunits__goto_6164_12 = 2)
+                            (cb.lastcapture = meta_arg__goto_6101_16)
                             __pc = 3
                             __goto_pending = 1
-                            if (if (if meta_arg > 5: 1 else: 0) != 0 and (if meta_arg < 23: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (matched_char = 1)
+                            if (if (if meta_arg__goto_6101_16 > 5: 1 else: 0) != 0 and (if meta_arg__goto_6101_16 < 23: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (matched_char__goto_6117_6 = 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if firstcuflags == 4294967295: 1 else: 0) != 0:
-                                    (firstcuflags = (4294967294 as c_uint))
+                                if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0:
+                                    (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (zerofirstcu = firstcu)
-                            (zerofirstcuflags = firstcuflags)
-                            (zeroreqcu = reqcu)
-                            (zeroreqcuflags = reqcuflags)
-                            if (if (if (if cb.assert_depth > 0: 1 else: 0) != 0 and (if meta_arg == 3: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((xoptions & 64)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                            (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
+                            (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
+                            (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
+                            (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
+                            if (if (if (if cb.assert_depth > 0: 1 else: 0) != 0 and (if meta_arg__goto_6101_16 == 3: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((xoptions__goto_6097_10 & 64)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                 ((unsafe: *errorcodeptr) = ERR99)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            match meta_arg
+                            match meta_arg__goto_6101_16
                                 14 =>
                                     cb.external_flags = cb.external_flags | 4194304
-                                    if (if utf != 0: 0 else: 1) != 0:
-                                        (meta_arg = 13)
+                                    if (if utf__goto_6129_6 != 0: 0 else: 1) != 0:
+                                        (meta_arg__goto_6101_16 = 13)
                                 4 =>
                                     if (if cb.max_lookbehind == 0: 1 else: 0) != 0:
                                         (cb.max_lookbehind = 1)
@@ -8353,33 +8612,33 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 3 =>
                                     cb.external_flags = cb.external_flags | 16777216
                                 _ => 0
-                            (unsafe: *code = meta_arg)
-                            (code = code + 1)
+                            (unsafe: *code__goto_6109_14 = meta_arg__goto_6101_16)
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                         2149318656 =>
-                            if (if (if meta_arg > 5: 1 else: 0) != 0 and (if meta_arg < 23: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (matched_char = 1)
+                            if (if (if meta_arg__goto_6101_16 > 5: 1 else: 0) != 0 and (if meta_arg__goto_6101_16 < 23: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (matched_char__goto_6117_6 = 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if firstcuflags == 4294967295: 1 else: 0) != 0:
-                                    (firstcuflags = (4294967294 as c_uint))
+                                if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0:
+                                    (firstcuflags__goto_6102_10 = (4294967294 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (zerofirstcu = firstcu)
-                            (zerofirstcuflags = firstcuflags)
-                            (zeroreqcu = reqcu)
-                            (zeroreqcuflags = reqcuflags)
-                            if (if (if (if cb.assert_depth > 0: 1 else: 0) != 0 and (if meta_arg == 3: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((xoptions & 64)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                            (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
+                            (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
+                            (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
+                            (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
+                            if (if (if (if cb.assert_depth > 0: 1 else: 0) != 0 and (if meta_arg__goto_6101_16 == 3: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((xoptions__goto_6097_10 & 64)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
                                 ((unsafe: *errorcodeptr) = ERR99)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            match meta_arg
+                            match meta_arg__goto_6101_16
                                 14 =>
                                     cb.external_flags = cb.external_flags | 4194304
-                                    if (if utf != 0: 0 else: 1) != 0:
-                                        (meta_arg = 13)
+                                    if (if utf__goto_6129_6 != 0: 0 else: 1) != 0:
+                                        (meta_arg__goto_6101_16 = 13)
                                 4 =>
                                     if (if cb.max_lookbehind == 0: 1 else: 0) != 0:
                                         (cb.max_lookbehind = 1)
@@ -8389,90 +8648,90 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 3 =>
                                     cb.external_flags = cb.external_flags | 16777216
                                 _ => 0
-                            (unsafe: *code = meta_arg)
-                            (code = code + 1)
+                            (unsafe: *code__goto_6109_14 = meta_arg__goto_6101_16)
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
                         _ =>
-                            if (if meta >= 2147483648: 1 else: 0) != 0:
+                            if (if meta__goto_6101_10 >= 2147483648: 1 else: 0) != 0:
                                 ((unsafe: *errorcodeptr) = ERR89)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            (meta = (unsafe: *pptr))
-                            (matched_char = 1)
-                            (mclength = 1)
+                            (meta__goto_6101_10 = (unsafe: *pptr__goto_6100_11))
+                            (matched_char__goto_6117_6 = 1)
+                            (mclength__goto_6163_12 = 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            ((&mcbuffer[0] as *mut u8)[0] = meta)
+                            ((&mcbuffer__goto_6170_15[0] as *mut u8)[0] = meta__goto_6101_10)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (unsafe: *code = (if ((if ((options & 8)) != 0: 1 else: 0)) != 0: OP_CHARI else: OP_CHAR))
-                            (code = code + 1)
-                            code = code + mclength
-                            if (if (if (&mcbuffer[0] as *mut u8)[0] == 13: 1 else: 0) != 0 or (if (&mcbuffer[0] as *mut u8)[0] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                            (unsafe: *code__goto_6109_14 = (if ((if ((options__goto_6096_10 & 8)) != 0: 1 else: 0)) != 0: OP_CHARI else: OP_CHAR))
+                            (code__goto_6109_14 = code__goto_6109_14 + 1)
+                            code__goto_6109_14 = code__goto_6109_14 + mclength__goto_6163_12
+                            if (if (if (&mcbuffer__goto_6170_15[0] as *mut u8)[0] == 13: 1 else: 0) != 0 or (if (&mcbuffer__goto_6170_15[0] as *mut u8)[0] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
                                 cb.external_flags = cb.external_flags | 2048
-                            if (if firstcuflags == 4294967295: 1 else: 0) != 0:
-                                (zerofirstcuflags = (4294967294 as c_uint))
+                            if (if firstcuflags__goto_6102_10 == 4294967295: 1 else: 0) != 0:
+                                (zerofirstcuflags__goto_6103_26 = (4294967294 as c_uint))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (zeroreqcu = reqcu)
+                                (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (zeroreqcuflags = reqcuflags)
+                                (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if (if mclength == 1: 1 else: 0) != 0 or (if req_caseopt == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (firstcu = (&mcbuffer[0] as *mut u8)[0])
+                                if (if (if mclength__goto_6163_12 == 1: 1 else: 0) != 0 or (if req_caseopt__goto_6104_10 == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (firstcu__goto_6098_10 = (&mcbuffer__goto_6170_15[0] as *mut u8)[0])
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (firstcuflags = req_caseopt)
+                                    (firstcuflags__goto_6102_10 = req_caseopt__goto_6104_10)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if mclength != 1: 1 else: 0) != 0:
-                                        (reqcu = code[-1])
+                                    if (if mclength__goto_6163_12 != 1: 1 else: 0) != 0:
+                                        (reqcu__goto_6098_19 = code__goto_6109_14[-1])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (reqcuflags = cb.req_varyopt)
+                                        (reqcuflags__goto_6102_24 = cb.req_varyopt)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    (reqcuflags = (4294967294 as c_uint))
-                                    (firstcuflags = reqcuflags)
+                                    (reqcuflags__goto_6102_24 = (4294967294 as c_uint))
+                                    (firstcuflags__goto_6102_10 = reqcuflags__goto_6102_24)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (zerofirstcu = firstcu)
+                                (zerofirstcu__goto_6099_21 = firstcu__goto_6098_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (zerofirstcuflags = firstcuflags)
+                                (zerofirstcuflags__goto_6103_26 = firstcuflags__goto_6102_10)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (zeroreqcu = reqcu)
+                                (zeroreqcu__goto_6099_10 = reqcu__goto_6098_19)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (zeroreqcuflags = reqcuflags)
+                                (zeroreqcuflags__goto_6103_10 = reqcuflags__goto_6102_24)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if (if mclength == 1: 1 else: 0) != 0 or (if req_caseopt == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                    (reqcu = code[-1])
+                                if (if (if mclength__goto_6163_12 == 1: 1 else: 0) != 0 or (if req_caseopt__goto_6104_10 == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (reqcu__goto_6098_19 = code__goto_6109_14[-1])
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (reqcuflags = (req_caseopt | cb.req_varyopt))
+                                    (reqcuflags__goto_6102_24 = (req_caseopt__goto_6104_10 | cb.req_varyopt))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                            if reset_caseful != 0:
-                                options = options & (0 - 8 - 1)
+                            if reset_caseful__goto_6119_6 != 0:
+                                options__goto_6096_10 = options__goto_6096_10 & (0 - 8 - 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (req_caseopt = 0)
+                                (req_caseopt__goto_6104_10 = 0)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (reset_caseful = 0)
+                                (reset_caseful__goto_6119_6 = 0)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -8697,38 +8956,38 @@ fn parsed_skip(__param_pptr: *mut c_uint, skiptype: c_uint) -> *mut c_uint:
 
 
 fn get_grouplength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, isinline: c_int, errcodeptr: *mut c_int, lcptr: *mut c_int, group: c_int, recurses: *mut parsed_recurse_check, cb: *mut compile_block_8) -> c_int:
-    var gi: *mut c_uint = null
-    var branchlength: c_int = 0
-    var branchminlength: c_int = 0
-    var grouplength: c_int = 0
-    var groupminlength: c_int = 0
-    var groupinfo: c_uint = 0
+    var gi__goto_9529_11: *mut c_uint = null
+    var branchlength__goto_9530_5: c_int = 0
+    var branchminlength__goto_9530_19: c_int = 0
+    var grouplength__goto_9531_5: c_int = 0
+    var groupminlength__goto_9532_5: c_int = 0
+    var groupinfo__goto_9541_12: c_uint = 0
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                gi = (cb.groupinfo + ((2 * group) as isize as usize))
-                grouplength = -1
-                groupminlength = 2147483647
+                gi__goto_9529_11 = (cb.groupinfo + ((2 * group) as isize as usize))
+                grouplength__goto_9531_5 = -1
+                groupminlength__goto_9532_5 = 2147483647
                 if (if (if group > 0: 1 else: 0) != 0 and (if ((cb.external_flags & 2097152)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                    groupinfo = gi[0]
+                    groupinfo__goto_9541_12 = gi__goto_9529_11[0]
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if ((groupinfo & 1073741824)) != 0: 1 else: 0) != 0:
+                    if (if ((groupinfo__goto_9541_12 & 1073741824)) != 0: 1 else: 0) != 0:
                         return -1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if ((groupinfo & (2147483648 as c_uint))) != 0: 1 else: 0) != 0:
+                    if (if ((groupinfo__goto_9541_12 & (2147483648 as c_uint))) != 0: 1 else: 0) != 0:
                         if isinline != 0:
                             ((unsafe: *pptrptr) = parsed_skip((unsafe: *pptrptr), 2))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        ((unsafe: *minptr) = gi[1])
+                        ((unsafe: *minptr) = gi__goto_9529_11[1])
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
-                        return (groupinfo & 65535)
+                        return (groupinfo__goto_9541_12 & 65535)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -8736,20 +8995,20 @@ fn get_grouplength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, isinline: c_in
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 while true:
-                    (branchlength = get_branchlength(pptrptr, (&mut branchminlength as *mut c_int), errcodeptr, lcptr, recurses, cb))
+                    (branchlength__goto_9530_5 = get_branchlength(pptrptr, (&mut branchminlength__goto_9530_19 as *mut c_int), errcodeptr, lcptr, recurses, cb))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if branchlength < 0: 1 else: 0) != 0:
+                    if (if branchlength__goto_9530_5 < 0: 1 else: 0) != 0:
                         __pc = 1
                         __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if branchlength > grouplength: 1 else: 0) != 0:
-                        (grouplength = branchlength)
+                    if (if branchlength__goto_9530_5 > grouplength__goto_9531_5: 1 else: 0) != 0:
+                        (grouplength__goto_9531_5 = branchlength__goto_9530_5)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if branchminlength < groupminlength: 1 else: 0) != 0:
-                        (groupminlength = branchminlength)
+                    if (if branchminlength__goto_9530_19 < groupminlength__goto_9532_5: 1 else: 0) != 0:
+                        (groupminlength__goto_9532_5 = branchminlength__goto_9530_19)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if (unsafe: *(unsafe: *pptrptr)) == 2149384192: 1 else: 0) != 0:
@@ -8764,15 +9023,18 @@ fn get_grouplength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, isinline: c_in
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if group > 0: 1 else: 0) != 0:
-                    (gi[1] = groupminlength)
+                    gi__goto_9529_11[0] = gi__goto_9529_11[0] | ((((2147483648 as c_uint) | grouplength__goto_9531_5)) as c_uint)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (gi__goto_9529_11[1] = groupminlength__goto_9532_5)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                ((unsafe: *minptr) = groupminlength)
+                ((unsafe: *minptr) = groupminlength__goto_9532_5)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                return grouplength
+                return grouplength__goto_9531_5
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 __pc = 1
@@ -8780,7 +9042,7 @@ fn get_grouplength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, isinline: c_in
             1 =>  // ISNOTFIXED
                 (__goto_pending = 0)
                 if (if group > 0: 1 else: 0) != 0:
-                    gi[0] = gi[0] | 1073741824
+                    gi__goto_9529_11[0] = gi__goto_9529_11[0] | 1073741824
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return -1
@@ -9010,9 +9272,9 @@ fn UCD_CATEGORY() -> Never:
 fn UCD_CHARTYPE() -> Never:
     comptime_error("untranslatable C macro: UCD_CHARTYPE")
 fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as c_int) == 0x69) or ((ch as c_int) == 0x0130))
+    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
 fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as c_int) == 0x0130): 0x69 else: (if ((ch as c_int) == 0x49): 0x0131 else: (ch as c_int)))
+    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
 // untranslatable fn-like macro
 fn UCD_GRAPHBREAK() -> Never:
     comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
