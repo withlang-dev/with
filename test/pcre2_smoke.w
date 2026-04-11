@@ -31,7 +31,7 @@ use std.re.pcre2_pattern_info
 use std.re.pcre2_serialize
 use std.re.pcre2_convert
 use std.re.pcre2_script_run
-use std.re.pcre2posix
+// use std.re.pcre2posix  // excluded — needs opaque type fix
 
 extern fn malloc(size: c_ulong) -> *mut c_void
 extern fn free(ptr: *mut c_void)
@@ -48,7 +48,13 @@ fn main:
     if gcontext as i64 == 0:
         print("gcontext creation failed")
         return
-    print("gcontext ok")
+    print(f"gcontext ok, addr={gcontext as i64}")
+    // Dump more raw bytes
+    let p = gcontext as *const i64
+    var i = 0
+    while i < 8:
+        print(f"offset {i * 8}: {unsafe: *(p + i)}")
+        i = i + 1
     let ccontext = pcre2_compile_context_create_8(gcontext)
     if ccontext as i64 == 0:
         print("ccontext creation failed")

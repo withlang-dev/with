@@ -47,15 +47,6 @@ extern fn with_memset(ptr: *i8, c: i32, n: i64) -> void
 extern fn with_memcmp(a: *i8, b: *i8, n: i64) -> i32
 
 
-// Opaque PCRE2 internal types (forward declarations)
-type pcre2_real_general_context_8 = opaque
-type pcre2_real_compile_context_8 = opaque
-type pcre2_real_match_context_8 = opaque
-type pcre2_real_convert_context_8 = opaque
-type pcre2_real_code_8 = opaque
-type pcre2_real_match_data_8 = opaque
-type pcre2_real_jit_stack_8 = opaque
-
 // Cross-module extern symbols (only those not emitted by migrator)
 
 // PCRE2 string constants (from pcre2_internal.h macros)

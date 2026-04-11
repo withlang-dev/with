@@ -119,15 +119,9 @@ prepare_generated_tree() {
     {
         printf '%s\n' '// std.re.defs — shared type aliases for migrated PCRE2'
         sed -n "2,${preamble_end}p" "$generated_dir/pcre2_tables.w"
-        # Forward-declare opaque PCRE2 internal struct types
-        printf '\n// Opaque PCRE2 internal types (forward declarations)\n'
-        printf '%s\n' 'type pcre2_real_general_context_8 = opaque'
-        printf '%s\n' 'type pcre2_real_compile_context_8 = opaque'
-        printf '%s\n' 'type pcre2_real_match_context_8 = opaque'
-        printf '%s\n' 'type pcre2_real_convert_context_8 = opaque'
-        printf '%s\n' 'type pcre2_real_code_8 = opaque'
-        printf '%s\n' 'type pcre2_real_match_data_8 = opaque'
-        printf '%s\n' 'type pcre2_real_jit_stack_8 = opaque'
+        # Note: pcre2_real_*_8 struct types are defined in their respective
+        # modules (pcre2_context.w, pcre2_compile.w, etc.), NOT as opaque
+        # forward declarations here. Opaque decls prevent field access.
         # Cross-module extern declarations
         printf '\n// Cross-module extern symbols (only those not emitted by migrator)\n'
         # STRING_* constants from pcre2_internal.h
