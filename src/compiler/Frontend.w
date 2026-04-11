@@ -1244,18 +1244,42 @@ fn frontend_name_shadowed_by_extern(tier: Vec[i32], pool: AstPool, name: i32) ->
             return true
     false
 
+fn frontend_fn_decl_rank(kind: i32) -> i32:
+    if kind == NodeKind.NK_FN_DECL:
+        return 2
+    if kind == NodeKind.NK_EXTERN_FN:
+        return 1
+    0
+
 fn frontend_fn_shadowed_in_tier(tier: Vec[i32], pool: AstPool, idx: i32, higher_names: Vec[i32]) -> bool:
     // Check if this fn is shadowed by a higher-priority tier.
-    let iname = pool.get_data0(tier.get(idx as i64))
+    let current = tier.get(idx as i64)
+    let current_kind = pool.kind(current)
+    let iname = pool.get_data0(current)
     if frontend_vec_contains_i32(higher_names, iname):
         return true
-    // Within-tier dedup: skip if a later fn in the same tier has the same name.
+
+    // Within-tier precedence:
+    // - a real fn beats any extern fn of the same name, regardless of order
+    // - otherwise, a later decl of the same rank wins
+    if current_kind == NodeKind.NK_EXTERN_FN:
+        for j in 0..tier.len() as i32:
+            if j == idx:
+                continue
+            let jd = tier.get(j as i64)
+            if pool.kind(jd) == NodeKind.NK_FN_DECL and pool.get_data0(jd) == iname:
+                return true
+        return false
+
+    let current_rank = frontend_fn_decl_rank(current_kind)
     var j = idx + 1
     while j < tier.len() as i32:
         let jd = tier.get(j as i64)
         let jk = pool.kind(jd)
         if (jk == NodeKind.NK_FN_DECL or jk == NodeKind.NK_EXTERN_FN) and pool.get_data0(jd) == iname:
-            return true
+            let other_rank = frontend_fn_decl_rank(jk)
+            if other_rank >= current_rank:
+                return true
         j = j + 1
     false
 
