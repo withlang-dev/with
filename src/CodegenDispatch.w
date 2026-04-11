@@ -588,6 +588,10 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 if idx_ty_opt.is_some():
                     idx_ty = idx_ty_opt.unwrap() as i64
                 idx_val = wl_build_load(self.builder, idx_ty, idx_ptr_opt.unwrap() as i64)
+            if wl_get_type_kind(wl_type_of(idx_val)) != wl_integer_type_kind():
+                with_eprint("error: code generation failed: index operand is not an integer")
+                self.had_error = 1
+                return 0
             let elem_llvm = self.mir_index_elem_llvm_type(cur_sema_ty, cur_ty)
             let elem_sema = self.mir_index_elem_sema_type(cur_sema_ty)
             if elem_sema > 0:
