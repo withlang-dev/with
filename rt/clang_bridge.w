@@ -1182,6 +1182,13 @@ pub fn cimport_decl_name(session: i64, idx: i32) -> str:
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
     clang_str_to_with(s, clang_getCursorSpelling(cursor))
 
+@[c_export("with_cimport_decl_cursor")]
+pub fn cimport_decl_cursor(session: i64, idx: i32) -> i32:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return -1
+    let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
+    store_cursor(s, cursor)
+
 // ── Function queries ────────────────────────────────────────
 
 @[c_export("with_cimport_fn_return_type")]

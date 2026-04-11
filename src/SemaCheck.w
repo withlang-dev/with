@@ -1764,6 +1764,10 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
 
     let ftk = self.get_type_kind(field_base)
 
+    if self.is_opaque_value_type(field_base as i32) != 0:
+        self.emit_error("field access requires a concrete struct or union type; this type is opaque", node)
+        return 0
+
     if ftk == TypeKind.TY_STRUCT:
         let _ = self.get_type_d0(field_base)
         return self.struct_field_type(field_base as i32, field)

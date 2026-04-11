@@ -820,6 +820,119 @@ PY
   echo "PASS(cli-selfhost-migrate) goto_shadowed_local"
 }
 
+expect_migrate_recursive_anonymous_records() {
+  local case_dir="$tmpdir/migrate_recursive_anonymous_records_case"
+  local src="$case_dir/anon_records.c"
+  local out_w="$case_dir/anon_records.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+typedef struct outer {
+  int tag;
+  union {
+    struct {
+      int x;
+      union {
+        int y;
+        unsigned char bytes[4];
+      } inner;
+    } named;
+    struct {
+      const char *p;
+      int n;
+    } other;
+  } fields;
+  int tail;
+} outer;
+
+int probe(outer *o) {
+  return o->fields.named.inner.y + o->tail;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) recursive_anonymous_records"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'type outer_fields {' "$out_w" \
+    || ! grep -Fq 'type outer_fields_named {' "$out_w" \
+    || ! grep -Fq 'type outer_fields_named_inner {' "$out_w" \
+    || ! grep -Fq 'fn probe' "$out_w" \
+    || grep -Fq 'type outer = opaque' "$out_w" \
+    || grep -Fq 'type outer_fields = opaque' "$out_w" \
+    || grep -Fq 'type outer_fields_named = opaque' "$out_w" \
+    || grep -Fq 'type outer_fields_named_inner = opaque' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) recursive_anonymous_records"
+    sed -n '1,260p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) recursive_anonymous_records"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) recursive_anonymous_records"
+}
+
+expect_opaque_field_access_is_rejected() {
+  local case_dir="$tmpdir/opaque_field_access_case"
+  local src="$case_dir/opaque_field_access.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+type T = opaque
+
+fn f(p: *mut T):
+    (p.x = 1)
+
+fn main:
+    let _ = 0
+EOF
+
+  if run_cli "$tmpdir/out" "$tmpdir/err" check "$src"; then
+    echo "FAIL(cli-selfhost-check) opaque_field_access"
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq "field access requires a concrete struct or union type; this type is opaque" "$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-diagnostic) opaque_field_access"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-check) opaque_field_access"
+}
+
+expect_pcre2_match_heapframe_is_concrete() {
+  local obj="$tmpdir/pcre2_match_issue111.o"
+
+  if grep -Fq 'type heapframe = opaque' lib/std/re/pcre2_match.w \
+    || grep -Fq 'type heapframe_align = opaque' lib/std/re/pcre2_match.w; then
+    echo "FAIL(cli-selfhost-stdlib) pcre2_match_heapframe"
+    rg -n 'type heapframe|type heapframe_align' lib/std/re/pcre2_match.w || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build lib/std/re/pcre2_match.w --emit-obj --no-prelude -O0 -o "$obj"; then
+    echo "FAIL(cli-selfhost-build) pcre2_match_heapframe"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) pcre2_match_heapframe"
+}
+
 expect_build_reports_mir_lowering_failure() {
   local case_dir="$tmpdir/mir_lowering_failure_case"
   local src="$case_dir/mir_lowering_failure.w"
@@ -1017,6 +1130,9 @@ expect_pcre2_prepare_shared_lets
 expect_std_re_shared_dependency_imports
 expect_migrate_initializer_regressions
 expect_migrate_goto_shadowed_local
+expect_migrate_recursive_anonymous_records
+expect_opaque_field_access_is_rejected
+expect_pcre2_match_heapframe_is_concrete
 expect_build_reports_mir_lowering_failure
 
 if [[ "$failures" -ne 0 ]]; then
