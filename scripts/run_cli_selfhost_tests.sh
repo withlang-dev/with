@@ -156,6 +156,53 @@ EOF
   echo "PASS(cli-selfhost-emit-obj) emit_obj_imported_symbols"
 }
 
+expect_whole_program_extern_var_redecl() {
+  local case_dir="$tmpdir/whole_program_extern_var_redecl_case"
+  local defs_src="$case_dir/defs.w"
+  local user_src="$case_dir/user.w"
+  local main_src="$case_dir/main.w"
+  local bin="$case_dir/whole_program_extern_var_redecl"
+  mkdir -p "$case_dir"
+
+  cat >"$defs_src" <<'EOF'
+var shared_counter: i32 = 41
+EOF
+
+  cat >"$user_src" <<'EOF'
+extern var shared_counter: i32
+fn read_counter() -> i32: shared_counter + 1
+EOF
+
+  cat >"$main_src" <<'EOF'
+use user
+use defs
+
+fn main:
+    if read_counter() == 42:
+        print("ok")
+    else:
+        print("bad")
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$main_src" -o "$bin"; then
+    echo "FAIL(cli-selfhost-build) whole_program_extern_var_redecl"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  local output
+  output="$("$bin" 2>&1 || true)"
+  if [[ "$output" != "ok" ]]; then
+    echo "FAIL(cli-selfhost-run) whole_program_extern_var_redecl"
+    printf '%s\n' "$output"
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) whole_program_extern_var_redecl"
+}
+
 expect_imported_module_dependency_order() {
   local case_dir="$tmpdir/imported_module_dependency_order_case"
   local defs_src="$case_dir/defs.w"
@@ -752,6 +799,98 @@ EOF
   echo "PASS(cli-selfhost-migrate) initializer_regressions"
 }
 
+expect_migrate_noop_pointer_cast_exprs() {
+  local case_dir="$tmpdir/migrate_noop_pointer_cast_exprs_case"
+  local src="$case_dir/noop_pointer_cast_exprs.c"
+  local out_w="$case_dir/noop_pointer_cast_exprs.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+typedef struct ctx { int x; } ctx;
+ctx g;
+
+ctx *ret_ctx(void) {
+  return (ctx *)(&g);
+}
+
+int f(ctx *ccontext) {
+  ctx *local = (ctx *)(&g);
+  ccontext = (ctx *)(&g);
+  return local->x + ccontext->x;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) noop_pointer_cast_exprs"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'fn ret_ctx() -> *mut ctx:' "$out_w" \
+    || grep -Fq 'extern fn ret_ctx()' "$out_w" \
+    || ! grep -Fq 'return (((&mut g as *mut ctx)) as *mut ctx)' "$out_w" \
+    || ! grep -Fq 'var local: *mut ctx = (((&mut g as *mut ctx)) as *mut ctx)' "$out_w" \
+    || ! grep -Fq '(ccontext = (((&mut g as *mut ctx)) as *mut ctx))' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) noop_pointer_cast_exprs"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) noop_pointer_cast_exprs"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) noop_pointer_cast_exprs"
+}
+
+expect_migrate_typed_cast_macros() {
+  local case_dir="$tmpdir/migrate_typed_cast_macros_case"
+  local src="$case_dir/typed_cast_macros.c"
+  local out_w="$case_dir/typed_cast_macros.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+typedef unsigned long usize;
+#define ZERO_TERM ((usize)-1)
+
+int f(usize patlen) {
+  int zero_terminated = 0;
+  if ((zero_terminated = (patlen == ZERO_TERM)))
+    patlen = 7;
+  return zero_terminated + (int)patlen;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) typed_cast_macros"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'let ZERO_TERM: c_ulong = (-1 as c_ulong)' "$out_w" \
+    || ! grep -Fq 'if ((zero_terminated = ((if patlen == ZERO_TERM: 1 else: 0)))) != 0:' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) typed_cast_macros"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) typed_cast_macros"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) typed_cast_macros"
+}
+
 expect_migrate_goto_shadowed_local() {
   local case_dir="$tmpdir/migrate_goto_shadowed_local_case"
   local src="$case_dir/shadowed_local.c"
@@ -1117,6 +1256,7 @@ expect_init_named_dir
 expect_pointer_index_is_rejected
 expect_emit_obj_global_symbols
 expect_emit_obj_imported_symbols
+expect_whole_program_extern_var_redecl
 expect_imported_module_dependency_order
 expect_imported_fn_beats_extern_redecl
 expect_emit_obj_imported_pcre2_symbol
@@ -1129,6 +1269,8 @@ expect_pcre2_prepare_shared_externs
 expect_pcre2_prepare_shared_lets
 expect_std_re_shared_dependency_imports
 expect_migrate_initializer_regressions
+expect_migrate_noop_pointer_cast_exprs
+expect_migrate_typed_cast_macros
 expect_migrate_goto_shadowed_local
 expect_migrate_recursive_anonymous_records
 expect_opaque_field_access_is_rejected

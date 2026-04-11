@@ -792,11 +792,9 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_INDEX:
         let base_node = self.ast.get_data0(node)
         let base_ty = self.expr_type(base_node)
-        if base_ty != 0 and base_ty != self.sema.ty_void as i32:
-            let resolved = self.sema.resolve_alias(base_ty) as i32
-            let tk = self.sema.get_type_kind(resolved)
-            if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
-                return self.sema.get_type_d0(resolved)
+        let elem_ty = self.indexed_element_type(base_ty)
+        if elem_ty != 0:
+            return elem_ty
     if kind == NodeKind.NK_BINARY:
         let op = self.ast.get_data0(node)
         let lhs_ty = self.expr_type(self.ast.get_data1(node))
@@ -1085,7 +1083,32 @@ fn MirBuilder.mark_unsupported(self: MirBuilder):
     if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
         let node_kind = if self.cur_node != 0: self.ast.kind(self.cur_node) else: 0
         let fn_name = self.pool.resolve(self.body.fn_sym)
-        with_eprint(f"[mir-lower-fail] kind={node_kind} fn={fn_name}")
+        var detail = ""
+        if self.cur_node != 0:
+            detail = f" span={self.ast.get_start(self.cur_node)}..{self.ast.get_end(self.cur_node)}"
+            if node_kind == NodeKind.NK_IDENT:
+                let sym = self.ast.get_data0(self.cur_node)
+                let name = self.pool.resolve(sym)
+                let sema_sym = self.sema.pool_lookup_symbol(name)
+                detail = detail ++ " ident=" ++ name
+                detail = detail ++ f" typed={if self.sema.typed_expr_types.contains(self.cur_node): self.sema.typed_expr_types.get(self.cur_node).unwrap() else: 0}"
+                detail = detail ++ f" sig_ast={self.sema.get_sig(sym)} sig_sema={self.sema.get_sig(sema_sym)}"
+                detail = detail ++ f" named_ast={if self.sema.named_types.contains(sym): self.sema.named_types.get(sym).unwrap() else: 0}"
+                detail = detail ++ f" named_sema={if self.sema.named_types.contains(sema_sym): self.sema.named_types.get(sema_sym).unwrap() else: 0}"
+                detail = detail ++ f" variant_ast={if self.sema.variant_lookup.contains(sym): self.sema.variant_lookup.get(sym).unwrap() else: -1}"
+                detail = detail ++ f" variant_sema={if self.sema.variant_lookup.contains(sema_sym): self.sema.variant_lookup.get(sema_sym).unwrap() else: -1}"
+            else if node_kind == NodeKind.NK_FIELD_ACCESS:
+                let base = self.ast.get_data0(self.cur_node)
+                let field_sym = self.ast.get_data1(self.cur_node)
+                let field_name = self.pool.resolve(field_sym)
+                let sema_field_sym = self.sema.pool_lookup_symbol(field_name)
+                let base_ty = self.expr_type(base)
+                let field_ty = self.expr_type(self.cur_node)
+                detail = detail ++ " field=" ++ field_name
+                detail = detail ++ f" base_kind={self.ast.kind(base)} base_ty={base_ty} field_ty={field_ty}"
+                detail = detail ++ f" typed={if self.sema.typed_expr_types.contains(self.cur_node): self.sema.typed_expr_types.get(self.cur_node).unwrap() else: 0}"
+                detail = detail ++ f" field_ast={self.struct_field_type(base_ty, field_sym)} field_sema={self.struct_field_type(base_ty, sema_field_sym)}"
+        with_eprint(f"[mir-lower-fail] kind={node_kind} fn={fn_name}{detail}")
     var b = self.body
     b.lowering_failed = 1
     self.body = b

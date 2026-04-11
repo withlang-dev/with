@@ -998,6 +998,10 @@ pub fn verify_module(m: i64) -> i32:
         if result != 0:
             let msg = "LLVM verify error\n"
             let _ = rt_write(2, msg as *const u8, 18)
+            let err_len = c_strlen(err as *const u8)
+            if err_len > 0:
+                let _ = rt_write(2, err as *const u8, err_len as u64)
+                let _ = rt_write(2, "\n" as *const u8, 1)
         LLVMDisposeMessage(err)
     result
 
