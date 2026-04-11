@@ -13,6 +13,7 @@ extern fn with_cimport_error(session: i64) -> str
 extern fn with_cimport_decl_count(session: i64) -> i32
 extern fn with_cimport_decl_kind(session: i64, idx: i32) -> i32
 extern fn with_cimport_decl_name(session: i64, idx: i32) -> str
+extern fn with_cimport_decl_cursor(session: i64, idx: i32) -> i32
 extern fn with_cimport_fn_return_type(session: i64, idx: i32) -> str
 extern fn with_cimport_fn_param_count(session: i64, idx: i32) -> i32
 extern fn with_cimport_fn_param_name(session: i64, idx: i32, param: i32) -> str
@@ -76,6 +77,7 @@ extern fn with_ci_cursor_kind(session: i64, cursor: i32) -> i32
 extern fn with_ci_cursor_spelling(session: i64, cursor: i32) -> str
 extern fn with_ci_cursor_type(session: i64, cursor: i32) -> i32
 extern fn with_ci_type_kind(session: i64, ty: i32) -> i32
+extern fn with_ci_type_declaration(session: i64, ty: i32) -> i32
 extern fn with_ci_type_translated(session: i64, ty: i32) -> str
 extern fn with_ci_cursor_is_definition(session: i64, cursor: i32) -> i32
 extern fn with_ci_cursor_location(session: i64, cursor: i32) -> str
@@ -105,6 +107,7 @@ extern fn with_system(cmd: str) -> i32
 let CK_STRUCT: i32 = 2
 let CK_UNION: i32 = 3
 let CK_ENUM: i32 = 5
+let CK_FIELD: i32 = 6
 let CK_FUNCTION: i32 = 8
 let CK_VAR: i32 = 9
 let CK_TYPEDEF: i32 = 20
@@ -500,6 +503,148 @@ fn ci_prepopulate_names(session: i64, count: i32) -> str:
         i = i + 1
     shadowed
 
+fn ci_find_decl_cursor(session: i64, kind: i32, name: str) -> i32:
+    if name.len() == 0:
+        return -1
+    let root = with_ci_root_cursor(session)
+    let n = with_ci_num_children(session, root)
+    var i = 0
+    while i < n:
+        let child = with_ci_child(session, root, i)
+        if with_ci_cursor_kind(session, child) == kind:
+            if with_ci_cursor_spelling(session, child) == name:
+                return child
+        i = i + 1
+    -1
+
+fn ci_find_decl_cursor_for_idx(session: i64, idx: i32) -> i32:
+    let kind = with_cimport_decl_kind(session, idx)
+    if kind != CK_STRUCT and kind != CK_UNION:
+        return -1
+    with_cimport_decl_cursor(session, idx)
+
+fn ci_decl_field_cursor(session: i64, decl_cursor: i32, field_idx: i32) -> i32:
+    if decl_cursor < 0 or field_idx < 0:
+        return -1
+    let nc = with_ci_num_children(session, decl_cursor)
+    var seen = 0
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, decl_cursor, i)
+        if with_ci_cursor_kind(session, child) == CK_FIELD:
+            if seen == field_idx:
+                return child
+            seen = seen + 1
+        i = i + 1
+    -1
+
+fn ci_field_cursor_anon_record_decl(session: i64, field_cursor: i32) -> i32:
+    if field_cursor < 0:
+        return -1
+    let field_ty = with_ci_cursor_type(session, field_cursor)
+    if field_ty < 0:
+        return -1
+    let decl_cursor = with_ci_type_declaration(session, field_ty)
+    if decl_cursor < 0:
+        return -1
+    let kind = with_ci_cursor_kind(session, decl_cursor)
+    if kind == CK_STRUCT or kind == CK_UNION:
+        let decl_name = with_ci_cursor_spelling(session, decl_cursor)
+        let field_ty_str = with_ci_type_translated(session, field_ty)
+        if decl_name.len() == 0 or ci_str_contains(field_ty_str, "(unnamed at ") or ci_str_contains(field_ty_str, "::("):
+            return decl_cursor
+    -1
+
+fn ci_record_decl_directly_demoted_cursor(session: i64, decl_cursor: i32) -> bool:
+    if decl_cursor < 0:
+        return true
+    if with_ci_cursor_is_definition(session, decl_cursor) == 0:
+        return true
+    let nc = with_ci_num_children(session, decl_cursor)
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, decl_cursor, i)
+        if with_ci_cursor_kind(session, child) == CK_FIELD:
+            let anon_decl = ci_field_cursor_anon_record_decl(session, child)
+            if anon_decl >= 0:
+                if ci_record_decl_directly_demoted_cursor(session, anon_decl):
+                    return true
+            else:
+                let field_ty = with_ci_type_translated(session, with_ci_cursor_type(session, child))
+                if ci_starts_with(field_ty, "__UNSUPPORTED:") or field_ty == "opaque":
+                    return true
+        i = i + 1
+    false
+
+fn ci_record_decl_has_demoted_field_cursor(session: i64, decl_cursor: i32, demoted: str) -> bool:
+    if decl_cursor < 0:
+        return false
+    let nc = with_ci_num_children(session, decl_cursor)
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, decl_cursor, i)
+        if with_ci_cursor_kind(session, child) == CK_FIELD:
+            let anon_decl = ci_field_cursor_anon_record_decl(session, child)
+            if anon_decl >= 0:
+                if ci_record_decl_has_demoted_field_cursor(session, anon_decl, demoted):
+                    return true
+            else:
+                let field_ty = with_ci_type_translated(session, with_ci_cursor_type(session, child))
+                if ci_field_type_is_demoted(field_ty, demoted):
+                    return true
+        i = i + 1
+    false
+
+fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: str) -> str:
+    if decl_cursor < 0 or synth_name.len() == 0:
+        return ""
+    if with_cimport_is_name_emitted(synth_name) != 0:
+        return ""
+    with_cimport_mark_name_emitted(synth_name)
+    if ci_record_decl_directly_demoted_cursor(session, decl_cursor):
+        return "type " ++ ci_escape_reserved(synth_name) ++ " = opaque\n"
+
+    let is_union = with_ci_cursor_kind(session, decl_cursor) == CK_UNION
+    var nested_decls = ""
+    var fields = ""
+    var anon_idx = 0
+    let nc = with_ci_num_children(session, decl_cursor)
+    var field_count = 0
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, decl_cursor, i)
+        if with_ci_cursor_kind(session, child) == CK_FIELD:
+            let raw_name = with_ci_cursor_spelling(session, child)
+            var actual_name = if raw_name.len() > 0: raw_name else: f"anon_{anon_idx}"
+            var field_ty = with_ci_type_translated(session, with_ci_cursor_type(session, child))
+            let anon_decl = ci_field_cursor_anon_record_decl(session, child)
+            if anon_decl >= 0:
+                let nested_name = if raw_name.len() > 0: synth_name ++ "_" ++ raw_name else: f"{synth_name}_anon_{anon_idx}"
+                nested_decls = nested_decls ++ ci_translate_anon_record_cursor(session, anon_decl, nested_name)
+                field_ty = ci_escape_reserved(nested_name)
+                actual_name = if raw_name.len() > 0: raw_name else: f"anon_{anon_idx}"
+                anon_idx = anon_idx + 1
+            else if ci_starts_with(field_ty, "__UNSUPPORTED:") or field_ty == "opaque":
+                return "type " ++ ci_escape_reserved(synth_name) ++ " = opaque\n"
+
+            if field_count > 0:
+                fields = fields ++ ", "
+            let default_val = ci_default_for_type(field_ty)
+            if default_val.len() > 0:
+                fields = fields ++ ci_escape_reserved(actual_name) ++ ": " ++ field_ty ++ " = " ++ default_val
+            else:
+                fields = fields ++ ci_escape_reserved(actual_name) ++ ": " ++ field_ty
+            field_count = field_count + 1
+        i = i + 1
+
+    if field_count == 0:
+        if is_union:
+            return nested_decls ++ "// union\ntype " ++ ci_escape_reserved(synth_name) ++ " { __pad0: u8 = 0 }\n"
+        return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " { __pad0: u8 = 0 }\n"
+
+    let union_prefix = if is_union: "// union\n" else: ""
+    nested_decls ++ union_prefix ++ "type " ++ ci_escape_reserved(synth_name) ++ " { " ++ fields ++ " }\n"
+
 // ── Opaque demotion pre-scan ─────────────────────────────────
 // Two-pass analysis: first collect directly demoted types (bitfield, forward
 // decl, unsupported fields), then cascade through field references until
@@ -542,19 +687,27 @@ fn ci_is_directly_demoted(session: i64, idx: i32) -> bool:
         if with_cimport_struct_has_definition(session, idx) != 0:
             return false
         return true
+    let decl_cursor = ci_find_decl_cursor_for_idx(session, idx)
     let field_count = with_cimport_struct_field_count(session, idx)
     // Bitfield in any field
     var fi = 0
     while fi < field_count:
         if with_cimport_struct_field_is_bitfield(session, idx, fi) != 0:
             return true
-        let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, fi)
-        if anon_kind != 0 and with_cimport_struct_field_anon_field_count(session, idx, fi) <= 0:
-            return true
+        let field_cursor = ci_decl_field_cursor(session, decl_cursor, fi)
+        let anon_decl = ci_field_cursor_anon_record_decl(session, field_cursor)
+        if anon_decl >= 0:
+            if ci_record_decl_directly_demoted_cursor(session, anon_decl):
+                return true
         fi = fi + 1
     // Unsupported or opaque field type
     fi = 0
     while fi < field_count:
+        let field_cursor = ci_decl_field_cursor(session, decl_cursor, fi)
+        let anon_decl = ci_field_cursor_anon_record_decl(session, field_cursor)
+        if anon_decl >= 0:
+            fi = fi + 1
+            continue
         let ft = with_cimport_struct_field_type_translated(session, idx, fi)
         if ci_starts_with(ft, "__UNSUPPORTED:"):
             return true
@@ -566,12 +719,19 @@ fn ci_is_directly_demoted(session: i64, idx: i32) -> bool:
 fn ci_has_demoted_field(session: i64, idx: i32, demoted: str) -> bool:
     if with_cimport_struct_is_opaque(session, idx) != 0:
         return false
+    let decl_cursor = ci_find_decl_cursor_for_idx(session, idx)
     let field_count = with_cimport_struct_field_count(session, idx)
     var fi = 0
     while fi < field_count:
-        let ft = with_cimport_struct_field_type_translated(session, idx, fi)
-        if ci_field_type_is_demoted(ft, demoted):
-            return true
+        let field_cursor = ci_decl_field_cursor(session, decl_cursor, fi)
+        let anon_decl = ci_field_cursor_anon_record_decl(session, field_cursor)
+        if anon_decl >= 0:
+            if ci_record_decl_has_demoted_field_cursor(session, anon_decl, demoted):
+                return true
+        else:
+            let ft = with_cimport_struct_field_type_translated(session, idx, fi)
+            if ci_field_type_is_demoted(ft, demoted):
+                return true
         fi = fi + 1
     false
 
@@ -989,6 +1149,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
 
     with_cimport_mark_name_emitted(name)
     let safe_name = ci_escape_reserved(name)
+    let decl_cursor = ci_find_decl_cursor_for_idx(session, idx)
 
     // Emit anonymous sub-record types before the parent.
     // Naming: Parent_anon_N for unnamed fields, Parent_fieldname for named fields.
@@ -996,26 +1157,12 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     var anon_idx = 0
     var afi = 0
     while afi < field_count:
-        let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, afi)
-        if anon_kind != 0:
+        let field_cursor = ci_decl_field_cursor(session, decl_cursor, afi)
+        let anon_decl = ci_field_cursor_anon_record_decl(session, field_cursor)
+        if anon_decl >= 0:
             let fname = with_cimport_struct_field_name(session, idx, afi)
             let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: f"{name}_anon_{anon_idx}"
-            let sub_count = with_cimport_struct_field_anon_field_count(session, idx, afi)
-            if sub_count > 0:
-                var sub_fields = ""
-                var sfi = 0
-                while sfi < sub_count:
-                    if sfi > 0:
-                        sub_fields = sub_fields ++ ", "
-                    let sf_name = with_cimport_struct_field_anon_field_name(session, idx, afi, sfi)
-                    let sf_type = with_cimport_struct_field_anon_field_type(session, idx, afi, sfi)
-                    let actual_sf_name = if sf_name.len() == 0: f"field_{sfi}" else: sf_name
-                    sub_fields = sub_fields ++ ci_escape_reserved(actual_sf_name) ++ ": " ++ sf_type
-                    sfi = sfi + 1
-                if anon_kind == 2:
-                    anon_decls = anon_decls ++ "// union\n"
-                anon_decls = anon_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " \{ " ++ sub_fields ++ " }\n"
-                with_cimport_mark_name_emitted(synth_name)
+            anon_decls = anon_decls ++ ci_translate_anon_record_cursor(session, anon_decl, synth_name)
             anon_idx = anon_idx + 1
         afi = afi + 1
 
@@ -1037,8 +1184,9 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
             if align_n > 0:
                 field_str = field_str ++ f"@[align({align_n})] "
 
-        let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, fi)
-        if anon_kind != 0:
+        let field_cursor = ci_decl_field_cursor(session, decl_cursor, fi)
+        let anon_decl = ci_field_cursor_anon_record_decl(session, field_cursor)
+        if anon_decl >= 0:
             let fname = with_cimport_struct_field_name(session, idx, fi)
             let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: f"{name}_anon_{anon_idx2}"
             let actual_name = if fname.len() > 0: fname else: f"anon_{anon_idx2}"
