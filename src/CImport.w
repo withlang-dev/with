@@ -4681,15 +4681,20 @@ fn ci_scope_contains(scope: str, name: str) -> bool:
     ci_str_contains(scope, "|" ++ name ++ "|") or ci_str_contains(scope, "|" ++ name ++ "=")
 
 fn ci_scope_lookup(scope: str, name: str) -> str:
-    // Look for "|name=mangled|" pattern
+    // Look for the innermost "|name=mangled|" mapping.
+    // Later scope entries shadow earlier ones.
     let needle = "|" ++ name ++ "="
-    let pos = ci_find_str(scope, needle)
-    if pos >= 0:
-        let start = pos + needle.len() as i32
-        var end = start
-        while end < scope.len() as i32 and scope.byte_at(end as i64) != 124:
-            end = end + 1
-        return scope.slice(start as i64, end as i64)
+    let slen = scope.len() as i32
+    let nlen = needle.len() as i32
+    var pos = slen - nlen
+    while pos >= 0:
+        if scope.slice(pos as i64, (pos + nlen) as i64) == needle:
+            let start = pos + nlen
+            var end = start
+            while end < slen and scope.byte_at(end as i64) != 124:
+                end = end + 1
+            return scope.slice(start as i64, end as i64)
+        pos = pos - 1
     // If just "|name|" exists, return the name unchanged
     ""
 
@@ -4718,6 +4723,45 @@ fn ci_find_char(s: str, c: i32) -> i32:
         i = i + 1
     0 - 1
 
+fn ci_find_last_char(s: str, c: i32) -> i32:
+    var i = s.len() as i32 - 1
+    while i >= 0:
+        if s.byte_at(i as i64) == c:
+            return i
+        i = i - 1
+    0 - 1
+
+fn ci_scoped_stmt_scope(scoped_stmt: str, fallback: str) -> str:
+    if ci_starts_with(scoped_stmt, "SCOPE:"):
+        let sep = ci_find_char(scoped_stmt, 10)
+        if sep > 0:
+            return scoped_stmt.slice(6, sep as i64)
+    fallback
+
+fn ci_scoped_stmt_text(scoped_stmt: str) -> str:
+    if ci_starts_with(scoped_stmt, "SCOPE:"):
+        let sep = ci_find_char(scoped_stmt, 10)
+        if sep > 0:
+            return scoped_stmt.slice((sep + 1) as i64, scoped_stmt.len())
+        return ""
+    scoped_stmt
+
+fn ci_goto_decl_suffix(session: i64, var_cursor: i32) -> str:
+    let loc = with_ci_cursor_location(session, var_cursor)
+    let last_colon = ci_find_last_char(loc, 58)
+    if last_colon > 0:
+        let prefix = loc.slice(0, last_colon as i64)
+        let prev_colon = ci_find_last_char(prefix, 58)
+        if prev_colon >= 0 and prev_colon + 1 < last_colon and last_colon + 1 < loc.len() as i32:
+            let line = loc.slice((prev_colon + 1) as i64, last_colon as i64)
+            let col = loc.slice((last_colon + 1) as i64, loc.len())
+            if line.len() > 0 and col.len() > 0:
+                return "__goto_" ++ line ++ "_" ++ col
+    "__goto_" ++ i64_to_string(var_cursor as i64)
+
+fn ci_goto_hoisted_var_name(session: i64, var_cursor: i32) -> str:
+    ci_escape_reserved(with_ci_cursor_spelling(session, var_cursor)) ++ ci_goto_decl_suffix(session, var_cursor)
+
 // Translate a DECL_STMT with scope tracking.
 // Returns "SCOPE:<updated_scope>\n<stmt_text>" or just "<stmt_text>".
 fn ci_trans_decl_stmt_scoped(session: i64, cursor: i32, indent: i32, scope: str) -> str:
@@ -4745,6 +4789,32 @@ fn ci_trans_decl_stmt_scoped(session: i64, cursor: i32, indent: i32, scope: str)
             else:
                 // No initializer — zero-initialized by With semantics
                 result = result ++ "var " ++ mangled ++ ": " ++ vty_str
+        i = i + 1
+    if new_scope != scope:
+        return "SCOPE:" ++ new_scope ++ "\n" ++ result
+    result
+
+// Translate a DECL_STMT inside a goto-lowered body.
+// Locals are hoisted, so this only emits initializer assignments while still
+// updating lexical scope for later references to shadowed names.
+fn ci_trans_decl_stmt_goto_scoped(session: i64, cursor: i32, indent: i32, scope: str) -> str:
+    let nc = with_ci_num_children(session, cursor)
+    var result = ""
+    var new_scope = scope
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, cursor, i)
+        if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
+            let raw_name = ci_escape_reserved(with_ci_cursor_spelling(session, child))
+            let hoisted_name = ci_goto_hoisted_var_name(session, child)
+            new_scope = ci_scope_add_mangled(new_scope, raw_name, hoisted_name)
+            let vty = with_ci_type_translated(session, with_ci_cursor_type(session, child))
+            if not (vty.len() > 0 and vty.byte_at(0) == 91):
+                let init = ci_var_init_expr(session, child, new_scope)
+                if init.len() > 0:
+                    if result.len() > 0:
+                        result = result ++ "\n" ++ ci_indent_str(indent)
+                    result = result ++ hoisted_name ++ " = " ++ init
         i = i + 1
     if new_scope != scope:
         return "SCOPE:" ++ new_scope ++ "\n" ++ result
@@ -6132,8 +6202,9 @@ fn ci_find_substr(haystack: str, needle: str) -> i32:
         i = i + 1
     -1
 
-// Collect all variable declarations in a function body (for hoisting).
-// Returns parallel pipe-delimited lists of names and types.
+// Collect all variable declarations in a goto-lowered function body.
+// Names are made unique at the declaration site because all locals are hoisted
+// into one With function scope.
 fn ci_collect_var_decls(session: i64, cursor: i32, names: &mut str, types: &mut str):
     let kind = with_ci_cursor_kind(session, cursor)
     if kind == CXK_DECL_STMT:
@@ -6142,7 +6213,7 @@ fn ci_collect_var_decls(session: i64, cursor: i32, names: &mut str, types: &mut 
         while i < nc:
             let child = with_ci_child(session, cursor, i)
             if with_ci_cursor_kind(session, child) == 9:  // CXK_VAR_DECL
-                let vname = ci_escape_reserved(with_ci_cursor_spelling(session, child))
+                let vname = ci_goto_hoisted_var_name(session, child)
                 let vty = with_ci_cursor_type(session, child)
                 let vty_str = with_ci_type_translated(session, vty)
                 if not ci_str_contains(*names, "|" ++ vname ++ "|"):
@@ -6162,31 +6233,9 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
     let label_map = ci_collect_labels(session, body_cursor)
 
     // Collect and hoist variable declarations.
-    // Skip vars that are already in the scope (param rebindings).
     var var_names = ""
     var var_types = ""
     ci_collect_var_decls(session, body_cursor, &mut var_names, &mut var_types)
-    // Remove hoisted vars that are already param-rebound (in scope)
-    var filtered_names = ""
-    var filtered_types = ""
-    var fvi = 1
-    var ftype_idx = 0
-    let flen = var_names.len() as i32
-    while fvi < flen:
-        var fve = fvi
-        while fve < flen and var_names.byte_at(fve as i64) != 124:
-            fve = fve + 1
-        let vn = var_names.slice(fvi as i64, fve as i64)
-        if not ci_str_contains(scope, "|" ++ vn ++ "|"):
-            filtered_names = filtered_names ++ "|" ++ vn ++ "|"
-            let vt = ci_get_nth_pipe_entry(var_types, ftype_idx)
-            filtered_types = filtered_types ++ "|" ++ vt ++ "|"
-        ftype_idx = ftype_idx + 1
-        fvi = fve + 1
-        if fvi < flen and var_names.byte_at(fvi as i64) == 124:
-            fvi = fvi + 1
-    var_names = filtered_names
-    var_types = filtered_types
 
     var output = ""
 
@@ -6244,6 +6293,7 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
     let nc = with_ci_num_children(session, body_cursor)
     var current_state = 0
     var arm_has_content = false
+    var body_scope = scope
     // Emit entry state arm
     output = output ++ ci_indent_str(indent + 2) ++ "0 =>\n"
     output = output ++ ci_indent_str(indent + 3) ++ "(__goto_pending = 0)\n"
@@ -6272,7 +6322,13 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
                 let label_body = with_ci_child(session, child, 0)
                 let lbk = with_ci_cursor_kind(session, label_body)
                 if lbk != CXK_LABEL_STMT:  // avoid double-processing nested labels
-                    let s = ci_trans_stmt_goto(session, label_body, 0, scope, label_map, 0)
+                    var s = ""
+                    if lbk == CXK_DECL_STMT:
+                        let decl_result = ci_trans_decl_stmt_goto_scoped(session, label_body, 0, body_scope)
+                        body_scope = ci_scoped_stmt_scope(decl_result, body_scope)
+                        s = ci_scoped_stmt_text(decl_result)
+                    else:
+                        s = ci_trans_stmt_goto(session, label_body, 0, body_scope, label_map, 0)
                     if s.len() > 0:
                         output = output ++ ci_indent_block(s, indent + 3)
                         output = output ++ ci_indent_str(indent + 3) ++ "if (if __goto_pending != 0: 1 else: 0) != 0:\n"
@@ -6293,21 +6349,15 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
                 arm_has_content = true
 
         else if kind == CXK_DECL_STMT:
-            // Variable declarations: emit only the initializer assignment (var was hoisted)
-            let dnc = with_ci_num_children(session, child)
-            var di = 0
-            while di < dnc:
-                let dchild = with_ci_child(session, child, di)
-                if with_ci_cursor_kind(session, dchild) == 9:  // VarDecl
-                    let vname = ci_escape_reserved(with_ci_cursor_spelling(session, dchild))
-                    let init_expr = ci_var_init_expr(session, dchild, scope)
-                    if init_expr.len() > 0:
-                        output = output ++ ci_indent_str(indent + 3) ++ vname ++ " = " ++ init_expr ++ "\n"
-                        arm_has_content = true
-                di = di + 1
+            let decl_result = ci_trans_decl_stmt_goto_scoped(session, child, 0, body_scope)
+            body_scope = ci_scoped_stmt_scope(decl_result, body_scope)
+            let stmt_text = ci_scoped_stmt_text(decl_result)
+            if stmt_text.len() > 0:
+                output = output ++ ci_indent_block(stmt_text, indent + 3)
+                arm_has_content = true
 
         else:
-            let s = ci_trans_stmt_goto(session, child, 0, scope, label_map, 0)
+            let s = ci_trans_stmt_goto(session, child, 0, body_scope, label_map, 0)
             if s.len() > 0:
                 output = output ++ ci_indent_block(s, indent + 3)
                 output = output ++ ci_indent_str(indent + 3) ++ "if (if __goto_pending != 0: 1 else: 0) != 0:\n"
@@ -6355,14 +6405,24 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
     if kind == CXK_COMPOUND_STMT:
         let nc = with_ci_num_children(session, cursor)
         var body = ""
+        var block_scope = scope
         var i = 0
         while i < nc:
             let child = with_ci_child(session, cursor, i)
-            let s = ci_trans_stmt_goto(session, child, 0, scope, label_map, loop_depth)
-            if s.len() > 0:
-                body = body ++ ci_indent_block(s, indent)
-                body = body ++ ci_indent_str(indent) ++ "if (if __goto_pending != 0: 1 else: 0) != 0:\n"
-                body = body ++ ci_indent_str(indent + 1) ++ (if loop_depth > 0: "break" else: "continue") ++ "\n"
+            if with_ci_cursor_kind(session, child) == CXK_DECL_STMT:
+                let decl_result = ci_trans_decl_stmt_goto_scoped(session, child, 0, block_scope)
+                block_scope = ci_scoped_stmt_scope(decl_result, block_scope)
+                let stmt_text = ci_scoped_stmt_text(decl_result)
+                if stmt_text.len() > 0:
+                    body = body ++ ci_indent_block(stmt_text, indent)
+                    body = body ++ ci_indent_str(indent) ++ "if (if __goto_pending != 0: 1 else: 0) != 0:\n"
+                    body = body ++ ci_indent_str(indent + 1) ++ (if loop_depth > 0: "break" else: "continue") ++ "\n"
+            else:
+                let s = ci_trans_stmt_goto(session, child, 0, block_scope, label_map, loop_depth)
+                if s.len() > 0:
+                    body = body ++ ci_indent_block(s, indent)
+                    body = body ++ ci_indent_str(indent) ++ "if (if __goto_pending != 0: 1 else: 0) != 0:\n"
+                    body = body ++ ci_indent_str(indent + 1) ++ (if loop_depth > 0: "break" else: "continue") ++ "\n"
             i = i + 1
         return body
 
@@ -6407,38 +6467,49 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
         if nc >= 1:
             let body_idx = nc - 1
             let body_cursor = with_ci_child(session, cursor, body_idx)
-            let body = ci_trans_stmt_goto(session, body_cursor, 0, scope, label_map, loop_depth + 1)
-            if body.len() == 0:
-                return ""
-
             var init_str = ""
             var cond_str = "true"
             var inc_str = ""
+            var loop_scope = scope
             if nc == 4:
                 // Use goto-aware handler so DeclStmt becomes assignment (var was hoisted)
-                init_str = ci_trans_stmt_goto(session, with_ci_child(session, cursor, 0), indent, scope, label_map, loop_depth)
-                let cond_e = ci_trans_bool_expr(session, with_ci_child(session, cursor, 1), scope)
+                let init_cursor = with_ci_child(session, cursor, 0)
+                if with_ci_cursor_kind(session, init_cursor) == CXK_DECL_STMT:
+                    let decl_result = ci_trans_decl_stmt_goto_scoped(session, init_cursor, indent, loop_scope)
+                    loop_scope = ci_scoped_stmt_scope(decl_result, loop_scope)
+                    init_str = ci_scoped_stmt_text(decl_result)
+                else:
+                    init_str = ci_trans_stmt_goto(session, init_cursor, indent, loop_scope, label_map, loop_depth)
+                let cond_e = ci_trans_bool_expr(session, with_ci_child(session, cursor, 1), loop_scope)
                 if cond_e.len() > 0:
                     cond_str = cond_e
-                inc_str = ci_trans_expr(session, with_ci_child(session, cursor, 2), scope)
+                else:
+                    cond_str = "true"
+                inc_str = ci_trans_expr(session, with_ci_child(session, cursor, 2), loop_scope)
             else if nc == 3:
                 let first = with_ci_child(session, cursor, 0)
                 let second = with_ci_child(session, cursor, 1)
                 let first_kind = with_ci_cursor_kind(session, first)
                 if first_kind == CXK_DECL_STMT:
-                    init_str = ci_trans_stmt_goto(session, first, indent, scope, label_map, loop_depth)
-                    let cond_e = ci_trans_bool_expr(session, second, scope)
+                    let decl_result = ci_trans_decl_stmt_goto_scoped(session, first, indent, loop_scope)
+                    loop_scope = ci_scoped_stmt_scope(decl_result, loop_scope)
+                    init_str = ci_scoped_stmt_text(decl_result)
+                    let cond_e = ci_trans_bool_expr(session, second, loop_scope)
                     if cond_e.len() > 0:
                         cond_str = cond_e
                 else:
-                    let cond_e = ci_trans_bool_expr(session, first, scope)
+                    let cond_e = ci_trans_bool_expr(session, first, loop_scope)
                     if cond_e.len() > 0:
                         cond_str = cond_e
-                    inc_str = ci_trans_expr(session, second, scope)
+                    inc_str = ci_trans_expr(session, second, loop_scope)
             else if nc == 2:
-                let cond_e = ci_trans_bool_expr(session, with_ci_child(session, cursor, 0), scope)
+                let cond_e = ci_trans_bool_expr(session, with_ci_child(session, cursor, 0), loop_scope)
                 if cond_e.len() > 0:
                     cond_str = cond_e
+
+            let body = ci_trans_stmt_goto(session, body_cursor, 0, loop_scope, label_map, loop_depth + 1)
+            if body.len() == 0:
+                return ""
 
             let body_text = ci_indent_block(body, indent + 1)
             var result = ""
@@ -6479,27 +6550,9 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
         return ""
 
     // Declaration statement inside goto body — variable was hoisted,
-    // so emit assignment instead of re-declaration to avoid shadowing.
+    // so emit initializer assignment while still updating lexical scope.
     if kind == CXK_DECL_STMT:
-        let nc = with_ci_num_children(session, cursor)
-        var result = ""
-        var di = 0
-        while di < nc:
-            let dchild = with_ci_child(session, cursor, di)
-            if with_ci_cursor_kind(session, dchild) == CXK_VAR_DECL:
-                let vname = ci_escape_reserved(with_ci_cursor_spelling(session, dchild))
-                // Skip array re-declarations (dimension expression is not a valid assignment)
-                let vdecl_ty = with_ci_type_translated(session, with_ci_cursor_type(session, dchild))
-                if vdecl_ty.len() > 0 and vdecl_ty.byte_at(0) == 91:
-                    di = di + 1
-                    continue
-                let init_expr = ci_var_init_expr(session, dchild, scope)
-                if init_expr.len() > 0:
-                    if result.len() > 0:
-                        result = result ++ "\n"
-                    result = result ++ vname ++ " = " ++ init_expr
-            di = di + 1
-        return result
+        return ci_scoped_stmt_text(ci_trans_decl_stmt_goto_scoped(session, cursor, indent, scope))
 
     // Everything else: use the normal translator (break, continue, return, etc.)
     ci_trans_stmt(session, cursor, indent, scope)

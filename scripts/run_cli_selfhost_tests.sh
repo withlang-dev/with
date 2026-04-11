@@ -752,6 +752,74 @@ EOF
   echo "PASS(cli-selfhost-migrate) initializer_regressions"
 }
 
+expect_migrate_goto_shadowed_local() {
+  local case_dir="$tmpdir/migrate_goto_shadowed_local_case"
+  local src="$case_dir/shadowed_local.c"
+  local out_w="$case_dir/shadowed_local.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+typedef struct rec { int groupnumber; int group; } rec;
+
+int f(int start, int ccount) {
+  const rec *p;
+  int groupnumber = 0;
+  rec rc[8];
+  goto label;
+label:
+  {
+    int i;
+    int p;
+    for (i = 0, p = start; i < ccount; i++, p = (p + 1) & 7) {
+      if (groupnumber == rc[p].groupnumber) return rc[p].group;
+    }
+  }
+  return p == 0;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) goto_shadowed_local"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! python3 - "$out_w" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text()
+decls = re.findall(r"\bvar (p__goto_\d+_\d+):", text)
+index_uses = set(re.findall(r"\[(p__goto_\d+_\d+)\]\.groupnumber", text))
+outer_match = re.search(r"return \(if (p__goto_\d+_\d+) == 0: 1 else: 0\)", text)
+
+if len(set(decls)) < 2 or len(index_uses) != 1 or outer_match is None:
+    raise SystemExit(1)
+
+if outer_match.group(1) in index_uses:
+    raise SystemExit(1)
+PY
+  then
+    echo "FAIL(cli-selfhost-migrate-output) goto_shadowed_local"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) goto_shadowed_local"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) goto_shadowed_local"
+}
+
 expect_build_reports_mir_lowering_failure() {
   local case_dir="$tmpdir/mir_lowering_failure_case"
   local src="$case_dir/mir_lowering_failure.w"
@@ -894,8 +962,46 @@ expect_init_named_dir() {
   echo "PASS(cli-selfhost-init) init_named_dir"
 }
 
+expect_pointer_index_is_rejected() {
+  local case_dir="$tmpdir/pointer_index_rejected_case"
+  local src="$case_dir/pointer_index_rejected.w"
+  local obj="$case_dir/pointer_index_rejected.o"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+fn main:
+    var arr: [4]i32 = [0 as i32; 4]
+    var p: *const i32 = null
+    let value = arr[p]
+    value
+EOF
+
+  if run_cli "$tmpdir/out" "$tmpdir/err" build "$src" --emit-obj -O0 -o "$obj"; then
+    echo "FAIL(cli-selfhost-invalid-index-build) pointer_index_rejected"
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq "index expression must be an integer" "$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-invalid-index-diagnostic) pointer_index_rejected"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if grep -Fq "LLVM verify error" "$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-invalid-index-verifier) pointer_index_rejected"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-invalid-index) pointer_index_rejected"
+}
+
 expect_init_in_cwd
 expect_init_named_dir
+expect_pointer_index_is_rejected
 expect_emit_obj_global_symbols
 expect_emit_obj_imported_symbols
 expect_imported_module_dependency_order
@@ -910,6 +1016,7 @@ expect_pcre2_prepare_shared_externs
 expect_pcre2_prepare_shared_lets
 expect_std_re_shared_dependency_imports
 expect_migrate_initializer_regressions
+expect_migrate_goto_shadowed_local
 expect_build_reports_mir_lowering_failure
 
 if [[ "$failures" -ne 0 ]]; then

@@ -1832,6 +1832,16 @@ fn Sema.check_vec_literal_elem(self: Sema, elem_ty: i32, elem_node: i32, arg_ind
             if self.arithmetic_result_type(elem_ty, actual_ty) == 0:
                 self.emit_argument_type_mismatch("Vec.literal", 0, arg_index, arg_index, elem_ty, actual_ty, elem_node)
 
+fn Sema.check_runtime_index_operand(self: Sema, index_node: i32) -> i32:
+    let index_ty = self.check_expr_with_expected(index_node, 0 as TypeId)
+    if index_ty == 0:
+        return 0
+    let index_unwrapped = self.unwrap_builtin_arg_distinct(index_ty)
+    let numeric_index_ty = self.numeric_operand_type(index_unwrapped)
+    if self.get_type_kind(numeric_index_ty) != TypeKind.TY_INT:
+        self.emit_error("index expression must be an integer", index_node)
+    return index_ty as i32
+
 fn Sema.check_index(self: Sema, node: i32) -> i32:
     let expr = self.ast.get_data0(node)
     let index = self.ast.get_data1(node)
@@ -1846,31 +1856,50 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
 
     let resolved = self.resolve_alias(arr_type)
     let tk = self.get_type_kind(resolved)
-    if tk == TypeKind.TY_ARRAY:
-        self.check_expr(index)
-        return self.get_type_d0(resolved)
-    if tk == TypeKind.TY_SLICE:
-        self.check_expr(index)
-        return self.get_type_d0(resolved)
-    if tk == TypeKind.TY_GENERIC_INST:
-        let base_name = self.pool_resolve(self.get_type_d0(resolved))
+    if tk == TypeKind.TY_PTR:
+        self.check_runtime_index_operand(index)
+        let elem_ty = self.get_type_d0(resolved)
+        self.typed_expr_types.insert(node, elem_ty)
+        return elem_ty
+    var container_tid = resolved
+    var container_tk = tk
+    if container_tk == TypeKind.TY_REF:
+        container_tid = self.resolve_alias(self.get_type_d0(container_tid))
+        container_tk = self.get_type_kind(container_tid)
+        if container_tk == TypeKind.TY_PTR:
+            self.check_runtime_index_operand(index)
+            let elem_ty = self.get_type_d0(container_tid)
+            self.typed_expr_types.insert(node, elem_ty)
+            return elem_ty
+    if container_tk == TypeKind.TY_ARRAY:
+        self.check_runtime_index_operand(index)
+        let elem_ty = self.get_type_d0(container_tid)
+        self.typed_expr_types.insert(node, elem_ty)
+        return elem_ty
+    if container_tk == TypeKind.TY_SLICE:
+        self.check_runtime_index_operand(index)
+        let elem_ty = self.get_type_d0(container_tid)
+        self.typed_expr_types.insert(node, elem_ty)
+        return elem_ty
+    if container_tk == TypeKind.TY_GENERIC_INST:
+        let base_name = self.pool_resolve(self.get_type_d0(container_tid))
         let is_type_level_index = self.index_expr_is_type_level(expr)
-        if is_type_level_index and base_name == "Vec" and self.get_generic_inst_arg_count(resolved) > 0:
-            let elem_ty = self.get_generic_inst_arg(resolved, 0)
+        if is_type_level_index and base_name == "Vec" and self.get_generic_inst_arg_count(container_tid) > 0:
+            let elem_ty = self.get_generic_inst_arg(container_tid, 0)
             self.check_vec_literal_elem(elem_ty, index, 0)
             if index2 != 0:
                 self.check_vec_literal_elem(elem_ty, index2, 1)
-            self.typed_expr_types.insert(node, resolved as i32)
-            return resolved as i32
-        if not is_type_level_index and base_name == "Vec" and self.get_generic_inst_arg_count(resolved) > 0:
-            self.check_expr(index)
-            let elem_ty = self.get_generic_inst_arg(resolved, 0)
+            self.typed_expr_types.insert(node, container_tid as i32)
+            return container_tid as i32
+        if not is_type_level_index and base_name == "Vec" and self.get_generic_inst_arg_count(container_tid) > 0:
+            self.check_runtime_index_operand(index)
+            let elem_ty = self.get_generic_inst_arg(container_tid, 0)
             self.typed_expr_types.insert(node, elem_ty)
             return elem_ty
 
     // Type-level NodeKind.NK_INDEX: Vec[i32], HashMap[str, i32], etc.
     // Create TypeKind.TY_GENERIC_INST so MirLower can find it in the sema snapshot.
-    if tk == TypeKind.TY_STRUCT:
+    if container_tk == TypeKind.TY_STRUCT:
         if self.ast.kind(expr) == NodeKind.NK_IDENT:
             let ci_base_sym = self.ast.get_data0(expr)
             if self.has_named_type_visible(ci_base_sym) != 0:
