@@ -376,11 +376,13 @@ fn rt_alloc(size_arg: i64) -> *mut u8:
 
     let head = get_freelist(idx)
     if head != 0:
-        // Pop from freelist. The first 8 bytes of the node store 'next'.
+        // Pop from freelist. Zero the payload — recycled memory is dirty.
         let next = *(head as *const i64)
         set_freelist(idx, next)
         alloc_store_small_header(head, cls_size)
-        return small_block_ptr(head)
+        let ptr = small_block_ptr(head)
+        rt_memset(ptr, 0, size)
+        return ptr
 
     // Carve from slab
     if slab_remaining < block_size:
