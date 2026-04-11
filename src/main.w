@@ -40,7 +40,7 @@ enum PreludeMode: i32:
     NoneMode = 2
 
 const CLI_DEFAULT_DEBUG_OPT_LEVEL: i32 = 0
-const CLI_DEFAULT_BUILD_OPT_LEVEL: i32 = 0
+const CLI_DEFAULT_BUILD_OPT_LEVEL: i32 = 1
 
 type CliOptions {
     command: str,
