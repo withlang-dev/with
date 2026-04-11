@@ -56,15 +56,17 @@ fn main:
         print("ccontext creation failed")
         pcre2_general_context_free_8(gcontext)
         return
-    // Set required defaults that are zero instead of PCRE2_UNSET (#102)
-    pcre2_set_max_pattern_length_8(ccontext, (0 -% 1) as c_ulong)
-    pcre2_set_max_pattern_compiled_length_8(ccontext, (0 -% 1) as c_ulong)
-    pcre2_set_parens_nest_limit_8(ccontext, 250 as c_uint)
-    pcre2_set_max_varlookbehind_8(ccontext, 255 as c_uint)
-    pcre2_set_newline_8(ccontext, 2 as c_uint)
+    // Set required defaults directly on struct fields (#102: struct initializers not migrated)
+    (ccontext.max_pattern_length = (0 -% 1) as c_ulong)
+    (ccontext.max_pattern_compiled_length = (0 -% 1) as c_ulong)
+    (ccontext.parens_nest_limit = 250)
+    (ccontext.max_varlookbehind = 255)
+    (ccontext.newline_convention = 2)  // PCRE2_NEWLINE_LF
+    (ccontext.bsr_convention = 0)
+    (ccontext.optimization_flags = 4294967295)  // PCRE2_OPTIMIZATION_ALL
     // Generate character tables at runtime (the static tables weren't migrated, #102)
     let tables = pcre2_maketables_8(gcontext)
-    pcre2_set_character_tables_8(ccontext, tables)
+    (ccontext.tables = tables)
     print("ccontext ok")
 
     // Compile a simple pattern
