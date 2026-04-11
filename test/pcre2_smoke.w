@@ -31,6 +31,7 @@ use std.re.pcre2_pattern_info
 use std.re.pcre2_serialize
 use std.re.pcre2_convert
 use std.re.pcre2_script_run
+use std.re.pcre2_maketables
 // use std.re.pcre2posix  // excluded — needs opaque type fix
 
 extern fn malloc(size: c_ulong) -> *mut c_void
@@ -55,6 +56,15 @@ fn main:
         print("ccontext creation failed")
         pcre2_general_context_free_8(gcontext)
         return
+    // Set required defaults that are zero instead of PCRE2_UNSET (#102)
+    pcre2_set_max_pattern_length_8(ccontext, (0 -% 1) as c_ulong)
+    pcre2_set_max_pattern_compiled_length_8(ccontext, (0 -% 1) as c_ulong)
+    pcre2_set_parens_nest_limit_8(ccontext, 250 as c_uint)
+    pcre2_set_max_varlookbehind_8(ccontext, 255 as c_uint)
+    pcre2_set_newline_8(ccontext, 2 as c_uint)
+    // Generate character tables at runtime (the static tables weren't migrated, #102)
+    let tables = pcre2_maketables_8(gcontext)
+    pcre2_set_character_tables_8(ccontext, tables)
     print("ccontext ok")
 
     // Compile a simple pattern
