@@ -5926,8 +5926,20 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
         if d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
             case_start = body.switch_table_starts.get(d1 as i64)
             case_count = body.switch_table_counts.get(d1 as i64)
-        let sw = wl_build_switch(self.builder, cond, default_bb, case_count)
+        // For i1 conditions with exactly 1 case, emit br i1 instead of switch i1.
+        // LLVM's optimizer has known issues with switch i1 (non-canonical form).
         let cond_ty = wl_type_of(cond)
+        if wl_get_int_type_width(cond_ty) == 1 and case_count == 1:
+            let target_bb = body.switch_table_targets.get(case_start as i64)
+            if target_bb >= 0 and target_bb < self.mir_bb_values.len() as i32:
+                let case_target = self.mir_bb_values.get(target_bb as i64)
+                let val = body.switch_table_vals.get(case_start as i64)
+                if val != 0:
+                    wl_build_cond_br(self.builder, cond, case_target, default_bb)
+                else:
+                    wl_build_cond_br(self.builder, cond, default_bb, case_target)
+            return true
+        let sw = wl_build_switch(self.builder, cond, default_bb, case_count)
         var int_ty = wl_i32_type(self.context)
         if wl_get_type_kind(cond_ty) == wl_integer_type_kind():
             int_ty = cond_ty
