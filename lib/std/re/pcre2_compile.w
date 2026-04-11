@@ -216,7 +216,6 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                     optim_flags__goto_10336_10 = optim_flags__goto_10336_10 & (0 - 4 - 1)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                eprint(f"[compile] tables check: ccontext.tables={ccontext.tables as i64}")
                 (tables__goto_10305_16 = (if ((if ccontext.tables != (null as *const u8): 1 else: 0)) != 0: ccontext.tables else: _pcre2_default_tables_8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
@@ -298,7 +297,6 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 (cb__goto_10304_15.start_pattern = pattern)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                eprint("[compile] CHECKPOINT 300")
                 (cb__goto_10304_15.start_workspace = cworkspace__goto_10349_14)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
@@ -398,7 +396,6 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                                     break
                                 break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
-                eprint("[compile] CHECKPOINT 400")
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
@@ -498,7 +495,6 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if bsr__goto_10329_5 == 0: 1 else: 0) != 0:
-                eprint("[compile] CHECKPOINT 500")
                     (bsr__goto_10329_5 = ccontext.bsr_convention)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
@@ -1063,7 +1059,6 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 __pc = 1
                 continue
             1 =>  // EXIT
-                eprint("[compile] STATE 1: EXIT")
                 (__goto_pending = 0)
                 if (if cb__goto_10304_15.parsed_pattern != (&stack_parsed_pattern__goto_10342_10[0] as *mut c_uint): 1 else: 0) != 0:
                     ccontext.memctl.free((cb__goto_10304_15.parsed_pattern as *mut c_void), ccontext.memctl.memory_data)
@@ -1083,7 +1078,6 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 __pc = 2
                 continue
             2 =>  // HAD_CB_ERROR
-                eprint("[compile] STATE 2: HAD_CB_ERROR")
                 (__goto_pending = 0)
                 (ptr__goto_10310_12 = (pattern + cb__goto_10304_15.erroroffset))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1091,7 +1085,6 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 __pc = 3
                 continue
             3 =>  // HAD_EARLY_ERROR
-                eprint("[compile] STATE 3: HAD_EARLY_ERROR")
                 (__goto_pending = 0)
                 ((unsafe: *erroroffset) = ((ptr__goto_10310_12 as usize -% pattern as usize) / sizeof[u8]()))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1099,7 +1092,6 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 __pc = 4
                 continue
             4 =>  // HAD_ERROR
-                eprint("[compile] STATE 4: HAD_ERROR")
                 (__goto_pending = 0)
                 ((unsafe: *errorptr) = errorcode__goto_10330_5)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
