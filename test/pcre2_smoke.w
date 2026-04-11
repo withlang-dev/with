@@ -33,12 +33,28 @@ use std.re.pcre2_convert
 use std.re.pcre2_script_run
 use std.re.pcre2posix
 
-fn main:
-    // Create a general context with real malloc/free
-    let gcontext = pcre2_general_context_create_8(null, null, null)
+extern fn malloc(size: c_ulong) -> *mut c_void
+extern fn free(ptr: *mut c_void)
 
-    // Create a compile context from the general context
+fn pcre2_malloc(size: c_ulong, data: *mut c_void) -> *mut c_void:
+    malloc(size)
+
+fn pcre2_free(ptr: *mut c_void, data: *mut c_void):
+    free(ptr)
+
+fn main:
+    // Create contexts with real malloc/free (bypasses zero-initialized defaults)
+    let gcontext = pcre2_general_context_create_8(pcre2_malloc, pcre2_free, null)
+    if gcontext as i64 == 0:
+        print("gcontext creation failed")
+        return
+    print("gcontext ok")
     let ccontext = pcre2_compile_context_create_8(gcontext)
+    if ccontext as i64 == 0:
+        print("ccontext creation failed")
+        pcre2_general_context_free_8(gcontext)
+        return
+    print("ccontext ok")
 
     // Compile a simple pattern
     var error_code: c_int
@@ -54,16 +70,16 @@ fn main:
     )
     if code as i64 == 0:
         print(f"compile failed: error {error_code} at offset {error_offset}")
-        pcre2_compile_context_free_8(ccontext)
-        pcre2_general_context_free_8(gcontext)
+        if ccontext as i64 != 0:
+            pcre2_compile_context_free_8(ccontext)
+        if gcontext as i64 != 0:
+            pcre2_general_context_free_8(gcontext)
         return
 
     print("compile ok")
 
-    // Create match context
-    let mcontext = pcre2_match_context_create_8(gcontext)
-
     // Match against a subject
+    let mcontext = pcre2_match_context_create_8(gcontext)
     let subject = "xabcdef"
     let md = pcre2_match_data_create_from_pattern_8(code, gcontext)
     let rc = pcre2_match_8(
