@@ -752,6 +752,48 @@ EOF
   echo "PASS(cli-selfhost-migrate) initializer_regressions"
 }
 
+expect_build_reports_mir_lowering_failure() {
+  local case_dir="$tmpdir/mir_lowering_failure_case"
+  local src="$case_dir/mir_lowering_failure.w"
+  local bin="$case_dir/mir_lowering_failure"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+use std.re.defs
+use std.re.pcre2_compile
+
+fn main:
+    let _ = pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8))
+    print("ok")
+EOF
+
+  if run_cli "$tmpdir/out" "$tmpdir/err" build "$src" -o "$bin"; then
+    echo "FAIL(cli-selfhost-build) mir_lowering_failure"
+    if [[ -f "$bin" ]]; then
+      ls -lh "$bin" || true
+    fi
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ -e "$bin" ]]; then
+    echo "FAIL(cli-selfhost-build-artifact) mir_lowering_failure"
+    ls -lh "$bin" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq "error: MIR lowering failed for function 'pcre2_compile_8'" "$tmpdir/err" \
+    || ! grep -Fq "AST codegen was removed" "$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-build-diagnostic) mir_lowering_failure"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) mir_lowering_failure"
+}
+
 expect_init_in_cwd() {
   local case_dir="$tmpdir/init_in_cwd_case"
   local expected_name
@@ -868,6 +910,7 @@ expect_pcre2_prepare_shared_externs
 expect_pcre2_prepare_shared_lets
 expect_std_re_shared_dependency_imports
 expect_migrate_initializer_regressions
+expect_build_reports_mir_lowering_failure
 
 if [[ "$failures" -ne 0 ]]; then
   echo "cli selfhost tests: $failures failure(s)"

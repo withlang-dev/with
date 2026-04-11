@@ -10,6 +10,28 @@ extern fn with_eprint(s: str) -> void
 
 // ── gen_function_dispatch: MIR-first, AST fallback for unsupported patterns ──
 
+fn Codegen.fail_mir_codegen_for_function(self: Codegen, fn_node: i32, reason: str):
+    let fn_sym = self.pool.get_data0(fn_node)
+    let fn_name = self.function_symbol_name(fn_sym)
+    let decl_index = self.find_decl_index(fn_node)
+    let source_path =
+        if decl_index >= 0: self.decl_source_path(decl_index)
+        else: self.current_decl_source_file
+    var msg =
+        if reason == "lowering-failed":
+            "error: MIR lowering failed for function '" ++ fn_name ++ "'"
+        else if reason == "no-blocks":
+            "error: MIR produced no basic blocks for function '" ++ fn_name ++ "'"
+        else:
+            "error: missing MIR body for function '" ++ fn_name ++ "'"
+    if source_path.len() > 0 and source_path != "<unknown>":
+        msg = msg ++ " in " ++ source_path
+    msg = msg ++ "; AST codegen was removed, so this function cannot be compiled"
+    if reason == "lowering-failed":
+        msg = msg ++ " (re-run with WITH_MIR_AUDIT=1 to inspect unsupported nodes)"
+    with_eprint(msg)
+    self.had_error = 1
+
 fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
     let flags = self.pool.get_data2(fn_node)
     let fn_sym = self.pool.get_data0(fn_node)
@@ -37,13 +59,10 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
             self.gen_function_mir(fn_node, body)
             self.debug_clear_location()
             return
-    // No MIR body — emit unreachable stub
-    let fv_fb = self.fn_values.get(fn_sym)
-    if fv_fb.is_some():
-        let fb_fn = fv_fb.unwrap() as i64
-        let fb_entry = wl_append_bb(self.context, fb_fn, "entry")
-        wl_position_at_end(self.builder, fb_entry)
-        let _ = wl_build_unreachable(self.builder)
+        let reason = if body.lowering_failed != 0: "lowering-failed" else: "no-blocks"
+        self.fail_mir_codegen_for_function(fn_node, reason)
+        return
+    self.fail_mir_codegen_for_function(fn_node, "no-body")
 
 fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     // Use MIR module's snapshot of sema type tables — the original sema's

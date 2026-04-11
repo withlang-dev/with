@@ -204,7 +204,7 @@ fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_
         return ""
     if not self.ensure_codegen_mir(pool):
         compilation_debug_init("build_binary_to_path:ensure_codegen_mir FAILED")
-        compilation_cleanup_build_products(obj_path, "")
+        compilation_cleanup_build_products(obj_path, bin_path)
         return ""
     let active_pool: AstPool = self.active_pool(pool)
     let opt_level = self.config.opt_level
@@ -215,7 +215,7 @@ fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_
     let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, false)
     if backend_rc != 0:
         compilation_debug_init(f"build_binary_to_path:backend FAILED rc={backend_rc}")
-        compilation_cleanup_build_products(obj_path, "")
+        compilation_cleanup_build_products(obj_path, bin_path)
         return ""
     compilation_debug_init("build_binary_to_path:linking")
     // Merge dep_link_libs from project config into link libs
