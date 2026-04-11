@@ -4419,6 +4419,8 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
     // Pass 2: generate function bodies
     for i in 0..self.pool.decl_count():
+        if self.had_error != 0:
+            break
         self.sync_decl_context(i)
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
