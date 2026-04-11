@@ -188,6 +188,64 @@ EOF
   echo "PASS(cli-selfhost-import-order) imported_module_dependency_order"
 }
 
+expect_imported_fn_beats_extern_redecl() {
+  local case_dir="$tmpdir/imported_fn_beats_extern_redecl_case"
+  local shared_src="$case_dir/shared.w"
+  local wrapper_src="$case_dir/wrapper.w"
+  local user_src="$case_dir/user.w"
+  local user_obj="$case_dir/user.o"
+  mkdir -p "$case_dir"
+
+  cat >"$shared_src" <<'EOF'
+fn shared_fn() -> i32: 1
+EOF
+
+  cat >"$wrapper_src" <<'EOF'
+extern fn shared_fn() -> i32
+EOF
+
+  cat >"$user_src" <<'EOF'
+use shared
+use wrapper
+@[c_export("call_shared")]
+fn call_shared() -> i32: shared_fn()
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$user_src" --emit-obj -O0 -o "$user_obj"; then
+    echo "FAIL(cli-selfhost-emit-obj-build) imported_fn_beats_extern_redecl"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! /usr/bin/nm "$user_obj" | awk '
+    {
+      type = (NF >= 2 ? $(NF - 1) : "")
+      name = $NF
+      sub(/^_/, "", name)
+      if (name == "call_shared") {
+        if (type == "U") bad = 1
+        seen["call_shared"] = 1
+      } else if (name ~ /^__with_mod_.*__shared_fn$/) {
+        if (type != "U") bad = 1
+        seen["shared_fn"] = 1
+      } else if (name == "shared_fn") {
+        bad = 1
+      }
+    }
+    END {
+      exit !(seen["call_shared"] && seen["shared_fn"]) || bad
+    }
+  '; then
+    echo "FAIL(cli-selfhost-emit-obj-symbols) imported_fn_beats_extern_redecl"
+    /usr/bin/nm "$user_obj" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-emit-obj) imported_fn_beats_extern_redecl"
+}
+
 expect_emit_obj_imported_pcre2_symbol() {
   local case_dir="$tmpdir/imported_pcre2_symbol_case"
   local src="$case_dir/test106.w"
@@ -235,6 +293,57 @@ EOF
   fi
 
   echo "PASS(cli-selfhost-emit-obj) imported_pcre2_symbol"
+}
+
+expect_emit_obj_imported_pcre2_symbol_multi_import() {
+  local case_dir="$tmpdir/imported_pcre2_symbol_multi_case"
+  local src="$case_dir/test106_multi.w"
+  local obj="$case_dir/test106_multi.o"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+use std.re.defs
+use std.re.pcre2_compile
+use std.re.pcre2_match
+
+@[c_export("call_compile")]
+fn call_compile() -> *mut pcre2_real_code_8:
+    pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8))
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$src" --emit-obj -O0 -o "$obj"; then
+    echo "FAIL(cli-selfhost-emit-obj-build) imported_pcre2_symbol_multi_import"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! /usr/bin/nm "$obj" | awk '
+    {
+      type = (NF >= 2 ? $(NF - 1) : "")
+      name = $NF
+      sub(/^_/, "", name)
+      if (name == "call_compile") {
+        if (type == "U") bad = 1
+        seen["call_compile"] = 1
+      } else if (name ~ /^__with_mod_.*__pcre2_compile_8$/) {
+        if (type != "U") bad = 1
+        seen["pcre2_compile_8"] = 1
+      } else if (name == "pcre2_compile_8") {
+        bad = 1
+      }
+    }
+    END {
+      exit !(seen["call_compile"] && seen["pcre2_compile_8"]) || bad
+    }
+  '; then
+    echo "FAIL(cli-selfhost-emit-obj-symbols) imported_pcre2_symbol_multi_import"
+    /usr/bin/nm "$obj" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-emit-obj) imported_pcre2_symbol_multi_import"
 }
 
 expect_migrate_global_init_list() {
@@ -748,7 +857,9 @@ expect_init_named_dir
 expect_emit_obj_global_symbols
 expect_emit_obj_imported_symbols
 expect_imported_module_dependency_order
+expect_imported_fn_beats_extern_redecl
 expect_emit_obj_imported_pcre2_symbol
+expect_emit_obj_imported_pcre2_symbol_multi_import
 expect_migrate_global_init_list
 expect_migrate_host_header_compat
 expect_migrate_pcre2_config_template
