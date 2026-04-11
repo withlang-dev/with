@@ -1214,8 +1214,9 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                     let sname = self.pool.resolve(shadowed_name)
                     self.diagnostics.emit(Diagnostic.err(f"extern fn '{sname}' shadows prelude function '{sname}'", Span { file: 0, start: merged_pool.get_start(id), end: merged_pool.get_end(id) }))
             continue
-        if ik == NodeKind.NK_EXTERN_VAR and frontend_extern_var_shadowed_in_tier(prelude_ordered, merged_pool, self.pool, oi):
-            continue
+        if ik == NodeKind.NK_EXTERN_VAR:
+            if frontend_extern_var_shadowed_in_tier(prelude_ordered, merged_pool, self.pool, oi) or frontend_extern_var_shadowed_by_tier(user_import_ordered, merged_pool, self.pool, id) or frontend_extern_var_shadowed_by_tier(root_ordered, merged_pool, self.pool, id):
+                continue
         merged_pool.add_decl(id)
         rebuilt_paths.push(prelude_paths.get(oi as i64))
         rebuilt_file_ids.push(prelude_file_ids.get(oi as i64))
@@ -1224,13 +1225,18 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let ik = merged_pool.kind(id)
         if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(user_import_ordered, merged_pool, oi, root_fn_names):
             continue
-        if ik == NodeKind.NK_EXTERN_VAR and frontend_extern_var_shadowed_in_tier(user_import_ordered, merged_pool, self.pool, oi):
-            continue
+        if ik == NodeKind.NK_EXTERN_VAR:
+            if frontend_extern_var_shadowed_in_tier(user_import_ordered, merged_pool, self.pool, oi) or frontend_extern_var_shadowed_by_tier(root_ordered, merged_pool, self.pool, id):
+                continue
         merged_pool.add_decl(id)
         rebuilt_paths.push(user_import_paths.get(oi as i64))
         rebuilt_file_ids.push(user_import_file_ids.get(oi as i64))
     for oi in 0..root_ordered.len() as i32:
-        merged_pool.add_decl(root_ordered.get(oi as i64))
+        let id = root_ordered.get(oi as i64)
+        let ik = merged_pool.kind(id)
+        if ik == NodeKind.NK_EXTERN_VAR and frontend_extern_var_shadowed_in_tier(root_ordered, merged_pool, self.pool, oi):
+            continue
+        merged_pool.add_decl(id)
         rebuilt_paths.push(root_paths.get(oi as i64))
         rebuilt_file_ids.push(root_file_ids.get(oi as i64))
     self.decl_source_paths = rebuilt_paths
@@ -1283,19 +1289,60 @@ fn frontend_fn_shadowed_in_tier(tier: Vec[i32], pool: AstPool, idx: i32, higher_
         j = j + 1
     false
 
+fn frontend_global_decl_mut(pool: AstPool, decl: i32) -> i32:
+    let kind = pool.kind(decl)
+    if kind == NodeKind.NK_EXTERN_VAR:
+        return if pool.get_data2(decl) != 0: 1 else: 0
+    if kind == NodeKind.NK_LET_DECL:
+        return pool.get_data2(decl) % 2
+    -1
+
+fn frontend_global_decl_type_text(pool: AstPool, intern: InternPool, decl: i32) -> str:
+    let kind = pool.kind(decl)
+    if kind == NodeKind.NK_EXTERN_VAR:
+        return render_type_expr(pool, intern, (pool.get_data1(decl)) as NodeId)
+    if kind == NodeKind.NK_LET_DECL:
+        let type_ann = top_level_let_type_ann(pool, pool.get_data2(decl))
+        if type_ann != 0:
+            return render_type_expr(pool, intern, (type_ann) as NodeId)
+    ""
+
+fn frontend_extern_var_matches_decl(pool: AstPool, intern: InternPool, decl: i32, other: i32) -> bool:
+    if pool.kind(decl) != NodeKind.NK_EXTERN_VAR:
+        return false
+    let other_kind = pool.kind(other)
+    if other_kind != NodeKind.NK_EXTERN_VAR and other_kind != NodeKind.NK_LET_DECL:
+        return false
+    if pool.get_data0(other) != pool.get_data0(decl):
+        return false
+    if frontend_global_decl_mut(pool, other) != frontend_global_decl_mut(pool, decl):
+        return false
+    let decl_type = frontend_global_decl_type_text(pool, intern, decl)
+    let other_type = frontend_global_decl_type_text(pool, intern, other)
+    if decl_type.len() == 0 or other_type.len() == 0:
+        return false
+    other_type == decl_type
+
+fn frontend_extern_var_shadowed_by_tier(tier: Vec[i32], pool: AstPool, intern: InternPool, decl: i32) -> bool:
+    for i in 0..tier.len() as i32:
+        if frontend_extern_var_matches_decl(pool, intern, decl, tier.get(i as i64)):
+            return true
+    false
+
 fn frontend_extern_var_shadowed_in_tier(tier: Vec[i32], pool: AstPool, intern: InternPool, idx: i32) -> bool:
     let decl = tier.get(idx as i64)
-    let decl_name = intern.resolve(pool.get_data0(decl))
-    let decl_mut = pool.get_data2(decl)
-    let decl_type = render_type_expr(pool, intern, (pool.get_data1(decl)) as NodeId)
+    for j in 0..tier.len() as i32:
+        if j == idx:
+            continue
+        let jd = tier.get(j as i64)
+        if pool.kind(jd) == NodeKind.NK_LET_DECL and frontend_extern_var_matches_decl(pool, intern, decl, jd):
+            return true
     var j = idx + 1
     while j < tier.len() as i32:
         let jd = tier.get(j as i64)
-        if pool.kind(jd) == NodeKind.NK_EXTERN_VAR and pool.get_data2(jd) == decl_mut:
-            if intern.resolve(pool.get_data0(jd)) == decl_name:
-                let other_type = render_type_expr(pool, intern, (pool.get_data1(jd)) as NodeId)
-                if other_type == decl_type:
-                    return true
+        if pool.kind(jd) == NodeKind.NK_EXTERN_VAR:
+            if frontend_extern_var_matches_decl(pool, intern, decl, jd):
+                return true
         j = j + 1
     false
 
