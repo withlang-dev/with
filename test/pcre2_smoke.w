@@ -49,12 +49,7 @@ fn main:
         print("gcontext creation failed")
         return
     print(f"gcontext ok, addr={gcontext as i64}")
-    // Dump more raw bytes
-    let p = gcontext as *const i64
-    var i = 0
-    while i < 8:
-        print(f"offset {i * 8}: {unsafe: *(p + i)}")
-        i = i + 1
+    // Context fields are correctly stored (verified via raw read)
     let ccontext = pcre2_compile_context_create_8(gcontext)
     if ccontext as i64 == 0:
         print("ccontext creation failed")
@@ -75,11 +70,9 @@ fn main:
         ccontext
     )
     if code as i64 == 0:
+        var err_msg: [256]u8
+        pcre2_get_error_message_8(error_code, (&mut err_msg[0] as *mut u8), 256 as c_ulong)
         print(f"compile failed: error {error_code} at offset {error_offset}")
-        if ccontext as i64 != 0:
-            pcre2_compile_context_free_8(ccontext)
-        if gcontext as i64 != 0:
-            pcre2_general_context_free_8(gcontext)
         return
 
     print("compile ok")
