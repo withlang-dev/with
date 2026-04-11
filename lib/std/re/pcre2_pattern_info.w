@@ -59,7 +59,7 @@ extern fn pcre2_code_free_8(p0: *mut pcre2_real_code_8) -> void
 extern fn pcre2_code_copy_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8
 extern fn pcre2_code_copy_with_tables_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8
 fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *mut c_void) -> c_int:
-    var re: *const pcre2_real_code_8
+    var re: *const pcre2_real_code_8 = (code as *const pcre2_real_code_8)
     if (if where_ == null: 1 else: 0) != 0:
         match what
             0 =>
@@ -73,43 +73,96 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
             _ => 0
         
 
+    if (if re == (null as *const pcre2_real_code_8): 1 else: 0) != 0:
+        return (-51)
+
+    if (if re.magic_number != 1346589253: 1 else: 0) != 0:
+        return (-31)
+
+    if (if ((re.flags & 1)) == 0: 1 else: 0) != 0:
+        return (-32)
+
     match what
-        0 => 0
-        1 => 0
-        2 => 0
-        3 => 0
-        4 => 0
-        21 => 0
-        26 => 0
-        6 => 0
-        5 => 0
-        7 => 0
-        24 => 0
-        23 => 0
-        8 => 0
-        25 => 0
-        9 => 0
-        10 => 0
-        12 => 0
-        11 => 0
-        13 => 0
-        14 => 0
-        15 => 0
-        16 => 0
-        18 => 0
-        17 => 0
-        19 => 0
-        20 => 0
-        22 => 0
-        _ => 0
+        0 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.overall_options)
+        1 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.compile_options)
+        2 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.top_backref)
+        3 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.bsr_convention)
+        4 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.top_bracket)
+        21 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.limit_depth)
+            if (if re.limit_depth == 4294967295: 1 else: 0) != 0:
+                return (-55)
+        26 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.extra_options)
+        6 =>
+            ((unsafe: *((where_ as *mut c_uint))) = (if ((if ((re.flags & 16)) != 0: 1 else: 0)) != 0: 1 else: (if ((if ((re.flags & 512)) != 0: 1 else: 0)) != 0: 2 else: 0)))
+        5 =>
+            ((unsafe: *((where_ as *mut c_uint))) = (if ((if ((re.flags & 16)) != 0: 1 else: 0)) != 0: re.first_codeunit else: 0))
+        7 =>
+            ((unsafe: *((where_ as *mut *const u8))) = (if ((if ((re.flags & 64)) != 0: 1 else: 0)) != 0: (&mut ((&re.start_bitmap[0] as *mut u8)[0]) as *const u8) else: (null as *const u8)))
+        24 =>
+            ((unsafe: *((where_ as *mut c_ulong))) = (120 +% ((re.top_bracket * 2) *% sizeof[c_ulong]())))
+        23 =>
+            ((unsafe: *((where_ as *mut c_uint))) = (if ((re.flags & 4194304)) != 0: 1 else: 0))
+        8 =>
+            ((unsafe: *((where_ as *mut c_uint))) = (if ((re.flags & 2048)) != 0: 1 else: 0))
+        25 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.limit_heap)
+            if (if re.limit_heap == 4294967295: 1 else: 0) != 0:
+                return (-55)
+        9 =>
+            ((unsafe: *((where_ as *mut c_uint))) = (if ((re.flags & 1024)) != 0: 1 else: 0))
+        10 =>
+            ((unsafe: *((where_ as *mut c_ulong))) = 0)
+        12 =>
+            ((unsafe: *((where_ as *mut c_uint))) = (if ((if ((re.flags & 128)) != 0: 1 else: 0)) != 0: 1 else: 0))
+        11 =>
+            ((unsafe: *((where_ as *mut c_uint))) = (if ((if ((re.flags & 128)) != 0: 1 else: 0)) != 0: re.last_codeunit else: 0))
+        13 =>
+            ((unsafe: *((where_ as *mut c_uint))) = (if ((re.flags & 8192)) != 0: 1 else: 0))
+        14 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.limit_match)
+            if (if re.limit_match == 4294967295: 1 else: 0) != 0:
+                return (-55)
+        15 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.max_lookbehind)
+        16 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.minlength)
+        18 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.name_entry_size)
+        17 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.name_count)
+        19 =>
+            ((unsafe: *((where_ as *mut *const u8))) = ((((re as *const i8) + sizeof[pcre2_real_code_8]())) as *const u8))
+        20 =>
+            ((unsafe: *((where_ as *mut c_uint))) = re.newline_convention)
+        22 =>
+            ((unsafe: *((where_ as *mut c_ulong))) = re.blocksize)
+        _ =>
+            return (-34)
 
     return 0
 
 fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn(*mut pcre2_callout_enumerate_block_8, *mut c_void) -> c_int, callout_data: *mut c_void) -> c_int:
-    var re: *const pcre2_real_code_8
+    var re: *const pcre2_real_code_8 = (code as *const pcre2_real_code_8)
     var cb: pcre2_callout_enumerate_block_8
     var cc: *const u8
+    if (if re == (null as *const pcre2_real_code_8): 1 else: 0) != 0:
+        return (-51)
+
+    if (if re.magic_number != 1346589253: 1 else: 0) != 0:
+        return (-31)
+
+    if (if ((re.flags & 1)) == 0: 1 else: 0) != 0:
+        return (-32)
+
     (cb.version = 0)
+    (cc = ((((re as *mut u8) + re.code_start)) as *const u8))
     while 1 != 0:
         var rc: c_int
         match (unsafe: *cc)
@@ -254,12 +307,27 @@ type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
 type struct_pcre2_real_jit_stack_8 = pcre2_real_jit_stack_8
 type dfa_recursion_info { prevrec: *mut dfa_recursion_info = null, subject_position: *const u8 = null, last_used_ptr: *const u8 = null, group_num: c_uint = 0 }
 type struct_dfa_recursion_info = dfa_recursion_info
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:696:8: demoted to opaque
-type heapframe = opaque
+// union
+type heapframe_fields_char_repeat_oc { oc: c_uint = 0, occu: [4]u8 = [0 as u8; 4] }
+type heapframe_fields_char_repeat { start_eptr: *const u8 = null, charptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: heapframe_fields_char_repeat_oc }
+type heapframe_fields_charnot_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: c_uint = 0 }
+type heapframe_fields_class_repeat { start_eptr: *const u8 = null, byte_map_address: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_xclass_repeat { start_eptr: *const u8 = null, xclass_data: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_eclass_repeat { start_eptr: *const u8 = null, eclass_data: *const u8 = null, eclass_len: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_type_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, ctype: c_uint = 0, propvalue: c_uint = 0 }
+type heapframe_fields_ref_repeat { start: *const u8 = null, offset: c_ulong = 0, length: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_op_bra { frame_type: c_uint = 0 }
+type heapframe_fields_op_brapos { start_eptr: *const u8 = null, start_group: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_recurse { start_branch: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_assert_scs { saved_end_subject: *const u8 = null, saved_eptr: *const u8 = null, true_end_extra: c_ulong = 0, saved_moptions: c_uint = 0 }
+type heapframe_fields_op_cond { start_branch: *const u8 = null, length: c_ulong = 0 }
+type heapframe_fields_op_vreverse { min: c_uint = 0, max: c_uint = 0 }
+// union
+type heapframe_fields { char_repeat: heapframe_fields_char_repeat, charnot_repeat: heapframe_fields_charnot_repeat, class_repeat: heapframe_fields_class_repeat, xclass_repeat: heapframe_fields_xclass_repeat, eclass_repeat: heapframe_fields_eclass_repeat, type_repeat: heapframe_fields_type_repeat, ref_repeat: heapframe_fields_ref_repeat, op_bra: heapframe_fields_op_bra, op_brapos: heapframe_fields_op_brapos, op_recurse: heapframe_fields_op_recurse, op_assert_scs: heapframe_fields_op_assert_scs, op_cond: heapframe_fields_op_cond, op_vreverse: heapframe_fields_op_vreverse }
+type heapframe { ecode: *const u8 = null, back_frame: c_ulong = 0, rdepth: c_uint = 0, group_frame_type: c_uint = 0, return_id: u8 = 0, op: u8 = 0, byte1: u8 = 0, byte2: u8 = 0, fields: heapframe_fields, eptr: *const u8 = null, start_match: *const u8 = null, mark: *const u8 = null, recurse_last_used: *const u8 = null, current_recurse: c_uint = 0, capture_last: c_uint = 0, last_group_offset: c_ulong = 0, offset_top: c_ulong = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
 type struct_heapframe = heapframe
 type static_assertion_heapframe_size = [1]c_int
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:1024:16: demoted to opaque
-type heapframe_align = opaque
+type heapframe_align { unalign: c_char = 0, frame: heapframe }
 type struct_heapframe_align = heapframe_align
 type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, hitend: c_int = 0, hasthen: c_int = 0, hasbsk: c_int = 0, allowemptypartial: c_int = 0, allowlookaroundbsk: c_int = 0, lcc: *const u8 = null, fcc: *const u8 = null, ctypes: *const u8 = null, start_offset: c_ulong = 0, end_offset_top: c_ulong = 0, partial: c_ushort = 0, bsr_convention: c_ushort = 0, name_count: c_ushort = 0, name_entry_size: c_ushort = 0, name_table: *const u8 = null, start_code: *const u8 = null, start_subject: *const u8 = null, check_subject: *const u8 = null, end_subject: *const u8 = null, true_end_subject: *const u8 = null, end_match_ptr: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, mark: *const u8 = null, nomatch_mark: *const u8 = null, verb_ecode_ptr: *const u8 = null, verb_skip_ptr: *const u8 = null, verb_current_recurse: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, skip_arg_count: c_uint = 0, ignore_skip_arg: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null }
 type struct_match_block_8 = match_block_8
@@ -448,9 +516,9 @@ fn UCD_CATEGORY() -> Never:
 fn UCD_CHARTYPE() -> Never:
     comptime_error("untranslatable C macro: UCD_CHARTYPE")
 fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as c_int) == 0x69) or ((ch as c_int) == 0x0130))
+    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
 fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as c_int) == 0x0130): 0x69 else: (if ((ch as c_int) == 0x49): 0x0131 else: (ch as c_int)))
+    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
 // untranslatable fn-like macro
 fn UCD_GRAPHBREAK() -> Never:
     comptime_error("untranslatable C macro: UCD_GRAPHBREAK")

@@ -67,83 +67,101 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
     var subject = __param_subject
     var length = __param_length
     var options = __param_options
-    var rc: c_int = 0
-    var re: *const pcre2_real_code_8 = null
-    var original_options: c_uint = 0
-    var null_str: [1]u8 = [0 as u8; 1]
-    var original_subject: *const u8 = null
-    var start_match: *const u8 = null
-    var end_subject: *const u8 = null
-    var bumpalong_limit: *const u8 = null
-    var req_cu_ptr: *const u8 = null
-    var utf: c_int = 0
-    var anchored: c_int = 0
-    var startline: c_int = 0
-    var firstline: c_int = 0
-    var has_first_cu: c_int = 0
-    var has_req_cu: c_int = 0
-    var memchr_found_first_cu: *const u8 = null
-    var memchr_found_first_cu2: *const u8 = null
-    var first_cu: u8 = 0
-    var first_cu2: u8 = 0
-    var req_cu: u8 = 0
-    var req_cu2: u8 = 0
-    var start_bits: *const u8 = null
-    var cb: pcre2_callout_block_8
-    var actual_match_block: dfa_match_block_8
-    var mb: *mut dfa_match_block_8 = null
-    var base_recursion_workspace: [7680]c_int = [0 as c_int; 7680]
-    var rws: *mut RWS_anchor = null
-    var t: *const u8 = null
-    var ok: c_int = 0
-    var c: u8 = 0
-    var pp1: *const u8 = null
-    var pp2: *const u8 = null
-    var searchlength: c_ulong = 0
-    var p: *const u8 = null
-    var check_length: c_ulong = 0
-    var pp: *const u8 = null
-    var next: *mut RWS_anchor = null
+    var rc__goto_3360_5: c_int = 0
+    var re__goto_3362_24: *const pcre2_real_code_8 = null
+    var original_options__goto_3363_10: c_uint = 0
+    var null_str__goto_3365_13: [1]u8 = [0 as u8; 1]
+    var original_subject__goto_3366_12: *const u8 = null
+    var start_match__goto_3367_12: *const u8 = null
+    var end_subject__goto_3368_12: *const u8 = null
+    var bumpalong_limit__goto_3369_12: *const u8 = null
+    var req_cu_ptr__goto_3370_12: *const u8 = null
+    var utf__goto_3372_6: c_int = 0
+    var anchored__goto_3372_11: c_int = 0
+    var startline__goto_3372_21: c_int = 0
+    var firstline__goto_3372_32: c_int = 0
+    var has_first_cu__goto_3373_6: c_int = 0
+    var has_req_cu__goto_3374_6: c_int = 0
+    var memchr_found_first_cu__goto_3377_12: *const u8 = null
+    var memchr_found_first_cu2__goto_3378_12: *const u8 = null
+    var first_cu__goto_3381_13: u8 = 0
+    var first_cu2__goto_3382_13: u8 = 0
+    var req_cu__goto_3383_13: u8 = 0
+    var req_cu2__goto_3384_13: u8 = 0
+    var start_bits__goto_3386_16: *const u8 = null
+    var cb__goto_3391_21: pcre2_callout_block_8
+    var actual_match_block__goto_3392_17: dfa_match_block_8
+    var mb__goto_3393_18: *mut dfa_match_block_8 = null
+    var base_recursion_workspace__goto_3400_5: [7680]c_int = [0 as c_int; 7680]
+    var rws__goto_3401_13: *mut RWS_anchor = null
+    var t__goto_3737_18: *const u8 = null
+    var ok__goto_3761_14: c_int = 0
+    var c__goto_3764_23: u8 = 0
+    var pp1__goto_3803_22: *const u8 = null
+    var pp2__goto_3804_22: *const u8 = null
+    var searchlength__goto_3805_22: c_ulong = 0
+    var c__goto_3918_20: c_uint = 0
+    var p__goto_3942_18: *const u8 = null
+    var check_length__goto_3976_20: c_ulong = 0
+    var pp__goto_3990_24: *const u8 = null
+    var next__goto_4135_15: *mut RWS_anchor = null
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                original_options = options
-                // null_str re-declared (skipped)
-                original_subject = subject
-                has_first_cu = 0
-                has_req_cu = 0
-                memchr_found_first_cu = (null as *const u8)
-                memchr_found_first_cu2 = (null as *const u8)
-                first_cu = 0
-                first_cu2 = 0
-                req_cu = 0
-                req_cu2 = 0
-                start_bits = (null as *const u8)
-                mb = (&mut actual_match_block as *mut dfa_match_block_8)
-                (rws.next = (null as *mut RWS_anchor))
+                re__goto_3362_24 = (code as *const pcre2_real_code_8)
+                original_options__goto_3363_10 = options
+                original_subject__goto_3366_12 = subject
+                has_first_cu__goto_3373_6 = 0
+                has_req_cu__goto_3374_6 = 0
+                memchr_found_first_cu__goto_3377_12 = (null as *const u8)
+                memchr_found_first_cu2__goto_3378_12 = (null as *const u8)
+                first_cu__goto_3381_13 = 0
+                first_cu2__goto_3382_13 = 0
+                req_cu__goto_3383_13 = 0
+                req_cu2__goto_3384_13 = 0
+                start_bits__goto_3386_16 = (null as *const u8)
+                mb__goto_3393_18 = (&mut actual_match_block__goto_3392_17 as *mut dfa_match_block_8)
+                rws__goto_3401_13 = ((&base_recursion_workspace__goto_3400_5[0] as *mut c_int) as *mut RWS_anchor)
+                (rws__goto_3401_13.next = (null as *mut RWS_anchor))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (rws.size = 7680)
+                (rws__goto_3401_13.size = 7680)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (rws.free = 7676)
+                (rws__goto_3401_13.free = 7676)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if (if subject == (null as *const u8): 1 else: 0) != 0 and (if length == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                    (subject = ((&null_str[0] as *mut u8) as *const u8))
+                    (subject = ((&null_str__goto_3365_13[0] as *mut u8) as *const u8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if (if (if re == (null as *const pcre2_real_code_8): 1 else: 0) != 0 or (if subject == (null as *const u8): 1 else: 0) != 0: 1 else: 0) != 0 or (if workspace == (null as *mut c_int): 1 else: 0) != 0: 1 else: 0) != 0:
+                if (if match_data == (null as *mut pcre2_real_match_data_8): 1 else: 0) != 0:
+                    return (-51)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if (if (if re__goto_3362_24 == (null as *const pcre2_real_code_8): 1 else: 0) != 0 or (if subject == (null as *const u8): 1 else: 0) != 0: 1 else: 0) != 0 or (if workspace == (null as *mut c_int): 1 else: 0) != 0: 1 else: 0) != 0:
+                    (rc__goto_3360_5 = (-51))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
                     __pc = 2
                     __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
+                if (if length == ((0 -% 1)): 1 else: 0) != 0:
+                    (length = _pcre2_strlen_8(subject))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 if (if wscount < 20: 1 else: 0) != 0:
+                    (rc__goto_3360_5 = (-43))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
                     __pc = 2
                     __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -151,27 +169,39 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if start_offset > length: 1 else: 0) != 0:
+                    (rc__goto_3360_5 = (-33))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
                     __pc = 2
                     __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if (if ((options & ((32 | 16)))) != 0: 1 else: 0) != 0 and (if ((((re.overall_options | options)) & 536870912)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                if (if (if ((options & ((32 | 16)))) != 0: 1 else: 0) != 0 and (if ((((re__goto_3362_24.overall_options | options)) & 536870912)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (rc__goto_3360_5 = (-34))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
                     __pc = 2
                     __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ((re.overall_options & 67108864)) != 0: 1 else: 0) != 0:
+                if (if ((re__goto_3362_24.overall_options & 67108864)) != 0: 1 else: 0) != 0:
+                    (rc__goto_3360_5 = (-66))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
                     __pc = 2
                     __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if re.magic_number != 1346589253: 1 else: 0) != 0:
+                if (if re__goto_3362_24.magic_number != 1346589253: 1 else: 0) != 0:
+                    (rc__goto_3360_5 = (-31))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
                     __pc = 2
                     __goto_pending = 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -180,6 +210,9 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                     continue
                 if (if ((options & 64)) != 0: 1 else: 0) != 0:
                     if (if (if (if ((workspace[0] & (-2))) != 0: 1 else: 0) != 0 or (if workspace[1] < 1: 1 else: 0) != 0: 1 else: 0) != 0 or (if workspace[1] > (((((wscount -% 2)) / 3)) as c_int): 1 else: 0) != 0: 1 else: 0) != 0:
+                        (rc__goto_3360_5 = (-38))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
                         __pc = 2
                         __goto_pending = 1
                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -188,177 +221,208 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (utf = (if ((re.overall_options & 524288)) != 0: 1 else: 0))
+                (utf__goto_3372_6 = (if ((re__goto_3362_24.overall_options & 524288)) != 0: 1 else: 0))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (start_match = (subject + start_offset))
+                (start_match__goto_3367_12 = (subject + start_offset))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (end_subject = (subject + length))
+                (end_subject__goto_3368_12 = (subject + length))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (req_cu_ptr = (start_match - (1 as isize as usize)))
+                (req_cu_ptr__goto_3370_12 = (start_match__goto_3367_12 - (1 as isize as usize)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (anchored = (if (if ((options & (((2147483648 as c_uint) | 64)))) != 0: 1 else: 0) != 0 or (if ((re.overall_options & (2147483648 as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
+                (anchored__goto_3372_11 = (if (if ((options & (((2147483648 as c_uint) | 64)))) != 0: 1 else: 0) != 0 or (if ((re__goto_3362_24.overall_options & (2147483648 as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (startline = (if ((re.flags & 512)) != 0: 1 else: 0))
+                (startline__goto_3372_21 = (if ((re__goto_3362_24.flags & 512)) != 0: 1 else: 0))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (firstline = (if (if anchored != 0: 0 else: 1) != 0 and (if ((re.overall_options & 256)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (firstline__goto_3372_32 = (if (if anchored__goto_3372_11 != 0: 0 else: 1) != 0 and (if ((re__goto_3362_24.overall_options & 256)) != 0: 1 else: 0) != 0: 1 else: 0))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (bumpalong_limit = end_subject)
+                (bumpalong_limit__goto_3369_12 = end_subject__goto_3368_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (mb.cb = (&mut cb as *mut pcre2_callout_block_8))
+                (mb__goto_3393_18.cb = (&mut cb__goto_3391_21 as *mut pcre2_callout_block_8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.version = 2)
+                (cb__goto_3391_21.version = 2)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.subject = subject)
+                (cb__goto_3391_21.subject = subject)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.callout_flags = 0)
+                (cb__goto_3391_21.subject_length = ((((end_subject__goto_3368_12 as usize -% subject as usize) / sizeof[u8]())) as c_ulong))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.capture_top = 1)
+                (cb__goto_3391_21.callout_flags = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.capture_last = 0)
+                (cb__goto_3391_21.capture_top = 1)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (cb.mark = (null as *const u8))
+                (cb__goto_3391_21.capture_last = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (cb__goto_3391_21.mark = (null as *const u8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if mcontext == (null as *mut pcre2_real_match_context_8): 1 else: 0) != 0:
-                    (mb.callout = (null as *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int))
+                    (mb__goto_3393_18.callout = (null as *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (mb.memctl = re.memctl)
+                    (mb__goto_3393_18.memctl = re__goto_3362_24.memctl)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (mb.match_limit = _pcre2_default_match_context_8.match_limit)
+                    (mb__goto_3393_18.match_limit = _pcre2_default_match_context_8.match_limit)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (mb.match_limit_depth = _pcre2_default_match_context_8.depth_limit)
+                    (mb__goto_3393_18.match_limit_depth = _pcre2_default_match_context_8.depth_limit)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (mb.heap_limit = _pcre2_default_match_context_8.heap_limit)
+                    (mb__goto_3393_18.heap_limit = _pcre2_default_match_context_8.heap_limit)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 else:
-                    (mb.callout = mcontext.callout)
+                    if (if mcontext.offset_limit != ((0 -% 1)): 1 else: 0) != 0:
+                        if (if ((re__goto_3362_24.overall_options & 8388608)) == 0: 1 else: 0) != 0:
+                            (rc__goto_3360_5 = (-56))
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                continue
+                            __pc = 2
+                            __goto_pending = 1
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                continue
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (bumpalong_limit__goto_3369_12 = (subject + mcontext.offset_limit))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (mb.callout_data = mcontext.callout_data)
+                    (mb__goto_3393_18.callout = mcontext.callout)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (mb.memctl = mcontext.memctl)
+                    (mb__goto_3393_18.callout_data = mcontext.callout_data)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (mb.match_limit = mcontext.match_limit)
+                    (mb__goto_3393_18.memctl = mcontext.memctl)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (mb.match_limit_depth = mcontext.depth_limit)
+                    (mb__goto_3393_18.match_limit = mcontext.match_limit)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (mb.heap_limit = mcontext.heap_limit)
+                    (mb__goto_3393_18.match_limit_depth = mcontext.depth_limit)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (mb__goto_3393_18.heap_limit = mcontext.heap_limit)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if mb.match_limit > re.limit_match: 1 else: 0) != 0:
-                    (mb.match_limit = re.limit_match)
+                if (if mb__goto_3393_18.match_limit > re__goto_3362_24.limit_match: 1 else: 0) != 0:
+                    (mb__goto_3393_18.match_limit = re__goto_3362_24.limit_match)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if mb.match_limit_depth > re.limit_depth: 1 else: 0) != 0:
-                    (mb.match_limit_depth = re.limit_depth)
+                if (if mb__goto_3393_18.match_limit_depth > re__goto_3362_24.limit_depth: 1 else: 0) != 0:
+                    (mb__goto_3393_18.match_limit_depth = re__goto_3362_24.limit_depth)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if mb.heap_limit > re.limit_heap: 1 else: 0) != 0:
-                    (mb.heap_limit = re.limit_heap)
+                if (if mb__goto_3393_18.heap_limit > re__goto_3362_24.limit_heap: 1 else: 0) != 0:
+                    (mb__goto_3393_18.heap_limit = re__goto_3362_24.limit_heap)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (mb.tables = re.tables)
+                (mb__goto_3393_18.start_code = ((((re__goto_3362_24 as *const u8) + re__goto_3362_24.code_start)) as *const u8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (mb.start_subject = subject)
+                (mb__goto_3393_18.tables = re__goto_3362_24.tables)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (mb.end_subject = end_subject)
+                (mb__goto_3393_18.start_subject = subject)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (mb.start_offset = start_offset)
+                (mb__goto_3393_18.end_subject = end_subject__goto_3368_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (mb.allowemptypartial = (if ((if re.max_lookbehind > 0: 1 else: 0)) != 0 or (if ((re.flags & 8192)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (mb__goto_3393_18.start_offset = start_offset)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (mb.moptions = options)
+                (mb__goto_3393_18.allowemptypartial = (if ((if re__goto_3362_24.max_lookbehind > 0: 1 else: 0)) != 0 or (if ((re__goto_3362_24.flags & 8192)) != 0: 1 else: 0) != 0: 1 else: 0))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (mb.poptions = re.overall_options)
+                (mb__goto_3393_18.moptions = options)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (mb.match_call_count = 0)
+                (mb__goto_3393_18.poptions = re__goto_3362_24.overall_options)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (mb.heap_used = 0)
+                (mb__goto_3393_18.match_call_count = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (mb.bsr_convention = re.bsr_convention)
+                (mb__goto_3393_18.heap_used = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (mb.nltype = 0)
+                (mb__goto_3393_18.bsr_convention = re__goto_3362_24.bsr_convention)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                match re.newline_convention
+                (mb__goto_3393_18.nltype = 0)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                match re__goto_3362_24.newline_convention
                     1 =>
-                        (mb.nllen = 1)
-                        ((&mb.nl[0] as *mut u8)[0] = 13)
+                        (mb__goto_3393_18.nllen = 1)
+                        ((&mb__goto_3393_18.nl[0] as *mut u8)[0] = 13)
                     2 =>
-                        (mb.nllen = 1)
-                        ((&mb.nl[0] as *mut u8)[0] = 10)
+                        (mb__goto_3393_18.nllen = 1)
+                        ((&mb__goto_3393_18.nl[0] as *mut u8)[0] = 10)
                     6 =>
-                        (mb.nllen = 1)
-                        ((&mb.nl[0] as *mut u8)[0] = 0)
+                        (mb__goto_3393_18.nllen = 1)
+                        ((&mb__goto_3393_18.nl[0] as *mut u8)[0] = 0)
                     3 =>
-                        (mb.nllen = 2)
-                        ((&mb.nl[0] as *mut u8)[0] = 13)
-                        ((&mb.nl[0] as *mut u8)[1] = 10)
+                        (mb__goto_3393_18.nllen = 2)
+                        ((&mb__goto_3393_18.nl[0] as *mut u8)[0] = 13)
+                        ((&mb__goto_3393_18.nl[0] as *mut u8)[1] = 10)
                     4 =>
-                        (mb.nltype = 1)
+                        (mb__goto_3393_18.nltype = 1)
                     5 =>
-                        (mb.nltype = 2)
+                        (mb__goto_3393_18.nltype = 2)
                     _ =>
+                        (rc__goto_3360_5 = (-44))
                         __pc = 2
                         __goto_pending = 1
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ((re.flags & 16)) != 0: 1 else: 0) != 0:
-                    (has_first_cu = 1)
+                if (if ((re__goto_3362_24.flags & 16)) != 0: 1 else: 0) != 0:
+                    (has_first_cu__goto_3373_6 = 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if ((re.flags & 32)) != 0: 1 else: 0) != 0:
-                        (first_cu2 = (((mb.tables + (256 as isize as usize)))[first_cu]))
+                    (first_cu2__goto_3382_13 = ((re__goto_3362_24.first_codeunit) as u8))
+                    (first_cu__goto_3381_13 = first_cu2__goto_3382_13)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    if (if ((re__goto_3362_24.flags & 32)) != 0: 1 else: 0) != 0:
+                        (first_cu2__goto_3382_13 = (((mb__goto_3393_18.tables + (256 as isize as usize)))[first_cu__goto_3381_13]))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 else:
-                    if (if (if startline != 0: 0 else: 1) != 0 and (if ((re.flags & 64)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                        (start_bits = (&re.start_bitmap[0] as *mut u8))
+                    if (if (if startline__goto_3372_21 != 0: 0 else: 1) != 0 and (if ((re__goto_3362_24.flags & 64)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                        (start_bits__goto_3386_16 = (&re__goto_3362_24.start_bitmap[0] as *mut u8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                if (if ((re.flags & 128)) != 0: 1 else: 0) != 0:
-                    (has_req_cu = 1)
+                if (if ((re__goto_3362_24.flags & 128)) != 0: 1 else: 0) != 0:
+                    (has_req_cu__goto_3374_6 = 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    if (if ((re.flags & 256)) != 0: 1 else: 0) != 0:
-                        (req_cu2 = (((mb.tables + (256 as isize as usize)))[req_cu]))
+                    (req_cu2__goto_3384_13 = ((re__goto_3362_24.last_codeunit) as u8))
+                    (req_cu__goto_3383_13 = req_cu2__goto_3384_13)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    if (if ((re__goto_3362_24.flags & 256)) != 0: 1 else: 0) != 0:
+                        (req_cu2__goto_3384_13 = (((mb__goto_3393_18.tables + (256 as isize as usize)))[req_cu__goto_3383_13]))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -374,7 +438,7 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (match_data.code = re)
+                (match_data.code = re__goto_3362_24)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 (match_data.subject = (null as *const u8))
@@ -386,127 +450,127 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                 (match_data.matchedby = 1)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (match_data.options = original_options)
+                (match_data.options = original_options__goto_3363_10)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 while true:
-                    if (if (if ((re.optimization_flags & 4)) != 0: 1 else: 0) != 0 and (if ((options & 64)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                        if firstline != 0:
-                            t = start_match
+                    if (if (if ((re__goto_3362_24.optimization_flags & 4)) != 0: 1 else: 0) != 0 and (if ((options & 64)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                        if firstline__goto_3372_32 != 0:
+                            t__goto_3737_18 = start_match__goto_3367_12
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (end_subject = t)
+                            (end_subject__goto_3368_12 = t__goto_3737_18)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if anchored != 0:
-                            if (if has_first_cu != 0 or (if start_bits != (null as *const u8): 1 else: 0) != 0: 1 else: 0) != 0:
-                                ok = (if start_match < end_subject: 1 else: 0)
+                        if anchored__goto_3372_11 != 0:
+                            if (if has_first_cu__goto_3373_6 != 0 or (if start_bits__goto_3386_16 != (null as *const u8): 1 else: 0) != 0: 1 else: 0) != 0:
+                                ok__goto_3761_14 = (if start_match__goto_3367_12 < end_subject__goto_3368_12: 1 else: 0)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if ok != 0:
-                                    c = (unsafe: *start_match)
+                                if ok__goto_3761_14 != 0:
+                                    c__goto_3764_23 = (unsafe: *start_match__goto_3367_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (ok = (if has_first_cu != 0 and ((if (if c == first_cu: 1 else: 0) != 0 or (if c == first_cu2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0))
+                                    (ok__goto_3761_14 = (if has_first_cu__goto_3373_6 != 0 and ((if (if c__goto_3764_23 == first_cu__goto_3381_13: 1 else: 0) != 0 or (if c__goto_3764_23 == first_cu2__goto_3382_13: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if ok != 0: 0 else: 1) != 0 and (if start_bits != (null as *const u8): 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (ok = (if ((start_bits[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0))
+                                    if (if (if ok__goto_3761_14 != 0: 0 else: 1) != 0 and (if start_bits__goto_3386_16 != (null as *const u8): 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (ok__goto_3761_14 = (if ((start_bits__goto_3386_16[(c__goto_3764_23 / 8)] & ((1 << ((c__goto_3764_23 & 7)))))) != 0: 1 else: 0))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if ok != 0: 0 else: 1) != 0:
+                                if (if ok__goto_3761_14 != 0: 0 else: 1) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         else:
-                            if has_first_cu != 0:
-                                if (if first_cu != first_cu2: 1 else: 0) != 0:
-                                    pp1 = (null as *const u8)
+                            if has_first_cu__goto_3373_6 != 0:
+                                if (if first_cu__goto_3381_13 != first_cu2__goto_3382_13: 1 else: 0) != 0:
+                                    pp1__goto_3803_22 = (null as *const u8)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    pp2 = (null as *const u8)
+                                    pp2__goto_3804_22 = (null as *const u8)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    searchlength = ((end_subject as usize -% start_match as usize) / sizeof[u8]())
+                                    searchlength__goto_3805_22 = ((end_subject__goto_3368_12 as usize -% start_match__goto_3367_12 as usize) / sizeof[u8]())
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if (if memchr_found_first_cu == (null as *const u8): 1 else: 0) != 0 or (if start_match > memchr_found_first_cu: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (pp1 = (memchr((start_match as *const c_void), first_cu, searchlength) as *const u8))
+                                    if (if (if memchr_found_first_cu__goto_3377_12 == (null as *const u8): 1 else: 0) != 0 or (if start_match__goto_3367_12 > memchr_found_first_cu__goto_3377_12: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (pp1__goto_3803_22 = (memchr((start_match__goto_3367_12 as *const c_void), first_cu__goto_3381_13, searchlength__goto_3805_22) as *const u8))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (memchr_found_first_cu = (if ((if pp1 == (null as *const u8): 1 else: 0)) != 0: end_subject else: pp1))
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
-                                            break
-                                    else:
-                                        (pp1 = (if ((if memchr_found_first_cu == end_subject: 1 else: 0)) != 0: (null as *const u8) else: memchr_found_first_cu))
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    if (if (if memchr_found_first_cu2 == (null as *const u8): 1 else: 0) != 0 or (if start_match > memchr_found_first_cu2: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (pp2 = (memchr((start_match as *const c_void), first_cu2, searchlength) as *const u8))
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
-                                            break
-                                        (memchr_found_first_cu2 = (if ((if pp2 == (null as *const u8): 1 else: 0)) != 0: end_subject else: pp2))
+                                        (memchr_found_first_cu__goto_3377_12 = (if ((if pp1__goto_3803_22 == (null as *const u8): 1 else: 0)) != 0: end_subject__goto_3368_12 else: pp1__goto_3803_22))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (pp2 = (if ((if memchr_found_first_cu2 == end_subject: 1 else: 0)) != 0: (null as *const u8) else: memchr_found_first_cu2))
+                                        (pp1__goto_3803_22 = (if ((if memchr_found_first_cu__goto_3377_12 == end_subject__goto_3368_12: 1 else: 0)) != 0: (null as *const u8) else: memchr_found_first_cu__goto_3377_12))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if pp1 == (null as *const u8): 1 else: 0) != 0:
-                                        (start_match = (if ((if pp2 == (null as *const u8): 1 else: 0)) != 0: end_subject else: pp2))
+                                    if (if (if memchr_found_first_cu2__goto_3378_12 == (null as *const u8): 1 else: 0) != 0 or (if start_match__goto_3367_12 > memchr_found_first_cu2__goto_3378_12: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (pp2__goto_3804_22 = (memchr((start_match__goto_3367_12 as *const c_void), first_cu2__goto_3382_13, searchlength__goto_3805_22) as *const u8))
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        (memchr_found_first_cu2__goto_3378_12 = (if ((if pp2__goto_3804_22 == (null as *const u8): 1 else: 0)) != 0: end_subject__goto_3368_12 else: pp2__goto_3804_22))
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
                                     else:
-                                        (start_match = (if ((if (if pp2 == (null as *const u8): 1 else: 0) != 0 or (if pp1 < pp2: 1 else: 0) != 0: 1 else: 0)) != 0: pp1 else: pp2))
+                                        (pp2__goto_3804_22 = (if ((if memchr_found_first_cu2__goto_3378_12 == end_subject__goto_3368_12: 1 else: 0)) != 0: (null as *const u8) else: memchr_found_first_cu2__goto_3378_12))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if pp1__goto_3803_22 == (null as *const u8): 1 else: 0) != 0:
+                                        (start_match__goto_3367_12 = (if ((if pp2__goto_3804_22 == (null as *const u8): 1 else: 0)) != 0: end_subject__goto_3368_12 else: pp2__goto_3804_22))
+                                    else:
+                                        (start_match__goto_3367_12 = (if ((if (if pp2__goto_3804_22 == (null as *const u8): 1 else: 0) != 0 or (if pp1__goto_3803_22 < pp2__goto_3804_22: 1 else: 0) != 0: 1 else: 0)) != 0: pp1__goto_3803_22 else: pp2__goto_3804_22))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    (start_match = (memchr((start_match as *const c_void), first_cu, ((end_subject as usize -% start_match as usize) / sizeof[u8]())) as *const u8))
+                                    (start_match__goto_3367_12 = (memchr((start_match__goto_3367_12 as *const c_void), first_cu__goto_3381_13, ((end_subject__goto_3368_12 as usize -% start_match__goto_3367_12 as usize) / sizeof[u8]())) as *const u8))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if start_match == (null as *const u8): 1 else: 0) != 0:
-                                        (start_match = end_subject)
+                                    if (if start_match__goto_3367_12 == (null as *const u8): 1 else: 0) != 0:
+                                        (start_match__goto_3367_12 = end_subject__goto_3368_12)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if (if ((mb.moptions & ((32 | 16)))) == 0: 1 else: 0) != 0 and (if start_match >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if (if ((mb__goto_3393_18.moptions & ((32 | 16)))) == 0: 1 else: 0) != 0 and (if start_match__goto_3367_12 >= mb__goto_3393_18.end_subject: 1 else: 0) != 0: 1 else: 0) != 0:
                                     break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                if startline != 0:
-                                    if (if start_match > (mb.start_subject + start_offset): 1 else: 0) != 0:
-                                        if (if (if (if (if start_match[-1] == 13: 1 else: 0) != 0 and ((if (if mb.nltype == 1: 1 else: 0) != 0 or (if mb.nltype == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and (if start_match < end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *start_match) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (start_match = start_match + 1)
+                                if startline__goto_3372_21 != 0:
+                                    if (if start_match__goto_3367_12 > (mb__goto_3393_18.start_subject + start_offset): 1 else: 0) != 0:
+                                        if (if (if (if (if start_match__goto_3367_12[-1] == 13: 1 else: 0) != 0 and ((if (if mb__goto_3393_18.nltype == 1: 1 else: 0) != 0 or (if mb__goto_3393_18.nltype == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0 and (if start_match__goto_3367_12 < end_subject__goto_3368_12: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *start_match__goto_3367_12) == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (start_match__goto_3367_12 = start_match__goto_3367_12 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 else:
-                                    if (if start_bits != (null as *const u8): 1 else: 0) != 0:
-                                        while (if start_match < end_subject: 1 else: 0) != 0:
-                                            c = (unsafe: *start_match)
+                                    if (if start_bits__goto_3386_16 != (null as *const u8): 1 else: 0) != 0:
+                                        while (if start_match__goto_3367_12 < end_subject__goto_3368_12: 1 else: 0) != 0:
+                                            c__goto_3918_20 = (unsafe: *start_match__goto_3367_12)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if ((start_bits[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0) != 0:
+                                            if (if ((start_bits__goto_3386_16[(c__goto_3918_20 / 8)] & ((1 << ((c__goto_3918_20 & 7)))))) != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (start_match = start_match + 1)
+                                            (start_match__goto_3367_12 = start_match__goto_3367_12 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if (if ((mb.moptions & ((32 | 16)))) == 0: 1 else: 0) != 0 and (if start_match >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        if (if (if ((mb__goto_3393_18.moptions & ((32 | 16)))) == 0: 1 else: 0) != 0 and (if start_match__goto_3367_12 >= mb__goto_3393_18.end_subject: 1 else: 0) != 0: 1 else: 0) != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -514,55 +578,55 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (end_subject = mb.end_subject)
+                        (end_subject__goto_3368_12 = mb__goto_3393_18.end_subject)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if ((mb.moptions & ((32 | 16)))) == 0: 1 else: 0) != 0:
-                            if (if ((end_subject as usize -% start_match as usize) / sizeof[u8]()) < re.minlength: 1 else: 0) != 0:
+                        if (if ((mb__goto_3393_18.moptions & ((32 | 16)))) == 0: 1 else: 0) != 0:
+                            if (if ((end_subject__goto_3368_12 as usize -% start_match__goto_3367_12 as usize) / sizeof[u8]()) < re__goto_3362_24.minlength: 1 else: 0) != 0:
                                 __pc = 1
                                 __goto_pending = 1
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (p = (start_match + (((if has_first_cu != 0: 1 else: 0)) as isize as usize)))
+                            (p__goto_3942_18 = (start_match__goto_3367_12 + (((if has_first_cu__goto_3373_6 != 0: 1 else: 0)) as isize as usize)))
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if (if has_req_cu != 0 and (if p > req_cu_ptr: 1 else: 0) != 0: 1 else: 0) != 0:
-                                check_length = ((end_subject as usize -% start_match as usize) / sizeof[u8]())
+                            if (if has_req_cu__goto_3374_6 != 0 and (if p__goto_3942_18 > req_cu_ptr__goto_3370_12: 1 else: 0) != 0: 1 else: 0) != 0:
+                                check_length__goto_3976_20 = ((end_subject__goto_3368_12 as usize -% start_match__goto_3367_12 as usize) / sizeof[u8]())
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if (if check_length < 5000: 1 else: 0) != 0 or ((if (if anchored != 0: 0 else: 1) != 0 and (if check_length < 5000000: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                    if (if req_cu != req_cu2: 1 else: 0) != 0:
-                                        pp = p
+                                if (if (if check_length__goto_3976_20 < 5000: 1 else: 0) != 0 or ((if (if anchored__goto_3372_11 != 0: 0 else: 1) != 0 and (if check_length__goto_3976_20 < 5000000: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                    if (if req_cu__goto_3383_13 != req_cu2__goto_3384_13: 1 else: 0) != 0:
+                                        pp__goto_3990_24 = p__goto_3942_18
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (p = (memchr((pp as *const c_void), req_cu, ((end_subject as usize -% pp as usize) / sizeof[u8]())) as *const u8))
+                                        (p__goto_3942_18 = (memchr((pp__goto_3990_24 as *const c_void), req_cu__goto_3383_13, ((end_subject__goto_3368_12 as usize -% pp__goto_3990_24 as usize) / sizeof[u8]())) as *const u8))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if p == (null as *const u8): 1 else: 0) != 0:
-                                            (p = (memchr((pp as *const c_void), req_cu2, ((end_subject as usize -% pp as usize) / sizeof[u8]())) as *const u8))
+                                        if (if p__goto_3942_18 == (null as *const u8): 1 else: 0) != 0:
+                                            (p__goto_3942_18 = (memchr((pp__goto_3990_24 as *const c_void), req_cu2__goto_3384_13, ((end_subject__goto_3368_12 as usize -% pp__goto_3990_24 as usize) / sizeof[u8]())) as *const u8))
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            if (if p == (null as *const u8): 1 else: 0) != 0:
-                                                (p = end_subject)
+                                            if (if p__goto_3942_18 == (null as *const u8): 1 else: 0) != 0:
+                                                (p__goto_3942_18 = end_subject__goto_3368_12)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     else:
-                                        (p = (memchr((p as *const c_void), req_cu, ((end_subject as usize -% p as usize) / sizeof[u8]())) as *const u8))
+                                        (p__goto_3942_18 = (memchr((p__goto_3942_18 as *const c_void), req_cu__goto_3383_13, ((end_subject__goto_3368_12 as usize -% p__goto_3942_18 as usize) / sizeof[u8]())) as *const u8))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        if (if p == (null as *const u8): 1 else: 0) != 0:
-                                            (p = end_subject)
+                                        if (if p__goto_3942_18 == (null as *const u8): 1 else: 0) != 0:
+                                            (p__goto_3942_18 = end_subject__goto_3368_12)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if p >= end_subject: 1 else: 0) != 0:
+                                    if (if p__goto_3942_18 >= end_subject__goto_3368_12: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (req_cu_ptr = p)
+                                    (req_cu_ptr__goto_3370_12 = p__goto_3942_18)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -573,28 +637,96 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if start_match > bumpalong_limit: 1 else: 0) != 0:
+                    if (if start_match__goto_3367_12 > bumpalong_limit__goto_3369_12: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (mb.start_used_ptr = start_match)
+                    (mb__goto_3393_18.start_used_ptr = start_match__goto_3367_12)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (mb.last_used_ptr = start_match)
+                    (mb__goto_3393_18.last_used_ptr = start_match__goto_3367_12)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (mb.recursive = (null as *mut dfa_recursion_info))
+                    (mb__goto_3393_18.recursive = (null as *mut dfa_recursion_info))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (start_match = start_match + 1)
+                    (rc__goto_3360_5 = internal_dfa_match(mb__goto_3393_18, mb__goto_3393_18.start_code, start_match__goto_3367_12, start_offset, (&match_data.ovector[0] as *mut c_ulong), ((match_data.oveccount as c_uint) *% 2), workspace, (wscount as c_int), 0, (&base_recursion_workspace__goto_3400_5[0] as *mut c_int)))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if start_match > end_subject: 1 else: 0) != 0:
+                    if (if (if rc__goto_3360_5 != ((0 -% 1)): 1 else: 0) != 0 or anchored__goto_3372_11 != 0: 1 else: 0) != 0:
+                        if (if rc__goto_3360_5 == ((0 -% 1)): 1 else: 0) != 0:
+                            __pc = 1
+                            __goto_pending = 1
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            break
+                        if (if (if rc__goto_3360_5 == (-2): 1 else: 0) != 0 and (if match_data.oveccount > 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                            ((&match_data.ovector[0] as *mut c_ulong)[0] = ((((start_match__goto_3367_12 as usize -% subject as usize) / sizeof[u8]())) as c_ulong))
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
+                            ((&match_data.ovector[0] as *mut c_ulong)[1] = ((((end_subject__goto_3368_12 as usize -% subject as usize) / sizeof[u8]())) as c_ulong))
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            break
+                        if (if (if rc__goto_3360_5 >= 0: 1 else: 0) != 0 or (if rc__goto_3360_5 == (-2): 1 else: 0) != 0: 1 else: 0) != 0:
+                            (match_data.subject_length = length)
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
+                            (match_data.start_offset = start_offset)
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
+                            (match_data.leftchar = ((((mb__goto_3393_18.start_used_ptr as usize -% subject as usize) / sizeof[u8]())) as c_ulong))
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
+                            (match_data.rightchar = ((((mb__goto_3393_18.last_used_ptr as usize -% subject as usize) / sizeof[u8]())) as c_ulong))
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
+                            (match_data.startchar = ((((start_match__goto_3367_12 as usize -% subject as usize) / sizeof[u8]())) as c_ulong))
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            break
+                        if (if (if rc__goto_3360_5 >= 0: 1 else: 0) != 0 and (if ((options & 16384)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (if length != 0: 1 else: 0) != 0:
+                                if (if match_data.subject == (null as *const u8): 1 else: 0) != 0:
+                                    (rc__goto_3360_5 = (-48))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    __pc = 2
+                                    __goto_pending = 1
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                            else:
+                                (match_data.subject = (null as *const u8))
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
+                            match_data.flags = match_data.flags | 1
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
+                        else:
+                            if (if (if rc__goto_3360_5 >= 0: 1 else: 0) != 0 or (if rc__goto_3360_5 == (-2): 1 else: 0) != 0: 1 else: 0) != 0:
+                                (match_data.subject = original_subject__goto_3366_12)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            break
+                        __pc = 2
+                        __goto_pending = 1
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            break
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        break
+                    (start_match__goto_3367_12 = start_match__goto_3367_12 + 1)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        break
+                    if (if start_match__goto_3367_12 > end_subject__goto_3368_12: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if (if (if (if (if start_match[-1] == 13: 1 else: 0) != 0 and (if start_match < end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *start_match) == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((re.flags & 2048)) == 0: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (if mb.nltype == 1: 1 else: 0) != 0 or (if mb.nltype == 2: 1 else: 0) != 0: 1 else: 0) != 0 or (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                        (start_match = start_match + 1)
+                    if (if (if (if (if (if start_match__goto_3367_12[-1] == 13: 1 else: 0) != 0 and (if start_match__goto_3367_12 < end_subject__goto_3368_12: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *start_match__goto_3367_12) == 10: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((re__goto_3362_24.flags & 2048)) == 0: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (if mb__goto_3393_18.nltype == 1: 1 else: 0) != 0 or (if mb__goto_3393_18.nltype == 2: 1 else: 0) != 0: 1 else: 0) != 0 or (if mb__goto_3393_18.nllen == 2: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                        (start_match__goto_3367_12 = start_match__goto_3367_12 + 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -605,7 +737,7 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                 continue
             1 =>  // NOMATCH_EXIT
                 (__goto_pending = 0)
-                (match_data.subject = original_subject)
+                (match_data.subject = original_subject__goto_3366_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 (match_data.subject_length = length)
@@ -614,28 +746,31 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                 (match_data.start_offset = start_offset)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
+                (rc__goto_3360_5 = ((0 -% 1)))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 __pc = 2
                 continue
             2 =>  // EXIT
                 (__goto_pending = 0)
-                while (if rws.next != (null as *mut RWS_anchor): 1 else: 0) != 0:
-                    next = rws.next
+                while (if rws__goto_3401_13.next != (null as *mut RWS_anchor): 1 else: 0) != 0:
+                    next__goto_4135_15 = rws__goto_3401_13.next
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (rws.next = next.next)
+                    (rws__goto_3401_13.next = next__goto_4135_15.next)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    mb.memctl.free((next as *mut c_void), mb.memctl.memory_data)
+                    mb__goto_3393_18.memctl.free((next__goto_4135_15 as *mut c_void), mb__goto_3393_18.memctl.memory_data)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (match_data.rc = rc)
+                (match_data.rc = rc__goto_3360_5)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                return rc
+                return rc__goto_3360_5
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
             _ => break
@@ -752,12 +887,27 @@ type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
 type struct_pcre2_real_jit_stack_8 = pcre2_real_jit_stack_8
 type dfa_recursion_info { prevrec: *mut dfa_recursion_info = null, subject_position: *const u8 = null, last_used_ptr: *const u8 = null, group_num: c_uint = 0 }
 type struct_dfa_recursion_info = dfa_recursion_info
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:696:8: demoted to opaque
-type heapframe = opaque
+// union
+type heapframe_fields_char_repeat_oc { oc: c_uint = 0, occu: [4]u8 = [0 as u8; 4] }
+type heapframe_fields_char_repeat { start_eptr: *const u8 = null, charptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: heapframe_fields_char_repeat_oc }
+type heapframe_fields_charnot_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: c_uint = 0 }
+type heapframe_fields_class_repeat { start_eptr: *const u8 = null, byte_map_address: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_xclass_repeat { start_eptr: *const u8 = null, xclass_data: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_eclass_repeat { start_eptr: *const u8 = null, eclass_data: *const u8 = null, eclass_len: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_type_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, ctype: c_uint = 0, propvalue: c_uint = 0 }
+type heapframe_fields_ref_repeat { start: *const u8 = null, offset: c_ulong = 0, length: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
+type heapframe_fields_op_bra { frame_type: c_uint = 0 }
+type heapframe_fields_op_brapos { start_eptr: *const u8 = null, start_group: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_recurse { start_branch: *const u8 = null, frame_type: c_uint = 0 }
+type heapframe_fields_op_assert_scs { saved_end_subject: *const u8 = null, saved_eptr: *const u8 = null, true_end_extra: c_ulong = 0, saved_moptions: c_uint = 0 }
+type heapframe_fields_op_cond { start_branch: *const u8 = null, length: c_ulong = 0 }
+type heapframe_fields_op_vreverse { min: c_uint = 0, max: c_uint = 0 }
+// union
+type heapframe_fields { char_repeat: heapframe_fields_char_repeat, charnot_repeat: heapframe_fields_charnot_repeat, class_repeat: heapframe_fields_class_repeat, xclass_repeat: heapframe_fields_xclass_repeat, eclass_repeat: heapframe_fields_eclass_repeat, type_repeat: heapframe_fields_type_repeat, ref_repeat: heapframe_fields_ref_repeat, op_bra: heapframe_fields_op_bra, op_brapos: heapframe_fields_op_brapos, op_recurse: heapframe_fields_op_recurse, op_assert_scs: heapframe_fields_op_assert_scs, op_cond: heapframe_fields_op_cond, op_vreverse: heapframe_fields_op_vreverse }
+type heapframe { ecode: *const u8 = null, back_frame: c_ulong = 0, rdepth: c_uint = 0, group_frame_type: c_uint = 0, return_id: u8 = 0, op: u8 = 0, byte1: u8 = 0, byte2: u8 = 0, fields: heapframe_fields, eptr: *const u8 = null, start_match: *const u8 = null, mark: *const u8 = null, recurse_last_used: *const u8 = null, current_recurse: c_uint = 0, capture_last: c_uint = 0, last_group_offset: c_ulong = 0, offset_top: c_ulong = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
 type struct_heapframe = heapframe
 type static_assertion_heapframe_size = [1]c_int
-// /Users/eric/with/.reference/pcre2/src/pcre2_intmodedep.h:1024:16: demoted to opaque
-type heapframe_align = opaque
+type heapframe_align { unalign: c_char = 0, frame: heapframe }
 type struct_heapframe_align = heapframe_align
 type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, hitend: c_int = 0, hasthen: c_int = 0, hasbsk: c_int = 0, allowemptypartial: c_int = 0, allowlookaroundbsk: c_int = 0, lcc: *const u8 = null, fcc: *const u8 = null, ctypes: *const u8 = null, start_offset: c_ulong = 0, end_offset_top: c_ulong = 0, partial: c_ushort = 0, bsr_convention: c_ushort = 0, name_count: c_ushort = 0, name_entry_size: c_ushort = 0, name_table: *const u8 = null, start_code: *const u8 = null, start_subject: *const u8 = null, check_subject: *const u8 = null, end_subject: *const u8 = null, true_end_subject: *const u8 = null, end_match_ptr: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, mark: *const u8 = null, nomatch_mark: *const u8 = null, verb_ecode_ptr: *const u8 = null, verb_skip_ptr: *const u8 = null, verb_current_recurse: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, skip_arg_count: c_uint = 0, ignore_skip_arg: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null }
 type struct_match_block_8 = match_block_8
@@ -803,6 +953,8 @@ fn do_callout_dfa(code: *const u8, offsets: *mut c_ulong, current_subject: *cons
         return 0
 
     (cb.offset_vector = offsets)
+    (cb.start_match = ((((current_subject as usize -% mb.start_subject as usize) / sizeof[u8]())) as c_ulong))
+    (cb.current_position = ((((ptr as usize -% mb.start_subject as usize) / sizeof[u8]())) as c_ulong))
     if (if code[extracode] == OP_CALLOUT: 1 else: 0) != 0:
         (cb.callout_number = code[(5 +% extracode)])
         (cb.callout_string_offset = 0)
@@ -823,6 +975,12 @@ fn more_workspace(rwsptr: *mut *mut RWS_anchor, ovecsize: c_uint, mb: *mut dfa_m
     else:
         var newsize: c_uint
         var newsizeK: c_uint
+        if (if (newsizeK +% mb.heap_used) > mb.heap_limit: 1 else: 0) != 0:
+            (newsizeK = (((mb.heap_limit -% mb.heap_used)) as c_uint))
+        
+        if (if new == (null as *mut RWS_anchor): 1 else: 0) != 0:
+            return (-48)
+        
         mb.heap_used = mb.heap_used + newsizeK
         (new.next = (null as *mut RWS_anchor))
         (new.size = newsize)
@@ -837,127 +995,184 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
     var wscount = __param_wscount
     var rlevel = __param_rlevel
     var RWS = __param_RWS
-    var active_states: *mut stateblock = null
-    var new_states: *mut stateblock = null
-    var temp_states: *mut stateblock = null
-    var next_active_state: *mut stateblock = null
-    var next_new_state: *mut stateblock = null
-    var ctypes: *const u8 = null
-    var lcc: *const u8 = null
-    var fcc: *const u8 = null
-    var ptr: *const u8 = null
-    var end_code: *const u8 = null
-    var new_recursive: dfa_recursion_info
-    var active_count: c_int = 0
-    var new_count: c_int = 0
-    var match_count: c_int = 0
-    var start_subject: *const u8 = null
-    var end_subject: *const u8 = null
-    var start_code: *const u8 = null
-    var utf: c_int = 0
-    var reset_could_continue: c_int = 0
-    var max_back: c_ulong = 0
-    var gone_back: c_ulong = 0
-    var back: c_ulong = 0
-    var current_offset: c_ulong = 0
-    var revlen: c_uint = 0
-    var bstate: c_int = 0
-    var length: c_int = 0
-    var i: c_int = 0
-    var j: c_int = 0
-    var clen: c_int = 0
-    var dlen: c_int = 0
-    var c: c_uint = 0
-    var d: c_uint = 0
-    var partial_newline: c_int = 0
-    var could_continue: c_int = 0
-    var current_state: *mut stateblock = null
-    var caseless: c_int = 0
-    var code: *const u8 = null
-    var codevalue: c_uint = 0
-    var state_offset: c_int = 0
-    var rrc: c_int = 0
-    var count: c_int = 0
-    var left_word: c_int = 0
-    var right_word: c_int = 0
-    var temp: *const u8 = null
-    var ncount: c_int = 0
-    var OK: c_int = 0
-    var otherd: c_uint = 0
-    var isinclass: c_int = 0
-    var next_state_offset: c_int = 0
-    var ecode: *const u8 = null
-    var max: c_int = 0
-    var rc: c_int = 0
-    var local_workspace: *mut c_int = null
-    var local_offsets: *mut c_ulong = null
-    var endasscode: *const u8 = null
-    var rws: *mut RWS_anchor = null
-    var codelink: c_int = 0
-    var condcode: u8 = 0
-    var callout_length: c_ulong = 0
-    var value: c_uint = 0
-    var asscode: *const u8 = null
-    var callpat: *const u8 = null
-    var recno: c_uint = 0
-    var ri: *mut dfa_recursion_info = null
-    var charcount: c_ulong = 0
-    var matched_count: c_ulong = 0
-    var local_ptr: *const u8 = null
-    var allow_zero: c_int = 0
-    var end_subpattern: *const u8 = null
-    var p: *const u8 = null
-    var pp: *const u8 = null
-    var repeat_state_offset: c_int = 0
+    var active_states__goto_558_13: *mut stateblock = null
+    var new_states__goto_558_29: *mut stateblock = null
+    var temp_states__goto_558_42: *mut stateblock = null
+    var next_active_state__goto_559_13: *mut stateblock = null
+    var next_new_state__goto_559_33: *mut stateblock = null
+    var ctypes__goto_560_16: *const u8 = null
+    var lcc__goto_560_25: *const u8 = null
+    var fcc__goto_560_31: *const u8 = null
+    var ptr__goto_561_12: *const u8 = null
+    var end_code__goto_562_12: *const u8 = null
+    var new_recursive__goto_563_20: dfa_recursion_info
+    var active_count__goto_564_5: c_int = 0
+    var new_count__goto_564_19: c_int = 0
+    var match_count__goto_564_30: c_int = 0
+    var start_subject__goto_569_12: *const u8 = null
+    var end_subject__goto_570_12: *const u8 = null
+    var start_code__goto_571_12: *const u8 = null
+    var utf__goto_577_6: c_int = 0
+    var reset_could_continue__goto_580_6: c_int = 0
+    var max_back__goto_610_10: c_ulong = 0
+    var gone_back__goto_611_10: c_ulong = 0
+    var back__goto_616_12: c_ulong = 0
+    var current_offset__goto_644_12: c_ulong = 0
+    var revlen__goto_660_14: c_uint = 0
+    var back__goto_661_12: c_ulong = 0
+    var bstate__goto_664_11: c_int = 0
+    var length__goto_696_9: c_int = 0
+    var i__goto_717_7: c_int = 0
+    var j__goto_717_10: c_int = 0
+    var clen__goto_718_7: c_int = 0
+    var dlen__goto_718_13: c_int = 0
+    var c__goto_719_12: c_uint = 0
+    var d__goto_719_15: c_uint = 0
+    var partial_newline__goto_720_8: c_int = 0
+    var could_continue__goto_721_8: c_int = 0
+    var current_state__goto_769_17: *mut stateblock = null
+    var caseless__goto_770_10: c_int = 0
+    var code__goto_771_16: *const u8 = null
+    var codevalue__goto_772_14: c_uint = 0
+    var state_offset__goto_773_9: c_int = 0
+    var rrc__goto_774_9: c_int = 0
+    var count__goto_775_9: c_int = 0
+    var left_word__goto_1116_13: c_int = 0
+    var right_word__goto_1116_24: c_int = 0
+    var temp__goto_1120_22: *const u8 = null
+    var temp__goto_1145_24: *const u8 = null
+    var ncount__goto_1606_13: c_int = 0
+    var OK__goto_1648_14: c_int = 0
+    var OK__goto_1681_14: c_int = 0
+    var ncount__goto_1884_13: c_int = 0
+    var OK__goto_1934_14: c_int = 0
+    var OK__goto_1974_14: c_int = 0
+    var ncount__goto_2165_13: c_int = 0
+    var OK__goto_2211_14: c_int = 0
+    var OK__goto_2247_14: c_int = 0
+    var otherd__goto_2437_18: c_uint = 0
+    var otherd__goto_2470_18: c_uint = 0
+    var otherd__goto_2513_18: c_uint = 0
+    var otherd__goto_2554_18: c_uint = 0
+    var otherd__goto_2587_18: c_uint = 0
+    var otherd__goto_2627_18: c_uint = 0
+    var isinclass__goto_2663_14: c_int = 0
+    var next_state_offset__goto_2664_13: c_int = 0
+    var ecode__goto_2665_20: *const u8 = null
+    var max__goto_2769_17: c_int = 0
+    var rc__goto_2805_13: c_int = 0
+    var local_workspace__goto_2806_14: *mut c_int = null
+    var local_offsets__goto_2807_21: *mut c_ulong = null
+    var endasscode__goto_2808_20: *const u8 = null
+    var rws__goto_2809_21: *mut RWS_anchor = null
+    var codelink__goto_2848_13: c_int = 0
+    var condcode__goto_2849_21: u8 = 0
+    var callout_length__goto_2858_22: c_ulong = 0
+    var value__goto_2892_24: c_uint = 0
+    var rc__goto_2903_15: c_int = 0
+    var local_workspace__goto_2904_16: *mut c_int = null
+    var local_offsets__goto_2905_23: *mut c_ulong = null
+    var asscode__goto_2906_22: *const u8 = null
+    var endasscode__goto_2907_22: *const u8 = null
+    var rws__goto_2908_23: *mut RWS_anchor = null
+    var rc__goto_2950_13: c_int = 0
+    var local_workspace__goto_2951_14: *mut c_int = null
+    var local_offsets__goto_2952_21: *mut c_ulong = null
+    var rws__goto_2953_21: *mut RWS_anchor = null
+    var callpat__goto_2954_20: *const u8 = null
+    var recno__goto_2955_18: c_uint = 0
+    var ri__goto_2976_34: *mut dfa_recursion_info = null
+    var charcount__goto_3021_24: c_ulong = 0
+    var rc__goto_3052_13: c_int = 0
+    var local_workspace__goto_3053_14: *mut c_int = null
+    var local_offsets__goto_3054_21: *mut c_ulong = null
+    var charcount__goto_3055_20: c_ulong = 0
+    var matched_count__goto_3055_31: c_ulong = 0
+    var local_ptr__goto_3056_20: *const u8 = null
+    var rws__goto_3057_21: *mut RWS_anchor = null
+    var allow_zero__goto_3058_14: c_int = 0
+    var end_subpattern__goto_3118_22: *const u8 = null
+    var next_state_offset__goto_3119_15: c_int = 0
+    var p__goto_3139_24: *const u8 = null
+    var pp__goto_3140_24: *const u8 = null
+    var rc__goto_3154_13: c_int = 0
+    var local_workspace__goto_3155_14: *mut c_int = null
+    var local_offsets__goto_3156_21: *mut c_ulong = null
+    var rws__goto_3157_21: *mut RWS_anchor = null
+    var end_subpattern__goto_3186_22: *const u8 = null
+    var charcount__goto_3187_22: c_ulong = 0
+    var next_state_offset__goto_3188_15: c_int = 0
+    var repeat_state_offset__goto_3188_34: c_int = 0
+    var callout_length__goto_3263_20: c_ulong = 0
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
         match __pc
             0 =>
                 (__goto_pending = 0)
-                start_subject = mb.start_subject
-                end_subject = mb.end_subject
-                start_code = mb.start_code
-                utf = 0
-                reset_could_continue = 0
+                start_subject__goto_569_12 = mb.start_subject
+                end_subject__goto_570_12 = mb.end_subject
+                start_code__goto_571_12 = mb.start_code
+                utf__goto_577_6 = 0
+                reset_could_continue__goto_580_6 = 0
+                if (if (mb.match_call_count = mb.match_call_count + 1) >= mb.match_limit: 1 else: 0) != 0:
+                    return (-47)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if (rlevel = rlevel + 1) > mb.match_limit_depth: 1 else: 0) != 0:
+                    return (-53)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                offsetcount = offsetcount & ((-2) as c_uint)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 wscount = wscount - 2
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (lcc = (mb.tables + (0 as isize as usize)))
+                (lcc__goto_560_25 = (mb.tables + (0 as isize as usize)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (fcc = (mb.tables + (256 as isize as usize)))
+                (fcc__goto_560_31 = (mb.tables + (256 as isize as usize)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (new_states = (active_states + (wscount as isize as usize)))
-                (next_new_state = new_states)
+                (match_count__goto_564_30 = ((0 -% 1)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (new_count = 0)
+                (active_states__goto_558_13 = (((workspace + (2 as isize as usize))) as *mut stateblock))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (new_states__goto_558_29 = (active_states__goto_558_13 + (wscount as isize as usize)))
+                (next_new_state__goto_559_33 = new_states__goto_558_29)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (new_count__goto_564_19 = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if (if (unsafe: *this_start_code) == OP_ASSERTBACK: 1 else: 0) != 0 or (if (unsafe: *this_start_code) == OP_ASSERTBACK_NOT: 1 else: 0) != 0: 1 else: 0) != 0:
-                    max_back = 0
+                    max_back__goto_610_10 = 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (end_code = this_start_code)
+                    (end_code__goto_562_12 = this_start_code)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     while true:
-                        if (if back > max_back: 1 else: 0) != 0:
-                            (max_back = back)
+                        if (if back__goto_616_12 > max_back__goto_610_10: 1 else: 0) != 0:
+                            (max_back__goto_610_10 = back__goto_616_12)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if not ((if (unsafe: *end_code) == OP_ALT: 1 else: 0) != 0):
+                        if not ((if (unsafe: *end_code__goto_562_12) == OP_ALT: 1 else: 0) != 0):
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (gone_back = (if ((if current_offset < max_back: 1 else: 0)) != 0: current_offset else: max_back))
+                    current_offset__goto_644_12 = ((((current_subject as usize -% start_subject__goto_569_12 as usize) / sizeof[u8]())) as c_ulong)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    current_subject = current_subject - gone_back
+                    (gone_back__goto_611_10 = (if ((if current_offset__goto_644_12 < max_back__goto_610_10: 1 else: 0)) != 0: current_offset__goto_644_12 else: max_back__goto_610_10))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    current_subject = current_subject - gone_back__goto_611_10
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -966,44 +1181,48 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (mb.start_used_ptr = current_subject)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
-                    (end_code = this_start_code)
+                    (end_code__goto_562_12 = this_start_code)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     while true:
-                        revlen = (if ((if end_code[(1 + 2)] == OP_REVERSE: 1 else: 0)) != 0: (1 + 2) else: 0)
+                        revlen__goto_660_14 = (if ((if end_code__goto_562_12[(1 + 2)] == OP_REVERSE: 1 else: 0)) != 0: (1 + 2) else: 0)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if back <= gone_back: 1 else: 0) != 0:
-                            bstate = (((((((end_code as usize -% start_code as usize) / sizeof[u8]()) + 1) + 2) + revlen)) as c_int)
+                        if (if back__goto_661_12 <= gone_back__goto_611_10: 1 else: 0) != 0:
+                            bstate__goto_664_11 = (((((((end_code__goto_562_12 as usize -% start_code__goto_571_12 as usize) / sizeof[u8]()) + 1) + 2) + revlen__goto_660_14)) as c_int)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if not ((if (unsafe: *end_code) == OP_ALT: 1 else: 0) != 0):
+                        if not ((if (unsafe: *end_code__goto_562_12) == OP_ALT: 1 else: 0) != 0):
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                 else:
-                    (end_code = this_start_code)
+                    (end_code__goto_562_12 = this_start_code)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     if (if (if rlevel == 1: 1 else: 0) != 0 and (if ((mb.moptions & 64)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                        (new_count = workspace[1])
+                        (new_count__goto_564_19 = workspace[1])
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        if (if workspace[0] != 0: 0 else: 1) != 0:
+                            with_memcpy((new_states__goto_558_29 as *mut c_void) as *i8, (active_states__goto_558_13 as *const c_void) as *i8, ((new_count__goto_564_19 as c_ulong) *% sizeof[stateblock]()) as i64)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     else:
-                        length = ((1 + 2) + ((if ((if (if (if (if (unsafe: *this_start_code) == OP_CBRA: 1 else: 0) != 0 or (if (unsafe: *this_start_code) == OP_SCBRA: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *this_start_code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *this_start_code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
+                        length__goto_696_9 = ((1 + 2) + ((if ((if (if (if (if (unsafe: *this_start_code) == OP_CBRA: 1 else: 0) != 0 or (if (unsafe: *this_start_code) == OP_SCBRA: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *this_start_code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *this_start_code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                         while true:
-                            (length = (1 + 2))
+                            (length__goto_696_9 = (1 + 2))
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if not ((if (unsafe: *end_code) == OP_ALT: 1 else: 0) != 0):
+                            if not ((if (unsafe: *end_code__goto_562_12) == OP_ALT: 1 else: 0) != 0):
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
@@ -1014,132 +1233,133 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                 (workspace[0] = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                (ptr = current_subject)
+                (ptr__goto_561_12 = current_subject)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 while true:
-                    partial_newline = 0
+                    partial_newline__goto_720_8 = 0
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    could_continue = reset_could_continue
+                    could_continue__goto_721_8 = reset_could_continue__goto_580_6
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (reset_could_continue = 0)
+                    (reset_could_continue__goto_580_6 = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if ptr > mb.last_used_ptr: 1 else: 0) != 0:
-                        (mb.last_used_ptr = ptr)
+                    if (if ptr__goto_561_12 > mb.last_used_ptr: 1 else: 0) != 0:
+                        (mb.last_used_ptr = ptr__goto_561_12)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (temp_states = active_states)
+                    (temp_states__goto_558_42 = active_states__goto_558_13)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (active_states = new_states)
+                    (active_states__goto_558_13 = new_states__goto_558_29)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (new_states = temp_states)
+                    (new_states__goto_558_29 = temp_states__goto_558_42)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (active_count = new_count)
+                    (active_count__goto_564_5 = new_count__goto_564_19)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (new_count = 0)
+                    (new_count__goto_564_19 = 0)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     workspace[0] = workspace[0] ^ 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (workspace[1] = active_count)
+                    (workspace[1] = active_count__goto_564_5)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (next_active_state = (active_states + (active_count as isize as usize)))
+                    (next_active_state__goto_559_13 = (active_states__goto_558_13 + (active_count__goto_564_5 as isize as usize)))
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (next_new_state = new_states)
+                    (next_new_state__goto_559_33 = new_states__goto_558_29)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if ptr < end_subject: 1 else: 0) != 0:
-                        (clen = 1)
+                    if (if ptr__goto_561_12 < end_subject__goto_570_12: 1 else: 0) != 0:
+                        (clen__goto_718_7 = 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (c = (unsafe: *ptr))
+                        (c__goto_719_12 = (unsafe: *ptr__goto_561_12))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     else:
-                        (clen = 0)
+                        (clen__goto_718_7 = 0)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (c = (4294967295 as c_uint))
+                        (c__goto_719_12 = (4294967295 as c_uint))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    (i = 0)
-                    while (if i < active_count: 1 else: 0) != 0:
-                        current_state = (active_states + (i as isize as usize))
+                    (i__goto_717_7 = 0)
+                    while (if i__goto_717_7 < active_count__goto_564_5: 1 else: 0) != 0:
+                        current_state__goto_769_17 = (active_states__goto_558_13 + (i__goto_717_7 as isize as usize))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        caseless = 0
+                        caseless__goto_770_10 = 0
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        state_offset = current_state.offset
+                        state_offset__goto_773_9 = current_state__goto_769_17.offset
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if state_offset < 0: 1 else: 0) != 0:
-                            if (if current_state.data > 0: 1 else: 0) != 0:
-                                if could_continue != 0:
-                                    (reset_could_continue = 1)
+                        if (if state_offset__goto_773_9 < 0: 1 else: 0) != 0:
+                            if (if current_state__goto_769_17.data > 0: 1 else: 0) != 0:
+                                if could_continue__goto_721_8 != 0:
+                                    (reset_could_continue__goto_580_6 = 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 continue
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             else:
-                                (state_offset = (0 - state_offset))
-                                (current_state.offset = state_offset)
+                                (state_offset__goto_773_9 = (0 - state_offset__goto_773_9))
+                                (current_state__goto_769_17.offset = state_offset__goto_773_9)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (j = 0)
-                        while (if j < i: 1 else: 0) != 0:
-                            if (if (if active_states[j].offset == state_offset: 1 else: 0) != 0 and (if active_states[j].count == current_state.count: 1 else: 0) != 0: 1 else: 0) != 0:
+                        (j__goto_717_10 = 0)
+                        while (if j__goto_717_10 < i__goto_717_7: 1 else: 0) != 0:
+                            if (if (if active_states__goto_558_13[j__goto_717_10].offset == state_offset__goto_773_9: 1 else: 0) != 0 and (if active_states__goto_558_13[j__goto_717_10].count == current_state__goto_769_17.count: 1 else: 0) != 0: 1 else: 0) != 0:
                                 __pc = 7
                                 __goto_pending = 1
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (j = j + 1)
+                            (j__goto_717_10 = j__goto_717_10 + 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (code = (start_code + (state_offset as isize as usize)))
+                        (code__goto_771_16 = (start_code__goto_571_12 + (state_offset__goto_773_9 as isize as usize)))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (codevalue = (unsafe: *code))
+                        (codevalue__goto_772_14 = (unsafe: *code__goto_771_16))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if (if clen == 0: 1 else: 0) != 0 and (if (&poptable[0] as *mut u8)[codevalue] != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                            (could_continue = 1)
+                        if (if (if clen__goto_718_7 == 0: 1 else: 0) != 0 and (if (&poptable[0] as *mut u8)[codevalue__goto_772_14] != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                            (could_continue__goto_721_8 = 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        if (if (&coptable[0] as *mut u8)[codevalue] > 0: 1 else: 0) != 0:
-                            (dlen = 1)
+                        if (if (&coptable[0] as *mut u8)[codevalue__goto_772_14] > 0: 1 else: 0) != 0:
+                            (dlen__goto_718_13 = 1)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (d = code[(&coptable[0] as *mut u8)[codevalue]])
+                            (d__goto_719_15 = code__goto_771_16[(&coptable[0] as *mut u8)[codevalue__goto_772_14]])
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            if (if codevalue >= 85: 1 else: 0) != 0:
-                                match d
-                                    14 => 0
+                            if (if codevalue__goto_772_14 >= 85: 1 else: 0) != 0:
+                                match d__goto_719_15
+                                    14 =>
+                                        return (-42)
                                     15 => 0
                                     17 =>
-                                        codevalue = codevalue + 340
+                                        codevalue__goto_772_14 = codevalue__goto_772_14 + 340
                                     22 =>
-                                        codevalue = codevalue + 320
+                                        codevalue__goto_772_14 = codevalue__goto_772_14 + 320
                                     18 => 0
                                     20 => 0
                                     _ => 0
@@ -1148,15 +1368,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         else:
-                            (dlen = 0)
+                            (dlen__goto_718_13 = 0)
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
-                            (d = (4294967295 as c_uint))
+                            (d__goto_719_15 = (4294967295 as c_uint))
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        match codevalue
+                        match codevalue__goto_772_14
                             122 => 0
                             121 => 0
                             137 => 0
@@ -1165,7 +1385,12 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             169 => 0
                             27 => 0
                             28 => 0
-                            24 => 0
+                            24 =>
+                                if (if ptr__goto_561_12 >= end_subject__goto_570_12: 1 else: 0) != 0:
+                                    if (if ((mb.moptions & 32)) != 0: 1 else: 0) != 0:
+                                        return (-2)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
                             1 => 0
                             2 => 0
                             12 => 0
@@ -1173,127 +1398,127 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             23 => 0
                             25 =>
                                 if (if ((mb.moptions & 2)) == 0: 1 else: 0) != 0:
-                                    if (if (if clen == 0: 1 else: 0) != 0 and (if ((mb.moptions & 32)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (could_continue = 1)
+                                    if (if (if clen__goto_718_7 == 0: 1 else: 0) != 0 and (if ((mb.moptions & 32)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (could_continue__goto_721_8 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             26 =>
                                 if (if ((mb.moptions & 2)) == 0: 1 else: 0) != 0:
-                                    if (if (if clen == 0: 1 else: 0) != 0 and (if ((mb.moptions & 32)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (could_continue = 1)
+                                    if (if (if clen__goto_718_7 == 0: 1 else: 0) != 0 and (if ((mb.moptions & 32)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (could_continue__goto_721_8 = 1)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             7 => 0
                             6 => 0
                             5 => 0
                             87 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    if (if (if (if (if (if (if d == 12: 1 else: 0) != 0 and (if (ptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & (32))) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if c == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (partial_newline = 1)
-                                        (could_continue = partial_newline)
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    if (if (if (if (if (if (if d__goto_719_15 == 12: 1 else: 0) != 0 and (if (ptr__goto_561_12 + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & (32))) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if c__goto_719_12 == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (partial_newline__goto_720_8 = 1)
+                                        (could_continue__goto_721_8 = partial_newline__goto_720_8)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             89 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    if (if (if (if (if (if (if d == 12: 1 else: 0) != 0 and (if (ptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & (32))) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if c == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (partial_newline = 1)
-                                        (could_continue = partial_newline)
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    if (if (if (if (if (if (if d__goto_719_15 == 12: 1 else: 0) != 0 and (if (ptr__goto_561_12 + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & (32))) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if c__goto_719_12 == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (partial_newline__goto_720_8 = 1)
+                                        (could_continue__goto_721_8 = partial_newline__goto_720_8)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             85 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    if (if (if (if (if (if (if d == 12: 1 else: 0) != 0 and (if (ptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & (32))) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if c == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (partial_newline = 1)
-                                        (could_continue = partial_newline)
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    if (if (if (if (if (if (if d__goto_719_15 == 12: 1 else: 0) != 0 and (if (ptr__goto_561_12 + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & (32))) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if c__goto_719_12 == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (partial_newline__goto_720_8 = 1)
+                                        (could_continue__goto_721_8 = partial_newline__goto_720_8)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             93 =>
-                                (count = current_state.count)
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    if (if (if (if (if (if (if d == 12: 1 else: 0) != 0 and (if (ptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & (32))) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if c == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (partial_newline = 1)
-                                        (could_continue = partial_newline)
+                                (count__goto_775_9 = current_state__goto_769_17.count)
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    if (if (if (if (if (if (if d__goto_719_15 == 12: 1 else: 0) != 0 and (if (ptr__goto_561_12 + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & (32))) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if c__goto_719_12 == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (partial_newline__goto_720_8 = 1)
+                                        (could_continue__goto_721_8 = partial_newline__goto_720_8)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             91 =>
-                                (count = current_state.count)
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    if (if (if (if (if (if (if d == 12: 1 else: 0) != 0 and (if (ptr + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & (32))) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if c == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
-                                        (partial_newline = 1)
-                                        (could_continue = partial_newline)
+                                (count__goto_775_9 = current_state__goto_769_17.count)
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    if (if (if (if (if (if (if d__goto_719_15 == 12: 1 else: 0) != 0 and (if (ptr__goto_561_12 + (1 as isize as usize)) >= mb.end_subject: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & (32))) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if c__goto_719_12 == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        (partial_newline__goto_720_8 = 1)
+                                        (could_continue__goto_721_8 = partial_newline__goto_720_8)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             427 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    ncount = 0
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    ncount__goto_1606_13 = 0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    match c
+                                    match c__goto_719_12
                                         11 =>
                                             __pc = 1
                                             __goto_pending = 1
-                                            if (if (if (ptr + (1 as isize as usize)) < end_subject: 1 else: 0) != 0 and (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                (ncount = 1)
-                                            (count = count + 1)
+                                            if (if (if (ptr__goto_561_12 + (1 as isize as usize)) < end_subject__goto_570_12: 1 else: 0) != 0 and (if ptr__goto_561_12[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (ncount__goto_1606_13 = 1)
+                                            (count__goto_775_9 = count__goto_775_9 + 1)
                                         13 =>
-                                            if (if (if (ptr + (1 as isize as usize)) < end_subject: 1 else: 0) != 0 and (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                (ncount = 1)
-                                            (count = count + 1)
+                                            if (if (if (ptr__goto_561_12 + (1 as isize as usize)) < end_subject__goto_570_12: 1 else: 0) != 0 and (if ptr__goto_561_12[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (ncount__goto_1606_13 = 1)
+                                            (count__goto_775_9 = count__goto_775_9 + 1)
                                         _ => 0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             467 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         10 => 0
                                         _ =>
-                                            (OK = 0)
+                                            (OK__goto_1648_14 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if OK == ((if d == 21: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if count > 0: 1 else: 0) != 0 and (if codevalue == 475: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if OK__goto_1648_14 == ((if d__goto_719_15 == 21: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if count__goto_775_9 > 0: 1 else: 0) != 0 and (if codevalue__goto_772_14 == 475: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (count = count + 1)
+                                        (count__goto_775_9 = count__goto_775_9 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             447 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         9 => 0
                                         _ =>
-                                            (OK = 0)
+                                            (OK__goto_1681_14 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if OK == ((if d == 19: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if count > 0: 1 else: 0) != 0 and (if codevalue == 455: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if OK__goto_1681_14 == ((if d__goto_719_15 == 19: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if count__goto_775_9 > 0: 1 else: 0) != 0 and (if codevalue__goto_772_14 == 455: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (count = count + 1)
+                                        (count__goto_775_9 = count__goto_775_9 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1301,55 +1526,55 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             429 =>
                                 __pc = 2
                                 __goto_pending = 1
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    ncount = 0
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    ncount__goto_1884_13 = 0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    match c
+                                    match c__goto_719_12
                                         11 =>
                                             __pc = 3
                                             __goto_pending = 1
-                                            if (if (if (ptr + (1 as isize as usize)) < end_subject: 1 else: 0) != 0 and (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                (ncount = 1)
+                                            if (if (if (ptr__goto_561_12 + (1 as isize as usize)) < end_subject__goto_570_12: 1 else: 0) != 0 and (if ptr__goto_561_12[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (ncount__goto_1884_13 = 1)
                                         13 =>
-                                            if (if (if (ptr + (1 as isize as usize)) < end_subject: 1 else: 0) != 0 and (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                (ncount = 1)
+                                            if (if (if (ptr__goto_561_12 + (1 as isize as usize)) < end_subject__goto_570_12: 1 else: 0) != 0 and (if ptr__goto_561_12[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (ncount__goto_1884_13 = 1)
                                         _ => 0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             425 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    ncount = 0
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    ncount__goto_1884_13 = 0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    match c
+                                    match c__goto_719_12
                                         11 =>
                                             __pc = 3
                                             __goto_pending = 1
-                                            if (if (if (ptr + (1 as isize as usize)) < end_subject: 1 else: 0) != 0 and (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                (ncount = 1)
+                                            if (if (if (ptr__goto_561_12 + (1 as isize as usize)) < end_subject__goto_570_12: 1 else: 0) != 0 and (if ptr__goto_561_12[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (ncount__goto_1884_13 = 1)
                                         13 =>
-                                            if (if (if (ptr + (1 as isize as usize)) < end_subject: 1 else: 0) != 0 and (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                (ncount = 1)
+                                            if (if (if (ptr__goto_561_12 + (1 as isize as usize)) < end_subject__goto_570_12: 1 else: 0) != 0 and (if ptr__goto_561_12[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (ncount__goto_1884_13 = 1)
                                         _ => 0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             469 =>
                                 __pc = 4
                                 __goto_pending = 1
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         10 => 0
                                         _ =>
-                                            (OK = 0)
+                                            (OK__goto_1934_14 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if OK == ((if d == 21: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if codevalue == 474: 1 else: 0) != 0 or (if codevalue == 476: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if OK__goto_1934_14 == ((if d__goto_719_15 == 21: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if codevalue__goto_772_14 == 474: 1 else: 0) != 0 or (if codevalue__goto_772_14 == 476: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1357,19 +1582,19 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             465 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         10 => 0
                                         _ =>
-                                            (OK = 0)
+                                            (OK__goto_1934_14 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if OK == ((if d == 21: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if codevalue == 474: 1 else: 0) != 0 or (if codevalue == 476: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if OK__goto_1934_14 == ((if d__goto_719_15 == 21: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if codevalue__goto_772_14 == 474: 1 else: 0) != 0 or (if codevalue__goto_772_14 == 476: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1379,19 +1604,19 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             449 =>
                                 __pc = 5
                                 __goto_pending = 1
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         9 => 0
                                         _ =>
-                                            (OK = 0)
+                                            (OK__goto_1974_14 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if OK == ((if d == 19: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if codevalue == 454: 1 else: 0) != 0 or (if codevalue == 456: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if OK__goto_1974_14 == ((if d__goto_719_15 == 19: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if codevalue__goto_772_14 == 454: 1 else: 0) != 0 or (if codevalue__goto_772_14 == 456: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1399,19 +1624,19 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             445 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         9 => 0
                                         _ =>
-                                            (OK = 0)
+                                            (OK__goto_1974_14 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if OK == ((if d == 19: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if codevalue == 454: 1 else: 0) != 0 or (if codevalue == 456: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if OK__goto_1974_14 == ((if d__goto_719_15 == 19: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if codevalue__goto_772_14 == 454: 1 else: 0) != 0 or (if codevalue__goto_772_14 == 456: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1419,38 +1644,38 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             433 =>
-                                (count = current_state.count)
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    ncount = 0
+                                (count__goto_775_9 = current_state__goto_769_17.count)
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    ncount__goto_2165_13 = 0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    match c
+                                    match c__goto_719_12
                                         11 =>
                                             __pc = 6
                                             __goto_pending = 1
-                                            if (if (if (ptr + (1 as isize as usize)) < end_subject: 1 else: 0) != 0 and (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                (ncount = 1)
+                                            if (if (if (ptr__goto_561_12 + (1 as isize as usize)) < end_subject__goto_570_12: 1 else: 0) != 0 and (if ptr__goto_561_12[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (ncount__goto_2165_13 = 1)
                                         13 =>
-                                            if (if (if (ptr + (1 as isize as usize)) < end_subject: 1 else: 0) != 0 and (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
-                                                (ncount = 1)
+                                            if (if (if (ptr__goto_561_12 + (1 as isize as usize)) < end_subject__goto_570_12: 1 else: 0) != 0 and (if ptr__goto_561_12[1] == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                                                (ncount__goto_2165_13 = 1)
                                         _ => 0
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             473 =>
-                                (count = current_state.count)
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                (count__goto_775_9 = current_state__goto_769_17.count)
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         10 => 0
                                         _ =>
-                                            (OK = 0)
+                                            (OK__goto_2211_14 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if OK == ((if d == 21: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if codevalue == 477: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if OK__goto_2211_14 == ((if d__goto_719_15 == 21: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if codevalue__goto_772_14 == 477: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1458,20 +1683,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             453 =>
-                                (count = current_state.count)
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                (count__goto_775_9 = current_state__goto_769_17.count)
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         9 => 0
                                         _ =>
-                                            (OK = 0)
+                                            (OK__goto_2247_14 = 0)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if OK == ((if d == 19: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if codevalue == 457: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if OK__goto_2247_14 == ((if d__goto_719_15 == 19: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if codevalue__goto_772_14 == 457: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1480,117 +1705,117 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                             29 => 0
                             30 =>
-                                if (if clen == 0: 1 else: 0) != 0:
+                                if (if clen__goto_718_7 == 0: 1 else: 0) != 0:
                                     break
                             17 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         11 => 0
                                         10 => 0
                                         13 =>
-                                            if (if (ptr + (1 as isize as usize)) >= end_subject: 1 else: 0) != 0:
+                                            if (if (ptr__goto_561_12 + (1 as isize as usize)) >= end_subject__goto_570_12: 1 else: 0) != 0:
                                                 if (if ((mb.moptions & 32)) != 0: 1 else: 0) != 0:
-                                                    (reset_could_continue = 1)
+                                                    (reset_could_continue__goto_580_6 = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
                                         _ => 0
                             20 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         10 => 0
                                         _ => 0
                             21 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         10 => 0
                                         _ => 0
                             18 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         9 => 0
                                         _ => 0
                             19 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    match c
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    match c__goto_719_12
                                         9 => 0
                                         _ => 0
                             31 => 0
                             32 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    (otherd = ((fcc)[d]))
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    (otherd__goto_2437_18 = ((fcc__goto_560_31)[d__goto_719_15]))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             48 =>
-                                codevalue = codevalue - 13
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    otherd = 4294967295
+                                codevalue__goto_772_14 = codevalue__goto_772_14 - 13
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    otherd__goto_2470_18 = 4294967295
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if caseless != 0:
-                                        (otherd = ((fcc)[d]))
+                                    if caseless__goto_770_10 != 0:
+                                        (otherd__goto_2470_18 = ((fcc__goto_560_31)[d__goto_719_15]))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if ((if (if c == d: 1 else: 0) != 0 or (if c == otherd: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue < 59: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if count > 0: 1 else: 0) != 0 and ((if (if codevalue == 43: 1 else: 0) != 0 or (if codevalue == 69: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if ((if (if c__goto_719_12 == d__goto_719_15: 1 else: 0) != 0 or (if c__goto_719_12 == otherd__goto_2470_18: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue__goto_772_14 < 59: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if count__goto_775_9 > 0: 1 else: 0) != 0 and ((if (if codevalue__goto_772_14 == 43: 1 else: 0) != 0 or (if codevalue__goto_772_14 == 69: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (count = count + 1)
+                                        (count__goto_775_9 = count__goto_775_9 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             35 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    otherd = 4294967295
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    otherd__goto_2470_18 = 4294967295
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if caseless != 0:
-                                        (otherd = ((fcc)[d]))
+                                    if caseless__goto_770_10 != 0:
+                                        (otherd__goto_2470_18 = ((fcc__goto_560_31)[d__goto_719_15]))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if ((if (if c == d: 1 else: 0) != 0 or (if c == otherd: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue < 59: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if count > 0: 1 else: 0) != 0 and ((if (if codevalue == 43: 1 else: 0) != 0 or (if codevalue == 69: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if ((if (if c__goto_719_12 == d__goto_719_15: 1 else: 0) != 0 or (if c__goto_719_12 == otherd__goto_2470_18: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue__goto_772_14 < 59: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if count__goto_775_9 > 0: 1 else: 0) != 0 and ((if (if codevalue__goto_772_14 == 43: 1 else: 0) != 0 or (if codevalue__goto_772_14 == 69: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        (count = count + 1)
+                                        (count__goto_775_9 = count__goto_775_9 + 1)
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             50 =>
-                                codevalue = codevalue - 13
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    otherd = 4294967295
+                                codevalue__goto_772_14 = codevalue__goto_772_14 - 13
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    otherd__goto_2513_18 = 4294967295
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if caseless != 0:
-                                        (otherd = ((fcc)[d]))
+                                    if caseless__goto_770_10 != 0:
+                                        (otherd__goto_2513_18 = ((fcc__goto_560_31)[d__goto_719_15]))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if ((if (if c == d: 1 else: 0) != 0 or (if c == otherd: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue < 59: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if codevalue == 44: 1 else: 0) != 0 or (if codevalue == 70: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if ((if (if c__goto_719_12 == d__goto_719_15: 1 else: 0) != 0 or (if c__goto_719_12 == otherd__goto_2513_18: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue__goto_772_14 < 59: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if codevalue__goto_772_14 == 44: 1 else: 0) != 0 or (if codevalue__goto_772_14 == 70: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1598,22 +1823,22 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             37 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    otherd = 4294967295
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    otherd__goto_2513_18 = 4294967295
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if caseless != 0:
-                                        (otherd = ((fcc)[d]))
+                                    if caseless__goto_770_10 != 0:
+                                        (otherd__goto_2513_18 = ((fcc__goto_560_31)[d__goto_719_15]))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if ((if (if c == d: 1 else: 0) != 0 or (if c == otherd: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue < 59: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if codevalue == 44: 1 else: 0) != 0 or (if codevalue == 70: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if ((if (if c__goto_719_12 == d__goto_719_15: 1 else: 0) != 0 or (if c__goto_719_12 == otherd__goto_2513_18: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue__goto_772_14 < 59: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if codevalue__goto_772_14 == 44: 1 else: 0) != 0 or (if codevalue__goto_772_14 == 70: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1621,23 +1846,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             46 =>
-                                codevalue = codevalue - 13
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    otherd = 4294967295
+                                codevalue__goto_772_14 = codevalue__goto_772_14 - 13
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    otherd__goto_2554_18 = 4294967295
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if caseless != 0:
-                                        (otherd = ((fcc)[d]))
+                                    if caseless__goto_770_10 != 0:
+                                        (otherd__goto_2554_18 = ((fcc__goto_560_31)[d__goto_719_15]))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if ((if (if c == d: 1 else: 0) != 0 or (if c == otherd: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue < 59: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if codevalue == 42: 1 else: 0) != 0 or (if codevalue == 68: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if ((if (if c__goto_719_12 == d__goto_719_15: 1 else: 0) != 0 or (if c__goto_719_12 == otherd__goto_2554_18: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue__goto_772_14 < 59: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if codevalue__goto_772_14 == 42: 1 else: 0) != 0 or (if codevalue__goto_772_14 == 68: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1645,22 +1870,22 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             33 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    otherd = 4294967295
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    otherd__goto_2554_18 = 4294967295
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if caseless != 0:
-                                        (otherd = ((fcc)[d]))
+                                    if caseless__goto_770_10 != 0:
+                                        (otherd__goto_2554_18 = ((fcc__goto_560_31)[d__goto_719_15]))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if ((if (if c == d: 1 else: 0) != 0 or (if c == otherd: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue < 59: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if codevalue == 42: 1 else: 0) != 0 or (if codevalue == 68: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if ((if (if c__goto_719_12 == d__goto_719_15: 1 else: 0) != 0 or (if c__goto_719_12 == otherd__goto_2554_18: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue__goto_772_14 < 59: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if codevalue__goto_772_14 == 42: 1 else: 0) != 0 or (if codevalue__goto_772_14 == 68: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1668,47 +1893,47 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             54 =>
-                                codevalue = codevalue - 13
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    otherd = 4294967295
+                                codevalue__goto_772_14 = codevalue__goto_772_14 - 13
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    otherd__goto_2587_18 = 4294967295
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if caseless != 0:
-                                        (otherd = ((fcc)[d]))
+                                    if caseless__goto_770_10 != 0:
+                                        (otherd__goto_2587_18 = ((fcc__goto_560_31)[d__goto_719_15]))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             41 =>
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    otherd = 4294967295
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    otherd__goto_2587_18 = 4294967295
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if caseless != 0:
-                                        (otherd = ((fcc)[d]))
+                                    if caseless__goto_770_10 != 0:
+                                        (otherd__goto_2587_18 = ((fcc__goto_560_31)[d__goto_719_15]))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             52 =>
-                                codevalue = codevalue - 13
-                                (count = current_state.count)
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    otherd = 4294967295
+                                codevalue__goto_772_14 = codevalue__goto_772_14 - 13
+                                (count__goto_775_9 = current_state__goto_769_17.count)
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    otherd__goto_2627_18 = 4294967295
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if caseless != 0:
-                                        (otherd = ((fcc)[d]))
+                                    if caseless__goto_770_10 != 0:
+                                        (otherd__goto_2627_18 = ((fcc__goto_560_31)[d__goto_719_15]))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if ((if (if c == d: 1 else: 0) != 0 or (if c == otherd: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue < 59: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if codevalue == 45: 1 else: 0) != 0 or (if codevalue == 71: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if ((if (if c__goto_719_12 == d__goto_719_15: 1 else: 0) != 0 or (if c__goto_719_12 == otherd__goto_2627_18: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue__goto_772_14 < 59: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if codevalue__goto_772_14 == 45: 1 else: 0) != 0 or (if codevalue__goto_772_14 == 71: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1716,23 +1941,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                             39 =>
-                                (count = current_state.count)
-                                if (if clen > 0: 1 else: 0) != 0:
-                                    otherd = 4294967295
+                                (count__goto_775_9 = current_state__goto_769_17.count)
+                                if (if clen__goto_718_7 > 0: 1 else: 0) != 0:
+                                    otherd__goto_2627_18 = 4294967295
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if caseless != 0:
-                                        (otherd = ((fcc)[d]))
+                                    if caseless__goto_770_10 != 0:
+                                        (otherd__goto_2627_18 = ((fcc__goto_560_31)[d__goto_719_15]))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    if (if ((if (if c == d: 1 else: 0) != 0 or (if c == otherd: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue < 59: 1 else: 0)): 1 else: 0) != 0:
-                                        if (if (if codevalue == 45: 1 else: 0) != 0 or (if codevalue == 71: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (active_count = active_count - 1)
+                                    if (if ((if (if c__goto_719_12 == d__goto_719_15: 1 else: 0) != 0 or (if c__goto_719_12 == otherd__goto_2627_18: 1 else: 0) != 0: 1 else: 0)) == ((if codevalue__goto_772_14 < 59: 1 else: 0)): 1 else: 0) != 0:
+                                        if (if (if codevalue__goto_772_14 == 45: 1 else: 0) != 0 or (if codevalue__goto_772_14 == 71: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            (active_count__goto_564_5 = active_count__goto_564_5 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                            (next_active_state = next_active_state - 1)
+                                            (next_active_state__goto_559_13 = next_active_state__goto_559_13 - 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1744,77 +1969,125 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             128 => 0
                             141 => 0
                             118 =>
-                                (new_recursive.group_num = recno)
+                                rws__goto_2953_21 = (RWS as *mut RWS_anchor)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (new_recursive.subject_position = ptr)
+                                if (if code__goto_771_16[(1 + 2)] == OP_CREF: 1 else: 0) != 0:
+                                    return (-42)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (new_recursive.last_used_ptr = mb.last_used_ptr)
+                                (local_offsets__goto_2952_21 = ((((RWS + rws__goto_2953_21.size) - rws__goto_2953_21.free)) as *mut c_ulong))
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (new_recursive.prevrec = mb.recursive)
+                                ri__goto_2976_34 = mb.recursive
+                                while (if ri__goto_2976_34 != (null as *mut dfa_recursion_info): 1 else: 0) != 0:
+                                    if (if (if (if recno__goto_2955_18 == ri__goto_2976_34.group_num: 1 else: 0) != 0 and (if ptr__goto_561_12 == ri__goto_2976_34.subject_position: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.last_used_ptr == ri__goto_2976_34.last_used_ptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                        return (-52)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (ri__goto_2976_34 = ri__goto_2976_34.prevrec)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (mb.recursive = (&mut new_recursive as *mut dfa_recursion_info))
+                                (new_recursive__goto_563_20.group_num = recno__goto_2955_18)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                (mb.recursive = new_recursive.prevrec)
+                                (new_recursive__goto_563_20.subject_position = ptr__goto_561_12)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
-                                if (if rc > 0: 1 else: 0) != 0:
-                                    (rc = ((rc * 2) - 2))
-                                    while (if rc >= 0: 1 else: 0) != 0:
-                                        charcount = (local_offsets[(rc + 1)] -% local_offsets[rc])
+                                (new_recursive__goto_563_20.last_used_ptr = mb.last_used_ptr)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (new_recursive__goto_563_20.prevrec = mb.recursive)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (mb.recursive = (&mut new_recursive__goto_563_20 as *mut dfa_recursion_info))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (rc__goto_2950_13 = internal_dfa_match(mb, callpat__goto_2954_20, ptr__goto_561_12, ((((ptr__goto_561_12 as usize -% start_subject__goto_569_12 as usize) / sizeof[u8]())) as c_ulong), local_offsets__goto_2952_21, 1000, local_workspace__goto_2951_14, 1000, rlevel, RWS))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (mb.recursive = new_recursive__goto_563_20.prevrec)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if rc__goto_2950_13 == 0: 1 else: 0) != 0:
+                                    return (-39)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if rc__goto_2950_13 > 0: 1 else: 0) != 0:
+                                    (rc__goto_2950_13 = ((rc__goto_2950_13 * 2) - 2))
+                                    while (if rc__goto_2950_13 >= 0: 1 else: 0) != 0:
+                                        charcount__goto_3021_24 = (local_offsets__goto_2952_21[(rc__goto_2950_13 + 1)] -% local_offsets__goto_2952_21[rc__goto_2950_13])
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                        rc = rc - 2
+                                        rc__goto_2950_13 = rc__goto_2950_13 - 2
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
+                                else:
+                                    if (if rc__goto_2950_13 != ((0 -% 1)): 1 else: 0) != 0:
+                                        return rc__goto_2950_13
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             138 => 0
                             135 =>
-                                if (if rc >= 0: 1 else: 0) != 0:
-                                    end_subpattern = code
+                                rws__goto_3157_21 = (RWS as *mut RWS_anchor)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (local_offsets__goto_3156_21 = ((((RWS + rws__goto_3157_21.size) - rws__goto_3157_21.free)) as *mut c_ulong))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (rc__goto_3154_13 = internal_dfa_match(mb, code__goto_771_16, ptr__goto_561_12, ((((ptr__goto_561_12 as usize -% start_subject__goto_569_12 as usize) / sizeof[u8]())) as c_ulong), local_offsets__goto_3156_21, 2, local_workspace__goto_3155_14, 1000, rlevel, RWS))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if rc__goto_3154_13 >= 0: 1 else: 0) != 0:
+                                    end_subpattern__goto_3186_22 = code__goto_771_16
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    charcount = (local_offsets[1] -% local_offsets[0])
+                                    charcount__goto_3187_22 = (local_offsets__goto_3156_21[1] -% local_offsets__goto_3156_21[0])
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
-                                    (next_state_offset = ((((((end_subpattern as usize -% start_code as usize) / sizeof[u8]()) + 2) + 1)) as c_int))
+                                    (next_state_offset__goto_3188_15 = ((((((end_subpattern__goto_3186_22 as usize -% start_code__goto_571_12 as usize) / sizeof[u8]()) + 2) + 1)) as c_int))
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
+                                else:
+                                    if (if rc__goto_3154_13 != ((0 -% 1)): 1 else: 0) != 0:
+                                        return rc__goto_3154_13
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             119 => 0
-                            _ => 0
+                            _ =>
+                                return (-42)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                         continue
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
-                        (i = i + 1)
+                        (i__goto_717_7 = i__goto_717_7 + 1)
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    if (if new_count <= 0: 1 else: 0) != 0:
+                    if (if new_count__goto_564_19 <= 0: 1 else: 0) != 0:
                         break
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
-                    ptr = ptr + clen
+                    ptr__goto_561_12 = ptr__goto_561_12 + clen__goto_718_7
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
-                return match_count
+                if (if (if (if match_count__goto_564_30 >= 0: 1 else: 0) != 0 and (if ((((mb.moptions | mb.poptions)) & 536870912)) != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if ptr__goto_561_12 < end_subject__goto_570_12: 1 else: 0) != 0: 1 else: 0) != 0:
+                    (match_count__goto_564_30 = ((0 -% 1)))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                return match_count__goto_564_30
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
             _ => break
@@ -2002,9 +2275,9 @@ fn UCD_CATEGORY() -> Never:
 fn UCD_CHARTYPE() -> Never:
     comptime_error("untranslatable C macro: UCD_CHARTYPE")
 fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as c_int) == 0x69) or ((ch as c_int) == 0x0130))
+    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
 fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as c_int) == 0x0130): 0x69 else: (if ((ch as c_int) == 0x49): 0x0131 else: (ch as c_int)))
+    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
 // untranslatable fn-like macro
 fn UCD_GRAPHBREAK() -> Never:
     comptime_error("untranslatable C macro: UCD_GRAPHBREAK")

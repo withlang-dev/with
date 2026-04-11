@@ -126,6 +126,7 @@ fn pcre2_regcomp(preg: *mut regex_t, pattern: *const i8, cflags: c_int) -> c_int
     var re_nsub: c_int = 0
     (preg.re_match_data = null)
     (preg.re_pcre2_code = null)
+    (patlen = (if ((if ((cflags & 2048)) != 0: 1 else: 0)) != 0: ((((preg.re_endp as usize -% pattern as usize) / sizeof[c_char]())) as c_ulong) else: ((0 -% 1))))
     if (if ((cflags & 1)) != 0: 1 else: 0) != 0:
         options = options | 8
 
@@ -148,6 +149,7 @@ fn pcre2_regcomp(preg: *mut regex_t, pattern: *const i8, cflags: c_int) -> c_int
         options = options | 262144
 
     (preg.re_cflags = cflags)
+    (preg.re_pcre2_code = (pcre2_compile_8((pattern as *const u8), patlen, options, (&mut errorcode as *mut c_int), (&mut erroffset as *mut c_ulong), (null as *mut pcre2_real_compile_context_8)) as *mut c_void))
     (preg.re_erroffset = erroffset)
     if (if preg.re_pcre2_code == null: 1 else: 0) != 0:
         var i: c_uint
@@ -163,7 +165,10 @@ fn pcre2_regcomp(preg: *mut regex_t, pattern: *const i8, cflags: c_int) -> c_int
         
         return REG_BADPAT
 
+    pcre2_pattern_info_8((preg.re_pcre2_code as *const pcre2_real_code_8), 4, ((&mut re_nsub as *mut c_int) as *mut c_void))
+    (preg.re_nsub = (re_nsub as c_ulong))
     (preg.re_match_data = (pcre2_match_data_create_8((re_nsub + 1), (null as *mut pcre2_real_general_context_8)) as *mut c_void))
+    (preg.re_erroffset = ((-1) as c_ulong))
     if (if preg.re_match_data == null: 1 else: 0) != 0:
         pcre2_code_free_8((preg.re_pcre2_code as *mut pcre2_real_code_8))
         (preg.re_pcre2_code = null)
@@ -177,7 +182,7 @@ fn pcre2_regexec(preg: *const regex_t, string: *const i8, __param_nmatch: c_ulon
     var so: c_int
     var eo: c_int
     var options: c_int = 0
-    var md: *mut pcre2_real_match_data_8
+    var md: *mut pcre2_real_match_data_8 = (preg.re_match_data as *mut pcre2_real_match_data_8)
     if (if string == (null as *const i8): 1 else: 0) != 0:
         return REG_INVARG
 
@@ -203,9 +208,19 @@ fn pcre2_regexec(preg: *const regex_t, string: *const i8, __param_nmatch: c_ulon
         (so = 0)
         (eo = (string_len(string) as c_int))
 
+    (rc = pcre2_match_8((preg.re_pcre2_code as *const pcre2_real_code_8), ((string as *const u8) + (so as isize as usize)), ((eo - so)), 0, options, md, (null as *mut pcre2_real_match_context_8)))
     if (if rc >= 0: 1 else: 0) != 0:
         var i: c_ulong
         var ovector: *mut c_ulong = pcre2_get_ovector_pointer_8(md)
+        if (if (rc as c_ulong) > nmatch: 1 else: 0) != 0:
+            (rc = (nmatch as c_int))
+        
+        (i = 0)
+        while (if i < (rc as c_ulong): 1 else: 0) != 0:
+            (pmatch[i].rm_so = (if ((if ovector[(i *% 2)] == ((0 -% 1)): 1 else: 0)) != 0: -1 else: (((ovector[(i *% 2)] +% so)) as c_int)))
+            (pmatch[i].rm_eo = (if ((if ovector[((i *% 2) +% 1)] == ((0 -% 1)): 1 else: 0)) != 0: -1 else: (((ovector[((i *% 2) +% 1)] +% so)) as c_int)))
+            (i = i + 1)
+        
         while (if i < nmatch: 1 else: 0) != 0:
             (pmatch[i].rm_eo = -1)
             (pmatch[i].rm_so = pmatch[i].rm_eo)
@@ -213,7 +228,28 @@ fn pcre2_regexec(preg: *const regex_t, string: *const i8, __param_nmatch: c_ulon
         
         return 0
 
+    if (if (if rc <= (-3): 1 else: 0) != 0 and (if rc >= (-23): 1 else: 0) != 0: 1 else: 0) != 0:
+        return REG_INVARG
+
     match rc
+        (-63) =>
+            return REG_ESPACE
+        (-1) =>
+            return REG_NOMATCH
+        (-32) =>
+            return REG_INVARG
+        (-31) =>
+            return REG_INVARG
+        (-34) =>
+            return REG_INVARG
+        (-36) =>
+            return REG_INVARG
+        (-47) =>
+            return REG_ESPACE
+        (-48) =>
+            return REG_ESPACE
+        (-51) =>
+            return REG_INVARG
         _ =>
             return REG_ASSERT
 

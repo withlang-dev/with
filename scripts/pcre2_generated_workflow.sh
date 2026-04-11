@@ -186,10 +186,8 @@ prepare_generated_tree() {
         perl -pi -e 's/^(\s+)(temp|null_str|stack_groupinfo|stack_parsed_pattern|named_groups|backref_cache) = \[?\d+\]?$/$1\/\/ $2 re-declared (skipped)/' "$dst"
     done
 
-    # Default context vars need extern (storage provided by pcre2_context_init.c)
-    for dst in "$generated_dir"/*.w; do
-        perl -pi -e 's/^var (_pcre2_default_\w+_context_8:)/extern var $1/' "$dst"
-    done
+    # Default context vars keep their var definitions (storage from With code).
+    # The pcre2_context_init.c workaround is no longer needed since #100/#101.
 
     # The migrator re-emits PCRE2 header globals into every translation unit.
     # Keep one real definition per shared symbol and make all other modules
@@ -209,6 +207,18 @@ prepare_generated_tree() {
         perl -pi -e 's/"([^"]*)" "([^"]*)"/"$1$2"/g' "$dst"
         perl -pi -e 's/(?<!fn )with_alloc\(([^)]+)\)/(with_alloc($1) as *mut c_void)/g' "$dst"
     done
+
+    # -1 in unsigned assignment context (PCRE2_UNSET = ~(size_t)0 = ULONG_MAX)
+    # Only replace (-1) when preceded by = (assignment/binding), not in match arms
+    for dst in "$generated_dir"/*.w; do
+        perl -pi -e 's/= \(-1\b/= ((0 -% 1)/g' "$dst"
+        perl -pi -e 's/else: \(-1\b/else: ((0 -% 1)/g' "$dst"
+    done
+
+    # Fix pointer-typed p used as integer index in pcre2_compile's recurse_cache binary search
+    if [ -f "$generated_dir/pcre2_compile.w" ]; then
+        perl -pi -e 's/recurse_cache\)\[p\]/recurse_cache)[(p as c_int)]/g' "$generated_dir/pcre2_compile.w"
+    fi
 
     hoist_shared_lets_to_defs "$generated_dir"
 }

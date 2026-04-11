@@ -118,6 +118,7 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
             0 =>
                 (__goto_pending = 0)
                 start_bits__goto_6994_16 = (null as *const u8)
+                re__goto_6995_24 = (code as *const pcre2_real_code_8)
                 original_options__goto_6996_10 = options
                 has_first_cu__goto_7000_6 = 0
                 has_req_cu__goto_7001_6 = 0
@@ -132,17 +133,47 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                     (subject = ((&null_str__goto_7014_13[0] as *mut u8) as *const u8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
+                if (if match_data == (null as *mut pcre2_real_match_data_8): 1 else: 0) != 0:
+                    return (-51)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if (if code == (null as *const pcre2_real_code_8): 1 else: 0) != 0 or (if subject == (null as *const u8): 1 else: 0) != 0: 1 else: 0) != 0:
+                    return (match_data.rc = (-51))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 (start_match__goto_7019_12 = (subject + start_offset))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 (req_cu_ptr__goto_7020_12 = (start_match__goto_7019_12 - (1 as isize as usize)))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
+                if (if length == ((0 -% 1)): 1 else: 0) != 0:
+                    (length = _pcre2_strlen_8(subject))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 (end_subject__goto_7017_12 = (subject + length))
                 (true_end_subject__goto_7018_12 = end_subject__goto_7017_12)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
+                if (if start_offset > length: 1 else: 0) != 0:
+                    return (match_data.rc = (-33))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if re__goto_6995_24.magic_number != 1346589253: 1 else: 0) != 0:
+                    return (match_data.rc = (-31))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 (mb__goto_7050_14.partial = (if ((if ((options & 32)) != 0: 1 else: 0)) != 0: 2 else: (if ((if ((options & 16)) != 0: 1 else: 0)) != 0: 1 else: 0)))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if (if mb__goto_7050_14.partial != 0: 1 else: 0) != 0 and (if ((((re__goto_6995_24.overall_options | options)) & 536870912)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    return (match_data.rc = (-34))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if (if (if mcontext != (null as *mut pcre2_real_match_context_8): 1 else: 0) != 0 and (if mcontext.offset_limit != ((0 -% 1)): 1 else: 0) != 0: 1 else: 0) != 0 and (if ((re__goto_6995_24.overall_options & 8388608)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    return (match_data.rc = (-56))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if ((match_data.flags & 1)) != 0: 1 else: 0) != 0:
@@ -164,6 +195,9 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 if (if mcontext == (null as *mut pcre2_real_match_context_8): 1 else: 0) != 0:
+                    (mcontext = (((&mut _pcre2_default_match_context_8 as *mut pcre2_real_match_context_8)) as *mut pcre2_real_match_context_8))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
                     (mb__goto_7050_14.memctl = re__goto_6995_24.memctl)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
@@ -180,6 +214,9 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                 (startline__goto_7002_6 = (if ((re__goto_6995_24.flags & 512)) != 0: 1 else: 0))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
+                (bumpalong_limit__goto_7016_12 = (if ((if mcontext.offset_limit == ((0 -% 1)): 1 else: 0)) != 0: true_end_subject__goto_7018_12 else: (subject + mcontext.offset_limit)))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 (mb__goto_7050_14.cb = (&mut cb__goto_7048_21 as *mut pcre2_callout_block_8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
@@ -187,6 +224,9 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 (cb__goto_7048_21.subject = subject)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (cb__goto_7048_21.subject_length = ((((end_subject__goto_7017_12 as usize -% subject as usize) / sizeof[u8]())) as c_ulong))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 (cb__goto_7048_21.callout_flags = 0)
@@ -232,10 +272,16 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                 (mb__goto_7050_14.mark = mb__goto_7050_14.nomatch_mark)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
+                (mb__goto_7050_14.name_table = ((((re__goto_6995_24 as *const u8) + sizeof[pcre2_real_code_8]())) as *const u8))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 (mb__goto_7050_14.name_count = re__goto_6995_24.name_count)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 (mb__goto_7050_14.name_entry_size = re__goto_6995_24.name_entry_size)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (mb__goto_7050_14.start_code = ((((re__goto_6995_24 as *const u8) + re__goto_6995_24.code_start)) as *const u8))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 (mb__goto_7050_14.bsr_convention = re__goto_6995_24.bsr_convention)
@@ -262,7 +308,8 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                         (mb__goto_7050_14.nltype = 1)
                     5 =>
                         (mb__goto_7050_14.nltype = 2)
-                    _ => 0
+                    _ =>
+                        return (match_data.rc = (-44))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 (frame_size__goto_7042_12 = (((((120 +% ((re__goto_6995_24.top_bracket * 2) *% sizeof[c_ulong]())) +% 8) -% 1)) & (0 - ((8 -% 1)) - 1)))
@@ -288,6 +335,10 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                     max_size__goto_7536_14 = (1024 *% mb__goto_7050_14.heap_limit)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
+                    if (if max_size__goto_7536_14 < frame_size__goto_7042_12: 1 else: 0) != 0:
+                        return (match_data.rc = (-63))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
                     (heapframes_size__goto_7043_12 = max_size__goto_7536_14)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
@@ -302,6 +353,9 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                         continue
                     if (if match_data.heapframes == (null as *mut heapframe): 1 else: 0) != 0:
                         (match_data.heapframes_size = 0)
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        return (match_data.rc = (-48))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -324,6 +378,10 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                     (has_first_cu__goto_7000_6 = 1)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
+                    (first_cu2__goto_7010_13 = ((re__goto_6995_24.first_codeunit) as u8))
+                    (first_cu__goto_7009_13 = first_cu2__goto_7010_13)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
                     if (if ((re__goto_6995_24.flags & 32)) != 0: 1 else: 0) != 0:
                         (first_cu2__goto_7010_13 = ((mb__goto_7050_14.fcc)[first_cu__goto_7009_13]))
                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -337,6 +395,10 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                     continue
                 if (if ((re__goto_6995_24.flags & 128)) != 0: 1 else: 0) != 0:
                     (has_req_cu__goto_7001_6 = 1)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (req_cu2__goto_7012_13 = ((re__goto_6995_24.last_codeunit) as u8))
+                    (req_cu__goto_7011_13 = req_cu2__goto_7012_13)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     if (if ((re__goto_6995_24.flags & 256)) != 0: 1 else: 0) != 0:
@@ -577,6 +639,9 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                             break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
+                    (cb__goto_7048_21.start_match = ((((start_match__goto_7019_12 as usize -% subject as usize) / sizeof[u8]())) as c_ulong))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        break
                     cb__goto_7048_21.callout_flags = cb__goto_7048_21.callout_flags | 1
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
@@ -611,8 +676,26 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     match rc__goto_6993_5
+                        (-994) =>
+                            (new_start_match__goto_7632_14 = start_match__goto_7019_12)
+                            (mb__goto_7050_14.ignore_skip_arg = mb__goto_7050_14.skip_arg_count)
+                        (-995) =>
+                            if (if mb__goto_7050_14.verb_skip_ptr > start_match__goto_7019_12: 1 else: 0) != 0:
+                                (new_start_match__goto_7632_14 = mb__goto_7050_14.verb_skip_ptr)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                            (new_start_match__goto_7632_14 = (start_match__goto_7019_12 + (1 as isize as usize)))
                         0 =>
                             (new_start_match__goto_7632_14 = (start_match__goto_7019_12 + (1 as isize as usize)))
+                        (-997) =>
+                            (rc__goto_6993_5 = 0)
+                            __pc = 1
+                            __goto_pending = 1
+                            __pc = 1
+                            __goto_pending = 1
                         _ =>
                             __pc = 1
                             __goto_pending = 1
@@ -675,6 +758,15 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         continue
                     if (if ((options & 16384)) != 0: 1 else: 0) != 0:
+                        if (if length != 0: 1 else: 0) != 0:
+                            if (if match_data.subject == (null as *const u8): 1 else: 0) != 0:
+                                return (match_data.rc = (-48))
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                continue
+                        else:
+                            (match_data.subject = (null as *const u8))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
                         match_data.flags = match_data.flags | 1
                         if (if __goto_pending != 0: 1 else: 0) != 0:
                             continue
@@ -688,6 +780,52 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 (match_data.mark = mb__goto_7050_14.nomatch_mark)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if (if rc__goto_6993_5 != 0: 1 else: 0) != 0 and (if rc__goto_6993_5 != (-2): 1 else: 0) != 0: 1 else: 0) != 0:
+                    (match_data.rc = rc__goto_6993_5)
+                else:
+                    if (if match_partial__goto_7022_12 != (null as *const u8): 1 else: 0) != 0:
+                        (match_data.subject = original_subject__goto_7015_12)
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (match_data.subject_length = length)
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (match_data.start_offset = start_offset)
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        ((&match_data.ovector[0] as *mut c_ulong)[0] = ((match_partial__goto_7022_12 as usize -% subject as usize) / sizeof[u8]()))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        ((&match_data.ovector[0] as *mut c_ulong)[1] = ((end_subject__goto_7017_12 as usize -% subject as usize) / sizeof[u8]()))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (match_data.startchar = ((match_partial__goto_7022_12 as usize -% subject as usize) / sizeof[u8]()))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (match_data.leftchar = ((start_partial__goto_7021_12 as usize -% subject as usize) / sizeof[u8]()))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (match_data.rightchar = ((end_subject__goto_7017_12 as usize -% subject as usize) / sizeof[u8]()))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (match_data.rc = (-2))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                    else:
+                        (match_data.subject = original_subject__goto_7015_12)
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (match_data.subject_length = length)
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (match_data.start_offset = start_offset)
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (match_data.rc = ((0 -% 1)))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 return match_data.rc
@@ -910,10 +1048,13 @@ fn do_callout(F: *mut heapframe, mb: *mut match_block_8, lengthptr: *mut c_ulong
     if (if mb.callout == (null as *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int): 1 else: 0) != 0:
         return 0
 
+    (callout_ovector = (((&(F.ovector)[0] as *mut c_ulong) as *mut c_ulong) - (2 as isize as usize)))
     (cb = mb.cb)
+    (cb.capture_top = (((F.offset_top as c_uint) / 2) +% 1))
     (cb.capture_last = F.capture_last)
     (cb.offset_vector = callout_ovector)
     (cb.mark = mb.nomatch_mark)
+    (cb.current_position = ((((F.eptr as usize -% mb.start_subject as usize) / sizeof[u8]())) as c_ulong))
     if (if (unsafe: *F.ecode) == OP_CALLOUT: 1 else: 0) != 0:
         (cb.callout_number = F.ecode[(1 + (2 * 2))])
         (cb.callout_string_offset = 0)
@@ -926,6 +1067,8 @@ fn do_callout(F: *mut heapframe, mb: *mut match_block_8, lengthptr: *mut c_ulong
 
     (save0 = callout_ovector[0])
     (save1 = callout_ovector[1])
+    (callout_ovector[1] = ((0 -% 1)))
+    (callout_ovector[0] = callout_ovector[1])
     (rc = mb.callout(cb, mb.callout_data))
     (callout_ovector[0] = save0)
     (callout_ovector[1] = save1)
@@ -938,6 +1081,14 @@ fn match_ref(offset: c_ulong, caseless: c_int, caseopts: c_int, F: *mut heapfram
     var eptr: *const u8
     var eptr_start: *const u8
     caseopts
+    if (if (if offset >= F.offset_top: 1 else: 0) != 0 or (if (&F.ovector[0] as *mut c_ulong)[offset] == ((0 -% 1)): 1 else: 0) != 0: 1 else: 0) != 0:
+        if (if ((mb.poptions & 512)) != 0: 1 else: 0) != 0:
+            ((unsafe: *lengthptr) = 0)
+            return 0
+        else:
+            return -1
+        
+
     (eptr_start = F.eptr)
     (eptr = eptr_start)
     (p = (mb.start_subject + (&F.ovector[0] as *mut c_ulong)[offset]))
@@ -1094,6 +1245,9 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                 (F__goto_706_12 = match_data.heapframes)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
+                (frames_top__goto_710_12 = ((((F__goto_706_12 as *mut i8) + match_data.heapframes_size)) as *mut heapframe))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 (F__goto_706_12.rdepth = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
@@ -1113,6 +1267,9 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                 (F__goto_706_12.offset_top = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
+                (F__goto_706_12.last_group_offset = ((0 -% 1)))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 (group_frame_type__goto_731_10 = 0)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
@@ -1122,6 +1279,83 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                 continue
             1 =>  // MATCH_RECURSE
                 (__goto_pending = 0)
+                (N__goto_707_12 = ((((F__goto_706_12 as *mut i8) + frame_size)) as *mut heapframe))
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if ((((N__goto_707_12 as *mut i8) + frame_size)) as *mut heapframe) >= frames_top__goto_710_12: 1 else: 0) != 0:
+                    usedsize__goto_779_14 = (((N__goto_707_12 as *mut i8) as usize -% ((match_data.heapframes) as *mut i8) as usize) / sizeof[c_char]())
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    if (if match_data.heapframes_size >= ((0 -% 1) / 2): 1 else: 0) != 0:
+                        if (if match_data.heapframes_size == ((0 -% 1) -% 1): 1 else: 0) != 0:
+                            return (-48)
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        (newsize__goto_778_14 = ((0 -% 1) -% 1))
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                    else:
+                        (newsize__goto_778_14 = (match_data.heapframes_size *% 2))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    if (if (newsize__goto_778_14 / 1024) >= mb.heap_limit: 1 else: 0) != 0:
+                        old_size__goto_792_16 = (match_data.heapframes_size / 1024)
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                        if (if mb.heap_limit <= old_size__goto_792_16: 1 else: 0) != 0:
+                            return (-63)
+                        else:
+                            max_delta__goto_797_18 = (1024 *% ((mb.heap_limit -% old_size__goto_792_16)))
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                continue
+                            over_bytes__goto_798_11 = (match_data.heapframes_size % 1024)
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                continue
+                            if over_bytes__goto_798_11 != 0:
+                                max_delta__goto_797_18 = max_delta__goto_797_18 - ((1024 - over_bytes__goto_798_11))
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                continue
+                            (newsize__goto_778_14 = (match_data.heapframes_size +% max_delta__goto_797_18))
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                continue
+                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                            continue
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    if (if (newsize__goto_778_14 -% usedsize__goto_779_14) < frame_size: 1 else: 0) != 0:
+                        return (-63)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (new__goto_777_14 = (match_data.memctl.malloc(newsize__goto_778_14, match_data.memctl.memory_data) as *mut heapframe))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    if (if new__goto_777_14 == (null as *mut heapframe): 1 else: 0) != 0:
+                        return (-48)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    with_memcpy((new__goto_777_14 as *mut c_void) as *i8, (match_data.heapframes as *const c_void) as *i8, usedsize__goto_779_14 as i64)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (N__goto_707_12 = ((((new__goto_777_14 as *mut i8) + usedsize__goto_779_14)) as *mut heapframe))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (F__goto_706_12 = ((((N__goto_707_12 as *mut i8) - frame_size)) as *mut heapframe))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    match_data.memctl.free((match_data.heapframes as *mut c_void), match_data.memctl.memory_data)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (match_data.heapframes = new__goto_777_14)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (match_data.heapframes_size = newsize__goto_778_14)
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                    (frames_top__goto_710_12 = ((((new__goto_777_14 as *mut i8) + newsize__goto_778_14)) as *mut heapframe))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        continue
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 with_memcpy((((N__goto_707_12 as *mut i8) + 64) as *mut c_void) as *i8, (((F__goto_706_12 as *mut i8) + 64) as *const c_void) as *i8, frame_copy_size__goto_712_12 as i64)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
@@ -1153,7 +1387,18 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         continue
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
+                if (if (mb.match_call_count = mb.match_call_count + 1) >= mb.match_limit: 1 else: 0) != 0:
+                    return (-47)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                if (if F__goto_706_12.rdepth >= mb.match_limit_depth: 1 else: 0) != 0:
+                    return (-53)
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
                 while true:
+                    (F__goto_706_12.op = (((unsafe: *F__goto_706_12.ecode)) as u8))
+                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                        break
                     match F__goto_706_12.op
                         OP_CLOSE =>
                             if (if F__goto_706_12.current_recurse == 4294967295: 1 else: 0) != 0:
@@ -1161,6 +1406,16 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 while true:
+                                    if (if offset__goto_719_12 == ((0 -% 1)): 1 else: 0) != 0:
+                                        return (-44)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (N__goto_707_12 = ((((match_data.heapframes as *mut i8) + offset__goto_719_12)) as *mut heapframe))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (P__goto_708_12 = ((((N__goto_707_12 as *mut i8) - frame_size)) as *mut heapframe))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
                                     if (if N__goto_707_12.group_frame_type == ((65536 | number__goto_729_10)): 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -1207,6 +1462,16 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 while true:
+                                    if (if offset__goto_719_12 == ((0 -% 1)): 1 else: 0) != 0:
+                                        return (-44)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (N__goto_707_12 = ((((match_data.heapframes as *mut i8) + offset__goto_719_12)) as *mut heapframe))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (P__goto_708_12 = ((((N__goto_707_12 as *mut i8) - frame_size)) as *mut heapframe))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
                                     (offset__goto_719_12 = P__goto_708_12.last_group_offset)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -1262,6 +1527,11 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
+                            if (if (if F__goto_706_12.start_match < (mb.start_subject + mb.start_offset): 1 else: 0) != 0 or (if F__goto_706_12.start_match > F__goto_706_12.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if mb.allowlookaroundbsk != 0: 0 else: 1) != 0:
+                                    return (-75)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             (mb.end_match_ptr = F__goto_706_12.eptr)
                             (mb.end_offset_top = F__goto_706_12.offset_top)
                             (mb.mark = F__goto_706_12.mark)
@@ -1271,6 +1541,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             ((&match_data.ovector[0] as *mut c_ulong)[1] = ((F__goto_706_12.eptr as usize -% mb.start_subject as usize) / sizeof[u8]()))
                             (i__goto_727_10 = (2 * ((if ((if (top_bracket + 1) > match_data.oveccount: 1 else: 0)) != 0: match_data.oveccount else: (top_bracket + 1)))))
                             with_memcpy((((&match_data.ovector[0] as *mut c_ulong) + (2 as isize as usize)) as *mut c_void) as *i8, ((&F__goto_706_12.ovector[0] as *mut c_ulong) as *const c_void) as *i8, (((i__goto_727_10 -% 2)) *% sizeof[c_ulong]()) as i64)
+                            while (if (i__goto_727_10 = i__goto_727_10 - 1) >= (F__goto_706_12.offset_top +% 2): 1 else: 0) != 0:
+                                ((&match_data.ovector[0] as *mut c_ulong)[i__goto_727_10] = ((0 -% 1)))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             return 1
                         OP_ACCEPT =>
                             if (if F__goto_706_12.current_recurse != 4294967295: 1 else: 0) != 0:
@@ -1278,6 +1552,16 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 while true:
+                                    if (if offset__goto_719_12 == ((0 -% 1)): 1 else: 0) != 0:
+                                        return (-44)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (N__goto_707_12 = ((((match_data.heapframes as *mut i8) + offset__goto_719_12)) as *mut heapframe))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (P__goto_708_12 = ((((N__goto_707_12 as *mut i8) - frame_size)) as *mut heapframe))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
                                     (offset__goto_719_12 = P__goto_708_12.last_group_offset)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -1333,6 +1617,11 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
+                            if (if (if F__goto_706_12.start_match < (mb.start_subject + mb.start_offset): 1 else: 0) != 0 or (if F__goto_706_12.start_match > F__goto_706_12.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if mb.allowlookaroundbsk != 0: 0 else: 1) != 0:
+                                    return (-75)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             (mb.end_match_ptr = F__goto_706_12.eptr)
                             (mb.end_offset_top = F__goto_706_12.offset_top)
                             (mb.mark = F__goto_706_12.mark)
@@ -1342,6 +1631,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             ((&match_data.ovector[0] as *mut c_ulong)[1] = ((F__goto_706_12.eptr as usize -% mb.start_subject as usize) / sizeof[u8]()))
                             (i__goto_727_10 = (2 * ((if ((if (top_bracket + 1) > match_data.oveccount: 1 else: 0)) != 0: match_data.oveccount else: (top_bracket + 1)))))
                             with_memcpy((((&match_data.ovector[0] as *mut c_ulong) + (2 as isize as usize)) as *mut c_void) as *i8, ((&F__goto_706_12.ovector[0] as *mut c_ulong) as *const c_void) as *i8, (((i__goto_727_10 -% 2)) *% sizeof[c_ulong]()) as i64)
+                            while (if (i__goto_727_10 = i__goto_727_10 - 1) >= (F__goto_706_12.offset_top +% 2): 1 else: 0) != 0:
+                                ((&match_data.ovector[0] as *mut c_ulong)[i__goto_727_10] = ((0 -% 1)))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             return 1
                         OP_END =>
                             if (if (if F__goto_706_12.eptr == F__goto_706_12.start_match: 1 else: 0) != 0 and ((if (if ((mb.moptions & 4)) != 0: 1 else: 0) != 0 or ((if (if ((mb.moptions & 8)) != 0: 1 else: 0) != 0 and (if F__goto_706_12.start_match == (mb.start_subject + mb.start_offset): 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
@@ -1374,6 +1667,11 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 return 0
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
+                            if (if (if F__goto_706_12.start_match < (mb.start_subject + mb.start_offset): 1 else: 0) != 0 or (if F__goto_706_12.start_match > F__goto_706_12.eptr: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if mb.allowlookaroundbsk != 0: 0 else: 1) != 0:
+                                    return (-75)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             (mb.end_match_ptr = F__goto_706_12.eptr)
                             (mb.end_offset_top = F__goto_706_12.offset_top)
                             (mb.mark = F__goto_706_12.mark)
@@ -1383,10 +1681,18 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             ((&match_data.ovector[0] as *mut c_ulong)[1] = ((F__goto_706_12.eptr as usize -% mb.start_subject as usize) / sizeof[u8]()))
                             (i__goto_727_10 = (2 * ((if ((if (top_bracket + 1) > match_data.oveccount: 1 else: 0)) != 0: match_data.oveccount else: (top_bracket + 1)))))
                             with_memcpy((((&match_data.ovector[0] as *mut c_ulong) + (2 as isize as usize)) as *mut c_void) as *i8, ((&F__goto_706_12.ovector[0] as *mut c_ulong) as *const c_void) as *i8, (((i__goto_727_10 -% 2)) *% sizeof[c_ulong]()) as i64)
+                            while (if (i__goto_727_10 = i__goto_727_10 - 1) >= (F__goto_706_12.offset_top +% 2): 1 else: 0) != 0:
+                                ((&match_data.ovector[0] as *mut c_ulong)[i__goto_727_10] = ((0 -% 1)))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             return 1
                         OP_ANY =>
                             if (if (if (if (if (if mb.partial != 0: 1 else: 0) != 0 and (if F__goto_706_12.eptr == (mb.end_subject - (1 as isize as usize)): 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nltype == 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.nllen == 2: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *F__goto_706_12.eptr) == (&mb.nl[0] as *mut u8)[0]: 1 else: 0) != 0: 1 else: 0) != 0:
                                 (mb.hitend = 1)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if mb.partial > 1: 1 else: 0) != 0:
+                                    return (-2)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if F__goto_706_12.eptr >= mb.end_subject: 1 else: 0) != 0:
@@ -8069,6 +8375,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
+                                                if (if mb.partial > 1: 1 else: 0) != 0:
+                                                    return (-2)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             (F__goto_706_12.eptr = F__goto_706_12.eptr + 1)
@@ -8459,7 +8769,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if F__goto_706_12.fields.type_repeat.min == F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -8661,7 +8972,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                         break
                                                     if not (0 != 0):
                                                         break
-                                        _ => 0
+                                        _ =>
+                                            return (-44)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -8690,7 +9002,13 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    13 => 0
+                                    13 =>
+                                        if (if fc__goto_728_10 > ((((mb.end_subject as usize -% F__goto_706_12.eptr as usize) / sizeof[u8]())) as c_uint): 1 else: 0) != 0:
+                                            (F__goto_706_12.eptr = mb.end_subject)
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                        else:
+                                            F__goto_706_12.eptr = F__goto_706_12.eptr + fc__goto_728_10
                                     17 =>
                                         (i__goto_727_10 = F__goto_706_12.fields.type_repeat.min)
                                         while (if i__goto_727_10 < F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -9101,7 +9419,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if reptype__goto_730_10 == 2: 1 else: 0) != 0:
@@ -9207,6 +9526,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
+                                                if (if mb.partial > 1: 1 else: 0) != 0:
+                                                    return (-2)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             (F__goto_706_12.eptr = F__goto_706_12.eptr + 1)
@@ -9597,7 +9920,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if F__goto_706_12.fields.type_repeat.min == F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -9799,7 +10123,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                         break
                                                     if not (0 != 0):
                                                         break
-                                        _ => 0
+                                        _ =>
+                                            return (-44)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -9828,7 +10153,13 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    13 => 0
+                                    13 =>
+                                        if (if fc__goto_728_10 > ((((mb.end_subject as usize -% F__goto_706_12.eptr as usize) / sizeof[u8]())) as c_uint): 1 else: 0) != 0:
+                                            (F__goto_706_12.eptr = mb.end_subject)
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                        else:
+                                            F__goto_706_12.eptr = F__goto_706_12.eptr + fc__goto_728_10
                                     17 =>
                                         (i__goto_727_10 = F__goto_706_12.fields.type_repeat.min)
                                         while (if i__goto_727_10 < F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -10239,7 +10570,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if reptype__goto_730_10 == 2: 1 else: 0) != 0:
@@ -10341,6 +10673,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
+                                                if (if mb.partial > 1: 1 else: 0) != 0:
+                                                    return (-2)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             (F__goto_706_12.eptr = F__goto_706_12.eptr + 1)
@@ -10731,7 +11067,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if F__goto_706_12.fields.type_repeat.min == F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -10933,7 +11270,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                         break
                                                     if not (0 != 0):
                                                         break
-                                        _ => 0
+                                        _ =>
+                                            return (-44)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -10962,7 +11300,13 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    13 => 0
+                                    13 =>
+                                        if (if fc__goto_728_10 > ((((mb.end_subject as usize -% F__goto_706_12.eptr as usize) / sizeof[u8]())) as c_uint): 1 else: 0) != 0:
+                                            (F__goto_706_12.eptr = mb.end_subject)
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                        else:
+                                            F__goto_706_12.eptr = F__goto_706_12.eptr + fc__goto_728_10
                                     17 =>
                                         (i__goto_727_10 = F__goto_706_12.fields.type_repeat.min)
                                         while (if i__goto_727_10 < F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -11373,7 +11717,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if reptype__goto_730_10 == 2: 1 else: 0) != 0:
@@ -11469,6 +11814,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
+                                                if (if mb.partial > 1: 1 else: 0) != 0:
+                                                    return (-2)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             (F__goto_706_12.eptr = F__goto_706_12.eptr + 1)
@@ -11859,7 +12208,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if F__goto_706_12.fields.type_repeat.min == F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -12061,7 +12411,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                         break
                                                     if not (0 != 0):
                                                         break
-                                        _ => 0
+                                        _ =>
+                                            return (-44)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -12090,7 +12441,13 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    13 => 0
+                                    13 =>
+                                        if (if fc__goto_728_10 > ((((mb.end_subject as usize -% F__goto_706_12.eptr as usize) / sizeof[u8]())) as c_uint): 1 else: 0) != 0:
+                                            (F__goto_706_12.eptr = mb.end_subject)
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                        else:
+                                            F__goto_706_12.eptr = F__goto_706_12.eptr + fc__goto_728_10
                                     17 =>
                                         (i__goto_727_10 = F__goto_706_12.fields.type_repeat.min)
                                         while (if i__goto_727_10 < F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -12501,7 +12858,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if reptype__goto_730_10 == 2: 1 else: 0) != 0:
@@ -12591,6 +12949,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
+                                                if (if mb.partial > 1: 1 else: 0) != 0:
+                                                    return (-2)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             (F__goto_706_12.eptr = F__goto_706_12.eptr + 1)
@@ -12981,7 +13343,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if F__goto_706_12.fields.type_repeat.min == F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -13183,7 +13546,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                         break
                                                     if not (0 != 0):
                                                         break
-                                        _ => 0
+                                        _ =>
+                                            return (-44)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -13212,7 +13576,13 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    13 => 0
+                                    13 =>
+                                        if (if fc__goto_728_10 > ((((mb.end_subject as usize -% F__goto_706_12.eptr as usize) / sizeof[u8]())) as c_uint): 1 else: 0) != 0:
+                                            (F__goto_706_12.eptr = mb.end_subject)
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                        else:
+                                            F__goto_706_12.eptr = F__goto_706_12.eptr + fc__goto_728_10
                                     17 =>
                                         (i__goto_727_10 = F__goto_706_12.fields.type_repeat.min)
                                         while (if i__goto_727_10 < F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -13623,7 +13993,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if reptype__goto_730_10 == 2: 1 else: 0) != 0:
@@ -13707,6 +14078,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
+                                                if (if mb.partial > 1: 1 else: 0) != 0:
+                                                    return (-2)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             (F__goto_706_12.eptr = F__goto_706_12.eptr + 1)
@@ -14097,7 +14472,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if F__goto_706_12.fields.type_repeat.min == F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -14299,7 +14675,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                         break
                                                     if not (0 != 0):
                                                         break
-                                        _ => 0
+                                        _ =>
+                                            return (-44)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -14328,7 +14705,13 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    13 => 0
+                                    13 =>
+                                        if (if fc__goto_728_10 > ((((mb.end_subject as usize -% F__goto_706_12.eptr as usize) / sizeof[u8]())) as c_uint): 1 else: 0) != 0:
+                                            (F__goto_706_12.eptr = mb.end_subject)
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                        else:
+                                            F__goto_706_12.eptr = F__goto_706_12.eptr + fc__goto_728_10
                                     17 =>
                                         (i__goto_727_10 = F__goto_706_12.fields.type_repeat.min)
                                         while (if i__goto_727_10 < F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -14739,7 +15122,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if reptype__goto_730_10 == 2: 1 else: 0) != 0:
@@ -14818,6 +15202,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 (mb.hitend = 1)
                                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                                     break
+                                                if (if mb.partial > 1: 1 else: 0) != 0:
+                                                    return (-2)
+                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                    break
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                             (F__goto_706_12.eptr = F__goto_706_12.eptr + 1)
@@ -15208,7 +15596,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             if (if F__goto_706_12.fields.type_repeat.min == F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -15410,7 +15799,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                         break
                                                     if not (0 != 0):
                                                         break
-                                        _ => 0
+                                        _ =>
+                                            return (-44)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -15439,7 +15829,13 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    13 => 0
+                                    13 =>
+                                        if (if fc__goto_728_10 > ((((mb.end_subject as usize -% F__goto_706_12.eptr as usize) / sizeof[u8]())) as c_uint): 1 else: 0) != 0:
+                                            (F__goto_706_12.eptr = mb.end_subject)
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                        else:
+                                            F__goto_706_12.eptr = F__goto_706_12.eptr + fc__goto_728_10
                                     17 =>
                                         (i__goto_727_10 = F__goto_706_12.fields.type_repeat.min)
                                         while (if i__goto_727_10 < F__goto_706_12.fields.type_repeat.max: 1 else: 0) != 0:
@@ -15850,7 +16246,8 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                             (i__goto_727_10 = i__goto_727_10 + 1)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
-                                    _ => 0
+                                    _ =>
+                                        return (-44)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if (if reptype__goto_730_10 == 2: 1 else: 0) != 0:
@@ -15902,10 +16299,15 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         OP_DNREF =>
+                            (F__goto_706_12.byte2 = (((if ((if F__goto_706_12.op == OP_DNREFI: 1 else: 0)) != 0: F__goto_706_12.ecode[(1 + (2 * 2))] else: 0)) as u8))
                             F__goto_706_12.ecode = F__goto_706_12.ecode + ((1 + (2 * 2)) + ((if (if F__goto_706_12.op == OP_DNREFI: 1 else: 0) != 0: 1 else: 0)))
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
                             while (if (count__goto_5270_11 = count__goto_5270_11 - 1) > 0: 1 else: 0) != 0:
+                                if (if (if F__goto_706_12.fields.ref_repeat.offset < F__goto_706_12.offset_top: 1 else: 0) != 0 and (if (&F__goto_706_12.ovector[0] as *mut c_ulong)[F__goto_706_12.fields.ref_repeat.offset] != ((0 -% 1)): 1 else: 0) != 0: 1 else: 0) != 0:
+                                    break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                                 slot__goto_5271_18 = slot__goto_5271_18 + mb.name_entry_size
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -15951,6 +16353,16 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         break
                                     F__goto_706_12.eptr = F__goto_706_12.eptr + length__goto_720_12
                                     continue
+                            if (if (if F__goto_706_12.fields.ref_repeat.offset < F__goto_706_12.offset_top: 1 else: 0) != 0 and (if (&F__goto_706_12.ovector[0] as *mut c_ulong)[F__goto_706_12.fields.ref_repeat.offset] != ((0 -% 1)): 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if (&F__goto_706_12.ovector[0] as *mut c_ulong)[F__goto_706_12.fields.ref_repeat.offset] == (&F__goto_706_12.ovector[0] as *mut c_ulong)[(F__goto_706_12.fields.ref_repeat.offset +% 1)]: 1 else: 0) != 0:
+                                    continue
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                            else:
+                                if (if (if F__goto_706_12.fields.ref_repeat.min == 0: 1 else: 0) != 0 or (if ((mb.poptions & 512)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    continue
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             (i__goto_727_10 = 1)
                             while (if i__goto_727_10 <= F__goto_706_12.fields.ref_repeat.min: 1 else: 0) != 0:
                                 (rrc__goto_722_5 = match_ref(F__goto_706_12.fields.ref_repeat.offset, F__goto_706_12.byte1, F__goto_706_12.byte2, F__goto_706_12, mb, (&mut slength__goto_5357_18 as *mut c_ulong)))
@@ -16068,6 +16480,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     if (if rrc__goto_722_5 != 0: 1 else: 0) != 0:
                                         if (if (if (if rrc__goto_722_5 > 0: 1 else: 0) != 0 and (if mb.partial != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.end_subject > mb.start_used_ptr: 1 else: 0) != 0: 1 else: 0) != 0:
                                             (mb.hitend = 1)
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            if (if mb.partial > 1: 1 else: 0) != 0:
+                                                return (-2)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -16271,6 +16687,16 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         break
                                     F__goto_706_12.eptr = F__goto_706_12.eptr + length__goto_720_12
                                     continue
+                            if (if (if F__goto_706_12.fields.ref_repeat.offset < F__goto_706_12.offset_top: 1 else: 0) != 0 and (if (&F__goto_706_12.ovector[0] as *mut c_ulong)[F__goto_706_12.fields.ref_repeat.offset] != ((0 -% 1)): 1 else: 0) != 0: 1 else: 0) != 0:
+                                if (if (&F__goto_706_12.ovector[0] as *mut c_ulong)[F__goto_706_12.fields.ref_repeat.offset] == (&F__goto_706_12.ovector[0] as *mut c_ulong)[(F__goto_706_12.fields.ref_repeat.offset +% 1)]: 1 else: 0) != 0:
+                                    continue
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                            else:
+                                if (if (if F__goto_706_12.fields.ref_repeat.min == 0: 1 else: 0) != 0 or (if ((mb.poptions & 512)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    continue
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             (i__goto_727_10 = 1)
                             while (if i__goto_727_10 <= F__goto_706_12.fields.ref_repeat.min: 1 else: 0) != 0:
                                 (rrc__goto_722_5 = match_ref(F__goto_706_12.fields.ref_repeat.offset, F__goto_706_12.byte1, F__goto_706_12.byte2, F__goto_706_12, mb, (&mut slength__goto_5357_18 as *mut c_ulong)))
@@ -16388,6 +16814,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     if (if rrc__goto_722_5 != 0: 1 else: 0) != 0:
                                         if (if (if (if rrc__goto_722_5 > 0: 1 else: 0) != 0 and (if mb.partial != 0: 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.end_subject > mb.start_used_ptr: 1 else: 0) != 0: 1 else: 0) != 0:
                                             (mb.hitend = 1)
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            if (if mb.partial > 1: 1 else: 0) != 0:
+                                                return (-2)
                                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -16665,6 +17095,31 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
+                                if (if rrc__goto_722_5 == (-998): 1 else: 0) != 0:
+                                    (F__goto_706_12.byte1 = 1)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if F__goto_706_12.eptr == F__goto_706_12.fields.op_brapos.start_eptr: 1 else: 0) != 0:
+                                        break
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (F__goto_706_12.ecode = F__goto_706_12.fields.op_brapos.start_group)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    continue
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if rrc__goto_722_5 == (-993): 1 else: 0) != 0:
+                                    if (if (if mb.verb_ecode_ptr < next_ecode__goto_5599_20: 1 else: 0) != 0 and ((if (if (unsafe: *F__goto_706_12.ecode) == OP_ALT: 1 else: 0) != 0 or (if (unsafe: *next_ecode__goto_5599_20) == OP_ALT: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (rrc__goto_722_5 = 0)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                                 if (if rrc__goto_722_5 != 0: 1 else: 0) != 0:
                                     while true:
                                         __pc = 57
@@ -16775,6 +17230,31 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
+                                if (if rrc__goto_722_5 == (-998): 1 else: 0) != 0:
+                                    (F__goto_706_12.byte1 = 1)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if F__goto_706_12.eptr == F__goto_706_12.fields.op_brapos.start_eptr: 1 else: 0) != 0:
+                                        break
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (F__goto_706_12.ecode = F__goto_706_12.fields.op_brapos.start_group)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    continue
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if rrc__goto_722_5 == (-993): 1 else: 0) != 0:
+                                    if (if (if mb.verb_ecode_ptr < next_ecode__goto_5599_20: 1 else: 0) != 0 and ((if (if (unsafe: *F__goto_706_12.ecode) == OP_ALT: 1 else: 0) != 0 or (if (unsafe: *next_ecode__goto_5599_20) == OP_ALT: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (rrc__goto_722_5 = 0)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                                 if (if rrc__goto_722_5 != 0: 1 else: 0) != 0:
                                     while true:
                                         __pc = 57
@@ -16879,6 +17359,31 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if not (0 != 0):
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if rrc__goto_722_5 == (-998): 1 else: 0) != 0:
+                                    (F__goto_706_12.byte1 = 1)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if F__goto_706_12.eptr == F__goto_706_12.fields.op_brapos.start_eptr: 1 else: 0) != 0:
+                                        break
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (F__goto_706_12.ecode = F__goto_706_12.fields.op_brapos.start_group)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    continue
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if rrc__goto_722_5 == (-993): 1 else: 0) != 0:
+                                    if (if (if mb.verb_ecode_ptr < next_ecode__goto_5599_20: 1 else: 0) != 0 and ((if (if (unsafe: *F__goto_706_12.ecode) == OP_ALT: 1 else: 0) != 0 or (if (unsafe: *next_ecode__goto_5599_20) == OP_ALT: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (rrc__goto_722_5 = 0)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17034,6 +17539,13 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
+                                if (if rrc__goto_722_5 == (-993): 1 else: 0) != 0:
+                                    if (if (if mb.verb_ecode_ptr < next_ecode__goto_5699_20: 1 else: 0) != 0 and ((if (if (unsafe: *F__goto_706_12.ecode) == OP_ALT: 1 else: 0) != 0 or (if (unsafe: *next_ecode__goto_5699_20) == OP_ALT: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (rrc__goto_722_5 = 0)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                                 if (if rrc__goto_722_5 != 0: 1 else: 0) != 0:
                                     while true:
                                         __pc = 57
@@ -17064,6 +17576,30 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 (offset__goto_719_12 = F__goto_706_12.last_group_offset)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
+                                while (if offset__goto_719_12 != ((0 -% 1)): 1 else: 0) != 0:
+                                    (N__goto_707_12 = ((((match_data.heapframes as *mut i8) + offset__goto_719_12)) as *mut heapframe))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (P__goto_708_12 = ((((N__goto_707_12 as *mut i8) - frame_size)) as *mut heapframe))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if N__goto_707_12.group_frame_type == ((262144 | number__goto_729_10)): 1 else: 0) != 0:
+                                        if (if (if (if F__goto_706_12.eptr == P__goto_708_12.eptr: 1 else: 0) != 0 and (if mb.last_used_ptr == P__goto_708_12.recurse_last_used: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & 262144)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            return (-52)
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        break
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (offset__goto_719_12 = P__goto_708_12.last_group_offset)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             (F__goto_706_12.recurse_last_used = mb.last_used_ptr)
                             (F__goto_706_12.fields.op_recurse.start_branch = bracode__goto_718_12)
                             (F__goto_706_12.fields.op_recurse.frame_type = (262144 | number__goto_729_10))
@@ -17082,6 +17618,23 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if not (0 != 0):
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if (if (if rrc__goto_722_5 >= (-997): 1 else: 0) != 0 and (if rrc__goto_722_5 <= (-993): 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.verb_current_recurse == ((F__goto_706_12.fields.op_recurse.frame_type ^ 262144)): 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (if rrc__goto_722_5 == (-993): 1 else: 0) != 0 and (if mb.verb_ecode_ptr < next_ecode__goto_5761_18: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (unsafe: *F__goto_706_12.fields.op_recurse.start_branch) == OP_ALT: 1 else: 0) != 0 or (if (unsafe: *next_ecode__goto_5761_18) == OP_ALT: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (rrc__goto_722_5 = 0)
+                                    else:
+                                        while true:
+                                            __pc = 57
+                                            __goto_pending = 1
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            if not (0 != 0):
+                                                break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17134,6 +17687,13 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
+                                if (if rrc__goto_722_5 == (-993): 1 else: 0) != 0:
+                                    if (if (if mb.verb_ecode_ptr < next_ecode__goto_5699_20: 1 else: 0) != 0 and ((if (if (unsafe: *F__goto_706_12.ecode) == OP_ALT: 1 else: 0) != 0 or (if (unsafe: *next_ecode__goto_5699_20) == OP_ALT: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (rrc__goto_722_5 = 0)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                                 if (if rrc__goto_722_5 != 0: 1 else: 0) != 0:
                                     while true:
                                         __pc = 57
@@ -17164,6 +17724,30 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 (offset__goto_719_12 = F__goto_706_12.last_group_offset)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
+                                while (if offset__goto_719_12 != ((0 -% 1)): 1 else: 0) != 0:
+                                    (N__goto_707_12 = ((((match_data.heapframes as *mut i8) + offset__goto_719_12)) as *mut heapframe))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (P__goto_708_12 = ((((N__goto_707_12 as *mut i8) - frame_size)) as *mut heapframe))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if N__goto_707_12.group_frame_type == ((262144 | number__goto_729_10)): 1 else: 0) != 0:
+                                        if (if (if (if F__goto_706_12.eptr == P__goto_708_12.eptr: 1 else: 0) != 0 and (if mb.last_used_ptr == P__goto_708_12.recurse_last_used: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & 262144)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            return (-52)
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        break
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (offset__goto_719_12 = P__goto_708_12.last_group_offset)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             (F__goto_706_12.recurse_last_used = mb.last_used_ptr)
                             (F__goto_706_12.fields.op_recurse.start_branch = bracode__goto_718_12)
                             (F__goto_706_12.fields.op_recurse.frame_type = (262144 | number__goto_729_10))
@@ -17182,6 +17766,23 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if not (0 != 0):
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if (if (if rrc__goto_722_5 >= (-997): 1 else: 0) != 0 and (if rrc__goto_722_5 <= (-993): 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.verb_current_recurse == ((F__goto_706_12.fields.op_recurse.frame_type ^ 262144)): 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (if rrc__goto_722_5 == (-993): 1 else: 0) != 0 and (if mb.verb_ecode_ptr < next_ecode__goto_5761_18: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (unsafe: *F__goto_706_12.fields.op_recurse.start_branch) == OP_ALT: 1 else: 0) != 0 or (if (unsafe: *next_ecode__goto_5761_18) == OP_ALT: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (rrc__goto_722_5 = 0)
+                                    else:
+                                        while true:
+                                            __pc = 57
+                                            __goto_pending = 1
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            if not (0 != 0):
+                                                break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17220,6 +17821,30 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 (offset__goto_719_12 = F__goto_706_12.last_group_offset)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
+                                while (if offset__goto_719_12 != ((0 -% 1)): 1 else: 0) != 0:
+                                    (N__goto_707_12 = ((((match_data.heapframes as *mut i8) + offset__goto_719_12)) as *mut heapframe))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (P__goto_708_12 = ((((N__goto_707_12 as *mut i8) - frame_size)) as *mut heapframe))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if N__goto_707_12.group_frame_type == ((262144 | number__goto_729_10)): 1 else: 0) != 0:
+                                        if (if (if (if F__goto_706_12.eptr == P__goto_708_12.eptr: 1 else: 0) != 0 and (if mb.last_used_ptr == P__goto_708_12.recurse_last_used: 1 else: 0) != 0: 1 else: 0) != 0 and (if ((mb.moptions & 262144)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                            return (-52)
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        break
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (offset__goto_719_12 = P__goto_708_12.last_group_offset)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             (F__goto_706_12.recurse_last_used = mb.last_used_ptr)
                             (F__goto_706_12.fields.op_recurse.start_branch = bracode__goto_718_12)
                             (F__goto_706_12.fields.op_recurse.frame_type = (262144 | number__goto_729_10))
@@ -17238,6 +17863,23 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if not (0 != 0):
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if (if (if rrc__goto_722_5 >= (-997): 1 else: 0) != 0 and (if rrc__goto_722_5 <= (-993): 1 else: 0) != 0: 1 else: 0) != 0 and (if mb.verb_current_recurse == ((F__goto_706_12.fields.op_recurse.frame_type ^ 262144)): 1 else: 0) != 0: 1 else: 0) != 0:
+                                    if (if (if (if rrc__goto_722_5 == (-993): 1 else: 0) != 0 and (if mb.verb_ecode_ptr < next_ecode__goto_5761_18: 1 else: 0) != 0: 1 else: 0) != 0 and ((if (if (unsafe: *F__goto_706_12.fields.op_recurse.start_branch) == OP_ALT: 1 else: 0) != 0 or (if (unsafe: *next_ecode__goto_5761_18) == OP_ALT: 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                                        (rrc__goto_722_5 = 0)
+                                    else:
+                                        while true:
+                                            __pc = 57
+                                            __goto_pending = 1
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                break
+                                            if not (0 != 0):
+                                                break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17294,6 +17936,11 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     ecode__goto_5886_18 = ecode__goto_5886_18 + (1 + 2)
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
+                                    if (if (if offset__goto_719_12 < F__goto_706_12.offset_top: 1 else: 0) != 0 and (if (&F__goto_706_12.ovector[0] as *mut c_ulong)[offset__goto_719_12] != ((0 -% 1)): 1 else: 0) != 0: 1 else: 0) != 0:
+                                        __pc = 39
+                                        __goto_pending = 1
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
                                     continue
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -17318,6 +17965,11 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 while (if count__goto_5887_11 > 0: 1 else: 0) != 0:
+                                    if (if (if offset__goto_719_12 < F__goto_706_12.offset_top: 1 else: 0) != 0 and (if (&F__goto_706_12.ovector[0] as *mut c_ulong)[offset__goto_719_12] != ((0 -% 1)): 1 else: 0) != 0: 1 else: 0) != 0:
+                                        __pc = 39
+                                        __goto_pending = 1
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
                                     slot__goto_5888_18 = slot__goto_5888_18 + mb.name_entry_size
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
@@ -17379,6 +18031,53 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                     if not (0 != 0):
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if rrc__goto_722_5 == (-999): 1 else: 0) != 0:
+                                    with_memcpy(((&F__goto_706_12.ovector[0] as *mut c_ulong) as *mut c_void) as *i8, (((assert_accept_frame__goto_711_12 as *mut i8) + 120) as *const c_void) as *i8, (assert_accept_frame__goto_711_12.offset_top *% sizeof[c_ulong]()) as i64)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (F__goto_706_12.offset_top = assert_accept_frame__goto_711_12.offset_top)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (F__goto_706_12.mark = assert_accept_frame__goto_711_12.mark)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (mb.end_subject = F__goto_706_12.fields.op_assert_scs.saved_end_subject)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (mb.true_end_subject = (mb.end_subject + F__goto_706_12.fields.op_assert_scs.true_end_extra))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (mb.moptions = F__goto_706_12.fields.op_assert_scs.saved_moptions)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if (if rrc__goto_722_5 != 0: 1 else: 0) != 0 and (if rrc__goto_722_5 != (-993): 1 else: 0) != 0: 1 else: 0) != 0:
+                                    (mb.end_subject = F__goto_706_12.fields.op_assert_scs.saved_end_subject)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (mb.true_end_subject = (mb.end_subject + F__goto_706_12.fields.op_assert_scs.true_end_extra))
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    (mb.moptions = F__goto_706_12.fields.op_assert_scs.saved_moptions)
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    while true:
+                                        __pc = 57
+                                        __goto_pending = 1
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
+                                        if not (0 != 0):
+                                            break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
                                         break
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17496,9 +18195,13 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
-                                OP_CREF => 0
+                                OP_CREF =>
+                                    (condition__goto_733_6 = (if (if offset__goto_719_12 < F__goto_706_12.offset_top: 1 else: 0) != 0 and (if (&F__goto_706_12.ovector[0] as *mut c_ulong)[offset__goto_719_12] != ((0 -% 1)): 1 else: 0) != 0: 1 else: 0))
                                 OP_DNCREF =>
                                     while (if (count__goto_6090_13 = count__goto_6090_13 - 1) > 0: 1 else: 0) != 0:
+                                        (condition__goto_733_6 = (if (if offset__goto_719_12 < F__goto_706_12.offset_top: 1 else: 0) != 0 and (if (&F__goto_706_12.ovector[0] as *mut c_ulong)[offset__goto_719_12] != ((0 -% 1)): 1 else: 0) != 0: 1 else: 0))
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
                                         if condition__goto_733_6 != 0:
                                             break
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -17515,6 +18218,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 OP_TRUE =>
                                     (condition__goto_733_6 = 1)
                                 _ =>
+                                    (F__goto_706_12.byte1 = (((if (if (unsafe: *F__goto_706_12.ecode) == OP_ASSERT: 1 else: 0) != 0 or (if (unsafe: *F__goto_706_12.ecode) == OP_ASSERTBACK: 1 else: 0) != 0: 1 else: 0)) as u8))
                                     (F__goto_706_12.fields.op_cond.start_branch = F__goto_706_12.ecode)
                                     while true:
                                         (group_frame_type__goto_731_10 = 196608)
@@ -17535,12 +18239,17 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
                                         match rrc__goto_722_5
+                                            (-999) =>
+                                                with_memcpy(((&F__goto_706_12.ovector[0] as *mut c_ulong) as *mut c_void) as *i8, (((assert_accept_frame__goto_711_12 as *mut i8) + 120) as *const c_void) as *i8, (assert_accept_frame__goto_711_12.offset_top *% sizeof[c_ulong]()) as i64)
+                                                (F__goto_706_12.offset_top = assert_accept_frame__goto_711_12.offset_top)
+                                                (condition__goto_733_6 = F__goto_706_12.byte1)
                                             1 =>
                                                 (condition__goto_733_6 = F__goto_706_12.byte1)
                                             0 =>
                                                 if (if (unsafe: *F__goto_706_12.fields.op_cond.start_branch) == OP_ALT: 1 else: 0) != 0:
                                                     continue
                                                 (condition__goto_733_6 = (if F__goto_706_12.byte1 != 0: 0 else: 1))
+                                            (-997) => 0
                                             _ =>
                                                 while true:
                                                     __pc = 57
@@ -17589,6 +18298,18 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                         OP_REVERSE =>
+                            if (if (number__goto_729_10 as c_long) > ((F__goto_706_12.eptr as usize -% mb.start_subject as usize) / sizeof[u8]()): 1 else: 0) != 0:
+                                while true:
+                                    __pc = 57
+                                    __goto_pending = 1
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if not (0 != 0):
+                                        break
+                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                break
                             F__goto_706_12.eptr = F__goto_706_12.eptr - number__goto_729_10
                             if (if __goto_pending != 0: 1 else: 0) != 0:
                                 break
@@ -17674,6 +18395,12 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                             (branch_start__goto_717_12 = bracode__goto_718_12)
                             (branch_end__goto_716_12 = (null as *const u8))
                             if (if (if (unsafe: *bracode__goto_718_12) != OP_BRA: 1 else: 0) != 0 and (if (unsafe: *bracode__goto_718_12) != OP_COND: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (N__goto_707_12 = ((((match_data.heapframes as *mut i8) + F__goto_706_12.last_group_offset)) as *mut heapframe))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                (P__goto_708_12 = ((((N__goto_707_12 as *mut i8) - frame_size)) as *mut heapframe))
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                                 (F__goto_706_12.last_group_offset = P__goto_708_12.last_group_offset)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
@@ -17719,6 +18446,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     if (if (if F__goto_706_12.current_recurse != 0: 1 else: 0) != 0 or (if F__goto_706_12.ecode[(1 + 2)] != OP_END: 1 else: 0) != 0: 1 else: 0) != 0:
                                         break
                                     (offset__goto_719_12 = F__goto_706_12.last_group_offset)
+                                    if (if offset__goto_719_12 == ((0 -% 1)): 1 else: 0) != 0:
+                                        return (-44)
+                                    (N__goto_707_12 = ((((match_data.heapframes as *mut i8) + offset__goto_719_12)) as *mut heapframe))
+                                    (P__goto_708_12 = ((((N__goto_707_12 as *mut i8) - frame_size)) as *mut heapframe))
                                     (F__goto_706_12.last_group_offset = P__goto_708_12.last_group_offset)
                                     (F__goto_706_12.ecode = ((P__goto_708_12.ecode + (1 as isize as usize)) + (2 as isize as usize)))
                                     if (if (unsafe: *F__goto_706_12.ecode) != OP_CREF: 1 else: 0) != 0:
@@ -17952,6 +18683,9 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                                 break
                                 OP_CBRA =>
                                     if (if F__goto_706_12.current_recurse == number__goto_729_10: 1 else: 0) != 0:
+                                        (P__goto_708_12 = ((((N__goto_707_12 as *mut i8) - frame_size)) as *mut heapframe))
+                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            break
                                         (F__goto_706_12.ecode = ((P__goto_708_12.ecode + (1 as isize as usize)) + (2 as isize as usize)))
                                         if (if __goto_pending != 0: 1 else: 0) != 0:
                                             break
@@ -18106,6 +18840,10 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 (mb.hitend = 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
+                                if (if mb.partial > 1: 1 else: 0) != 0:
+                                    return (-2)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             (F__goto_706_12.ecode = F__goto_706_12.ecode + 1)
                         OP_EOD =>
                             if (if F__goto_706_12.eptr < mb.true_end_subject: 1 else: 0) != 0:
@@ -18122,10 +18860,18 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 (mb.hitend = 1)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
+                                if (if mb.partial > 1: 1 else: 0) != 0:
+                                    return (-2)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
                             (F__goto_706_12.ecode = F__goto_706_12.ecode + 1)
                         OP_EODN =>
                             if (if mb.partial != 0: 1 else: 0) != 0:
                                 (mb.hitend = 1)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                if (if mb.partial > 1: 1 else: 0) != 0:
+                                    return (-2)
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             (F__goto_706_12.ecode = F__goto_706_12.ecode + 1)
@@ -18201,6 +18947,21 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                 if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                                 if not (0 != 0):
+                                    break
+                            if (if (if rrc__goto_722_5 == (-994): 1 else: 0) != 0 and (if _pcre2_strcmp_8((F__goto_706_12.ecode + (2 as isize as usize)), mb.verb_skip_ptr) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                                (mb.verb_skip_ptr = F__goto_706_12.eptr)
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    break
+                                while true:
+                                    __pc = 57
+                                    __goto_pending = 1
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        break
+                                    if not (0 != 0):
+                                        break
+                                if (if __goto_pending != 0: 1 else: 0) != 0:
                                     break
                             while true:
                                 __pc = 57
@@ -18494,6 +19255,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                                 if not (0 != 0):
                                     break
+                            return (-44)
                         OP_FAIL =>
                             while true:
                                 __pc = 57
@@ -18778,6 +19540,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                                 if not (0 != 0):
                                     break
+                            return (-44)
                         OP_COMMIT =>
                             while true:
                                 __pc = 1
@@ -19053,6 +19816,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                                 if not (0 != 0):
                                     break
+                            return (-44)
                         OP_COMMIT_ARG =>
                             (mb.nomatch_mark = (F__goto_706_12.ecode + (2 as isize as usize)))
                             (F__goto_706_12.mark = mb.nomatch_mark)
@@ -19296,6 +20060,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                                 if not (0 != 0):
                                     break
+                            return (-44)
                         OP_PRUNE =>
                             while true:
                                 __pc = 1
@@ -19505,6 +20270,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                                 if not (0 != 0):
                                     break
+                            return (-44)
                         OP_PRUNE_ARG =>
                             (mb.nomatch_mark = (F__goto_706_12.ecode + (2 as isize as usize)))
                             (F__goto_706_12.mark = mb.nomatch_mark)
@@ -19682,6 +20448,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                                 if not (0 != 0):
                                     break
+                            return (-44)
                         OP_SKIP =>
                             while true:
                                 __pc = 1
@@ -19825,6 +20592,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                                 if not (0 != 0):
                                     break
+                            return (-44)
                         OP_SKIP_ARG =>
                             (mb.skip_arg_count = mb.skip_arg_count + 1)
                             if (if mb.skip_arg_count <= mb.ignore_skip_arg: 1 else: 0) != 0:
@@ -19935,6 +20703,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                                 if not (0 != 0):
                                     break
+                            return (-44)
                         OP_THEN =>
                             while true:
                                 __pc = 1
@@ -20004,6 +20773,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                                 if not (0 != 0):
                                     break
+                            return (-44)
                         OP_THEN_ARG =>
                             (mb.nomatch_mark = (F__goto_706_12.ecode + (2 as isize as usize)))
                             (F__goto_706_12.mark = mb.nomatch_mark)
@@ -20040,7 +20810,9 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                                     break
                                 if not (0 != 0):
                                     break
-                        _ => 0
+                            return (-44)
+                        _ =>
+                            return (-44)
                     if (if __goto_pending != 0: 1 else: 0) != 0:
                         break
                     if (if __goto_pending != 0: 1 else: 0) != 0:
@@ -20057,6 +20829,9 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                     continue
                 if (if F__goto_706_12.rdepth == 0: 1 else: 0) != 0:
                     return rrc__goto_722_5
+                if (if __goto_pending != 0: 1 else: 0) != 0:
+                    continue
+                (F__goto_706_12 = ((((F__goto_706_12 as *mut i8) - F__goto_706_12.back_frame)) as *mut heapframe))
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
                 mb.cb.callout_flags = mb.cb.callout_flags | 2
@@ -20142,6 +20917,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     2 =>
                         __pc = 34
                         __goto_pending = 1
@@ -20219,6 +20995,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     3 =>
                         __pc = 36
                         __goto_pending = 1
@@ -20294,6 +21071,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     4 =>
                         __pc = 37
                         __goto_pending = 1
@@ -20367,6 +21145,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     5 =>
                         __pc = 41
                         __goto_pending = 1
@@ -20438,6 +21217,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     6 =>
                         __pc = 45
                         __goto_pending = 1
@@ -20507,6 +21287,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     7 =>
                         __pc = 46
                         __goto_pending = 1
@@ -20574,6 +21355,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     8 =>
                         __pc = 31
                         __goto_pending = 1
@@ -20639,6 +21421,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     9 =>
                         __pc = 26
                         __goto_pending = 1
@@ -20702,6 +21485,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     10 =>
                         __pc = 27
                         __goto_pending = 1
@@ -20763,6 +21547,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     11 =>
                         __pc = 35
                         __goto_pending = 1
@@ -20822,6 +21607,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     12 =>
                         __pc = 48
                         __goto_pending = 1
@@ -20879,6 +21665,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     13 =>
                         __pc = 49
                         __goto_pending = 1
@@ -20934,6 +21721,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     14 =>
                         __pc = 51
                         __goto_pending = 1
@@ -20987,6 +21775,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     15 =>
                         __pc = 52
                         __goto_pending = 1
@@ -21038,6 +21827,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     16 =>
                         __pc = 53
                         __goto_pending = 1
@@ -21087,6 +21877,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     17 =>
                         __pc = 54
                         __goto_pending = 1
@@ -21134,6 +21925,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     18 =>
                         __pc = 55
                         __goto_pending = 1
@@ -21179,6 +21971,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     19 =>
                         __pc = 56
                         __goto_pending = 1
@@ -21222,6 +22015,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     20 =>
                         __pc = 23
                         __goto_pending = 1
@@ -21263,6 +22057,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     21 =>
                         __pc = 24
                         __goto_pending = 1
@@ -21302,6 +22097,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     22 =>
                         __pc = 25
                         __goto_pending = 1
@@ -21339,6 +22135,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     23 =>
                         __pc = 13
                         __goto_pending = 1
@@ -21374,6 +22171,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     24 =>
                         __pc = 14
                         __goto_pending = 1
@@ -21407,6 +22205,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     25 =>
                         __pc = 4
                         __goto_pending = 1
@@ -21438,6 +22237,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     26 =>
                         __pc = 5
                         __goto_pending = 1
@@ -21467,6 +22267,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     27 =>
                         __pc = 6
                         __goto_pending = 1
@@ -21494,6 +22295,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     28 =>
                         __pc = 7
                         __goto_pending = 1
@@ -21519,6 +22321,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     29 =>
                         __pc = 9
                         __goto_pending = 1
@@ -21542,6 +22345,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     30 =>
                         __pc = 10
                         __goto_pending = 1
@@ -21563,6 +22367,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     31 =>
                         __pc = 11
                         __goto_pending = 1
@@ -21582,6 +22387,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     32 =>
                         __pc = 12
                         __goto_pending = 1
@@ -21599,6 +22405,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     33 =>
                         __pc = 16
                         __goto_pending = 1
@@ -21614,6 +22421,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     34 =>
                         __pc = 21
                         __goto_pending = 1
@@ -21627,6 +22435,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     35 =>
                         __pc = 42
                         __goto_pending = 1
@@ -21638,6 +22447,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     36 =>
                         __pc = 50
                         __goto_pending = 1
@@ -21647,6 +22457,7 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     37 =>
                         __pc = 43
                         __goto_pending = 1
@@ -21654,16 +22465,360 @@ fn match_(start_eptr: *const u8, start_ecode: *const u8, top_bracket: c_ushort, 
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     38 =>
                         __pc = 40
                         __goto_pending = 1
                         __pc = 44
                         __goto_pending = 1
+                        return (-44)
                     39 =>
                         __pc = 44
                         __goto_pending = 1
-                    _ => 0
+                        return (-44)
+                    _ =>
+                        return (-44)
                 if (if __goto_pending != 0: 1 else: 0) != 0:
                     continue
             _ => break
 
+// untranslatable fn-like macro
+fn BYTES2CU() -> Never:
+    comptime_error("untranslatable C macro: BYTES2CU")
+// untranslatable fn-like macro
+fn CAST_USER_ADDR_T() -> Never:
+    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
+// untranslatable fn-like macro
+fn CHECK_PARTIAL() -> Never:
+    comptime_error("untranslatable C macro: CHECK_PARTIAL")
+// untranslatable fn-like macro
+fn CHMAX_255() -> Never:
+    comptime_error("untranslatable C macro: CHMAX_255")
+// untranslatable fn-like macro
+fn CU2BYTES() -> Never:
+    comptime_error("untranslatable C macro: CU2BYTES")
+// untranslatable fn-like macro
+fn GET() -> Never:
+    comptime_error("untranslatable C macro: GET")
+// untranslatable fn-like macro
+fn GET2() -> Never:
+    comptime_error("untranslatable C macro: GET2")
+// untranslatable fn-like macro
+fn GETCHAR() -> Never:
+    comptime_error("untranslatable C macro: GETCHAR")
+// untranslatable fn-like macro
+fn GETCHARINC() -> Never:
+    comptime_error("untranslatable C macro: GETCHARINC")
+// untranslatable fn-like macro
+fn GETCHARINCTEST() -> Never:
+    comptime_error("untranslatable C macro: GETCHARINCTEST")
+// untranslatable fn-like macro
+fn GETCHARLEN() -> Never:
+    comptime_error("untranslatable C macro: GETCHARLEN")
+// untranslatable fn-like macro
+fn GETCHARTEST() -> Never:
+    comptime_error("untranslatable C macro: GETCHARTEST")
+// untranslatable fn-like macro
+fn GETUTF8() -> Never:
+    comptime_error("untranslatable C macro: GETUTF8")
+// untranslatable fn-like macro
+fn GETUTF8INC() -> Never:
+    comptime_error("untranslatable C macro: GETUTF8INC")
+// untranslatable fn-like macro
+fn GETUTF8LEN() -> Never:
+    comptime_error("untranslatable C macro: GETUTF8LEN")
+// untranslatable fn-like macro
+fn GET_UCD() -> Never:
+    comptime_error("untranslatable C macro: GET_UCD")
+let GF_CAPTURE: c_uint = 0x00010000
+let GF_CONDASSERT: c_uint = 0x00030000
+fn GF_DATAMASK[T](a: T) -> T:
+    (a & 0x0000ffff)
+fn GF_IDMASK[T](a: T) -> T:
+    (a & 0xffff0000)
+let GF_NOCAPTURE: c_uint = 0x00020000
+let GF_RECURSE: c_uint = 0x00040000
+fn HASUTF8EXTRALEN[T](c: T) -> T:
+    (c >= 0xc0)
+// untranslatable fn-like macro
+fn HTONL() -> Never:
+    comptime_error("untranslatable C macro: HTONL")
+// untranslatable fn-like macro
+fn HTONLL() -> Never:
+    comptime_error("untranslatable C macro: HTONLL")
+// untranslatable fn-like macro
+fn HTONS() -> Never:
+    comptime_error("untranslatable C macro: HTONS")
+fn INT16_C[T](v: T) -> T:
+    v
+fn INT32_C[T](v: T) -> T:
+    v
+fn INT64_C[T](v: T) -> i64:
+    (v as i64)
+fn INT8_C[T](v: T) -> T:
+    v
+fn INTMAX_C[T](v: T) -> i64:
+    (v as i64)
+// untranslatable fn-like macro
+fn IS_NEWLINE() -> Never:
+    comptime_error("untranslatable C macro: IS_NEWLINE")
+// untranslatable fn-like macro
+fn MAPBIT() -> Never:
+    comptime_error("untranslatable C macro: MAPBIT")
+// untranslatable fn-like macro
+fn MAPSET() -> Never:
+    comptime_error("untranslatable C macro: MAPSET")
+let MATCH_ACCEPT: c_int = -999
+let MATCH_COMMIT: c_int = -997
+let MATCH_KETRPOS: c_int = -998
+let MATCH_MATCH: c_int = 1
+let MATCH_NOMATCH: c_int = 0
+let MATCH_PRUNE: c_int = -996
+let MATCH_SKIP: c_int = -995
+let MATCH_SKIP_ARG: c_int = -994
+let MATCH_THEN: c_int = -993
+// untranslatable fn-like macro
+fn MAX_255() -> Never:
+    comptime_error("untranslatable C macro: MAX_255")
+// untranslatable fn-like macro
+fn NTOHL() -> Never:
+    comptime_error("untranslatable C macro: NTOHL")
+// untranslatable fn-like macro
+fn NTOHLL() -> Never:
+    comptime_error("untranslatable C macro: NTOHLL")
+// untranslatable fn-like macro
+fn NTOHS() -> Never:
+    comptime_error("untranslatable C macro: NTOHS")
+// untranslatable fn-like macro
+fn PCRE2_ASSERT() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_ASSERT")
+// untranslatable fn-like macro
+fn PCRE2_DEBUG_UNREACHABLE() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
+// untranslatable fn-like macro
+fn PCRE2_GLUE() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_GLUE")
+// untranslatable fn-like macro
+fn PCRE2_JOIN() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_JOIN")
+fn PCRE2_SUFFIX[T](a: T) -> T:
+    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
+// untranslatable fn-like macro
+fn PCRE2_UNREACHABLE() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
+// untranslatable fn-like macro
+fn PRIV() -> Never:
+    comptime_error("untranslatable C macro: PRIV")
+let PUBLIC_JIT_MATCH_OPTIONS: c_int = 1073758271
+let PUBLIC_MATCH_OPTIONS: c_int = 1610899519
+// untranslatable fn-like macro
+fn PUT() -> Never:
+    comptime_error("untranslatable C macro: PUT")
+// untranslatable fn-like macro
+fn PUT2() -> Never:
+    comptime_error("untranslatable C macro: PUT2")
+// untranslatable fn-like macro
+fn PUT2INC() -> Never:
+    comptime_error("untranslatable C macro: PUT2INC")
+// untranslatable fn-like macro
+fn PUTCHAR() -> Never:
+    comptime_error("untranslatable C macro: PUTCHAR")
+// untranslatable fn-like macro
+fn PUTINC() -> Never:
+    comptime_error("untranslatable C macro: PUTINC")
+// untranslatable fn-like macro
+fn REAL_GET_UCD() -> Never:
+    comptime_error("untranslatable C macro: REAL_GET_UCD")
+let RECURSE_UNSET: c_uint = 0xffffffff
+// untranslatable fn-like macro
+fn RMATCH() -> Never:
+    comptime_error("untranslatable C macro: RMATCH")
+// untranslatable fn-like macro
+fn RRETURN() -> Never:
+    comptime_error("untranslatable C macro: RRETURN")
+// untranslatable fn-like macro
+fn SCHECK_PARTIAL() -> Never:
+    comptime_error("untranslatable C macro: SCHECK_PARTIAL")
+// untranslatable fn-like macro
+fn STATIC_ASSERT() -> Never:
+    comptime_error("untranslatable C macro: STATIC_ASSERT")
+// untranslatable fn-like macro
+fn STATIC_ASSERT_JOIN() -> Never:
+    comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
+// untranslatable fn-like macro
+fn TABLE_GET() -> Never:
+    comptime_error("untranslatable C macro: TABLE_GET")
+// untranslatable fn-like macro
+fn UCD_ANY_I() -> Never:
+    comptime_error("untranslatable C macro: UCD_ANY_I")
+// untranslatable fn-like macro
+fn UCD_BIDICLASS() -> Never:
+    comptime_error("untranslatable C macro: UCD_BIDICLASS")
+// untranslatable fn-like macro
+fn UCD_BIDICLASS_PROP() -> Never:
+    comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
+// untranslatable fn-like macro
+fn UCD_BPROPS() -> Never:
+    comptime_error("untranslatable C macro: UCD_BPROPS")
+// untranslatable fn-like macro
+fn UCD_BPROPS_PROP() -> Never:
+    comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
+// untranslatable fn-like macro
+fn UCD_CASESET() -> Never:
+    comptime_error("untranslatable C macro: UCD_CASESET")
+// untranslatable fn-like macro
+fn UCD_CATEGORY() -> Never:
+    comptime_error("untranslatable C macro: UCD_CATEGORY")
+// untranslatable fn-like macro
+fn UCD_CHARTYPE() -> Never:
+    comptime_error("untranslatable C macro: UCD_CHARTYPE")
+fn UCD_DOTTED_I[T](ch: T) -> T:
+    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
+fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
+    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
+// untranslatable fn-like macro
+fn UCD_GRAPHBREAK() -> Never:
+    comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
+// untranslatable fn-like macro
+fn UCD_OTHERCASE() -> Never:
+    comptime_error("untranslatable C macro: UCD_OTHERCASE")
+// untranslatable fn-like macro
+fn UCD_SCRIPT() -> Never:
+    comptime_error("untranslatable C macro: UCD_SCRIPT")
+// untranslatable fn-like macro
+fn UCD_SCRIPTX() -> Never:
+    comptime_error("untranslatable C macro: UCD_SCRIPTX")
+// untranslatable fn-like macro
+fn UCD_SCRIPTX_PROP() -> Never:
+    comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
+fn UINT16_C[T](v: T) -> T:
+    v
+fn UINT32_C[T](v: T) -> u32:
+    (v as u32)
+fn UINT64_C[T](v: T) -> u64:
+    (v as u64)
+fn UINT8_C[T](v: T) -> T:
+    v
+fn UINTMAX_C[T](v: T) -> u64:
+    (v as u64)
+// untranslatable fn-like macro
+fn WAS_NEWLINE() -> Never:
+    comptime_error("untranslatable C macro: WAS_NEWLINE")
+// untranslatable fn-like macro
+fn WCOREDUMP() -> Never:
+    comptime_error("untranslatable C macro: WCOREDUMP")
+// untranslatable fn-like macro
+fn WEXITSTATUS() -> Never:
+    comptime_error("untranslatable C macro: WEXITSTATUS")
+// untranslatable fn-like macro
+fn WIFCONTINUED() -> Never:
+    comptime_error("untranslatable C macro: WIFCONTINUED")
+// untranslatable fn-like macro
+fn WIFEXITED() -> Never:
+    comptime_error("untranslatable C macro: WIFEXITED")
+// untranslatable fn-like macro
+fn WIFSIGNALED() -> Never:
+    comptime_error("untranslatable C macro: WIFSIGNALED")
+// untranslatable fn-like macro
+fn WIFSTOPPED() -> Never:
+    comptime_error("untranslatable C macro: WIFSTOPPED")
+// untranslatable fn-like macro
+fn WSTOPSIG() -> Never:
+    comptime_error("untranslatable C macro: WSTOPSIG")
+// untranslatable fn-like macro
+fn WTERMSIG() -> Never:
+    comptime_error("untranslatable C macro: WTERMSIG")
+fn W_EXITCODE[T](ret: T, sig: T) -> T:
+    ((ret << 8) | sig)
+// untranslatable fn-like macro
+fn W_STOPCODE() -> Never:
+    comptime_error("untranslatable C macro: W_STOPCODE")
+// untranslatable fn-like macro
+fn alloca() -> Never:
+    comptime_error("untranslatable C macro: alloca")
+// untranslatable fn-like macro
+fn clearerr_unlocked() -> Never:
+    comptime_error("untranslatable C macro: clearerr_unlocked")
+// untranslatable fn-like macro
+fn feof_unlocked() -> Never:
+    comptime_error("untranslatable C macro: feof_unlocked")
+// untranslatable fn-like macro
+fn ferror_unlocked() -> Never:
+    comptime_error("untranslatable C macro: ferror_unlocked")
+// untranslatable fn-like macro
+fn fileno_unlocked() -> Never:
+    comptime_error("untranslatable C macro: fileno_unlocked")
+// untranslatable fn-like macro
+fn fropen() -> Never:
+    comptime_error("untranslatable C macro: fropen")
+// untranslatable fn-like macro
+fn fwopen() -> Never:
+    comptime_error("untranslatable C macro: fwopen")
+// untranslatable fn-like macro
+fn getc_unlocked() -> Never:
+    comptime_error("untranslatable C macro: getc_unlocked")
+// untranslatable fn-like macro
+fn getchar_unlocked() -> Never:
+    comptime_error("untranslatable C macro: getchar_unlocked")
+// untranslatable fn-like macro
+fn htonl() -> Never:
+    comptime_error("untranslatable C macro: htonl")
+// untranslatable fn-like macro
+fn htonll() -> Never:
+    comptime_error("untranslatable C macro: htonll")
+// untranslatable fn-like macro
+fn htons() -> Never:
+    comptime_error("untranslatable C macro: htons")
+fn memccpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn memcpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn memmove() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn memset() -> Never:
+    comptime_error("variadic macro — use direct call")
+// untranslatable fn-like macro
+fn ntohl() -> Never:
+    comptime_error("untranslatable C macro: ntohl")
+// untranslatable fn-like macro
+fn ntohll() -> Never:
+    comptime_error("untranslatable C macro: ntohll")
+// untranslatable fn-like macro
+fn ntohs() -> Never:
+    comptime_error("untranslatable C macro: ntohs")
+// untranslatable fn-like macro
+fn offsetof() -> Never:
+    comptime_error("untranslatable C macro: offsetof")
+// untranslatable fn-like macro
+fn putc_unlocked() -> Never:
+    comptime_error("untranslatable C macro: putc_unlocked")
+// untranslatable fn-like macro
+fn putchar_unlocked() -> Never:
+    comptime_error("untranslatable C macro: putchar_unlocked")
+// untranslatable fn-like macro
+fn sigmask() -> Never:
+    comptime_error("untranslatable C macro: sigmask")
+fn snprintf() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn sprintf() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn stpcpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn stpncpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strcat() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strcpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strlcat() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strlcpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strncat() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strncpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn vsnprintf() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn vsprintf() -> Never:
+    comptime_error("variadic macro — use direct call")
