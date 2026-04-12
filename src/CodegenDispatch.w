@@ -582,6 +582,10 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
             // pd is a local_id holding the index value
             let idx_ptr_opt = self.mir_local_ptrs.get(pd)
             var idx_val: i64 = wl_const_int(wl_i64_type(self.context), 0, 0)
+            // Track the index's sema type so we can pick zext vs sext when widening.
+            // Default to a signed type so that without info we behave like the
+            // old code (i32, sign-extending).
+            var idx_sema_ty: i32 = body.local_type_ids.get(pd as i64)
             if idx_ptr_opt.is_some():
                 let idx_ty_opt = self.mir_local_types.get(pd)
                 var idx_ty = wl_i32_type(self.context)
@@ -592,6 +596,18 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 with_eprint("error: code generation failed: index operand is not an integer")
                 self.had_error = 1
                 return 0
+            // LLVM GEP treats integer indices as SIGNED. For unsigned index
+            // types narrower than i64 we must zero-extend explicitly — otherwise
+            // a u8 value of 137 (= 0x89) sign-extends to -119 and the GEP reads
+            // from before the start of the array. (This bit `_pcre2_OP_lengths_8[*code]`
+            // in PCRE2: OP_BRA = 137, was indexing the table at offset -119.)
+            let idx_bits = wl_get_int_type_width(wl_type_of(idx_val))
+            if idx_bits < 64:
+                let i64_ty = wl_i64_type(self.context)
+                if idx_sema_ty != 0 and self.sema.is_unsigned_int_type(idx_sema_ty):
+                    idx_val = wl_build_zext(self.builder, idx_val, i64_ty)
+                else:
+                    idx_val = wl_build_sext(self.builder, idx_val, i64_ty)
             let elem_llvm = self.mir_index_elem_llvm_type(cur_sema_ty, cur_ty)
             let elem_sema = self.mir_index_elem_sema_type(cur_sema_ty)
             if elem_sema > 0:

@@ -78,19 +78,19 @@ fn pcre2_substring_copy_byname_8(match_data: *mut pcre2_real_match_data_8, strin
     var entry: *const u8
     var failrc: c_int
     var entrysize: c_int
-    if (if match_data.matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0:
+    if (match_data.matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER):
         return (-41)
 
-    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, (&mut first as *mut *const u8), (&mut last as *mut *const u8)))
-    if (if entrysize < 0: 1 else: 0) != 0:
+    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, ((&first as *const *const u8) as *mut *const u8), ((&last as *const *const u8) as *mut *const u8)))
+    if (entrysize < 0):
         return entrysize
 
     (failrc = (-54))
     (entry = first)
-    while (if entry <= last: 1 else: 0) != 0:
-        var n: c_uint
-        if (if n < match_data.oveccount: 1 else: 0) != 0:
-            if (if (&match_data.ovector[0] as *mut c_ulong)[(n *% 2)] != ((0 -% 1)): 1 else: 0) != 0:
+    while (entry <= last):
+        var n: c_uint = ((((((((entry)[0] as c_uint) << 8))) | (entry)[((0) + 1)])) as c_uint)
+        if (n < match_data.oveccount):
+            if ((&match_data.ovector[0] as *mut c_ulong)[(n *% 2)] != ((0 - (0 as c_ulong) - 1))):
                 return pcre2_substring_copy_bynumber_8(match_data, n, buffer, sizeptr)
             
             (failrc = (-55))
@@ -102,19 +102,22 @@ fn pcre2_substring_copy_byname_8(match_data: *mut pcre2_real_match_data_8, strin
 fn pcre2_substring_copy_bynumber_8(match_data: *mut pcre2_real_match_data_8, stringnumber: c_uint, buffer: *mut u8, sizeptr: *mut c_ulong) -> c_int:
     var rc: c_int
     var size: c_ulong
-    (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, (&mut size as *mut c_ulong)))
-    if (if rc < 0: 1 else: 0) != 0:
+    (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, ((&size as *const c_ulong) as *mut c_ulong)))
+    if (rc < 0):
         return rc
 
-    if (if (size +% 1) > (unsafe: *sizeptr): 1 else: 0) != 0:
+    if ((size +% 1) > (unsafe: *sizeptr)):
         return (-48)
+
+    if (size != 0):
+        with_memcpy((buffer as *mut c_void) as *i8, ((match_data.subject + (&match_data.ovector[0] as *mut c_ulong)[(stringnumber *% 2)]) as *const c_void) as *i8, (((size) *% 1)) as i64)
 
     (buffer[size] = 0)
     ((unsafe: *sizeptr) = size)
     return 0
 
 fn pcre2_substring_free_8(string: *mut u8):
-    if (if string != (null as *mut u8): 1 else: 0) != 0:
+    if (string != (null as *mut u8)):
         var memctl: *mut pcre2_memctl = ((((string as *mut i8) - sizeof[pcre2_memctl]())) as *mut pcre2_memctl)
         memctl.free((memctl as *mut c_void), memctl.memory_data)
 
@@ -125,19 +128,19 @@ fn pcre2_substring_get_byname_8(match_data: *mut pcre2_real_match_data_8, string
     var entry: *const u8
     var failrc: c_int
     var entrysize: c_int
-    if (if match_data.matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0:
+    if (match_data.matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER):
         return (-41)
 
-    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, (&mut first as *mut *const u8), (&mut last as *mut *const u8)))
-    if (if entrysize < 0: 1 else: 0) != 0:
+    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, ((&first as *const *const u8) as *mut *const u8), ((&last as *const *const u8) as *mut *const u8)))
+    if (entrysize < 0):
         return entrysize
 
     (failrc = (-54))
     (entry = first)
-    while (if entry <= last: 1 else: 0) != 0:
-        var n: c_uint
-        if (if n < match_data.oveccount: 1 else: 0) != 0:
-            if (if (&match_data.ovector[0] as *mut c_ulong)[(n *% 2)] != ((0 -% 1)): 1 else: 0) != 0:
+    while (entry <= last):
+        var n: c_uint = ((((((((entry)[0] as c_uint) << 8))) | (entry)[((0) + 1)])) as c_uint)
+        if (n < match_data.oveccount):
+            if ((&match_data.ovector[0] as *mut c_ulong)[(n *% 2)] != ((0 - (0 as c_ulong) - 1))):
                 return pcre2_substring_get_bynumber_8(match_data, n, stringptr, sizeptr)
             
             (failrc = (-55))
@@ -150,15 +153,18 @@ fn pcre2_substring_get_bynumber_8(match_data: *mut pcre2_real_match_data_8, stri
     var rc: c_int
     var size: c_ulong
     var yield_: *mut u8
-    (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, (&mut size as *mut c_ulong)))
-    if (if rc < 0: 1 else: 0) != 0:
+    (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, ((&size as *const c_ulong) as *mut c_ulong)))
+    if (rc < 0):
         return rc
 
     (yield_ = (_pcre2_memctl_malloc_8((sizeof[pcre2_memctl]() +% (((size +% 1)) *% 8)), (match_data as *mut pcre2_memctl)) as *mut u8))
-    if (if yield_ == (null as *mut u8): 1 else: 0) != 0:
+    if (yield_ == (null as *mut u8)):
         return (-48)
 
     (yield_ = (((((yield_ as *mut i8)) + sizeof[pcre2_memctl]())) as *mut u8))
+    if (size != 0):
+        with_memcpy((yield_ as *mut c_void) as *i8, ((match_data.subject + (&match_data.ovector[0] as *mut c_ulong)[(stringnumber *% 2)]) as *const c_void) as *i8, (((size) *% 1)) as i64)
+
     (yield_[size] = 0)
     ((unsafe: *stringptr) = yield_)
     ((unsafe: *sizeptr) = size)
@@ -170,19 +176,19 @@ fn pcre2_substring_length_byname_8(match_data: *mut pcre2_real_match_data_8, str
     var entry: *const u8
     var failrc: c_int
     var entrysize: c_int
-    if (if match_data.matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0:
+    if (match_data.matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER):
         return (-41)
 
-    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, (&mut first as *mut *const u8), (&mut last as *mut *const u8)))
-    if (if entrysize < 0: 1 else: 0) != 0:
+    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, ((&first as *const *const u8) as *mut *const u8), ((&last as *const *const u8) as *mut *const u8)))
+    if (entrysize < 0):
         return entrysize
 
     (failrc = (-54))
     (entry = first)
-    while (if entry <= last: 1 else: 0) != 0:
-        var n: c_uint
-        if (if n < match_data.oveccount: 1 else: 0) != 0:
-            if (if (&match_data.ovector[0] as *mut c_ulong)[(n *% 2)] != ((0 -% 1)): 1 else: 0) != 0:
+    while (entry <= last):
+        var n: c_uint = ((((((((entry)[0] as c_uint) << 8))) | (entry)[((0) + 1)])) as c_uint)
+        if (n < match_data.oveccount):
+            if ((&match_data.ovector[0] as *mut c_ulong)[(n *% 2)] != ((0 - (0 as c_ulong) - 1))):
                 return pcre2_substring_length_bynumber_8(match_data, n, sizeptr)
             
             (failrc = (-55))
@@ -195,40 +201,40 @@ fn pcre2_substring_length_bynumber_8(match_data: *mut pcre2_real_match_data_8, s
     var left: c_ulong
     var right: c_ulong
     var count: c_int = match_data.rc
-    if (if count == (-2): 1 else: 0) != 0:
-        if (if stringnumber > 0: 1 else: 0) != 0:
+    if (count == (-2)):
+        if (stringnumber > 0):
             return (-2)
         
         (count = 0)
     else:
-        if (if count < 0: 1 else: 0) != 0:
+        if (count < 0):
             return count
 
-    if (if match_data.matchedby != PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0:
-        if (if stringnumber > match_data.code.top_bracket: 1 else: 0) != 0:
+    if (match_data.matchedby != PCRE2_MATCHEDBY_DFA_INTERPRETER):
+        if (stringnumber > match_data.code.top_bracket):
             return (-49)
         
-        if (if stringnumber >= match_data.oveccount: 1 else: 0) != 0:
+        if (stringnumber >= match_data.oveccount):
             return (-54)
         
-        if (if (&match_data.ovector[0] as *mut c_ulong)[(stringnumber *% 2)] == ((0 -% 1)): 1 else: 0) != 0:
+        if ((&match_data.ovector[0] as *mut c_ulong)[(stringnumber *% 2)] == ((0 - (0 as c_ulong) - 1))):
             return (-55)
         
     else:
-        if (if stringnumber >= match_data.oveccount: 1 else: 0) != 0:
+        if (stringnumber >= match_data.oveccount):
             return (-54)
         
-        if (if (if count != 0: 1 else: 0) != 0 and (if stringnumber >= (count as c_uint): 1 else: 0) != 0: 1 else: 0) != 0:
+        if ((count != 0) and (stringnumber >= (count as c_uint))):
             return (-55)
         
 
     (left = (&match_data.ovector[0] as *mut c_ulong)[(stringnumber *% 2)])
     (right = (&match_data.ovector[0] as *mut c_ulong)[((stringnumber *% 2) +% 1)])
-    if (if (if left > match_data.subject_length: 1 else: 0) != 0 or (if right > match_data.subject_length: 1 else: 0) != 0: 1 else: 0) != 0:
+    if ((left > match_data.subject_length) or (right > match_data.subject_length)):
         return (-67)
 
-    if (if sizeptr != (null as *mut c_ulong): 1 else: 0) != 0:
-        ((unsafe: *sizeptr) = (if ((if left > right: 1 else: 0)) != 0: 0 else: (right -% left)))
+    if (sizeptr != (null as *mut c_ulong)):
+        ((unsafe: *sizeptr) = (if (left > right): 0 else: (right -% left)))
 
     return 0
 
@@ -237,34 +243,37 @@ fn pcre2_substring_nametable_scan_8(code: *const pcre2_real_code_8, stringname: 
     var top: c_ushort = code.name_count
     var entrysize: c_ushort = code.name_entry_size
     var nametable: *const u8 = ((((code as *const i8) + sizeof[pcre2_real_code_8]())) as *const u8)
-    while (if top > bot: 1 else: 0) != 0:
+    while (top > bot):
         var mid: c_ushort = (((top + bot)) / 2)
         var entry: *const u8 = (nametable + ((entrysize * mid) as isize as usize))
         var c: c_int = _pcre2_strcmp_8(stringname, (entry + (2 as isize as usize)))
-        if (if c == 0: 1 else: 0) != 0:
+        if (c == 0):
             var first: *const u8
             var last: *const u8
             var lastentry: *const u8
             (lastentry = (nametable + ((entrysize * ((code.name_count - 1))) as isize as usize)))
             (last = entry)
             (first = last)
-            while (if first > nametable: 1 else: 0) != 0:
-                if (if _pcre2_strcmp_8(stringname, (((first - (entrysize as isize as usize)) + (2 as isize as usize)))) != 0: 1 else: 0) != 0:
+            while (first > nametable):
+                if (_pcre2_strcmp_8(stringname, (((first - (entrysize as isize as usize)) + (2 as isize as usize)))) != 0):
                     break
                 
                 first = first - entrysize
             
-            while (if last < lastentry: 1 else: 0) != 0:
-                if (if _pcre2_strcmp_8(stringname, (((last + (entrysize as isize as usize)) + (2 as isize as usize)))) != 0: 1 else: 0) != 0:
+            while (last < lastentry):
+                if (_pcre2_strcmp_8(stringname, (((last + (entrysize as isize as usize)) + (2 as isize as usize)))) != 0):
                     break
                 
                 last = last + entrysize
+            
+            if (firstptr == (null as *mut *const u8)):
+                return (if (first == last): (((((((((entry)[0] as c_uint) << 8))) | (entry)[((0) + 1)])) as c_uint) as c_int) else: (-50))
             
             ((unsafe: *firstptr) = first)
             ((unsafe: *lastptr) = last)
             return entrysize
         
-        if (if c > 0: 1 else: 0) != 0:
+        if (c > 0):
             (bot = (mid + 1))
         else:
             (top = mid)
@@ -276,7 +285,7 @@ fn pcre2_substring_number_from_name_8(code: *const pcre2_real_code_8, stringname
     return pcre2_substring_nametable_scan_8(code, stringname, (null as *mut *const u8), (null as *mut *const u8))
 
 fn pcre2_substring_list_free_8(list: *mut *mut u8):
-    if (if list != (null as *mut *mut u8): 1 else: 0) != 0:
+    if (list != (null as *mut *mut u8)):
         var memctl: *mut pcre2_memctl = ((((list as *mut i8) - sizeof[pcre2_memctl]())) as *mut pcre2_memctl)
         memctl.free((memctl as *mut c_void), memctl.memory_data)
 
@@ -291,31 +300,34 @@ fn pcre2_substring_list_get_8(match_data: *mut pcre2_real_match_data_8, listptr:
     var listp: *mut *mut u8
     var sp: *mut u8
     var ovector: *mut c_ulong
-    if (if ((count = match_data.rc)) < 0: 1 else: 0) != 0:
+    if (((count = match_data.rc)) < 0):
         return count
 
-    if (if count == 0: 1 else: 0) != 0:
+    if (count == 0):
         (count = match_data.oveccount)
 
     (count2 = (2 * count))
     (ovector = (&match_data.ovector[0] as *mut c_ulong))
     (size = (sizeof[pcre2_memctl]() +% sizeof[u8]()))
-    if (if lengthsptr != (null as *mut *mut c_ulong): 1 else: 0) != 0:
+    if (lengthsptr != (null as *mut *mut c_ulong)):
         size = size + (sizeof[c_ulong]() *% count)
 
     (i = 0)
-    while (if i < count2: 1 else: 0) != 0:
+    while (i < count2):
         size = size + (sizeof[u8]() +% 1)
+        if (ovector[(i + 1)] > ovector[i]):
+            size = size + ((((ovector[(i + 1)] -% ovector[i])) *% 1))
+        
         i = i + 2
 
     (memp = (_pcre2_memctl_malloc_8(size, (match_data as *mut pcre2_memctl)) as *mut pcre2_memctl))
-    if (if memp == (null as *mut pcre2_memctl): 1 else: 0) != 0:
+    if (memp == (null as *mut pcre2_memctl)):
         return (-48)
 
     (listp = ((((memp as *mut i8) + sizeof[pcre2_memctl]())) as *mut *mut u8))
     ((unsafe: *listptr) = listp)
     (lensp = ((((listp as *mut i8) + (sizeof[u8]() *% ((count + 1))))) as *mut c_ulong))
-    if (if lengthsptr == (null as *mut *mut c_ulong): 1 else: 0) != 0:
+    if (lengthsptr == (null as *mut *mut c_ulong)):
         (sp = (lensp as *mut u8))
         (lensp = (null as *mut c_ulong))
     else:
@@ -323,11 +335,14 @@ fn pcre2_substring_list_get_8(match_data: *mut pcre2_real_match_data_8, listptr:
         (sp = ((((lensp as *mut i8) + (sizeof[c_ulong]() *% count))) as *mut u8))
 
     (i = 0)
-    while (if i < count2: 1 else: 0) != 0:
-        (size = (if ((if ovector[(i + 1)] > ovector[i]: 1 else: 0)) != 0: ((ovector[(i + 1)] -% ovector[i])) else: 0))
+    while (i < count2):
+        (size = (if (ovector[(i + 1)] > ovector[i]): ((ovector[(i + 1)] -% ovector[i])) else: 0))
+        if (size != 0):
+            with_memcpy((sp as *mut c_void) as *i8, ((match_data.subject + ovector[i]) as *const c_void) as *i8, (((size) *% 1)) as i64)
+        
         (unsafe: *listp = sp)
         (listp = listp + 1)
-        if (if lensp != (null as *mut c_ulong): 1 else: 0) != 0:
+        if (lensp != (null as *mut c_ulong)):
             (unsafe: *lensp = size)
             (lensp = lensp + 1)
         
@@ -482,311 +497,3 @@ extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_
 extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
 extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
 extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
-// untranslatable fn-like macro
-fn BYTES2CU() -> Never:
-    comptime_error("untranslatable C macro: BYTES2CU")
-// untranslatable fn-like macro
-fn CAST_USER_ADDR_T() -> Never:
-    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
-// untranslatable fn-like macro
-fn CHMAX_255() -> Never:
-    comptime_error("untranslatable C macro: CHMAX_255")
-// untranslatable fn-like macro
-fn CU2BYTES() -> Never:
-    comptime_error("untranslatable C macro: CU2BYTES")
-// untranslatable fn-like macro
-fn GET() -> Never:
-    comptime_error("untranslatable C macro: GET")
-// untranslatable fn-like macro
-fn GET2() -> Never:
-    comptime_error("untranslatable C macro: GET2")
-// untranslatable fn-like macro
-fn GETCHAR() -> Never:
-    comptime_error("untranslatable C macro: GETCHAR")
-// untranslatable fn-like macro
-fn GETCHARINC() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINC")
-// untranslatable fn-like macro
-fn GETCHARINCTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINCTEST")
-// untranslatable fn-like macro
-fn GETCHARLEN() -> Never:
-    comptime_error("untranslatable C macro: GETCHARLEN")
-// untranslatable fn-like macro
-fn GETCHARTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARTEST")
-// untranslatable fn-like macro
-fn GETUTF8() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8")
-// untranslatable fn-like macro
-fn GETUTF8INC() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8INC")
-// untranslatable fn-like macro
-fn GETUTF8LEN() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8LEN")
-// untranslatable fn-like macro
-fn GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: GET_UCD")
-fn HASUTF8EXTRALEN[T](c: T) -> T:
-    (c >= 0xc0)
-// untranslatable fn-like macro
-fn HTONL() -> Never:
-    comptime_error("untranslatable C macro: HTONL")
-// untranslatable fn-like macro
-fn HTONLL() -> Never:
-    comptime_error("untranslatable C macro: HTONLL")
-// untranslatable fn-like macro
-fn HTONS() -> Never:
-    comptime_error("untranslatable C macro: HTONS")
-fn INT16_C[T](v: T) -> T:
-    v
-fn INT32_C[T](v: T) -> T:
-    v
-fn INT64_C[T](v: T) -> i64:
-    (v as i64)
-fn INT8_C[T](v: T) -> T:
-    v
-fn INTMAX_C[T](v: T) -> i64:
-    (v as i64)
-// untranslatable fn-like macro
-fn IS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: IS_NEWLINE")
-// untranslatable fn-like macro
-fn MAPBIT() -> Never:
-    comptime_error("untranslatable C macro: MAPBIT")
-// untranslatable fn-like macro
-fn MAPSET() -> Never:
-    comptime_error("untranslatable C macro: MAPSET")
-// untranslatable fn-like macro
-fn MAX_255() -> Never:
-    comptime_error("untranslatable C macro: MAX_255")
-// untranslatable fn-like macro
-fn NTOHL() -> Never:
-    comptime_error("untranslatable C macro: NTOHL")
-// untranslatable fn-like macro
-fn NTOHLL() -> Never:
-    comptime_error("untranslatable C macro: NTOHLL")
-// untranslatable fn-like macro
-fn NTOHS() -> Never:
-    comptime_error("untranslatable C macro: NTOHS")
-// untranslatable fn-like macro
-fn PCRE2_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_ASSERT")
-// untranslatable fn-like macro
-fn PCRE2_DEBUG_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
-// untranslatable fn-like macro
-fn PCRE2_GLUE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_GLUE")
-// untranslatable fn-like macro
-fn PCRE2_JOIN() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_JOIN")
-fn PCRE2_SUFFIX[T](a: T) -> T:
-    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
-// untranslatable fn-like macro
-fn PCRE2_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
-// untranslatable fn-like macro
-fn PRIV() -> Never:
-    comptime_error("untranslatable C macro: PRIV")
-// untranslatable fn-like macro
-fn PUT() -> Never:
-    comptime_error("untranslatable C macro: PUT")
-// untranslatable fn-like macro
-fn PUT2() -> Never:
-    comptime_error("untranslatable C macro: PUT2")
-// untranslatable fn-like macro
-fn PUT2INC() -> Never:
-    comptime_error("untranslatable C macro: PUT2INC")
-// untranslatable fn-like macro
-fn PUTCHAR() -> Never:
-    comptime_error("untranslatable C macro: PUTCHAR")
-// untranslatable fn-like macro
-fn PUTINC() -> Never:
-    comptime_error("untranslatable C macro: PUTINC")
-// untranslatable fn-like macro
-fn REAL_GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: REAL_GET_UCD")
-// untranslatable fn-like macro
-fn STATIC_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT")
-// untranslatable fn-like macro
-fn STATIC_ASSERT_JOIN() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
-// untranslatable fn-like macro
-fn TABLE_GET() -> Never:
-    comptime_error("untranslatable C macro: TABLE_GET")
-// untranslatable fn-like macro
-fn UCD_ANY_I() -> Never:
-    comptime_error("untranslatable C macro: UCD_ANY_I")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
-// untranslatable fn-like macro
-fn UCD_BPROPS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS")
-// untranslatable fn-like macro
-fn UCD_BPROPS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
-// untranslatable fn-like macro
-fn UCD_CASESET() -> Never:
-    comptime_error("untranslatable C macro: UCD_CASESET")
-// untranslatable fn-like macro
-fn UCD_CATEGORY() -> Never:
-    comptime_error("untranslatable C macro: UCD_CATEGORY")
-// untranslatable fn-like macro
-fn UCD_CHARTYPE() -> Never:
-    comptime_error("untranslatable C macro: UCD_CHARTYPE")
-fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
-fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
-// untranslatable fn-like macro
-fn UCD_GRAPHBREAK() -> Never:
-    comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
-// untranslatable fn-like macro
-fn UCD_OTHERCASE() -> Never:
-    comptime_error("untranslatable C macro: UCD_OTHERCASE")
-// untranslatable fn-like macro
-fn UCD_SCRIPT() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPT")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
-fn UINT16_C[T](v: T) -> T:
-    v
-fn UINT32_C[T](v: T) -> u32:
-    (v as u32)
-fn UINT64_C[T](v: T) -> u64:
-    (v as u64)
-fn UINT8_C[T](v: T) -> T:
-    v
-fn UINTMAX_C[T](v: T) -> u64:
-    (v as u64)
-// untranslatable fn-like macro
-fn WAS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: WAS_NEWLINE")
-// untranslatable fn-like macro
-fn WCOREDUMP() -> Never:
-    comptime_error("untranslatable C macro: WCOREDUMP")
-// untranslatable fn-like macro
-fn WEXITSTATUS() -> Never:
-    comptime_error("untranslatable C macro: WEXITSTATUS")
-// untranslatable fn-like macro
-fn WIFCONTINUED() -> Never:
-    comptime_error("untranslatable C macro: WIFCONTINUED")
-// untranslatable fn-like macro
-fn WIFEXITED() -> Never:
-    comptime_error("untranslatable C macro: WIFEXITED")
-// untranslatable fn-like macro
-fn WIFSIGNALED() -> Never:
-    comptime_error("untranslatable C macro: WIFSIGNALED")
-// untranslatable fn-like macro
-fn WIFSTOPPED() -> Never:
-    comptime_error("untranslatable C macro: WIFSTOPPED")
-// untranslatable fn-like macro
-fn WSTOPSIG() -> Never:
-    comptime_error("untranslatable C macro: WSTOPSIG")
-// untranslatable fn-like macro
-fn WTERMSIG() -> Never:
-    comptime_error("untranslatable C macro: WTERMSIG")
-fn W_EXITCODE[T](ret: T, sig: T) -> T:
-    ((ret << 8) | sig)
-// untranslatable fn-like macro
-fn W_STOPCODE() -> Never:
-    comptime_error("untranslatable C macro: W_STOPCODE")
-// untranslatable fn-like macro
-fn alloca() -> Never:
-    comptime_error("untranslatable C macro: alloca")
-// untranslatable fn-like macro
-fn clearerr_unlocked() -> Never:
-    comptime_error("untranslatable C macro: clearerr_unlocked")
-// untranslatable fn-like macro
-fn feof_unlocked() -> Never:
-    comptime_error("untranslatable C macro: feof_unlocked")
-// untranslatable fn-like macro
-fn ferror_unlocked() -> Never:
-    comptime_error("untranslatable C macro: ferror_unlocked")
-// untranslatable fn-like macro
-fn fileno_unlocked() -> Never:
-    comptime_error("untranslatable C macro: fileno_unlocked")
-// untranslatable fn-like macro
-fn fropen() -> Never:
-    comptime_error("untranslatable C macro: fropen")
-// untranslatable fn-like macro
-fn fwopen() -> Never:
-    comptime_error("untranslatable C macro: fwopen")
-// untranslatable fn-like macro
-fn getc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getc_unlocked")
-// untranslatable fn-like macro
-fn getchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getchar_unlocked")
-// untranslatable fn-like macro
-fn htonl() -> Never:
-    comptime_error("untranslatable C macro: htonl")
-// untranslatable fn-like macro
-fn htonll() -> Never:
-    comptime_error("untranslatable C macro: htonll")
-// untranslatable fn-like macro
-fn htons() -> Never:
-    comptime_error("untranslatable C macro: htons")
-fn memccpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memmove() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memset() -> Never:
-    comptime_error("variadic macro — use direct call")
-// untranslatable fn-like macro
-fn ntohl() -> Never:
-    comptime_error("untranslatable C macro: ntohl")
-// untranslatable fn-like macro
-fn ntohll() -> Never:
-    comptime_error("untranslatable C macro: ntohll")
-// untranslatable fn-like macro
-fn ntohs() -> Never:
-    comptime_error("untranslatable C macro: ntohs")
-// untranslatable fn-like macro
-fn offsetof() -> Never:
-    comptime_error("untranslatable C macro: offsetof")
-// untranslatable fn-like macro
-fn putc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putc_unlocked")
-// untranslatable fn-like macro
-fn putchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putchar_unlocked")
-// untranslatable fn-like macro
-fn sigmask() -> Never:
-    comptime_error("untranslatable C macro: sigmask")
-fn snprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn sprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsnprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsprintf() -> Never:
-    comptime_error("variadic macro — use direct call")

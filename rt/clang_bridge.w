@@ -85,6 +85,8 @@ extern fn clang_Cursor_isFunctionInlined(cursor: CXCursor) -> i32
 extern fn clang_Cursor_isBitField(cursor: CXCursor) -> i32
 extern fn clang_Cursor_isAnonymous(cursor: CXCursor) -> i32
 extern fn clang_Cursor_hasAttrs(cursor: CXCursor) -> i32
+extern fn clang_Cursor_getBinaryOpcode(cursor: CXCursor) -> i32
+extern fn clang_getCursorUnaryOperatorKind(cursor: CXCursor) -> i32
 extern fn clang_getCursorDefinition(cursor: CXCursor) -> CXCursor
 extern fn clang_getCursorExtent(cursor: CXCursor) -> CXSourceRange
 extern fn clang_isCursorDefinition(cursor: CXCursor) -> i32
@@ -2398,6 +2400,21 @@ pub fn ci_cursor_location(session: i64, cursor_idx: i32) -> str:
     clang_disposeString(fname)
     session_make_str(s, &buf as *const [1024]u8 as *const u8)
 
+// Returns the start byte offset of a cursor's source range, or -1 if unavailable.
+// Used by the for-loop handler to classify children as init/cond/inc by position.
+@[c_export("with_ci_cursor_start_offset")]
+pub fn ci_cursor_start_offset(session: i64, cursor_idx: i32) -> i32:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
+    let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+    let range = clang_getCursorExtent(cursor)
+    let start_loc = clang_getRangeStart(range)
+    var file: *mut u8 = 0 as *mut u8
+    var start_off: u32 = 0
+    clang_getFileLocation(start_loc, &mut file, 0 as *mut u32, 0 as *mut u32, &mut start_off)
+    if file as i64 == 0: return -1
+    start_off as i32
+
 @[c_export("with_ci_cursor_source_text")]
 pub fn ci_cursor_source_text(session: i64, cursor_idx: i32) -> str:
     let s = session as *mut CImportSession
@@ -2490,55 +2507,89 @@ pub fn ci_binary_op(session: i64, cursor_idx: i32) -> i32:
     var file: *mut u8 = 0 as *mut u8
     clang_getFileLocation(lhs_end, &mut file, 0 as *mut u32, 0 as *mut u32, &mut lhs_end_off)
     clang_getFileLocation(rhs_start, 0 as *mut *mut u8, 0 as *mut u32, 0 as *mut u32, &mut rhs_start_off)
-    if file as i64 == 0 or rhs_start_off <= lhs_end_off: return -1
-    var buf_size: u64 = 0
-    let contents = clang_getFileContents((*s).tu, file, &mut buf_size)
-    if contents as i64 == 0 or rhs_start_off as u64 > buf_size: return -1
-    // Extract operator text between lhs end and rhs start, trimmed
-    var op_s = lhs_end_off
-    var op_e = rhs_start_off
-    while op_s < op_e and (*((contents as i64 + op_s as i64) as *const u8) == 32 or *((contents as i64 + op_s as i64) as *const u8) == 9 or *((contents as i64 + op_s as i64) as *const u8) == 10):
-        op_s = op_s + 1
-    while op_e > op_s and (*((contents as i64 + (op_e - 1) as i64) as *const u8) == 32 or *((contents as i64 + (op_e - 1) as i64) as *const u8) == 9 or *((contents as i64 + (op_e - 1) as i64) as *const u8) == 10):
-        op_e = op_e - 1
-    let op_len = op_e - op_s
-    let c0 = *((contents as i64 + op_s as i64) as *const u8)
-    // Return values must match the BO_* constants in CImport.w (1-indexed)
-    if op_len == 1:
-        if c0 == 43: return 1   // + = BO_ADD
-        if c0 == 45: return 2   // - = BO_SUB
-        if c0 == 42: return 3   // * = BO_MUL
-        if c0 == 47: return 4   // / = BO_DIV
-        if c0 == 37: return 5   // % = BO_REM
-        if c0 == 38: return 6   // & = BO_AND
-        if c0 == 124: return 7  // | = BO_OR
-        if c0 == 94: return 8   // ^ = BO_XOR
-        if c0 == 60: return 13  // < = BO_LT
-        if c0 == 62: return 14  // > = BO_GT
-        if c0 == 61: return 19  // = = BO_ASSIGN
-        if c0 == 44: return 30  // , = BO_COMMA
-    let c1 = *((contents as i64 + op_s as i64 + 1) as *const u8)
-    if op_len == 2:
-        if c0 == 60 and c1 == 60: return 9    // << = BO_SHL
-        if c0 == 62 and c1 == 62: return 10   // >> = BO_SHR
-        if c0 == 61 and c1 == 61: return 11   // == = BO_EQ
-        if c0 == 33 and c1 == 61: return 12   // != = BO_NE
-        if c0 == 60 and c1 == 61: return 15   // <= = BO_LE
-        if c0 == 62 and c1 == 61: return 16   // >= = BO_GE
-        if c0 == 38 and c1 == 38: return 17   // && = BO_LAND
-        if c0 == 124 and c1 == 124: return 18 // || = BO_LOR
-        if c0 == 43 and c1 == 61: return 20   // += = BO_ADD_ASSIGN
-        if c0 == 45 and c1 == 61: return 21   // -= = BO_SUB_ASSIGN
-        if c0 == 42 and c1 == 61: return 22   // *= = BO_MUL_ASSIGN
-        if c0 == 47 and c1 == 61: return 23   // /= = BO_DIV_ASSIGN
-        if c0 == 37 and c1 == 61: return 24   // %= = BO_REM_ASSIGN
-        if c0 == 38 and c1 == 61: return 25   // &= = BO_AND_ASSIGN
-        if c0 == 124 and c1 == 61: return 26  // |= = BO_OR_ASSIGN
-        if c0 == 94 and c1 == 61: return 27   // ^= = BO_XOR_ASSIGN
-    if op_len == 3:
-        let c2 = *((contents as i64 + op_s as i64 + 2) as *const u8)
-        if c0 == 60 and c1 == 60 and c2 == 61: return 28 // <<= = BO_SHL_ASSIGN
-        if c0 == 62 and c1 == 62 and c2 == 61: return 29 // >>=
+    if file as i64 != 0 and rhs_start_off > lhs_end_off:
+        var buf_size: u64 = 0
+        let contents = clang_getFileContents((*s).tu, file, &mut buf_size)
+        if contents as i64 != 0 and rhs_start_off as u64 <= buf_size:
+            // Extract operator text between lhs end and rhs start, trimmed
+            var op_s = lhs_end_off
+            var op_e = rhs_start_off
+            while op_s < op_e and (*((contents as i64 + op_s as i64) as *const u8) == 32 or *((contents as i64 + op_s as i64) as *const u8) == 9 or *((contents as i64 + op_s as i64) as *const u8) == 10):
+                op_s = op_s + 1
+            while op_e > op_s and (*((contents as i64 + (op_e - 1) as i64) as *const u8) == 32 or *((contents as i64 + (op_e - 1) as i64) as *const u8) == 9 or *((contents as i64 + (op_e - 1) as i64) as *const u8) == 10):
+                op_e = op_e - 1
+            let op_len = op_e - op_s
+            let c0 = *((contents as i64 + op_s as i64) as *const u8)
+            // Return values must match the BO_* constants in CImport.w (1-indexed)
+            if op_len == 1:
+                if c0 == 43: return 1   // + = BO_ADD
+                if c0 == 45: return 2   // - = BO_SUB
+                if c0 == 42: return 3   // * = BO_MUL
+                if c0 == 47: return 4   // / = BO_DIV
+                if c0 == 37: return 5   // % = BO_REM
+                if c0 == 38: return 6   // & = BO_AND
+                if c0 == 124: return 7  // | = BO_OR
+                if c0 == 94: return 8   // ^ = BO_XOR
+                if c0 == 60: return 13  // < = BO_LT
+                if c0 == 62: return 14  // > = BO_GT
+                if c0 == 61: return 19  // = = BO_ASSIGN
+                if c0 == 44: return 30  // , = BO_COMMA
+            let c1 = *((contents as i64 + op_s as i64 + 1) as *const u8)
+            if op_len == 2:
+                if c0 == 60 and c1 == 60: return 9    // << = BO_SHL
+                if c0 == 62 and c1 == 62: return 10   // >> = BO_SHR
+                if c0 == 61 and c1 == 61: return 11   // == = BO_EQ
+                if c0 == 33 and c1 == 61: return 12   // != = BO_NE
+                if c0 == 60 and c1 == 61: return 15   // <= = BO_LE
+                if c0 == 62 and c1 == 61: return 16   // >= = BO_GE
+                if c0 == 38 and c1 == 38: return 17   // && = BO_LAND
+                if c0 == 124 and c1 == 124: return 18 // || = BO_LOR
+                if c0 == 43 and c1 == 61: return 20   // += = BO_ADD_ASSIGN
+                if c0 == 45 and c1 == 61: return 21   // -= = BO_SUB_ASSIGN
+                if c0 == 42 and c1 == 61: return 22   // *= = BO_MUL_ASSIGN
+                if c0 == 47 and c1 == 61: return 23   // /= = BO_DIV_ASSIGN
+                if c0 == 37 and c1 == 61: return 24   // %= = BO_REM_ASSIGN
+                if c0 == 38 and c1 == 61: return 25   // &= = BO_AND_ASSIGN
+                if c0 == 124 and c1 == 61: return 26  // |= = BO_OR_ASSIGN
+                if c0 == 94 and c1 == 61: return 27   // ^= = BO_XOR_ASSIGN
+            if op_len == 3:
+                let c2 = *((contents as i64 + op_s as i64 + 2) as *const u8)
+                if c0 == 60 and c1 == 60 and c2 == 61: return 28 // <<= = BO_SHL_ASSIGN
+                if c0 == 62 and c1 == 62 and c2 == 61: return 29 // >>=
+    // Fallback: use clang_Cursor_getBinaryOpcode API for macro expansions
+    // where source locations span across files (LHS at call site, RHS in macro def)
+    let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+    let cx_op = clang_Cursor_getBinaryOpcode(cursor)
+    if cx_op == 3: return 3    // CX_BO_Mul → BO_MUL
+    if cx_op == 4: return 4    // CX_BO_Div → BO_DIV
+    if cx_op == 5: return 5    // CX_BO_Rem → BO_REM
+    if cx_op == 6: return 1    // CX_BO_Add → BO_ADD
+    if cx_op == 7: return 2    // CX_BO_Sub → BO_SUB
+    if cx_op == 8: return 9    // CX_BO_Shl → BO_SHL
+    if cx_op == 9: return 10   // CX_BO_Shr → BO_SHR
+    if cx_op == 11: return 13  // CX_BO_LT → BO_LT
+    if cx_op == 12: return 14  // CX_BO_GT → BO_GT
+    if cx_op == 13: return 15  // CX_BO_LE → BO_LE
+    if cx_op == 14: return 16  // CX_BO_GE → BO_GE
+    if cx_op == 15: return 11  // CX_BO_EQ → BO_EQ
+    if cx_op == 16: return 12  // CX_BO_NE → BO_NE
+    if cx_op == 17: return 6   // CX_BO_And → BO_AND
+    if cx_op == 18: return 8   // CX_BO_Xor → BO_XOR
+    if cx_op == 19: return 7   // CX_BO_Or → BO_OR
+    if cx_op == 20: return 17  // CX_BO_LAnd → BO_LAND
+    if cx_op == 21: return 18  // CX_BO_LOr → BO_LOR
+    if cx_op == 22: return 19  // CX_BO_Assign → BO_ASSIGN
+    if cx_op == 23: return 22  // CX_BO_MulAssign → BO_MUL_ASSIGN
+    if cx_op == 24: return 23  // CX_BO_DivAssign → BO_DIV_ASSIGN
+    if cx_op == 25: return 24  // CX_BO_RemAssign → BO_REM_ASSIGN
+    if cx_op == 26: return 20  // CX_BO_AddAssign → BO_ADD_ASSIGN
+    if cx_op == 27: return 21  // CX_BO_SubAssign → BO_SUB_ASSIGN
+    if cx_op == 28: return 28  // CX_BO_ShlAssign → BO_SHL_ASSIGN
+    if cx_op == 29: return 29  // CX_BO_ShrAssign → BO_SHR_ASSIGN
+    if cx_op == 30: return 25  // CX_BO_AndAssign → BO_AND_ASSIGN
+    if cx_op == 31: return 27  // CX_BO_XorAssign → BO_XOR_ASSIGN
+    if cx_op == 32: return 26  // CX_BO_OrAssign → BO_OR_ASSIGN
+    if cx_op == 33: return 30  // CX_BO_Comma → BO_COMMA
     -1
 
 @[c_export("with_ci_unary_op")]
@@ -2593,6 +2644,18 @@ pub fn ci_unary_op(session: i64, cursor_idx: i32) -> i32:
             len2 = len2 - 1
         if len2 >= 2 and *op2 == 43 and *((op2 as i64 + 1) as *const u8) == 43: return 9  // x++ = UO_POST_INC
         if len2 >= 2 and *op2 == 45 and *((op2 as i64 + 1) as *const u8) == 45: return 10 // x-- = UO_POST_DEC
+    // Fallback: use clang_getCursorUnaryOperatorKind for macro expansions
+    let cx_uop = clang_getCursorUnaryOperatorKind(cursor)
+    if cx_uop == 1: return 9   // CXUnaryOperator_PostInc → UO_POST_INC
+    if cx_uop == 2: return 10  // CXUnaryOperator_PostDec → UO_POST_DEC
+    if cx_uop == 3: return 7   // CXUnaryOperator_PreInc → UO_PRE_INC
+    if cx_uop == 4: return 8   // CXUnaryOperator_PreDec → UO_PRE_DEC
+    if cx_uop == 5: return 4   // CXUnaryOperator_AddrOf → UO_ADDR
+    if cx_uop == 6: return 5   // CXUnaryOperator_Deref → UO_DEREF
+    if cx_uop == 7: return 6   // CXUnaryOperator_Plus → UO_PLUS
+    if cx_uop == 8: return 1   // CXUnaryOperator_Minus → UO_MINUS
+    if cx_uop == 9: return 2   // CXUnaryOperator_Not → UO_NOT (bitwise ~)
+    if cx_uop == 10: return 3  // CXUnaryOperator_LNot → UO_LNOT (logical !)
     -1
 
 // ── Implicit cast kind ──────────────────────────────────────

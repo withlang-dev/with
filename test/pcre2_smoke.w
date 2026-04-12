@@ -44,12 +44,16 @@ fn pcre2_free(ptr: *mut c_void, data: *mut c_void):
     free(ptr)
 
 fn main:
+    // The migrator doesn't translate static array initializers (#102), so the
+    // PCRE2 OP_LENGTHS table that several internal functions index by opcode
+    // is null until we manually point it at the static data.
+    pcre2_init_op_lengths_8()
     // Create contexts with real malloc/free (bypasses zero-initialized defaults)
     let gcontext = pcre2_general_context_create_8(pcre2_malloc, pcre2_free, null)
     if gcontext as i64 == 0:
         print("gcontext creation failed")
         return
-    print(f"gcontext ok, addr={gcontext as i64}")
+    print("gcontext ok")
     // Context fields are correctly stored (verified via raw read)
     let ccontext = pcre2_compile_context_create_8(gcontext)
     if ccontext as i64 == 0:

@@ -241,6 +241,12 @@ fn _pcre2_compile_find_named_group8(name: *const u8, length: c_uint, cb: *mut co
     var hash: c_ushort = _pcre2_compile_get_hash_from_name8(name, length)
     var ng: *mut named_group_8
     var end: *mut named_group_8 = (cb.named_groups + (cb.names_found as isize as usize))
+    (ng = cb.named_groups)
+    while (ng < end):
+        if (((length == ng.length) and (hash == (((ng).hash_dup & 32767)))) and (_pcre2_strncmp_8(name, ng.name, length) == 0)):
+            return ng
+        (ng = ng + 1)
+
     return (null as *mut named_group_8)
 
 fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut named_group_8, __param_tablecount: c_uint) -> c_uint:
@@ -251,36 +257,39 @@ fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut 
     var length: c_int = ng.length
     var duplicate_count: c_uint = 1
     var slot: *mut u8 = cb.name_table
-    if (if ((ng.hash_dup & 32768)) != 0: 1 else: 0) != 0:
+    if (((ng.hash_dup & 32768)) != 0):
         var ng_it: *mut named_group_8
         var end: *mut named_group_8 = (cb.named_groups + (cb.names_found as isize as usize))
         (ng_it = (ng + (1 as isize as usize)))
-        while (if ng_it < end: 1 else: 0) != 0:
-            if (if ng_it.name == name: 1 else: 0) != 0:
+        while (ng_it < end):
+            if (ng_it.name == name):
                 (duplicate_count = duplicate_count + 1)
             (ng_it = ng_it + 1)
         
 
     (i = 0)
-    while (if i < tablecount: 1 else: 0) != 0:
-        var crc: c_int
-        if (if (if crc == 0: 1 else: 0) != 0 and (if slot[(2 + length)] != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+    while (i < tablecount):
+        var crc: c_int = with_memcmp((name as *const c_void) as *i8, ((slot + (2 as isize as usize)) as *const c_void) as *i8, (((length) * (((8 / 8))))) as i64)
+        if ((crc == 0) and (slot[(2 + length)] != 0)):
             (crc = -1)
         
-        if (if crc < 0: 1 else: 0) != 0:
+        if (crc < 0):
+            with_memmove(((slot + (cb.name_entry_size *% duplicate_count)) as *mut c_void) as *i8, (slot as *const c_void) as *i8, ((((((tablecount -% i)) *% cb.name_entry_size)) *% 1)) as i64)
             break
         
         slot = slot + cb.name_entry_size
         (i = i + 1)
 
     tablecount = tablecount + duplicate_count
-    while 1 != 0:
-        if (if (duplicate_count = duplicate_count - 1) == 0: 1 else: 0) != 0:
+    while (1 != 0):
+        with_memcpy(((slot + (2 as isize as usize)) as *mut c_void) as *i8, (name as *const c_void) as *i8, (((length) * (((8 / 8))))) as i64)
+        with_memset((((slot + (2 as isize as usize)) + (length as isize as usize)) as *mut c_void) as *i8, 0, (((((cb.name_entry_size - length) - 2)) * (((8 / 8))))) as i64)
+        if ((duplicate_count = duplicate_count - 1) == 0):
             break
         
-        while 1 != 0:
+        while (1 != 0):
             (ng = ng + 1)
-            if (if ng.name == name: 1 else: 0) != 0:
+            if (ng.name == name):
                 break
             
         
@@ -294,14 +303,14 @@ fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexpt
     var count: c_int
     var slot: *mut u8 = cb.name_table
     (i = 0)
-    while (if i < cb.names_found: 1 else: 0) != 0:
-        if (if (if _pcre2_strncmp_8(name, ((slot + (2 as isize as usize)) as *const u8), length) == 0: 1 else: 0) != 0 and (if slot[(2 +% length)] == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+    while (i < cb.names_found):
+        if ((_pcre2_strncmp_8(name, ((slot + (2 as isize as usize)) as *const u8), length) == 0) and (slot[(2 +% length)] == 0)):
             break
         
         slot = slot + cb.name_entry_size
         (i = i + 1)
 
-    if (if i >= cb.names_found: 1 else: 0) != 0:
+    if (i >= cb.names_found):
         ((unsafe: *errorcodeptr) = ERR53)
         (cb.erroroffset = ((name as usize -% cb.start_pattern as usize) / sizeof[u8]()))
         return 0
@@ -310,15 +319,16 @@ fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexpt
     (count = 0)
     while true:
         (count = count + 1)
-        cb.backref_map = cb.backref_map | (if ((if groupnumber < 32: 1 else: 0)) != 0: ((1 << groupnumber)) else: 1)
-        if (if groupnumber > cb.top_backref: 1 else: 0) != 0:
+        (groupnumber = ((((((((slot)[0] as c_uint) << 8))) | (slot)[((0) + 1)])) as c_uint))
+        cb.backref_map = cb.backref_map | (if (groupnumber < 32): ((1 << groupnumber)) else: 1)
+        if (groupnumber > cb.top_backref):
             (cb.top_backref = groupnumber)
         
-        if (if (i = i + 1) >= cb.names_found: 1 else: 0) != 0:
+        if ((i = i + 1) >= cb.names_found):
             break
         
         slot = slot + cb.name_entry_size
-        if (if (if _pcre2_strncmp_8(name, ((slot + (2 as isize as usize)) as *const u8), length) != 0: 1 else: 0) != 0 or (if ((slot + (2 as isize as usize)))[length] != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+        if ((_pcre2_strncmp_8(name, ((slot + (2 as isize as usize)) as *const u8), length) != 0) or (((slot + (2 as isize as usize)))[length] != 0)):
             break
         
 
@@ -335,18 +345,100 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
     var end: *mut named_group_8 = (cb.named_groups + (cb.names_found as isize as usize))
     var all_found: c_int
     var size: c_ulong
-    if (if _pcre2_compile_process_capture_list((pptr - (1 as isize as usize)), 0, errorcodeptr, cb) == 0: 1 else: 0) != 0:
+    if (_pcre2_compile_process_capture_list((pptr - (1 as isize as usize)), 0, errorcodeptr, cb) == 0):
         return (null as *mut c_uint)
 
     (size = ((((cb.bracount +% 1) +% 7)) >> 3))
     (captures = (cb.cx.memctl.malloc(size, cb.cx.memctl.memory_data) as *mut u8))
-    if (if captures == (null as *mut u8): 1 else: 0) != 0:
+    if (captures == (null as *mut u8)):
         ((unsafe: *errorcodeptr) = ERR21)
+        (cb.erroroffset = ((((pptr[1] as c_ulong) << 32)) | (pptr[2] as c_ulong)))
+        
         0
         return (null as *mut c_uint)
 
     with_memset((captures as *mut c_void) as *i8, 0, size as i64)
-    while 1 != 0:
+    while (1 != 0):
+        match (((unsafe: *pptr) & (4294901760 as c_uint)))
+            2148925440 =>
+                (pptr = pptr + 1)
+                pptr = pptr + 2
+                continue
+                (ng = (cb.named_groups + pptr[1]))
+                pptr = pptr + 2
+                (name = ng.name)
+                (all_found = 1)
+                while true:
+                    if (ng.name != name):
+                        continue
+                    
+                    (capture_ptr = (captures + ((ng.number >> 3))))
+                    (bit = (((1 << ((ng.number & 7)))) as u8))
+                    if ((((unsafe: *capture_ptr) & bit)) == 0):
+                        (unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit
+                        (all_found = 0)
+                    
+                    if not (((ng = ng + 1) < end)):
+                        break
+                if (not ((all_found != 0))):
+                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + 5
+                    continue
+                (pptr[-2] = (2149122048 as c_uint))
+                (pptr[-1] = 0)
+                continue
+                pptr = pptr + 2
+                (capture_ptr = (captures + ((pptr[-1] >> 3))))
+                (bit = (((1 << ((pptr[-1] & 7)))) as u8))
+                if ((((unsafe: *capture_ptr) & bit)) != 0):
+                    (pptr[-1] = 0)
+                    continue
+                (unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit
+                (unsafe: *lengthptr) = (unsafe: *lengthptr) + 3
+                continue
+            2149056512 =>
+                (ng = (cb.named_groups + pptr[1]))
+                pptr = pptr + 2
+                (name = ng.name)
+                (all_found = 1)
+                while true:
+                    if (ng.name != name):
+                        continue
+                    
+                    (capture_ptr = (captures + ((ng.number >> 3))))
+                    (bit = (((1 << ((ng.number & 7)))) as u8))
+                    if ((((unsafe: *capture_ptr) & bit)) == 0):
+                        (unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit
+                        (all_found = 0)
+                    
+                    if not (((ng = ng + 1) < end)):
+                        break
+                if (not ((all_found != 0))):
+                    (unsafe: *lengthptr) = (unsafe: *lengthptr) + 5
+                    continue
+                (pptr[-2] = (2149122048 as c_uint))
+                (pptr[-1] = 0)
+                continue
+                pptr = pptr + 2
+                (capture_ptr = (captures + ((pptr[-1] >> 3))))
+                (bit = (((1 << ((pptr[-1] & 7)))) as u8))
+                if ((((unsafe: *capture_ptr) & bit)) != 0):
+                    (pptr[-1] = 0)
+                    continue
+                (unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit
+                (unsafe: *lengthptr) = (unsafe: *lengthptr) + 3
+                continue
+            2149122048 =>
+                pptr = pptr + 2
+                (capture_ptr = (captures + ((pptr[-1] >> 3))))
+                (bit = (((1 << ((pptr[-1] & 7)))) as u8))
+                if ((((unsafe: *capture_ptr) & bit)) != 0):
+                    (pptr[-1] = 0)
+                    continue
+                (unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit
+                (unsafe: *lengthptr) = (unsafe: *lengthptr) + 3
+                continue
+            _ => 0
+        
         break
 
     cb.cx.memctl.free((captures as *mut c_void), cb.cx.memctl.memory_data)
@@ -365,43 +457,78 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
     var captures_end: *mut c_ushort
     var tmp: c_ushort
     (size = _pcre2_compile_process_capture_list(pptr, offset, errorcodeptr, cb))
-    if (if size == 0: 1 else: 0) != 0:
+    if (size == 0):
         return 0
 
     (args = (cb.cx.memctl.malloc((sizeof[recurse_arguments]() +% (size *% sizeof[c_ushort]())), cb.cx.memctl.memory_data) as *mut recurse_arguments))
-    if (if args == (null as *mut recurse_arguments): 1 else: 0) != 0:
+    if (args == (null as *mut recurse_arguments)):
         ((unsafe: *errorcodeptr) = ERR21)
         (cb.erroroffset = offset)
         return 0
 
     (args.header.next = (null as *mut compile_data))
     (args.size = size)
-    if (if cb.last_data != (null as *mut compile_data): 1 else: 0) != 0:
-        (cb.last_data.next = (&mut args.header as *mut compile_data))
+    if (cb.last_data != (null as *mut compile_data)):
+        (cb.last_data.next = ((&args.header as *const compile_data) as *mut compile_data))
     else:
-        (cb.first_data = (&mut args.header as *mut compile_data))
+        (cb.first_data = ((&args.header as *const compile_data) as *mut compile_data))
 
-    (cb.last_data = (&mut args.header as *mut compile_data))
+    (cb.last_data = ((&args.header as *const compile_data) as *mut compile_data))
     (captures = (((args + (1 as isize as usize))) as *mut c_ushort))
-    while 1 != 0:
+    while (1 != 0):
         (pptr = pptr + 1)
+        match (((unsafe: *pptr) & (4294901760 as c_uint)))
+            2148925440 =>
+                pptr = pptr + 2
+                continue
+                (ng = (cb.named_groups + (unsafe: *((pptr = pptr + 1)))))
+                (unsafe: *captures = ((ng.number) as c_ushort))
+                (captures = captures + 1)
+                (name = ng.name)
+                while ((ng = ng + 1) < end):
+                    if (ng.name == name):
+                        (unsafe: *captures = ((ng.number) as c_ushort))
+                        (captures = captures + 1)
+                continue
+                (pptr = pptr + 1)
+                ((unsafe: *(captures = captures + 1)) = (unsafe: *pptr))
+                continue
+            2149056512 =>
+                (ng = (cb.named_groups + (unsafe: *((pptr = pptr + 1)))))
+                (unsafe: *captures = ((ng.number) as c_ushort))
+                (captures = captures + 1)
+                (name = ng.name)
+                while ((ng = ng + 1) < end):
+                    if (ng.name == name):
+                        (unsafe: *captures = ((ng.number) as c_ushort))
+                        (captures = captures + 1)
+                continue
+                (pptr = pptr + 1)
+                ((unsafe: *(captures = captures + 1)) = (unsafe: *pptr))
+                continue
+            2149122048 =>
+                (pptr = pptr + 1)
+                ((unsafe: *(captures = captures + 1)) = (unsafe: *pptr))
+                continue
+            _ => 0
+        
         break
 
     (args.skip_size = (((((pptr as usize -% pptr_start as usize) / sizeof[c_uint]())) as c_ulong) -% 1))
-    if (if size == 1: 1 else: 0) != 0:
+    if (size == 1):
         return 1
 
     (captures = (((args + (1 as isize as usize))) as *mut c_ushort))
     (i = (((size >> 1)) -% 1))
-    while 1 != 0:
+    while (1 != 0):
         do_heapify_u16(captures, size, i)
-        if (if i == 0: 1 else: 0) != 0:
+        if (i == 0):
             break
         
         (i = i - 1)
 
     (i = (size -% 1))
-    while (if i > 0: 1 else: 0) != 0:
+    while (i > 0):
         (tmp = captures[0])
         (captures[0] = captures[i])
         (captures[i] = tmp)
@@ -409,10 +536,11 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
         (i = i - 1)
 
     (captures_end = (captures + size))
-    (tmp = (unsafe: *(captures = captures + 1)))
+    (tmp = (unsafe: *captures))
+    (captures = captures + 1)
     (current = captures)
-    while (if current < captures_end: 1 else: 0) != 0:
-        if (if (unsafe: *current) != tmp: 1 else: 0) != 0:
+    while (current < captures_end):
+        if ((unsafe: *current) != tmp):
             (tmp = (unsafe: *current))
             (unsafe: *captures = tmp)
             (captures = captures + 1)
@@ -431,8 +559,95 @@ fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset
     var name: *const u8
     var length: c_uint
     var end: *mut named_group_8 = (cb.named_groups + (cb.names_found as isize as usize))
-    while 1 != 0:
+    while (1 != 0):
         (pptr = pptr + 1)
+        match (((unsafe: *pptr) & (4294901760 as c_uint)))
+            2148925440 =>
+                (offset = ((((pptr[1] as c_ulong) << 32)) | (pptr[2] as c_ulong)))
+                pptr = pptr + 2
+                0
+                continue
+                offset = offset + (((unsafe: *pptr) & 65535))
+                (pptr = pptr + 1)
+                (length = (unsafe: *pptr))
+                (name = (cb.start_pattern + offset))
+                (ng = _pcre2_compile_find_named_group8(name, length, cb))
+                if (ng == (null as *mut named_group_8)):
+                    ((unsafe: *errorcodeptr) = ERR15)
+                    (cb.erroroffset = offset)
+                    return 0
+                if (((ng.hash_dup & 32768)) == 0):
+                    (pptr[-1] = (2149122048 as c_uint))
+                    (pptr[0] = ng.number)
+                    (size = size + 1)
+                    continue
+                (pptr[-1] = (2149056512 as c_uint))
+                (pptr[0] = ((((ng as usize -% cb.named_groups as usize) / sizeof[named_group_8]())) as c_uint))
+                (size = size + 1)
+                (name = ng.name)
+                while ((ng = ng + 1) < end):
+                    if (ng.name == name):
+                        (size = size + 1)
+                continue
+                offset = offset + (((unsafe: *pptr) & 65535))
+                (pptr = pptr + 1)
+                (i = (unsafe: *pptr))
+                if (i > cb.bracount):
+                    ((unsafe: *errorcodeptr) = ERR15)
+                    (cb.erroroffset = offset)
+                    return 0
+                if (i > cb.top_backref):
+                    (cb.top_backref = (i as c_ushort))
+                (size = size + 1)
+                continue
+            2149056512 =>
+                offset = offset + (((unsafe: *pptr) & 65535))
+                (pptr = pptr + 1)
+                (length = (unsafe: *pptr))
+                (name = (cb.start_pattern + offset))
+                (ng = _pcre2_compile_find_named_group8(name, length, cb))
+                if (ng == (null as *mut named_group_8)):
+                    ((unsafe: *errorcodeptr) = ERR15)
+                    (cb.erroroffset = offset)
+                    return 0
+                if (((ng.hash_dup & 32768)) == 0):
+                    (pptr[-1] = (2149122048 as c_uint))
+                    (pptr[0] = ng.number)
+                    (size = size + 1)
+                    continue
+                (pptr[-1] = (2149056512 as c_uint))
+                (pptr[0] = ((((ng as usize -% cb.named_groups as usize) / sizeof[named_group_8]())) as c_uint))
+                (size = size + 1)
+                (name = ng.name)
+                while ((ng = ng + 1) < end):
+                    if (ng.name == name):
+                        (size = size + 1)
+                continue
+                offset = offset + (((unsafe: *pptr) & 65535))
+                (pptr = pptr + 1)
+                (i = (unsafe: *pptr))
+                if (i > cb.bracount):
+                    ((unsafe: *errorcodeptr) = ERR15)
+                    (cb.erroroffset = offset)
+                    return 0
+                if (i > cb.top_backref):
+                    (cb.top_backref = (i as c_ushort))
+                (size = size + 1)
+                continue
+            2149122048 =>
+                offset = offset + (((unsafe: *pptr) & 65535))
+                (pptr = pptr + 1)
+                (i = (unsafe: *pptr))
+                if (i > cb.bracount):
+                    ((unsafe: *errorcodeptr) = ERR15)
+                    (cb.erroroffset = offset)
+                    return 0
+                if (i > cb.top_backref):
+                    (cb.top_backref = (i as c_ushort))
+                (size = size + 1)
+                continue
+            _ => 0
+        
         return size
 
 
@@ -442,17 +657,17 @@ fn do_heapify_u16(captures: *mut c_ushort, size: c_ulong, __param_i: c_ulong):
     var left: c_ulong
     var right: c_ulong
     var tmp: c_ushort
-    while 1 != 0:
+    while (1 != 0):
         (max = i)
         (left = (((i << 1)) +% 1))
         (right = (left +% 1))
-        if (if (if left < size: 1 else: 0) != 0 and (if captures[left] > captures[max]: 1 else: 0) != 0: 1 else: 0) != 0:
+        if ((left < size) and (captures[left] > captures[max])):
             (max = left)
         
-        if (if (if right < size: 1 else: 0) != 0 and (if captures[right] > captures[max]: 1 else: 0) != 0: 1 else: 0) != 0:
+        if ((right < size) and (captures[right] > captures[max])):
             (max = right)
         
-        if (if i == max: 1 else: 0) != 0:
+        if (i == max):
             return
         
         (tmp = captures[i])
@@ -461,347 +676,3 @@ fn do_heapify_u16(captures: *mut c_ushort, size: c_ulong, __param_i: c_ulong):
         (i = max)
 
 
-// untranslatable fn-like macro
-fn BYTES2CU() -> Never:
-    comptime_error("untranslatable C macro: BYTES2CU")
-// untranslatable fn-like macro
-fn CAST_USER_ADDR_T() -> Never:
-    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
-// untranslatable fn-like macro
-fn CHMAX_255() -> Never:
-    comptime_error("untranslatable C macro: CHMAX_255")
-// untranslatable fn-like macro
-fn CLIST_ALIGN_TO() -> Never:
-    comptime_error("untranslatable C macro: CLIST_ALIGN_TO")
-// untranslatable fn-like macro
-fn CU2BYTES() -> Never:
-    comptime_error("untranslatable C macro: CU2BYTES")
-// untranslatable fn-like macro
-fn GET() -> Never:
-    comptime_error("untranslatable C macro: GET")
-// untranslatable fn-like macro
-fn GET2() -> Never:
-    comptime_error("untranslatable C macro: GET2")
-// untranslatable fn-like macro
-fn GETCHAR() -> Never:
-    comptime_error("untranslatable C macro: GETCHAR")
-// untranslatable fn-like macro
-fn GETCHARINC() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINC")
-// untranslatable fn-like macro
-fn GETCHARINCTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINCTEST")
-// untranslatable fn-like macro
-fn GETCHARLEN() -> Never:
-    comptime_error("untranslatable C macro: GETCHARLEN")
-// untranslatable fn-like macro
-fn GETCHARTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARTEST")
-// untranslatable fn-like macro
-fn GETOFFSET() -> Never:
-    comptime_error("untranslatable C macro: GETOFFSET")
-// untranslatable fn-like macro
-fn GETPLUSOFFSET() -> Never:
-    comptime_error("untranslatable C macro: GETPLUSOFFSET")
-// untranslatable fn-like macro
-fn GETUTF8() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8")
-// untranslatable fn-like macro
-fn GETUTF8INC() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8INC")
-// untranslatable fn-like macro
-fn GETUTF8LEN() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8LEN")
-// untranslatable fn-like macro
-fn GET_MAX_CHAR_VALUE() -> Never:
-    comptime_error("untranslatable C macro: GET_MAX_CHAR_VALUE")
-// untranslatable fn-like macro
-fn GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: GET_UCD")
-fn HASUTF8EXTRALEN[T](c: T) -> T:
-    (c >= 0xc0)
-// untranslatable fn-like macro
-fn HTONL() -> Never:
-    comptime_error("untranslatable C macro: HTONL")
-// untranslatable fn-like macro
-fn HTONLL() -> Never:
-    comptime_error("untranslatable C macro: HTONLL")
-// untranslatable fn-like macro
-fn HTONS() -> Never:
-    comptime_error("untranslatable C macro: HTONS")
-fn INT16_C[T](v: T) -> T:
-    v
-fn INT32_C[T](v: T) -> T:
-    v
-fn INT64_C[T](v: T) -> i64:
-    (v as i64)
-fn INT8_C[T](v: T) -> T:
-    v
-fn INTMAX_C[T](v: T) -> i64:
-    (v as i64)
-// untranslatable fn-like macro
-fn IS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: IS_NEWLINE")
-// untranslatable fn-like macro
-fn MAPBIT() -> Never:
-    comptime_error("untranslatable C macro: MAPBIT")
-// untranslatable fn-like macro
-fn MAPSET() -> Never:
-    comptime_error("untranslatable C macro: MAPSET")
-// untranslatable fn-like macro
-fn MAX_255() -> Never:
-    comptime_error("untranslatable C macro: MAX_255")
-fn META_CODE[T](x: T) -> T:
-    (x & 0xffff0000)
-fn META_DATA[T](x: T) -> T:
-    (x & 0x0000ffff)
-// untranslatable fn-like macro
-fn META_DIFF() -> Never:
-    comptime_error("untranslatable C macro: META_DIFF")
-// untranslatable fn-like macro
-fn NAMED_GROUP_GET_HASH() -> Never:
-    comptime_error("untranslatable C macro: NAMED_GROUP_GET_HASH")
-// untranslatable fn-like macro
-fn NTOHL() -> Never:
-    comptime_error("untranslatable C macro: NTOHL")
-// untranslatable fn-like macro
-fn NTOHLL() -> Never:
-    comptime_error("untranslatable C macro: NTOHLL")
-// untranslatable fn-like macro
-fn NTOHS() -> Never:
-    comptime_error("untranslatable C macro: NTOHS")
-// untranslatable fn-like macro
-fn PCRE2_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_ASSERT")
-// untranslatable fn-like macro
-fn PCRE2_DEBUG_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
-// untranslatable fn-like macro
-fn PCRE2_GLUE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_GLUE")
-// untranslatable fn-like macro
-fn PCRE2_JOIN() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_JOIN")
-fn PCRE2_SUFFIX[T](a: T) -> T:
-    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
-// untranslatable fn-like macro
-fn PCRE2_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
-// untranslatable fn-like macro
-fn PRIV() -> Never:
-    comptime_error("untranslatable C macro: PRIV")
-// untranslatable fn-like macro
-fn PUT() -> Never:
-    comptime_error("untranslatable C macro: PUT")
-// untranslatable fn-like macro
-fn PUT2() -> Never:
-    comptime_error("untranslatable C macro: PUT2")
-// untranslatable fn-like macro
-fn PUT2INC() -> Never:
-    comptime_error("untranslatable C macro: PUT2INC")
-// untranslatable fn-like macro
-fn PUTCHAR() -> Never:
-    comptime_error("untranslatable C macro: PUTCHAR")
-// untranslatable fn-like macro
-fn PUTINC() -> Never:
-    comptime_error("untranslatable C macro: PUTINC")
-// untranslatable fn-like macro
-fn PUTOFFSET() -> Never:
-    comptime_error("untranslatable C macro: PUTOFFSET")
-// untranslatable fn-like macro
-fn READPLUSOFFSET() -> Never:
-    comptime_error("untranslatable C macro: READPLUSOFFSET")
-// untranslatable fn-like macro
-fn REAL_GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: REAL_GET_UCD")
-fn SELECT_VALUE8[T](value8: T, value: T) -> T:
-    value8
-// untranslatable fn-like macro
-fn SETBIT() -> Never:
-    comptime_error("untranslatable C macro: SETBIT")
-// untranslatable fn-like macro
-fn SKIPOFFSET() -> Never:
-    comptime_error("untranslatable C macro: SKIPOFFSET")
-// untranslatable fn-like macro
-fn STATIC_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT")
-// untranslatable fn-like macro
-fn STATIC_ASSERT_JOIN() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
-// untranslatable fn-like macro
-fn TABLE_GET() -> Never:
-    comptime_error("untranslatable C macro: TABLE_GET")
-// untranslatable fn-like macro
-fn UCD_ANY_I() -> Never:
-    comptime_error("untranslatable C macro: UCD_ANY_I")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
-// untranslatable fn-like macro
-fn UCD_BPROPS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS")
-// untranslatable fn-like macro
-fn UCD_BPROPS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
-// untranslatable fn-like macro
-fn UCD_CASESET() -> Never:
-    comptime_error("untranslatable C macro: UCD_CASESET")
-// untranslatable fn-like macro
-fn UCD_CATEGORY() -> Never:
-    comptime_error("untranslatable C macro: UCD_CATEGORY")
-// untranslatable fn-like macro
-fn UCD_CHARTYPE() -> Never:
-    comptime_error("untranslatable C macro: UCD_CHARTYPE")
-fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
-fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
-// untranslatable fn-like macro
-fn UCD_GRAPHBREAK() -> Never:
-    comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
-// untranslatable fn-like macro
-fn UCD_OTHERCASE() -> Never:
-    comptime_error("untranslatable C macro: UCD_OTHERCASE")
-// untranslatable fn-like macro
-fn UCD_SCRIPT() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPT")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
-fn UINT16_C[T](v: T) -> T:
-    v
-fn UINT32_C[T](v: T) -> u32:
-    (v as u32)
-fn UINT64_C[T](v: T) -> u64:
-    (v as u64)
-fn UINT8_C[T](v: T) -> T:
-    v
-fn UINTMAX_C[T](v: T) -> u64:
-    (v as u64)
-// untranslatable fn-like macro
-fn WAS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: WAS_NEWLINE")
-// untranslatable fn-like macro
-fn WCOREDUMP() -> Never:
-    comptime_error("untranslatable C macro: WCOREDUMP")
-// untranslatable fn-like macro
-fn WEXITSTATUS() -> Never:
-    comptime_error("untranslatable C macro: WEXITSTATUS")
-// untranslatable fn-like macro
-fn WIFCONTINUED() -> Never:
-    comptime_error("untranslatable C macro: WIFCONTINUED")
-// untranslatable fn-like macro
-fn WIFEXITED() -> Never:
-    comptime_error("untranslatable C macro: WIFEXITED")
-// untranslatable fn-like macro
-fn WIFSIGNALED() -> Never:
-    comptime_error("untranslatable C macro: WIFSIGNALED")
-// untranslatable fn-like macro
-fn WIFSTOPPED() -> Never:
-    comptime_error("untranslatable C macro: WIFSTOPPED")
-// untranslatable fn-like macro
-fn WSTOPSIG() -> Never:
-    comptime_error("untranslatable C macro: WSTOPSIG")
-// untranslatable fn-like macro
-fn WTERMSIG() -> Never:
-    comptime_error("untranslatable C macro: WTERMSIG")
-fn W_EXITCODE[T](ret: T, sig: T) -> T:
-    ((ret << 8) | sig)
-// untranslatable fn-like macro
-fn W_STOPCODE() -> Never:
-    comptime_error("untranslatable C macro: W_STOPCODE")
-// untranslatable fn-like macro
-fn alloca() -> Never:
-    comptime_error("untranslatable C macro: alloca")
-// untranslatable fn-like macro
-fn clearerr_unlocked() -> Never:
-    comptime_error("untranslatable C macro: clearerr_unlocked")
-// untranslatable fn-like macro
-fn feof_unlocked() -> Never:
-    comptime_error("untranslatable C macro: feof_unlocked")
-// untranslatable fn-like macro
-fn ferror_unlocked() -> Never:
-    comptime_error("untranslatable C macro: ferror_unlocked")
-// untranslatable fn-like macro
-fn fileno_unlocked() -> Never:
-    comptime_error("untranslatable C macro: fileno_unlocked")
-// untranslatable fn-like macro
-fn fropen() -> Never:
-    comptime_error("untranslatable C macro: fropen")
-// untranslatable fn-like macro
-fn fwopen() -> Never:
-    comptime_error("untranslatable C macro: fwopen")
-// untranslatable fn-like macro
-fn getc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getc_unlocked")
-// untranslatable fn-like macro
-fn getchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getchar_unlocked")
-// untranslatable fn-like macro
-fn htonl() -> Never:
-    comptime_error("untranslatable C macro: htonl")
-// untranslatable fn-like macro
-fn htonll() -> Never:
-    comptime_error("untranslatable C macro: htonll")
-// untranslatable fn-like macro
-fn htons() -> Never:
-    comptime_error("untranslatable C macro: htons")
-fn memccpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memmove() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memset() -> Never:
-    comptime_error("variadic macro — use direct call")
-// untranslatable fn-like macro
-fn ntohl() -> Never:
-    comptime_error("untranslatable C macro: ntohl")
-// untranslatable fn-like macro
-fn ntohll() -> Never:
-    comptime_error("untranslatable C macro: ntohll")
-// untranslatable fn-like macro
-fn ntohs() -> Never:
-    comptime_error("untranslatable C macro: ntohs")
-// untranslatable fn-like macro
-fn offsetof() -> Never:
-    comptime_error("untranslatable C macro: offsetof")
-// untranslatable fn-like macro
-fn putc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putc_unlocked")
-// untranslatable fn-like macro
-fn putchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putchar_unlocked")
-// untranslatable fn-like macro
-fn sigmask() -> Never:
-    comptime_error("untranslatable C macro: sigmask")
-fn snprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn sprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsnprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsprintf() -> Never:
-    comptime_error("variadic macro — use direct call")

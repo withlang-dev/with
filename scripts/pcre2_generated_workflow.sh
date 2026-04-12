@@ -212,6 +212,10 @@ prepare_generated_tree() {
     # Fix pointer-typed p used as integer index in pcre2_compile's recurse_cache binary search
     if [ -f "$generated_dir/pcre2_compile.w" ]; then
         perl -pi -e 's/recurse_cache\)\[p\]/recurse_cache)[(p as c_int)]/g' "$generated_dir/pcre2_compile.w"
+        # Adjacent string-literal macros: `STR_Q STR_BACKSLASH STR_E` should
+        # concatenate after preprocessing, but the migrator emits them as
+        # bare identifiers. Replace the one occurrence with the literal.
+        perl -pi -e 's/\(\(&STR_Q STR_BACKSLASH STR_E\[0\] as \*mut c_char\) as \*const i8\)/("Q\\\\E" as *const i8)/g' "$generated_dir/pcre2_compile.w"
     fi
 
     hoist_shared_lets_to_defs "$generated_dir"

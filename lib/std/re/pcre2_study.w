@@ -249,50 +249,50 @@ fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int:
                 utf__goto_1935_6 = (if ((re.overall_options & 524288)) != 0: 1 else: 0)
                 ucp__goto_1936_6 = (if ((re.overall_options & 131072)) != 0: 1 else: 0)
                 (code__goto_1934_14 = ((((re as *mut u8) + re.code_start)) as *mut u8))
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
-                if (if ((re.flags & ((16 | 512)))) == 0: 1 else: 0) != 0:
+                if (((re.flags & ((16 | 512)))) == 0):
                     depth__goto_1948_7 = 0
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         continue
-                    rc__goto_1949_7 = set_start_bits(re, (code__goto_1934_14 as *const u8), utf__goto_1935_6, ucp__goto_1936_6, (&mut depth__goto_1948_7 as *mut c_int))
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    rc__goto_1949_7 = set_start_bits(re, (code__goto_1934_14 as *const u8), utf__goto_1935_6, ucp__goto_1936_6, ((&depth__goto_1948_7 as *const c_int) as *mut c_int))
+                    if __goto_pending != 0:
                         continue
-                    if (if rc__goto_1949_7 == SSB_UNKNOWN: 1 else: 0) != 0:
+                    if (rc__goto_1949_7 == SSB_UNKNOWN):
                         return 1
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             continue
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         continue
-                    if (if rc__goto_1949_7 == SSB_DONE: 1 else: 0) != 0:
+                    if (rc__goto_1949_7 == SSB_DONE):
                         a__goto_1969_9 = -1
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             continue
                         b__goto_1970_9 = -1
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             continue
                         p__goto_1971_14 = (&re.start_bitmap[0] as *mut u8)
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             continue
                         flags__goto_1972_14 = 64
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             continue
                         (i__goto_1968_9 = 0)
-                        while (if i__goto_1968_9 < 256: 1 else: 0) != 0:
+                        while (i__goto_1968_9 < 256):
                             x__goto_1976_15 = (unsafe: *p__goto_1971_14)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 break
-                            if (if x__goto_1976_15 != 0: 1 else: 0) != 0:
+                            if (x__goto_1976_15 != 0):
                                 y__goto_1980_17 = (x__goto_1976_15 & (((0 - x__goto_1976_15 - 1) + 1)))
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
-                                if (if y__goto_1980_17 != x__goto_1976_15: 1 else: 0) != 0:
+                                if (y__goto_1980_17 != x__goto_1976_15):
                                     __pc = 1
                                     __goto_pending = 1
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                                 (c__goto_1979_13 = i__goto_1968_9)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                                 match x__goto_1976_15
                                     1 => 0
@@ -311,74 +311,74 @@ fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int:
                                     128 =>
                                         c__goto_1979_13 = c__goto_1979_13 + 7
                                     _ => 0
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
-                                if (if utf__goto_1935_6 != 0 and (if c__goto_1979_13 > 127: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if ((utf__goto_1935_6 != 0) and (c__goto_1979_13 > 127)):
                                     __pc = 1
                                     __goto_pending = 1
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
-                                if (if a__goto_1969_9 < 0: 1 else: 0) != 0:
+                                if (a__goto_1969_9 < 0):
                                     (a__goto_1969_9 = c__goto_1979_13)
                                 else:
-                                    if (if b__goto_1970_9 < 0: 1 else: 0) != 0:
+                                    if (b__goto_1970_9 < 0):
                                         d__goto_2012_15 = (((re.tables + (256 as isize as usize)))[(c__goto_1979_13 as c_uint)])
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        if __goto_pending != 0:
                                             break
-                                        if (if d__goto_2012_15 != a__goto_1969_9: 1 else: 0) != 0:
+                                        if (d__goto_2012_15 != a__goto_1969_9):
                                             __pc = 1
                                             __goto_pending = 1
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        if __goto_pending != 0:
                                             break
                                         (b__goto_1970_9 = c__goto_1979_13)
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        if __goto_pending != 0:
                                             break
                                     else:
                                         __pc = 1
                                         __goto_pending = 1
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 break
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 break
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             continue
-                        if (if a__goto_1969_9 >= 0: 1 else: 0) != 0:
-                            if (if ((re.flags & 128)) != 0 and ((if (if re.last_codeunit == (a__goto_1969_9 as c_uint): 1 else: 0) != 0 or ((if (if b__goto_1970_9 >= 0: 1 else: 0) != 0 and (if re.last_codeunit == (b__goto_1970_9 as c_uint): 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+                        if (a__goto_1969_9 >= 0):
+                            if (((re.flags & 128) != 0) and ((re.last_codeunit == (a__goto_1969_9 as c_uint)) or ((b__goto_1970_9 >= 0) and (re.last_codeunit == (b__goto_1970_9 as c_uint))))):
                                 re.flags = re.flags & (0 - ((128 | 256)) - 1)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
                                 (re.last_codeunit = 0)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
                             (re.first_codeunit = a__goto_1969_9)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
                             (flags__goto_1972_14 = 16)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
-                            if (if b__goto_1970_9 >= 0: 1 else: 0) != 0:
+                            if (b__goto_1970_9 >= 0):
                                 flags__goto_1972_14 = flags__goto_1972_14 | 32
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             continue
                         re.flags = re.flags | flags__goto_1972_14
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             continue
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         continue
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
-                if (if (if ((re.flags & ((8192 | 8388608)))) == 0: 1 else: 0) != 0 and (if re.top_backref <= 128: 1 else: 0) != 0: 1 else: 0) != 0:
+                if ((((re.flags & ((8192 | 8388608)))) == 0) and (re.top_backref <= 128)):
                     ((&backref_cache__goto_2073_7[0] as *mut c_int)[0] = 0)
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         continue
-                    (min__goto_2072_7 = find_minlength((re as *const pcre2_real_code_8), (code__goto_1934_14 as *const u8), (code__goto_1934_14 as *const u8), utf__goto_1935_6, (null as *mut recurse_check), (&mut count__goto_1933_5 as *mut c_int), (&backref_cache__goto_2073_7[0] as *mut c_int)))
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    (min__goto_2072_7 = find_minlength((re as *const pcre2_real_code_8), (code__goto_1934_14 as *const u8), (code__goto_1934_14 as *const u8), utf__goto_1935_6, (null as *mut recurse_check), ((&count__goto_1933_5 as *const c_int) as *mut c_int), (&backref_cache__goto_2073_7[0] as *mut c_int)))
+                    if __goto_pending != 0:
                         continue
                     match min__goto_2072_7
                         -1 => 0
@@ -387,13 +387,13 @@ fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int:
                         -3 =>
                             return 3
                         _ =>
-                            (re.minlength = (if ((if min__goto_2072_7 > (65535 as c_int): 1 else: 0)) != 0: (65535 as c_int) else: min__goto_2072_7))
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                            (re.minlength = (if (min__goto_2072_7 > (65535 as c_int)): (65535 as c_int) else: min__goto_2072_7))
+                    if __goto_pending != 0:
                         continue
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 return 0
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
             _ => break
 
@@ -448,116 +448,131 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                 once_fudge__goto_128_10 = 0
                 had_recurse__goto_129_6 = 0
                 dupcapused__goto_130_6 = (if ((re.flags & 2097152)) != 0: 1 else: 0)
+                nextbranch__goto_131_12 = (code + ((((((((code)[1] as c_uint) << 8))) | (code)[((1) + 1)])) as c_uint))
                 cc__goto_132_12 = ((code + (1 as isize as usize)) + (2 as isize as usize))
-                if (if (if (unsafe: *code) >= OP_SBRA: 1 else: 0) != 0 and (if (unsafe: *code) <= OP_SCOND: 1 else: 0) != 0: 1 else: 0) != 0:
+                if (((unsafe: *code) >= OP_SBRA) and ((unsafe: *code) <= OP_SCOND)):
                     return 0
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
-                if (if (if (unsafe: *code) == OP_CBRA: 1 else: 0) != 0 or (if (unsafe: *code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0:
+                if (((unsafe: *code) == OP_CBRA) or ((unsafe: *code) == OP_CBRAPOS)):
                     cc__goto_132_12 = cc__goto_132_12 + 2
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
-                if (if (((unsafe: *countptr)) = ((unsafe: *countptr)) + 1) > 1000: 1 else: 0) != 0:
+                if ((((unsafe: *countptr)) = ((unsafe: *countptr)) + 1) > 1000):
                     return -1
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 while true:
-                    if (if branchlength__goto_123_5 >= (65535 as c_int): 1 else: 0) != 0:
+                    if (branchlength__goto_123_5 >= (65535 as c_int)):
                         (branchlength__goto_123_5 = 65535)
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             break
                         (cc__goto_132_12 = nextbranch__goto_131_12)
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             break
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         break
                     (op__goto_154_15 = (unsafe: *cc__goto_132_12))
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         break
                     match op__goto_154_15
                         OP_COND =>
-                            if (if (unsafe: *cs__goto_155_14) != OP_ALT: 1 else: 0) != 0:
+                            if ((unsafe: *cs__goto_155_14) != OP_ALT):
                                 (cc__goto_132_12 = ((cs__goto_155_14 + (1 as isize as usize)) + (2 as isize as usize)))
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                                 break
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                             __pc = 1
                             __goto_pending = 1
-                            if (if (if cc__goto_132_12[(1 + 2)] == OP_RECURSE: 1 else: 0) != 0 and (if cc__goto_132_12[(2 * ((1 + 2)))] == OP_KET: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (once_fudge__goto_128_10 = 3)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                                cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                                break
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                            if (if d__goto_153_7 < 0: 1 else: 0) != 0:
-                                return d__goto_153_7
-                            branchlength__goto_123_5 = branchlength__goto_123_5 + d__goto_153_7
-                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
                         OP_BRA =>
-                            if (if (if cc__goto_132_12[(1 + 2)] == OP_RECURSE: 1 else: 0) != 0 and (if cc__goto_132_12[(2 * ((1 + 2)))] == OP_KET: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if ((cc__goto_132_12[(1 + 2)] == OP_RECURSE) and (cc__goto_132_12[(2 * ((1 + 2)))] == OP_KET)):
                                 (once_fudge__goto_128_10 = 3)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                                 cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                                 break
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
-                            if (if d__goto_153_7 < 0: 1 else: 0) != 0:
+                            if (d__goto_153_7 < 0):
                                 return d__goto_153_7
                             branchlength__goto_123_5 = branchlength__goto_123_5 + d__goto_153_7
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
                             cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
                         OP_ONCE =>
-                            if (if d__goto_153_7 < 0: 1 else: 0) != 0:
+                            if (d__goto_153_7 < 0):
                                 return d__goto_153_7
                             branchlength__goto_123_5 = branchlength__goto_123_5 + d__goto_153_7
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
                             cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
                         OP_CBRA =>
-                            if (if dupcapused__goto_130_6 != 0 or (if recno__goto_153_15 != prev_cap_recno__goto_124_5: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if ((dupcapused__goto_130_6 != 0) or (recno__goto_153_15 != prev_cap_recno__goto_124_5)):
                                 (prev_cap_recno__goto_124_5 = recno__goto_153_15)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                                 (prev_cap_d__goto_125_5 = find_minlength(re, cc__goto_132_12, startcode, utf, recurses, countptr, backref_cache))
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
-                                if (if prev_cap_d__goto_125_5 < 0: 1 else: 0) != 0:
+                                if (prev_cap_d__goto_125_5 < 0):
                                     return prev_cap_d__goto_125_5
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                             branchlength__goto_123_5 = branchlength__goto_123_5 + prev_cap_d__goto_125_5
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
                             cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
                         OP_ACCEPT =>
-                            if (if (if op__goto_154_15 != OP_ALT: 1 else: 0) != 0 or (if length__goto_122_5 == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if ((op__goto_154_15 != OP_ALT) or (length__goto_122_5 == 0)):
                                 return length__goto_122_5
+                            (nextbranch__goto_131_12 = (cc__goto_132_12 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
                             cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
                             (branchlength__goto_123_5 = 0)
                             (had_recurse__goto_129_6 = 0)
                         OP_ALT =>
-                            if (if (if op__goto_154_15 != OP_ALT: 1 else: 0) != 0 or (if length__goto_122_5 == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if ((op__goto_154_15 != OP_ALT) or (length__goto_122_5 == 0)):
                                 return length__goto_122_5
+                            (nextbranch__goto_131_12 = (cc__goto_132_12 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
                             cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
                             (branchlength__goto_123_5 = 0)
                             (had_recurse__goto_129_6 = 0)
                         OP_ASSERT => 0
                         OP_REVERSE => 0
-                        OP_CALLOUT_STR => 0
+                        OP_CALLOUT_STR =>
+                            cc__goto_132_12 = cc__goto_132_12 + ((((((((cc__goto_132_12)[(1 + (2 * 2))] as c_uint) << 8))) | (cc__goto_132_12)[(((1 + (2 * 2))) + 1)])) as c_uint)
                         OP_BRAZERO =>
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
                             cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
                         OP_CHAR =>
                             cc__goto_132_12 = cc__goto_132_12 + 2
                         OP_TYPEPLUS =>
-                            cc__goto_132_12 = cc__goto_132_12 + (if ((if (if cc__goto_132_12[1] == OP_PROP: 1 else: 0) != 0 or (if cc__goto_132_12[1] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 4 else: 2)
+                            cc__goto_132_12 = cc__goto_132_12 + (if ((cc__goto_132_12[1] == OP_PROP) or (cc__goto_132_12[1] == OP_NOTPROP)): 4 else: 2)
                         OP_EXACT =>
                             cc__goto_132_12 = cc__goto_132_12 + (2 + 2)
                         OP_TYPEEXACT =>
-                            cc__goto_132_12 = cc__goto_132_12 + ((2 + 2) + ((if ((if (if cc__goto_132_12[(1 + 2)] == OP_PROP: 1 else: 0) != 0 or (if cc__goto_132_12[(1 + 2)] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0)) != 0: 2 else: 0)))
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                            cc__goto_132_12 = cc__goto_132_12 + ((2 + 2) + ((if ((cc__goto_132_12[(1 + 2)] == OP_PROP) or (cc__goto_132_12[(1 + 2)] == OP_NOTPROP)): 2 else: 0)))
                         OP_PROP =>
                             (cc__goto_132_12 = cc__goto_132_12 + 1)
                         OP_NOT_DIGIT =>
@@ -584,166 +599,87 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
                             __pc = 2
                             __goto_pending = 1
-                            if (if (if recno__goto_153_15 <= backref_cache[0]: 1 else: 0) != 0 and (if backref_cache[recno__goto_153_15] >= 0: 1 else: 0) != 0: 1 else: 0) != 0:
-                                (d__goto_153_7 = backref_cache[recno__goto_153_15])
-                            else:
-                                (d__goto_153_7 = 0)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                                if (if ((re.overall_options & 512)) == 0: 1 else: 0) != 0:
-                                    (cs__goto_155_14 = _pcre2_find_bracket_8(startcode, utf, recno__goto_153_15))
-                                    (ce__goto_155_18 = cs__goto_155_14)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    if (if cs__goto_155_14 == (null as *const u8): 1 else: 0) != 0:
-                                        return -2
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                    if (if (if dupcapused__goto_130_6 != 0: 0 else: 1) != 0 or (if _pcre2_find_bracket_8(ce__goto_155_18, utf, recno__goto_153_15) == (null as *const u8): 1 else: 0) != 0: 1 else: 0) != 0:
-                                        if (if (if cc__goto_132_12 > cs__goto_155_14: 1 else: 0) != 0 and (if cc__goto_132_12 < ce__goto_155_18: 1 else: 0) != 0: 1 else: 0) != 0:
-                                            (had_recurse__goto_129_6 = 1)
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                break
-                                        else:
-                                            r__goto_587_28 = recurses
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                break
-                                            (r__goto_587_28 = recurses)
-                                            while (if r__goto_587_28 != (null as *mut recurse_check): 1 else: 0) != 0:
-                                                if (if r__goto_587_28.group == cs__goto_155_14: 1 else: 0) != 0:
-                                                    break
-                                                (r__goto_587_28 = r__goto_587_28.prev)
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                    break
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                break
-                                            if (if r__goto_587_28 != (null as *mut recurse_check): 1 else: 0) != 0:
-                                                (had_recurse__goto_129_6 = 1)
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                    break
-                                            else:
-                                                (this_recurse__goto_133_15.prev = recurses)
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                    break
-                                                (this_recurse__goto_133_15.group = cs__goto_155_14)
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                    break
-                                                (d__goto_153_7 = find_minlength(re, cs__goto_155_14, startcode, utf, (&mut this_recurse__goto_133_15 as *mut recurse_check), countptr, backref_cache))
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                    break
-                                                if (if d__goto_153_7 < 0: 1 else: 0) != 0:
-                                                    return d__goto_153_7
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                    break
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
-                                                break
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
-                                            break
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                                (backref_cache[recno__goto_153_15] = d__goto_153_7)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                                (i__goto_570_11 = (backref_cache[0] + 1))
-                                while (if i__goto_570_11 < recno__goto_153_15: 1 else: 0) != 0:
-                                    (backref_cache[i__goto_570_11] = -1)
-                                    (i__goto_570_11 = i__goto_570_11 + 1)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
-                                        break
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                                (backref_cache[0] = recno__goto_153_15)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
-                                    break
-                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
-                            match (unsafe: *cc__goto_132_12)
-                                OP_CRSTAR =>
-                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
-                                OP_CRPLUS =>
-                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
-                                OP_CRRANGE =>
-                                    cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
-                                _ =>
-                                    (min__goto_153_10 = 1)
-                            if (if ((if (if d__goto_153_7 > 0: 1 else: 0) != 0 and (if ((2147483647 / d__goto_153_7)) < min__goto_153_10: 1 else: 0) != 0: 1 else: 0)) != 0 or (if ((65535 as c_int) - branchlength__goto_123_5) < (min__goto_153_10 * d__goto_153_7): 1 else: 0) != 0: 1 else: 0) != 0:
-                                (branchlength__goto_123_5 = 65535)
-                            else:
-                                branchlength__goto_123_5 = branchlength__goto_123_5 + (min__goto_153_10 * d__goto_153_7)
                         OP_REF =>
-                            if (if (if recno__goto_153_15 <= backref_cache[0]: 1 else: 0) != 0 and (if backref_cache[recno__goto_153_15] >= 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if ((recno__goto_153_15 <= backref_cache[0]) and (backref_cache[recno__goto_153_15] >= 0)):
                                 (d__goto_153_7 = backref_cache[recno__goto_153_15])
                             else:
                                 (d__goto_153_7 = 0)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
-                                if (if ((re.overall_options & 512)) == 0: 1 else: 0) != 0:
+                                if (((re.overall_options & 512)) == 0):
                                     (cs__goto_155_14 = _pcre2_find_bracket_8(startcode, utf, recno__goto_153_15))
                                     (ce__goto_155_18 = cs__goto_155_14)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    if __goto_pending != 0:
                                         break
-                                    if (if cs__goto_155_14 == (null as *const u8): 1 else: 0) != 0:
+                                    if (cs__goto_155_14 == (null as *const u8)):
                                         return -2
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    if __goto_pending != 0:
                                         break
-                                    if (if (if dupcapused__goto_130_6 != 0: 0 else: 1) != 0 or (if _pcre2_find_bracket_8(ce__goto_155_18, utf, recno__goto_153_15) == (null as *const u8): 1 else: 0) != 0: 1 else: 0) != 0:
-                                        if (if (if cc__goto_132_12 > cs__goto_155_14: 1 else: 0) != 0 and (if cc__goto_132_12 < ce__goto_155_18: 1 else: 0) != 0: 1 else: 0) != 0:
+                                    while true:
+                                        ce__goto_155_18 = ce__goto_155_18 + ((((((((ce__goto_155_18)[1] as c_uint) << 8))) | (ce__goto_155_18)[((1) + 1)])) as c_uint)
+                                        if __goto_pending != 0:
+                                            break
+                                        if not (((unsafe: *ce__goto_155_18) == OP_ALT)):
+                                            break
+                                    if __goto_pending != 0:
+                                        break
+                                    if ((not ((dupcapused__goto_130_6 != 0))) or (_pcre2_find_bracket_8(ce__goto_155_18, utf, recno__goto_153_15) == (null as *const u8))):
+                                        if ((cc__goto_132_12 > cs__goto_155_14) and (cc__goto_132_12 < ce__goto_155_18)):
                                             (had_recurse__goto_129_6 = 1)
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            if __goto_pending != 0:
                                                 break
                                         else:
                                             r__goto_587_28 = recurses
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            if __goto_pending != 0:
                                                 break
                                             (r__goto_587_28 = recurses)
-                                            while (if r__goto_587_28 != (null as *mut recurse_check): 1 else: 0) != 0:
-                                                if (if r__goto_587_28.group == cs__goto_155_14: 1 else: 0) != 0:
+                                            while (r__goto_587_28 != (null as *mut recurse_check)):
+                                                if (r__goto_587_28.group == cs__goto_155_14):
                                                     break
                                                 (r__goto_587_28 = r__goto_587_28.prev)
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                if __goto_pending != 0:
                                                     break
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            if __goto_pending != 0:
                                                 break
-                                            if (if r__goto_587_28 != (null as *mut recurse_check): 1 else: 0) != 0:
+                                            if (r__goto_587_28 != (null as *mut recurse_check)):
                                                 (had_recurse__goto_129_6 = 1)
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                if __goto_pending != 0:
                                                     break
                                             else:
                                                 (this_recurse__goto_133_15.prev = recurses)
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                if __goto_pending != 0:
                                                     break
                                                 (this_recurse__goto_133_15.group = cs__goto_155_14)
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                if __goto_pending != 0:
                                                     break
-                                                (d__goto_153_7 = find_minlength(re, cs__goto_155_14, startcode, utf, (&mut this_recurse__goto_133_15 as *mut recurse_check), countptr, backref_cache))
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                (d__goto_153_7 = find_minlength(re, cs__goto_155_14, startcode, utf, ((&this_recurse__goto_133_15 as *const recurse_check) as *mut recurse_check), countptr, backref_cache))
+                                                if __goto_pending != 0:
                                                     break
-                                                if (if d__goto_153_7 < 0: 1 else: 0) != 0:
+                                                if (d__goto_153_7 < 0):
                                                     return d__goto_153_7
-                                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                                if __goto_pending != 0:
                                                     break
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            if __goto_pending != 0:
                                                 break
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        if __goto_pending != 0:
                                             break
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    if __goto_pending != 0:
                                         break
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                                 (backref_cache[recno__goto_153_15] = d__goto_153_7)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                                 (i__goto_570_11 = (backref_cache[0] + 1))
-                                while (if i__goto_570_11 < recno__goto_153_15: 1 else: 0) != 0:
+                                while (i__goto_570_11 < recno__goto_153_15):
                                     (backref_cache[i__goto_570_11] = -1)
                                     (i__goto_570_11 = i__goto_570_11 + 1)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    if __goto_pending != 0:
                                         break
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                                 (backref_cache[0] = recno__goto_153_15)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                             cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
                             match (unsafe: *cc__goto_132_12)
@@ -755,56 +691,67 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                     cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
                                 _ =>
                                     (min__goto_153_10 = 1)
-                            if (if ((if (if d__goto_153_7 > 0: 1 else: 0) != 0 and (if ((2147483647 / d__goto_153_7)) < min__goto_153_10: 1 else: 0) != 0: 1 else: 0)) != 0 or (if ((65535 as c_int) - branchlength__goto_123_5) < (min__goto_153_10 * d__goto_153_7): 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (((d__goto_153_7 > 0) and (((2147483647 / d__goto_153_7)) < min__goto_153_10)) or (((65535 as c_int) - branchlength__goto_123_5) < (min__goto_153_10 * d__goto_153_7))):
                                 (branchlength__goto_123_5 = 65535)
                             else:
                                 branchlength__goto_123_5 = branchlength__goto_123_5 + (min__goto_153_10 * d__goto_153_7)
                         OP_RECURSE =>
-                            if (if recno__goto_153_15 == prev_recurse_recno__goto_126_5: 1 else: 0) != 0:
+                            (ce__goto_155_18 = (startcode + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
+                            (cs__goto_155_14 = ce__goto_155_18)
+                            (recno__goto_153_15 = ((((((((cs__goto_155_14)[(1 + 2)] as c_uint) << 8))) | (cs__goto_155_14)[(((1 + 2)) + 1)])) as c_uint))
+                            if (recno__goto_153_15 == prev_recurse_recno__goto_126_5):
                                 branchlength__goto_123_5 = branchlength__goto_123_5 + prev_recurse_d__goto_127_5
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                             else:
-                                if (if (if cc__goto_132_12 > cs__goto_155_14: 1 else: 0) != 0 and (if cc__goto_132_12 < ce__goto_155_18: 1 else: 0) != 0: 1 else: 0) != 0:
+                                while true:
+                                    ce__goto_155_18 = ce__goto_155_18 + ((((((((ce__goto_155_18)[1] as c_uint) << 8))) | (ce__goto_155_18)[((1) + 1)])) as c_uint)
+                                    if __goto_pending != 0:
+                                        break
+                                    if not (((unsafe: *ce__goto_155_18) == OP_ALT)):
+                                        break
+                                if __goto_pending != 0:
+                                    break
+                                if ((cc__goto_132_12 > cs__goto_155_14) and (cc__goto_132_12 < ce__goto_155_18)):
                                     (had_recurse__goto_129_6 = 1)
                                 else:
                                     r__goto_673_24 = recurses
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    if __goto_pending != 0:
                                         break
                                     (r__goto_673_24 = recurses)
-                                    while (if r__goto_673_24 != (null as *mut recurse_check): 1 else: 0) != 0:
-                                        if (if r__goto_673_24.group == cs__goto_155_14: 1 else: 0) != 0:
+                                    while (r__goto_673_24 != (null as *mut recurse_check)):
+                                        if (r__goto_673_24.group == cs__goto_155_14):
                                             break
                                         (r__goto_673_24 = r__goto_673_24.prev)
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        if __goto_pending != 0:
                                             break
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    if __goto_pending != 0:
                                         break
-                                    if (if r__goto_673_24 != (null as *mut recurse_check): 1 else: 0) != 0:
+                                    if (r__goto_673_24 != (null as *mut recurse_check)):
                                         (had_recurse__goto_129_6 = 1)
                                     else:
                                         (this_recurse__goto_133_15.prev = recurses)
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        if __goto_pending != 0:
                                             break
                                         (this_recurse__goto_133_15.group = cs__goto_155_14)
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        if __goto_pending != 0:
                                             break
-                                        (prev_recurse_d__goto_127_5 = find_minlength(re, cs__goto_155_14, startcode, utf, (&mut this_recurse__goto_133_15 as *mut recurse_check), countptr, backref_cache))
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        (prev_recurse_d__goto_127_5 = find_minlength(re, cs__goto_155_14, startcode, utf, ((&this_recurse__goto_133_15 as *const recurse_check) as *mut recurse_check), countptr, backref_cache))
+                                        if __goto_pending != 0:
                                             break
-                                        if (if prev_recurse_d__goto_127_5 < 0: 1 else: 0) != 0:
+                                        if (prev_recurse_d__goto_127_5 < 0):
                                             return prev_recurse_d__goto_127_5
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        if __goto_pending != 0:
                                             break
                                         (prev_recurse_recno__goto_126_5 = recno__goto_153_15)
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        if __goto_pending != 0:
                                             break
                                         branchlength__goto_123_5 = branchlength__goto_123_5 + prev_recurse_d__goto_127_5
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        if __goto_pending != 0:
                                             break
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    if __goto_pending != 0:
                                         break
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     break
                             cc__goto_132_12 = cc__goto_132_12 + (3 +% once_fudge__goto_128_10)
                             (once_fudge__goto_128_10 = 0)
@@ -813,14 +760,14 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                         OP_CLOSE => 0
                         _ =>
                             return -3
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         break
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         break
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 return -3
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
             _ => break
 
@@ -829,12 +776,18 @@ fn set_table_bit(re: *mut pcre2_real_code_8, __param_p: *const u8, caseless: c_i
     var c: c_uint = (unsafe: *(p = p + 1))
     utf
     ucp
+    (&re.start_bitmap[0] as *mut u8)[((c) / 8)] = (&re.start_bitmap[0] as *mut u8)[((c) / 8)] | ((1 << (((c) & 7))))
+    if (caseless != 0):
+        if (1 != 0):
+            (&re.start_bitmap[0] as *mut u8)[((re.tables[(256 +% c)]) / 8)] = (&re.start_bitmap[0] as *mut u8)[((re.tables[(256 +% c)]) / 8)] | ((1 << (((re.tables[(256 +% c)]) & 7))))
+        
+
     return p
 
 fn set_type_bits(re: *mut pcre2_real_code_8, cbit_type: c_int, table_limit: c_uint):
     var c: c_uint
     (c = 0)
-    while (if c < table_limit: 1 else: 0) != 0:
+    while (c < table_limit):
         (&re.start_bitmap[0] as *mut u8)[c] = (&re.start_bitmap[0] as *mut u8)[c] | re.tables[((c +% 512) +% cbit_type)]
         (c = c + 1)
 
@@ -842,7 +795,7 @@ fn set_type_bits(re: *mut pcre2_real_code_8, cbit_type: c_int, table_limit: c_ui
 fn set_nottype_bits(re: *mut pcre2_real_code_8, cbit_type: c_int, table_limit: c_uint):
     var c: c_uint
     (c = 0)
-    while (if c < table_limit: 1 else: 0) != 0:
+    while (c < table_limit):
         (&re.start_bitmap[0] as *mut u8)[c] = (&re.start_bitmap[0] as *mut u8)[c] | (((0 - (re.tables[((c +% 512) +% cbit_type)]) - 1)) as u8)
         (c = c + 1)
 
@@ -853,16 +806,16 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
     var yield_: c_int = SSB_DONE
     var table_limit: c_int = 32
     (unsafe: *depthptr) = (unsafe: *depthptr) + 1
-    if (if (unsafe: *depthptr) > 1000: 1 else: 0) != 0:
+    if ((unsafe: *depthptr) > 1000):
         return SSB_TOODEEP
 
     while true:
         var try_next: c_int = 1
         var tcode: *const u8 = ((code + (1 as isize as usize)) + (2 as isize as usize))
-        if (if (if (if (if (unsafe: *code) == OP_CBRA: 1 else: 0) != 0 or (if (unsafe: *code) == OP_SCBRA: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0 or (if (unsafe: *code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0) != 0:
+        if (((((unsafe: *code) == OP_CBRA) or ((unsafe: *code) == OP_SCBRA)) or ((unsafe: *code) == OP_CBRAPOS)) or ((unsafe: *code) == OP_SCBRAPOS)):
             tcode = tcode + 2
         
-        while try_next != 0:
+        while (try_next != 0):
             var rc: c_int
             var ncode: *const u8
             var classmap: *const u8 = (null as *const u8)
@@ -872,45 +825,67 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                 OP_CIRC =>
                     tcode = tcode + _pcre2_OP_lengths_8[OP_CIRC]
                 OP_PROP =>
-                    if (if tcode[1] != 9: 1 else: 0) != 0:
+                    if (tcode[1] != 9):
                         return SSB_FAIL
                     var p: *const c_uint = (_pcre2_ucd_caseless_sets_8 + (tcode[2] as isize as usize))
+                    while (((c = (unsafe: *(p = p + 1)))) < 4294967295):
+                        if (c > 255):
+                            (&re.start_bitmap[0] as *mut u8)[((255) / 8)] = (&re.start_bitmap[0] as *mut u8)[((255) / 8)] | ((1 << (((255) & 7))))
+                        else:
+                            (&re.start_bitmap[0] as *mut u8)[((c) / 8)] = (&re.start_bitmap[0] as *mut u8)[((c) / 8)] | ((1 << (((c) & 7))))
+                        
+                    
                     (try_next = 0)
                 OP_WORD_BOUNDARY => 0
                 OP_ASSERT =>
+                    while ((unsafe: *ncode) == OP_ALT):
+                        ncode = ncode + ((((((((ncode)[1] as c_uint) << 8))) | (ncode)[((1) + 1)])) as c_uint)
                     ncode = ncode + (1 + 2)
                     var done: c_int = 0
-                    while (if done != 0: 0 else: 1) != 0:
+                    while (not ((done != 0))):
                         match (unsafe: *ncode)
                             OP_ASSERT =>
+                                while ((unsafe: *ncode) == OP_ALT):
+                                    ncode = ncode + ((((((((ncode)[1] as c_uint) << 8))) | (ncode)[((1) + 1)])) as c_uint)
                                 ncode = ncode + (1 + 2)
                             OP_WORD_BOUNDARY => 0
                             OP_CALLOUT =>
                                 ncode = ncode + _pcre2_OP_lengths_8[OP_CALLOUT]
-                            OP_CALLOUT_STR => 0
+                            OP_CALLOUT_STR =>
+                                ncode = ncode + ((((((((ncode)[(1 + (2 * 2))] as c_uint) << 8))) | (ncode)[(((1 + (2 * 2))) + 1)])) as c_uint)
                             _ =>
                                 (done = 1)
                         
                     match (unsafe: *ncode)
                         OP_PROP =>
-                            if (if ncode[1] != 9: 1 else: 0) != 0:
+                            if (ncode[1] != 9):
                                 break
                             continue
                         OP_ANYNL =>
                             continue
                         _ => 0
-                    if (if rc == SSB_DONE: 1 else: 0) != 0:
+                    if (rc == SSB_DONE):
                         (try_next = 0)
                     else:
-                        if (if rc == SSB_CONTINUE: 1 else: 0) != 0:
+                        if (rc == SSB_CONTINUE):
+                            while true:
+                                tcode = tcode + ((((((((tcode)[1] as c_uint) << 8))) | (tcode)[((1) + 1)])) as c_uint)
+                                if not (((unsafe: *tcode) == OP_ALT)):
+                                    break
+                            
                             tcode = tcode + (1 + 2)
                         else:
                             return rc
                 OP_BRA =>
-                    if (if rc == SSB_DONE: 1 else: 0) != 0:
+                    if (rc == SSB_DONE):
                         (try_next = 0)
                     else:
-                        if (if rc == SSB_CONTINUE: 1 else: 0) != 0:
+                        if (rc == SSB_CONTINUE):
+                            while true:
+                                tcode = tcode + ((((((((tcode)[1] as c_uint) << 8))) | (tcode)[((1) + 1)])) as c_uint)
+                                if not (((unsafe: *tcode) == OP_ALT)):
+                                    break
+                            
                             tcode = tcode + (1 + 2)
                         else:
                             return rc
@@ -921,15 +896,24 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                     tcode = tcode + _pcre2_OP_lengths_8[OP_CALLOUT]
                 OP_CALLOUT =>
                     tcode = tcode + _pcre2_OP_lengths_8[OP_CALLOUT]
-                OP_CALLOUT_STR => 0
+                OP_CALLOUT_STR =>
+                    tcode = tcode + ((((((((tcode)[(1 + (2 * 2))] as c_uint) << 8))) | (tcode)[(((1 + (2 * 2))) + 1)])) as c_uint)
                 OP_ASSERT_NOT =>
                     tcode = tcode + (1 + 2)
                 OP_BRAZERO =>
-                    if (if (if (if rc == SSB_FAIL: 1 else: 0) != 0 or (if rc == SSB_UNKNOWN: 1 else: 0) != 0: 1 else: 0) != 0 or (if rc == SSB_TOODEEP: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (((rc == SSB_FAIL) or (rc == SSB_UNKNOWN)) or (rc == SSB_TOODEEP)):
                         return rc
+                    while true:
+                        tcode = tcode + ((((((((tcode)[1] as c_uint) << 8))) | (tcode)[((1) + 1)])) as c_uint)
+                        if not (((unsafe: *tcode) == OP_ALT)):
+                            break
                     tcode = tcode + (1 + 2)
                 OP_SKIPZERO =>
                     (tcode = tcode + 1)
+                    while true:
+                        tcode = tcode + ((((((((tcode)[1] as c_uint) << 8))) | (tcode)[((1) + 1)])) as c_uint)
+                        if not (((unsafe: *tcode) == OP_ALT)):
+                            break
                     tcode = tcode + (1 + 2)
                 OP_STAR => 0
                 OP_STARI => 0
@@ -946,8 +930,15 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                 OP_CHARI =>
                     (try_next = 0)
                 OP_HSPACE =>
+                    (&re.start_bitmap[0] as *mut u8)[((9) / 8)] = (&re.start_bitmap[0] as *mut u8)[((9) / 8)] | ((1 << (((9) & 7))))
+                    (&re.start_bitmap[0] as *mut u8)[((32) / 8)] = (&re.start_bitmap[0] as *mut u8)[((32) / 8)] | ((1 << (((32) & 7))))
+                    (&re.start_bitmap[0] as *mut u8)[(160 / 8)] = (&re.start_bitmap[0] as *mut u8)[(160 / 8)] | ((1 << ((160 & 7))))
                     (try_next = 0)
                 OP_ANYNL =>
+                    (&re.start_bitmap[0] as *mut u8)[((11) / 8)] = (&re.start_bitmap[0] as *mut u8)[((11) / 8)] | ((1 << (((11) & 7))))
+                    (&re.start_bitmap[0] as *mut u8)[((12) / 8)] = (&re.start_bitmap[0] as *mut u8)[((12) / 8)] | ((1 << (((12) & 7))))
+                    (&re.start_bitmap[0] as *mut u8)[((13) / 8)] = (&re.start_bitmap[0] as *mut u8)[((13) / 8)] | ((1 << (((13) & 7))))
+                    (&re.start_bitmap[0] as *mut u8)[(133 / 8)] = (&re.start_bitmap[0] as *mut u8)[(133 / 8)] | ((1 << ((133 & 7))))
                     (try_next = 0)
                 OP_NOT_DIGIT =>
                     set_nottype_bits(re, 64, table_limit)
@@ -975,9 +966,9 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                 OP_TYPESTAR =>
                     tcode = tcode + 2
                 OP_NCLASS =>
-                    if (if classmap != (null as *const u8): 1 else: 0) != 0:
+                    if (classmap != (null as *const u8)):
                         (c = 0)
-                        while (if c < 32: 1 else: 0) != 0:
+                        while (c < 32):
                             (&re.start_bitmap[0] as *mut u8)[c] = (&re.start_bitmap[0] as *mut u8)[c] | classmap[c]
                             (c = c + 1)
                         
@@ -991,320 +982,9 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                     return SSB_UNKNOWN
             
         
-        if not ((if (unsafe: *code) == OP_ALT: 1 else: 0) != 0):
+        code = code + ((((((((code)[1] as c_uint) << 8))) | (code)[((1) + 1)])) as c_uint)
+        if not (((unsafe: *code) == OP_ALT)):
             break
 
     return yield_
 
-// untranslatable fn-like macro
-fn BYTES2CU() -> Never:
-    comptime_error("untranslatable C macro: BYTES2CU")
-// untranslatable fn-like macro
-fn CAST_USER_ADDR_T() -> Never:
-    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
-// untranslatable fn-like macro
-fn CHMAX_255() -> Never:
-    comptime_error("untranslatable C macro: CHMAX_255")
-// untranslatable fn-like macro
-fn CU2BYTES() -> Never:
-    comptime_error("untranslatable C macro: CU2BYTES")
-// untranslatable fn-like macro
-fn GET() -> Never:
-    comptime_error("untranslatable C macro: GET")
-// untranslatable fn-like macro
-fn GET2() -> Never:
-    comptime_error("untranslatable C macro: GET2")
-// untranslatable fn-like macro
-fn GETCHAR() -> Never:
-    comptime_error("untranslatable C macro: GETCHAR")
-// untranslatable fn-like macro
-fn GETCHARINC() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINC")
-// untranslatable fn-like macro
-fn GETCHARINCTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINCTEST")
-// untranslatable fn-like macro
-fn GETCHARLEN() -> Never:
-    comptime_error("untranslatable C macro: GETCHARLEN")
-// untranslatable fn-like macro
-fn GETCHARTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARTEST")
-// untranslatable fn-like macro
-fn GETUTF8() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8")
-// untranslatable fn-like macro
-fn GETUTF8INC() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8INC")
-// untranslatable fn-like macro
-fn GETUTF8LEN() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8LEN")
-// untranslatable fn-like macro
-fn GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: GET_UCD")
-fn HASUTF8EXTRALEN[T](c: T) -> T:
-    (c >= 0xc0)
-// untranslatable fn-like macro
-fn HTONL() -> Never:
-    comptime_error("untranslatable C macro: HTONL")
-// untranslatable fn-like macro
-fn HTONLL() -> Never:
-    comptime_error("untranslatable C macro: HTONLL")
-// untranslatable fn-like macro
-fn HTONS() -> Never:
-    comptime_error("untranslatable C macro: HTONS")
-fn INT16_C[T](v: T) -> T:
-    v
-fn INT32_C[T](v: T) -> T:
-    v
-fn INT64_C[T](v: T) -> i64:
-    (v as i64)
-fn INT8_C[T](v: T) -> T:
-    v
-fn INTMAX_C[T](v: T) -> i64:
-    (v as i64)
-// untranslatable fn-like macro
-fn IS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: IS_NEWLINE")
-// untranslatable fn-like macro
-fn MAPBIT() -> Never:
-    comptime_error("untranslatable C macro: MAPBIT")
-// untranslatable fn-like macro
-fn MAPSET() -> Never:
-    comptime_error("untranslatable C macro: MAPSET")
-// untranslatable fn-like macro
-fn MAX_255() -> Never:
-    comptime_error("untranslatable C macro: MAX_255")
-let MAX_CACHE_BACKREF: c_int = 128
-// untranslatable fn-like macro
-fn NTOHL() -> Never:
-    comptime_error("untranslatable C macro: NTOHL")
-// untranslatable fn-like macro
-fn NTOHLL() -> Never:
-    comptime_error("untranslatable C macro: NTOHLL")
-// untranslatable fn-like macro
-fn NTOHS() -> Never:
-    comptime_error("untranslatable C macro: NTOHS")
-// untranslatable fn-like macro
-fn PCRE2_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_ASSERT")
-// untranslatable fn-like macro
-fn PCRE2_DEBUG_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
-// untranslatable fn-like macro
-fn PCRE2_GLUE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_GLUE")
-// untranslatable fn-like macro
-fn PCRE2_JOIN() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_JOIN")
-fn PCRE2_SUFFIX[T](a: T) -> T:
-    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
-// untranslatable fn-like macro
-fn PCRE2_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
-// untranslatable fn-like macro
-fn PRIV() -> Never:
-    comptime_error("untranslatable C macro: PRIV")
-// untranslatable fn-like macro
-fn PUT() -> Never:
-    comptime_error("untranslatable C macro: PUT")
-// untranslatable fn-like macro
-fn PUT2() -> Never:
-    comptime_error("untranslatable C macro: PUT2")
-// untranslatable fn-like macro
-fn PUT2INC() -> Never:
-    comptime_error("untranslatable C macro: PUT2INC")
-// untranslatable fn-like macro
-fn PUTCHAR() -> Never:
-    comptime_error("untranslatable C macro: PUTCHAR")
-// untranslatable fn-like macro
-fn PUTINC() -> Never:
-    comptime_error("untranslatable C macro: PUTINC")
-// untranslatable fn-like macro
-fn REAL_GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: REAL_GET_UCD")
-// untranslatable fn-like macro
-fn SET_BIT() -> Never:
-    comptime_error("untranslatable C macro: SET_BIT")
-// untranslatable fn-like macro
-fn STATIC_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT")
-// untranslatable fn-like macro
-fn STATIC_ASSERT_JOIN() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
-// untranslatable fn-like macro
-fn TABLE_GET() -> Never:
-    comptime_error("untranslatable C macro: TABLE_GET")
-// untranslatable fn-like macro
-fn UCD_ANY_I() -> Never:
-    comptime_error("untranslatable C macro: UCD_ANY_I")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
-// untranslatable fn-like macro
-fn UCD_BPROPS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS")
-// untranslatable fn-like macro
-fn UCD_BPROPS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
-// untranslatable fn-like macro
-fn UCD_CASESET() -> Never:
-    comptime_error("untranslatable C macro: UCD_CASESET")
-// untranslatable fn-like macro
-fn UCD_CATEGORY() -> Never:
-    comptime_error("untranslatable C macro: UCD_CATEGORY")
-// untranslatable fn-like macro
-fn UCD_CHARTYPE() -> Never:
-    comptime_error("untranslatable C macro: UCD_CHARTYPE")
-fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
-fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
-// untranslatable fn-like macro
-fn UCD_GRAPHBREAK() -> Never:
-    comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
-// untranslatable fn-like macro
-fn UCD_OTHERCASE() -> Never:
-    comptime_error("untranslatable C macro: UCD_OTHERCASE")
-// untranslatable fn-like macro
-fn UCD_SCRIPT() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPT")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
-fn UINT16_C[T](v: T) -> T:
-    v
-fn UINT32_C[T](v: T) -> u32:
-    (v as u32)
-fn UINT64_C[T](v: T) -> u64:
-    (v as u64)
-fn UINT8_C[T](v: T) -> T:
-    v
-fn UINTMAX_C[T](v: T) -> u64:
-    (v as u64)
-// untranslatable fn-like macro
-fn WAS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: WAS_NEWLINE")
-// untranslatable fn-like macro
-fn WCOREDUMP() -> Never:
-    comptime_error("untranslatable C macro: WCOREDUMP")
-// untranslatable fn-like macro
-fn WEXITSTATUS() -> Never:
-    comptime_error("untranslatable C macro: WEXITSTATUS")
-// untranslatable fn-like macro
-fn WIFCONTINUED() -> Never:
-    comptime_error("untranslatable C macro: WIFCONTINUED")
-// untranslatable fn-like macro
-fn WIFEXITED() -> Never:
-    comptime_error("untranslatable C macro: WIFEXITED")
-// untranslatable fn-like macro
-fn WIFSIGNALED() -> Never:
-    comptime_error("untranslatable C macro: WIFSIGNALED")
-// untranslatable fn-like macro
-fn WIFSTOPPED() -> Never:
-    comptime_error("untranslatable C macro: WIFSTOPPED")
-// untranslatable fn-like macro
-fn WSTOPSIG() -> Never:
-    comptime_error("untranslatable C macro: WSTOPSIG")
-// untranslatable fn-like macro
-fn WTERMSIG() -> Never:
-    comptime_error("untranslatable C macro: WTERMSIG")
-fn W_EXITCODE[T](ret: T, sig: T) -> T:
-    ((ret << 8) | sig)
-// untranslatable fn-like macro
-fn W_STOPCODE() -> Never:
-    comptime_error("untranslatable C macro: W_STOPCODE")
-// untranslatable fn-like macro
-fn alloca() -> Never:
-    comptime_error("untranslatable C macro: alloca")
-// untranslatable fn-like macro
-fn clearerr_unlocked() -> Never:
-    comptime_error("untranslatable C macro: clearerr_unlocked")
-// untranslatable fn-like macro
-fn feof_unlocked() -> Never:
-    comptime_error("untranslatable C macro: feof_unlocked")
-// untranslatable fn-like macro
-fn ferror_unlocked() -> Never:
-    comptime_error("untranslatable C macro: ferror_unlocked")
-// untranslatable fn-like macro
-fn fileno_unlocked() -> Never:
-    comptime_error("untranslatable C macro: fileno_unlocked")
-// untranslatable fn-like macro
-fn fropen() -> Never:
-    comptime_error("untranslatable C macro: fropen")
-// untranslatable fn-like macro
-fn fwopen() -> Never:
-    comptime_error("untranslatable C macro: fwopen")
-// untranslatable fn-like macro
-fn getc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getc_unlocked")
-// untranslatable fn-like macro
-fn getchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getchar_unlocked")
-// untranslatable fn-like macro
-fn htonl() -> Never:
-    comptime_error("untranslatable C macro: htonl")
-// untranslatable fn-like macro
-fn htonll() -> Never:
-    comptime_error("untranslatable C macro: htonll")
-// untranslatable fn-like macro
-fn htons() -> Never:
-    comptime_error("untranslatable C macro: htons")
-fn memccpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memmove() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memset() -> Never:
-    comptime_error("variadic macro — use direct call")
-// untranslatable fn-like macro
-fn ntohl() -> Never:
-    comptime_error("untranslatable C macro: ntohl")
-// untranslatable fn-like macro
-fn ntohll() -> Never:
-    comptime_error("untranslatable C macro: ntohll")
-// untranslatable fn-like macro
-fn ntohs() -> Never:
-    comptime_error("untranslatable C macro: ntohs")
-// untranslatable fn-like macro
-fn offsetof() -> Never:
-    comptime_error("untranslatable C macro: offsetof")
-// untranslatable fn-like macro
-fn putc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putc_unlocked")
-// untranslatable fn-like macro
-fn putchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putchar_unlocked")
-// untranslatable fn-like macro
-fn sigmask() -> Never:
-    comptime_error("untranslatable C macro: sigmask")
-fn snprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn sprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsnprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsprintf() -> Never:
-    comptime_error("variadic macro — use direct call")

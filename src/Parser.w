@@ -4451,7 +4451,10 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
     if t == TokenKind.TK_INT_LIT:
         let text = self.source.slice(start as i64, end as i64)
         self.advance()
-        let val = parse_int(text)
+        // Use full i64 parsing (parse_int clamps to i32 range, which silently
+        // truncates pattern literals like META_END = 0x80000000 to i32 max,
+        // breaking match dispatch on every value >= 2^31).
+        let val64 = parse_i64(text)
         if self.peek() == TokenKind.TK_DOT_DOT or self.peek() == TokenKind.TK_DOT_DOT_EQ:
             let inclusive = if self.peek() == TokenKind.TK_DOT_DOT_EQ: 1 else: 0
             self.advance()
@@ -4460,8 +4463,10 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
             let etext = self.source.slice(es as i64, ee as i64)
             self.expect(TokenKind.TK_INT_LIT)
             let eval = parse_int(etext)
-            return self.pool.add_node(NodeKind.NK_PAT_RANGE, start, self.prev_end(), val, eval, inclusive)
-        return self.pool.add_node(NodeKind.NK_PAT_INT, start, end, val, 0, 0)
+            return self.pool.add_node(NodeKind.NK_PAT_RANGE, start, self.prev_end(), val64 as i32, eval, inclusive)
+        // Store the i64 value across d0/d1/d2 using the same 3-part encoding
+        // as NK_INT_LIT, so int_lit_value() can decode it uniformly.
+        return self.pool.add_node(NodeKind.NK_PAT_INT, start, end, ast_int_part0(val64), ast_int_part1(val64), ast_int_part2(val64))
 
     if t == TokenKind.TK_TRUE:
         let pat_end = self.current_end()
@@ -4483,7 +4488,8 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
         let ne = self.current_end()
         let text = self.source.slice(ns as i64, ne as i64)
         self.expect(TokenKind.TK_INT_LIT)
-        let val = 0 - parse_int(text)
+        let val64_neg = 0 - parse_i64(text)
+        let val = val64_neg as i32
         if self.peek() == TokenKind.TK_DOT_DOT or self.peek() == TokenKind.TK_DOT_DOT_EQ:
             let inclusive = if self.peek() == TokenKind.TK_DOT_DOT_EQ: 1 else: 0
             self.advance()
@@ -4502,7 +4508,7 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
                 self.expect(TokenKind.TK_INT_LIT)
                 eval = parse_int(etext)
             return self.pool.add_node(NodeKind.NK_PAT_RANGE, start, self.prev_end(), val, eval, inclusive)
-        return self.pool.add_node(NodeKind.NK_PAT_INT, start, self.prev_end(), val, 0, 0)
+        return self.pool.add_node(NodeKind.NK_PAT_INT, start, self.prev_end(), ast_int_part0(val64_neg), ast_int_part1(val64_neg), ast_int_part2(val64_neg))
 
     if t == TokenKind.TK_IDENT:
         let name = self.expect_ident()

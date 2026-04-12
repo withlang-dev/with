@@ -273,131 +273,263 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                 classbits__goto_1098_16 = (&cb.classbits.classbits[0] as *mut u8)
                 utf__goto_1103_6 = 0
                 has_bitmap
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 errorcodeptr
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 lengthptr
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 (should_flip_negation__goto_1094_6 = 0)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 with_memset((classbits__goto_1098_16 as *mut c_void) as *i8, 0, 32 as i64)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
-                while 1 != 0:
+                while (1 != 0):
                     meta__goto_1190_12 = (unsafe: *((pptr__goto_1092_11 = pptr__goto_1092_11 + 1)))
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
+                        break
+                    match ((meta__goto_1190_12 & (4294901760 as c_uint)))
+                        2149580800 =>
+                            (posix_class__goto_1192_7 = (unsafe: *pptr__goto_1092_11))
+                            (pptr__goto_1092_11 = pptr__goto_1092_11 + 1)
+                            if (local_negate__goto_1191_8 != 0):
+                                (should_flip_negation__goto_1094_6 = 1)
+                            if ((((options & 8)) != 0) and (posix_class__goto_1192_7 <= 2)):
+                                (posix_class__goto_1192_7 = 0)
+                            posix_class__goto_1192_7 = posix_class__goto_1192_7 * 3
+                            with_memcpy(((&pbits__goto_1194_22.classbits[0] as *mut u8) as *mut c_void) as *i8, ((cbits__goto_1095_16 + (_pcre2_posix_class_maps8[posix_class__goto_1192_7] as isize as usize)) as *const c_void) as *i8, 32 as i64)
+                            (taboffset__goto_1193_7 = _pcre2_posix_class_maps8[(posix_class__goto_1192_7 + 1)])
+                            (tabopt__goto_1193_18 = _pcre2_posix_class_maps8[(posix_class__goto_1192_7 + 2)])
+                            if (taboffset__goto_1193_7 >= 0):
+                                if (tabopt__goto_1193_18 >= 0):
+                                    i__goto_1295_18 = 0
+                                    while (i__goto_1295_18 < 32):
+                                        (&pbits__goto_1194_22.classbits[0] as *mut u8)[i__goto_1295_18] = (&pbits__goto_1194_22.classbits[0] as *mut u8)[i__goto_1295_18] | cbits__goto_1095_16[(i__goto_1295_18 + taboffset__goto_1193_7)]
+                                        (i__goto_1295_18 = i__goto_1295_18 + 1)
+                                        if __goto_pending != 0:
+                                            break
+                                else:
+                                    i__goto_1298_18 = 0
+                                    while (i__goto_1298_18 < 32):
+                                        (&pbits__goto_1194_22.classbits[0] as *mut u8)[i__goto_1298_18] = (&pbits__goto_1194_22.classbits[0] as *mut u8)[i__goto_1298_18] & (((0 - cbits__goto_1095_16[(i__goto_1298_18 + taboffset__goto_1193_7)] - 1)) as u8)
+                                        (i__goto_1298_18 = i__goto_1298_18 + 1)
+                                        if __goto_pending != 0:
+                                            break
+                                if __goto_pending != 0:
+                                    break
+                            if (tabopt__goto_1193_18 < 0):
+                                (tabopt__goto_1193_18 = (0 - tabopt__goto_1193_18))
+                            if (tabopt__goto_1193_18 == 1):
+                                (&pbits__goto_1194_22.classbits[0] as *mut u8)[1] = (&pbits__goto_1194_22.classbits[0] as *mut u8)[1] & (0 - 60 - 1)
+                            else:
+                                if (tabopt__goto_1193_18 == 2):
+                                    (&pbits__goto_1194_22.classbits[0] as *mut u8)[11] = (&pbits__goto_1194_22.classbits[0] as *mut u8)[11] & 127
+                            classwords__goto_1328_17 = (&cb.classbits.classwords[0] as *mut c_uint)
+                            if __goto_pending != 0:
+                                break
+                            if (local_negate__goto_1191_8 != 0):
+                                i__goto_1331_18 = 0
+                                while (i__goto_1331_18 < 8):
+                                    classwords__goto_1328_17[i__goto_1331_18] = classwords__goto_1328_17[i__goto_1331_18] | (((0 - (&pbits__goto_1194_22.classwords[0] as *mut c_uint)[i__goto_1331_18] - 1)) as c_uint)
+                                    (i__goto_1331_18 = i__goto_1331_18 + 1)
+                                    if __goto_pending != 0:
+                                        break
+                            else:
+                                i__goto_1334_18 = 0
+                                while (i__goto_1334_18 < 8):
+                                    classwords__goto_1328_17[i__goto_1334_18] = classwords__goto_1328_17[i__goto_1334_18] | (&pbits__goto_1194_22.classwords[0] as *mut c_uint)[i__goto_1334_18]
+                                    (i__goto_1334_18 = i__goto_1334_18 + 1)
+                                    if __goto_pending != 0:
+                                        break
+                            if __goto_pending != 0:
+                                break
+                            continue
+                            (meta__goto_1190_12 = (unsafe: *pptr__goto_1092_11))
+                            (pptr__goto_1092_11 = pptr__goto_1092_11 + 1)
+                        2147811328 =>
+                            (meta__goto_1190_12 = (unsafe: *pptr__goto_1092_11))
+                            (pptr__goto_1092_11 = pptr__goto_1092_11 + 1)
+                        2149318656 =>
+                            (escape__goto_1195_12 = ((meta__goto_1190_12 & 65535)))
+                            match escape__goto_1195_12
+                                7 =>
+                                    i__goto_1356_16 = 0
+                                    while (i__goto_1356_16 < 32):
+                                        classbits__goto_1098_16[i__goto_1356_16] = classbits__goto_1098_16[i__goto_1356_16] | cbits__goto_1095_16[(i__goto_1356_16 + 64)]
+                                        (i__goto_1356_16 = i__goto_1356_16 + 1)
+                                        if __goto_pending != 0:
+                                            break
+                                6 =>
+                                    (should_flip_negation__goto_1094_6 = 1)
+                                    i__goto_1361_16 = 0
+                                    while (i__goto_1361_16 < 32):
+                                        classbits__goto_1098_16[i__goto_1361_16] = classbits__goto_1098_16[i__goto_1361_16] | (((0 - cbits__goto_1095_16[(i__goto_1361_16 + 64)] - 1)) as u8)
+                                        (i__goto_1361_16 = i__goto_1361_16 + 1)
+                                        if __goto_pending != 0:
+                                            break
+                                11 =>
+                                    i__goto_1366_16 = 0
+                                    while (i__goto_1366_16 < 32):
+                                        classbits__goto_1098_16[i__goto_1366_16] = classbits__goto_1098_16[i__goto_1366_16] | cbits__goto_1095_16[(i__goto_1366_16 + 160)]
+                                        (i__goto_1366_16 = i__goto_1366_16 + 1)
+                                        if __goto_pending != 0:
+                                            break
+                                10 =>
+                                    (should_flip_negation__goto_1094_6 = 1)
+                                    i__goto_1371_16 = 0
+                                    while (i__goto_1371_16 < 32):
+                                        classbits__goto_1098_16[i__goto_1371_16] = classbits__goto_1098_16[i__goto_1371_16] | (((0 - cbits__goto_1095_16[(i__goto_1371_16 + 160)] - 1)) as u8)
+                                        (i__goto_1371_16 = i__goto_1371_16 + 1)
+                                        if __goto_pending != 0:
+                                            break
+                                9 =>
+                                    i__goto_1383_16 = 0
+                                    while (i__goto_1383_16 < 32):
+                                        classbits__goto_1098_16[i__goto_1383_16] = classbits__goto_1098_16[i__goto_1383_16] | cbits__goto_1095_16[(i__goto_1383_16 + 0)]
+                                        (i__goto_1383_16 = i__goto_1383_16 + 1)
+                                        if __goto_pending != 0:
+                                            break
+                                8 =>
+                                    (should_flip_negation__goto_1094_6 = 1)
+                                    i__goto_1388_16 = 0
+                                    while (i__goto_1388_16 < 32):
+                                        classbits__goto_1098_16[i__goto_1388_16] = classbits__goto_1098_16[i__goto_1388_16] | (((0 - cbits__goto_1095_16[(i__goto_1388_16 + 0)] - 1)) as u8)
+                                        (i__goto_1388_16 = i__goto_1388_16 + 1)
+                                        if __goto_pending != 0:
+                                            break
+                                19 =>
+                                    add_list_to_class((options & (0 - 8 - 1)), xoptions, cb, _pcre2_hspace_list_8)
+                                18 =>
+                                    add_not_list_to_class((options & (0 - 8 - 1)), xoptions, cb, _pcre2_hspace_list_8)
+                                21 =>
+                                    add_list_to_class((options & (0 - 8 - 1)), xoptions, cb, _pcre2_vspace_list_8)
+                                20 =>
+                                    add_not_list_to_class((options & (0 - 8 - 1)), xoptions, cb, _pcre2_vspace_list_8)
+                                _ => 0
+                            continue
+                            if (meta__goto_1190_12 < 2147483648):
+                                break
+                            __pc = 1
+                            __goto_pending = 1
+                        _ =>
+                            if (meta__goto_1190_12 < 2147483648):
+                                break
+                            __pc = 1
+                            __goto_pending = 1
+                    if __goto_pending != 0:
                         break
                     (c__goto_1195_20 = meta__goto_1190_12)
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         break
-                    if (if (if c__goto_1195_20 == 13: 1 else: 0) != 0 or (if c__goto_1195_20 == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if ((c__goto_1195_20 == 13) or (c__goto_1195_20 == 10)):
                         cb.external_flags = cb.external_flags | 2048
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         break
-                    if (if (if (unsafe: *pptr__goto_1092_11) == 2149777408: 1 else: 0) != 0 or (if (unsafe: *pptr__goto_1092_11) == 2149711872: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if (((unsafe: *pptr__goto_1092_11) == 2149777408) or ((unsafe: *pptr__goto_1092_11) == 2149711872)):
                         (pptr__goto_1092_11 = pptr__goto_1092_11 + 1)
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             break
-                        (d__goto_1513_14 = (unsafe: *((pptr__goto_1092_11 = pptr__goto_1092_11 + 1))))
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        (d__goto_1513_14 = (unsafe: *pptr__goto_1092_11))
+                        (pptr__goto_1092_11 = pptr__goto_1092_11 + 1)
+                        if __goto_pending != 0:
                             break
-                        if (if d__goto_1513_14 == 2147811328: 1 else: 0) != 0:
-                            (d__goto_1513_14 = (unsafe: *((pptr__goto_1092_11 = pptr__goto_1092_11 + 1))))
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if (d__goto_1513_14 == 2147811328):
+                            (d__goto_1513_14 = (unsafe: *pptr__goto_1092_11))
+                            (pptr__goto_1092_11 = pptr__goto_1092_11 + 1)
+                        if __goto_pending != 0:
                             break
-                        if (if (if d__goto_1513_14 == 13: 1 else: 0) != 0 or (if d__goto_1513_14 == 10: 1 else: 0) != 0: 1 else: 0) != 0:
+                        if ((d__goto_1513_14 == 13) or (d__goto_1513_14 == 10)):
                             cb.external_flags = cb.external_flags | 2048
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             break
                         add_to_class(options, xoptions, cb, c__goto_1195_20, d__goto_1513_14)
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             break
                         continue
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             break
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         break
                     add_to_class(options, xoptions, cb, meta__goto_1190_12, meta__goto_1190_12)
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         break
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         break
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 __pc = 1
                 continue
             1 =>  // END_PROCESSING
                 (__goto_pending = 0)
-                if negate_class != 0:
+                if (negate_class != 0):
                     classwords__goto_1856_13 = (&cb.classbits.classwords[0] as *mut c_uint)
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         continue
                     i__goto_1858_12 = 0
-                    while (if i__goto_1858_12 < 8: 1 else: 0) != 0:
+                    while (i__goto_1858_12 < 8):
                         (classwords__goto_1856_13[i__goto_1858_12] = (0 - classwords__goto_1856_13[i__goto_1858_12] - 1))
                         (i__goto_1858_12 = i__goto_1858_12 + 1)
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             break
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         continue
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
-                if (if ((if ((if utf__goto_1103_6 != 0: 0 else: 1)) != 0 or (if negate_class != should_flip_negation__goto_1094_6: 1 else: 0) != 0: 1 else: 0)) != 0 and (if (&cb.classbits.classwords[0] as *mut c_uint)[0] == (0 - (0 as c_uint) - 1): 1 else: 0) != 0: 1 else: 0) != 0:
+                if (((not ((utf__goto_1103_6 != 0))) or (negate_class != should_flip_negation__goto_1094_6)) and ((&cb.classbits.classwords[0] as *mut c_uint)[0] == (0 - (0 as c_uint) - 1))):
                     classwords__goto_1864_19 = ((&cb.classbits.classwords[0] as *mut c_uint) as *const c_uint)
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         continue
                     (i__goto_1865_7 = 0)
-                    while (if i__goto_1865_7 < 8: 1 else: 0) != 0:
-                        if (if classwords__goto_1864_19[i__goto_1865_7] != (0 - (0 as c_uint) - 1): 1 else: 0) != 0:
+                    while (i__goto_1865_7 < 8):
+                        if (classwords__goto_1864_19[i__goto_1865_7] != (0 - (0 as c_uint) - 1)):
                             break
                         (i__goto_1865_7 = i__goto_1865_7 + 1)
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             break
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         continue
-                    if (if i__goto_1865_7 == 8: 1 else: 0) != 0:
+                    if (i__goto_1865_7 == 8):
                         (unsafe: *code__goto_1093_14 = 13)
                         (code__goto_1093_14 = code__goto_1093_14 + 1)
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             continue
                         __pc = 2
                         __goto_pending = 1
-                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                        if __goto_pending != 0:
                             continue
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         continue
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
-                (unsafe: *code__goto_1093_14 = (if ((if negate_class == should_flip_negation__goto_1094_6: 1 else: 0)) != 0: OP_CLASS else: OP_NCLASS))
+                (unsafe: *code__goto_1093_14 = (if (negate_class == should_flip_negation__goto_1094_6): OP_CLASS else: OP_NCLASS))
                 (code__goto_1093_14 = code__goto_1093_14 + 1)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 with_memcpy((code__goto_1093_14 as *mut c_void) as *i8, (classbits__goto_1098_16 as *const c_void) as *i8, 32 as i64)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 code__goto_1093_14 = code__goto_1093_14 + (32 / sizeof[u8]())
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 __pc = 2
                 continue
             2 =>  // DONE
                 (__goto_pending = 0)
                 ((unsafe: *pcode) = code__goto_1093_14)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 return (pptr__goto_1092_11 - (1 as isize as usize))
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
             _ => break
 
 fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *mut c_uint, pcode: *mut *mut u8, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> c_int:
     var context: eclass_context
     var op_info: eclass_op_info
-    var previous_length: c_ulong = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: (unsafe: *lengthptr) else: 0)
+    var previous_length: c_ulong = (if (lengthptr != (null as *mut c_ulong)): (unsafe: *lengthptr) else: 0)
     var code: *mut u8 = (unsafe: *pcode)
     var previous: *mut u8
     var allbitsone: c_int = 1
@@ -412,39 +544,39 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
     code = code + 2
     (unsafe: *code = 0)
     (code = code + 1)
-    if (if compile_eclass_nested((&mut context as *mut eclass_context), 0, pptr, (&mut code as *mut *mut u8), (&mut op_info as *mut eclass_op_info), lengthptr) != 0: 0 else: 1) != 0:
+    if (not ((compile_eclass_nested(((&context as *const eclass_context) as *mut eclass_context), 0, pptr, ((&code as *const *mut u8) as *mut *mut u8), ((&op_info as *const eclass_op_info) as *mut eclass_op_info), lengthptr) != 0))):
         return 0
 
-    if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
+    if (lengthptr != (null as *mut c_ulong)):
         (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((code as usize -% previous as usize) / sizeof[u8]())
         (code = previous)
 
     var i: c_int = 0
-    while (if i < 8: 1 else: 0) != 0:
-        if (if (&op_info.bits.classwords[0] as *mut c_uint)[i] != 4294967295: 1 else: 0) != 0:
+    while (i < 8):
+        if ((&op_info.bits.classwords[0] as *mut c_uint)[i] != 4294967295):
             (allbitsone = 0)
             break
         (i = i + 1)
 
         (code = previous)
-    if (if (if op_info.op_single_type == 6: 1 else: 0) != 0 and allbitsone != 0: 1 else: 0) != 0:
-        if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
+    if ((op_info.op_single_type == 6) and (allbitsone != 0)):
+        if (lengthptr != (null as *mut c_ulong)):
             (unsafe: *lengthptr) = (unsafe: *lengthptr) - 1
         
         (unsafe: *code = 13)
         (code = code + 1)
     else:
-        if (if (if op_info.op_single_type == 6: 1 else: 0) != 0 or (if op_info.op_single_type == 7: 1 else: 0) != 0: 1 else: 0) != 0:
+        if ((op_info.op_single_type == 6) or (op_info.op_single_type == 7)):
             var required_len: c_ulong = (1 +% ((32 / sizeof[u8]())))
-            if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
-                if (if required_len > (((unsafe: *lengthptr) -% previous_length)): 1 else: 0) != 0:
+            if (lengthptr != (null as *mut c_ulong)):
+                if (required_len > (((unsafe: *lengthptr) -% previous_length))):
                     ((unsafe: *lengthptr) = (previous_length +% required_len))
                 
             
-            if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
+            if (lengthptr != (null as *mut c_ulong)):
                 (unsafe: *lengthptr) = (unsafe: *lengthptr) - required_len
             
-            (unsafe: *code = (if ((if op_info.op_single_type == 6: 1 else: 0)) != 0: OP_NCLASS else: OP_CLASS))
+            (unsafe: *code = (if (op_info.op_single_type == 6): OP_NCLASS else: OP_CLASS))
             (code = code + 1)
             with_memcpy((code as *mut c_void) as *i8, ((&op_info.bits.classbits[0] as *mut u8) as *const c_void) as *i8, 32 as i64)
             code = code + (32 / sizeof[u8]())
@@ -466,26 +598,49 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
     var c: c_uint
     var byte_start: c_uint
     var byte_end: c_uint
-    var classbits_end: c_uint = ((if (if end <= 255: 1 else: 0) != 0: end else: 255))
+    var classbits_end: c_uint = ((if (end <= 255): end else: 255))
     xoptions
+    if (((options & 8)) != 0):
+        (c = start)
+        while (c <= classbits_end):
+            classbits[((cb.fcc[c]) >> 3)] = classbits[((cb.fcc[c]) >> 3)] | (((1 << (((cb.fcc[c]) & 7)))) as u8)
+            (c = c + 1)
+        
+        
+
     (byte_start = (((start +% 7)) >> 3))
     (byte_end = (((classbits_end +% 1)) >> 3))
-    if (if byte_start >= byte_end: 1 else: 0) != 0:
+    if (byte_start >= byte_end):
+        (c = start)
+        while (c <= classbits_end):
+            classbits[((c) >> 3)] = classbits[((c) >> 3)] | (((1 << (((c) & 7)))) as u8)
+            (c = c + 1)
+        
         return
 
     (c = byte_start)
-    while (if c < byte_end: 1 else: 0) != 0:
+    while (c < byte_end):
         (classbits[c] = 255)
         (c = c + 1)
 
     byte_start = byte_start << 3
     byte_end = byte_end << 3
+    (c = start)
+    while (c < byte_start):
+        classbits[((c) >> 3)] = classbits[((c) >> 3)] | (((1 << (((c) & 7)))) as u8)
+        (c = c + 1)
+
+    (c = byte_end)
+    while (c <= classbits_end):
+        classbits[((c) >> 3)] = classbits[((c) >> 3)] | (((1 << (((c) & 7)))) as u8)
+        (c = c + 1)
+
 
 fn add_list_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, __param_p: *const c_uint):
     var p = __param_p
-    while (if p[0] < 256: 1 else: 0) != 0:
+    while (p[0] < 256):
         var n: c_uint = 0
-        while (if p[(n +% 1)] == ((p[0] +% n) +% 1): 1 else: 0) != 0:
+        while (p[(n +% 1)] == ((p[0] +% n) +% 1)):
             (n = n + 1)
         
         add_to_class(options, xoptions, cb, p[0], p[n])
@@ -494,39 +649,39 @@ fn add_list_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8
 
 fn add_not_list_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, __param_p: *const c_uint):
     var p = __param_p
-    if (if p[0] > 0: 1 else: 0) != 0:
+    if (p[0] > 0):
         add_to_class(options, xoptions, cb, 0, (p[0] -% 1))
 
-    while (if p[0] < 256: 1 else: 0) != 0:
-        while (if p[1] == (p[0] +% 1): 1 else: 0) != 0:
+    while (p[0] < 256):
+        while (p[1] == (p[0] +% 1)):
             (p = p + 1)
         
-        add_to_class(options, xoptions, cb, (p[0] +% 1), (if ((if p[1] > 255: 1 else: 0)) != 0: 255 else: (p[1] -% 1)))
+        add_to_class(options, xoptions, cb, (p[0] +% 1), (if (p[1] > 255): 255 else: (p[1] -% 1)))
         (p = p + 1)
 
 
 fn fold_negation(pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong, preserve_classbits: c_int):
-    if (if pop_info.op_single_type == 0: 1 else: 0) != 0:
-        if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
+    if (pop_info.op_single_type == 0):
+        if (lengthptr != (null as *mut c_ulong)):
             (unsafe: *lengthptr) = (unsafe: *lengthptr) + 1
         else:
             (pop_info.code_start[pop_info.length] = 4)
         
         pop_info.length = pop_info.length + 1
     else:
-        if (if (if pop_info.op_single_type == 6: 1 else: 0) != 0 or (if pop_info.op_single_type == 7: 1 else: 0) != 0: 1 else: 0) != 0:
-            (pop_info.op_single_type = (if ((if pop_info.op_single_type == 7: 1 else: 0)) != 0: 6 else: 7))
-            if (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0:
+        if ((pop_info.op_single_type == 6) or (pop_info.op_single_type == 7)):
+            (pop_info.op_single_type = (if (pop_info.op_single_type == 7): 6 else: 7))
+            if (lengthptr == (null as *mut c_ulong)):
                 ((unsafe: *(pop_info.code_start)) = pop_info.op_single_type)
             
         else:
-            if (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0:
+            if (lengthptr == (null as *mut c_ulong)):
                 pop_info.code_start[(1 + 2)] = pop_info.code_start[(1 + 2)] ^ 1
             
 
-    if (if preserve_classbits != 0: 0 else: 1) != 0:
+    if (not ((preserve_classbits != 0))):
         var i: c_int = 0
-        while (if i < 8: 1 else: 0) != 0:
+        while (i < 8):
             ((&pop_info.bits.classwords[0] as *mut c_uint)[i] = (0 - (&pop_info.bits.classwords[0] as *mut c_uint)[i] - 1))
             (i = i + 1)
         
@@ -536,17 +691,17 @@ fn fold_binary(op: c_int, lhs_op_info: *mut eclass_op_info, rhs_op_info: *mut ec
     match op
         1 =>
             var i: c_int = 0
-            while (if i < 8: 1 else: 0) != 0:
+            while (i < 8):
                 (&lhs_op_info.bits.classwords[0] as *mut c_uint)[i] = (&lhs_op_info.bits.classwords[0] as *mut c_uint)[i] & (&rhs_op_info.bits.classwords[0] as *mut c_uint)[i]
                 (i = i + 1)
         2 =>
             var i: c_int = 0
-            while (if i < 8: 1 else: 0) != 0:
+            while (i < 8):
                 (&lhs_op_info.bits.classwords[0] as *mut c_uint)[i] = (&lhs_op_info.bits.classwords[0] as *mut c_uint)[i] | (&rhs_op_info.bits.classwords[0] as *mut c_uint)[i]
                 (i = i + 1)
         3 =>
             var i: c_int = 0
-            while (if i < 8: 1 else: 0) != 0:
+            while (i < 8):
                 (&lhs_op_info.bits.classwords[0] as *mut c_uint)[i] = (&lhs_op_info.bits.classwords[0] as *mut c_uint)[i] ^ (&rhs_op_info.bits.classwords[0] as *mut c_uint)[i]
                 (i = i + 1)
         _ => 0
@@ -555,11 +710,11 @@ fn fold_binary(op: c_int, lhs_op_info: *mut eclass_op_info, rhs_op_info: *mut ec
 fn compile_eclass_nested(context: *mut eclass_context, __param_negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int:
     var negated = __param_negated
     var ptr: *mut c_uint = (unsafe: *pptr)
-    if (if (unsafe: *(ptr = ptr + 1)) == (((2148401152 as c_uint) | 1)): 1 else: 0) != 0:
+    if ((unsafe: *(ptr = ptr + 1)) == (((2148401152 as c_uint) | 1))):
         (negated = (if negated != 0: 0 else: 1))
 
     (((unsafe: *pptr)) = ((unsafe: *pptr)) + 1)
-    if (if compile_class_binary_loose(context, negated, pptr, pcode, pop_info, lengthptr) != 0: 0 else: 1) != 0:
+    if (not ((compile_class_binary_loose(context, negated, pptr, pcode, pop_info, lengthptr) != 0))):
         return 0
 
     return 1
@@ -583,232 +738,233 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                 ptr__goto_2151_11 = (unsafe: *pptr)
                 code__goto_2153_14 = (unsafe: *pcode)
                 code_start__goto_2154_14 = code__goto_2153_14
-                prev_length__goto_2155_12 = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: (unsafe: *lengthptr) else: 0)
+                prev_length__goto_2155_12 = (if (lengthptr != (null as *mut c_ulong)): (unsafe: *lengthptr) else: 0)
+                meta__goto_2157_10 = (((unsafe: *ptr__goto_2151_11) & (4294901760 as c_uint)))
                 match meta__goto_2157_10
                     2148270080 =>
                         (pop_info.length = 1)
-                        if (if ((if meta__goto_2157_10 == 2148204544: 1 else: 0)) == negated: 1 else: 0) != 0:
+                        if (((if meta__goto_2157_10 == 2148204544: 1 else: 0)) == negated):
                             (pop_info.op_single_type = 6)
                             ((unsafe: *(code__goto_2153_14 = code__goto_2153_14 + 1)) = pop_info.op_single_type)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
                             with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, 255, 32 as i64)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
                         else:
                             (pop_info.op_single_type = 7)
                             ((unsafe: *(code__goto_2153_14 = code__goto_2153_14 + 1)) = pop_info.op_single_type)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
                             with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, 0, 32 as i64)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
                     2148139008 =>
                         (ptr__goto_2151_11 = ptr__goto_2151_11 + 1)
                         (prev_ptr__goto_2152_11 = ptr__goto_2151_11)
-                        (ptr__goto_2151_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2151_11, (&mut code__goto_2153_14 as *mut *mut u8), (if ((if meta__goto_2157_10 != 2148401152: 1 else: 0)) == negated: 1 else: 0), (&mut context.needs_bitmap as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
-                        if (if ptr__goto_2151_11 == (null as *mut c_uint): 1 else: 0) != 0:
+                        (ptr__goto_2151_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2151_11, ((&code__goto_2153_14 as *const *mut u8) as *mut *mut u8), (if ((if meta__goto_2157_10 != 2148401152: 1 else: 0)) == negated: 1 else: 0), ((&context.needs_bitmap as *const c_int) as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
+                        if (ptr__goto_2151_11 == (null as *mut c_uint)):
                             return 0
-                        if (if ptr__goto_2151_11 <= prev_ptr__goto_2152_11: 1 else: 0) != 0:
+                        if (ptr__goto_2151_11 <= prev_ptr__goto_2152_11):
                             return 0
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
-                        if (if (if meta__goto_2157_10 == 2148139008: 1 else: 0) != 0 or (if meta__goto_2157_10 == 2148401152: 1 else: 0) != 0: 1 else: 0) != 0:
+                        if ((meta__goto_2157_10 == 2148139008) or (meta__goto_2157_10 == 2148401152)):
                             (ptr__goto_2151_11 = ptr__goto_2151_11 + 1)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
-                        (extra_length__goto_2156_12 = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: ((unsafe: *lengthptr) -% prev_length__goto_2155_12) else: 0))
-                        if (if (unsafe: *code_start__goto_2154_14) == OP_ALLANY: 1 else: 0) != 0:
+                        (extra_length__goto_2156_12 = (if (lengthptr != (null as *mut c_ulong)): ((unsafe: *lengthptr) -% prev_length__goto_2155_12) else: 0))
+                        if ((unsafe: *code_start__goto_2154_14) == OP_ALLANY):
                             (pop_info.length = 1)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
                             (pop_info.op_single_type = 6)
                             ((unsafe: *code_start__goto_2154_14) = pop_info.op_single_type)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
                             with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, 255, 32 as i64)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
                         else:
-                            if (if (if (unsafe: *code_start__goto_2154_14) == OP_CLASS: 1 else: 0) != 0 or (if (unsafe: *code_start__goto_2154_14) == OP_NCLASS: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (((unsafe: *code_start__goto_2154_14) == OP_CLASS) or ((unsafe: *code_start__goto_2154_14) == OP_NCLASS)):
                                 (pop_info.length = 1)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
-                                (pop_info.op_single_type = (if ((if (unsafe: *code_start__goto_2154_14) == OP_CLASS: 1 else: 0)) != 0: 7 else: 6))
+                                (pop_info.op_single_type = (if ((unsafe: *code_start__goto_2154_14) == OP_CLASS): 7 else: 6))
                                 ((unsafe: *code_start__goto_2154_14) = pop_info.op_single_type)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
                                 with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, ((code_start__goto_2154_14 + (1 as isize as usize)) as *const c_void) as *i8, 32 as i64)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
-                                if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
+                                if (lengthptr != (null as *mut c_ulong)):
                                     (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((code__goto_2153_14 as usize -% ((code_start__goto_2154_14 + (1 as isize as usize))) as usize) / sizeof[u8]())
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
                                 (code__goto_2153_14 = (code_start__goto_2154_14 + (1 as isize as usize)))
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
-                                if (if (if context.needs_bitmap != 0: 0 else: 1) != 0 and (if (unsafe: *code_start__goto_2154_14) == 7: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if ((not ((context.needs_bitmap != 0))) and ((unsafe: *code_start__goto_2154_14) == 7)):
                                     classwords__goto_2258_17 = (&pop_info.bits.classwords[0] as *mut c_uint)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    if __goto_pending != 0:
                                         continue
                                     i__goto_2260_16 = 0
-                                    while (if i__goto_2260_16 < 8: 1 else: 0) != 0:
-                                        if (if classwords__goto_2258_17[i__goto_2260_16] != 0: 1 else: 0) != 0:
+                                    while (i__goto_2260_16 < 8):
+                                        if (classwords__goto_2258_17[i__goto_2260_16] != 0):
                                             (context.needs_bitmap = 1)
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            if __goto_pending != 0:
                                                 break
                                             break
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            if __goto_pending != 0:
                                                 break
                                         (i__goto_2260_16 = i__goto_2260_16 + 1)
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        if __goto_pending != 0:
                                             break
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    if __goto_pending != 0:
                                         continue
                                 else:
                                     (context.needs_bitmap = 1)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
                             else:
                                 (pop_info.op_single_type = 5)
                                 ((unsafe: *code_start__goto_2154_14) = pop_info.op_single_type)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
                                 with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, ((&context.cb.classbits.classbits[0] as *mut u8) as *const c_void) as *i8, 32 as i64)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
                                 (pop_info.length = ((((code__goto_2153_14 as usize -% code_start__goto_2154_14 as usize) / sizeof[u8]())) +% extra_length__goto_2156_12))
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
                     _ =>
                         (prev_ptr__goto_2152_11 = ptr__goto_2151_11)
-                        (ptr__goto_2151_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2151_11, (&mut code__goto_2153_14 as *mut *mut u8), (if ((if meta__goto_2157_10 != 2148401152: 1 else: 0)) == negated: 1 else: 0), (&mut context.needs_bitmap as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
-                        if (if ptr__goto_2151_11 == (null as *mut c_uint): 1 else: 0) != 0:
+                        (ptr__goto_2151_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2151_11, ((&code__goto_2153_14 as *const *mut u8) as *mut *mut u8), (if ((if meta__goto_2157_10 != 2148401152: 1 else: 0)) == negated: 1 else: 0), ((&context.needs_bitmap as *const c_int) as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
+                        if (ptr__goto_2151_11 == (null as *mut c_uint)):
                             return 0
-                        if (if ptr__goto_2151_11 <= prev_ptr__goto_2152_11: 1 else: 0) != 0:
+                        if (ptr__goto_2151_11 <= prev_ptr__goto_2152_11):
                             return 0
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
-                        if (if (if meta__goto_2157_10 == 2148139008: 1 else: 0) != 0 or (if meta__goto_2157_10 == 2148401152: 1 else: 0) != 0: 1 else: 0) != 0:
+                        if ((meta__goto_2157_10 == 2148139008) or (meta__goto_2157_10 == 2148401152)):
                             (ptr__goto_2151_11 = ptr__goto_2151_11 + 1)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
-                        (extra_length__goto_2156_12 = (if ((if lengthptr != (null as *mut c_ulong): 1 else: 0)) != 0: ((unsafe: *lengthptr) -% prev_length__goto_2155_12) else: 0))
-                        if (if (unsafe: *code_start__goto_2154_14) == OP_ALLANY: 1 else: 0) != 0:
+                        (extra_length__goto_2156_12 = (if (lengthptr != (null as *mut c_ulong)): ((unsafe: *lengthptr) -% prev_length__goto_2155_12) else: 0))
+                        if ((unsafe: *code_start__goto_2154_14) == OP_ALLANY):
                             (pop_info.length = 1)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
                             (pop_info.op_single_type = 6)
                             ((unsafe: *code_start__goto_2154_14) = pop_info.op_single_type)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
                             with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, 255, 32 as i64)
-                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                            if __goto_pending != 0:
                                 continue
                         else:
-                            if (if (if (unsafe: *code_start__goto_2154_14) == OP_CLASS: 1 else: 0) != 0 or (if (unsafe: *code_start__goto_2154_14) == OP_NCLASS: 1 else: 0) != 0: 1 else: 0) != 0:
+                            if (((unsafe: *code_start__goto_2154_14) == OP_CLASS) or ((unsafe: *code_start__goto_2154_14) == OP_NCLASS)):
                                 (pop_info.length = 1)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
-                                (pop_info.op_single_type = (if ((if (unsafe: *code_start__goto_2154_14) == OP_CLASS: 1 else: 0)) != 0: 7 else: 6))
+                                (pop_info.op_single_type = (if ((unsafe: *code_start__goto_2154_14) == OP_CLASS): 7 else: 6))
                                 ((unsafe: *code_start__goto_2154_14) = pop_info.op_single_type)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
                                 with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, ((code_start__goto_2154_14 + (1 as isize as usize)) as *const c_void) as *i8, 32 as i64)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
-                                if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
+                                if (lengthptr != (null as *mut c_ulong)):
                                     (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((code__goto_2153_14 as usize -% ((code_start__goto_2154_14 + (1 as isize as usize))) as usize) / sizeof[u8]())
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
                                 (code__goto_2153_14 = (code_start__goto_2154_14 + (1 as isize as usize)))
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
-                                if (if (if context.needs_bitmap != 0: 0 else: 1) != 0 and (if (unsafe: *code_start__goto_2154_14) == 7: 1 else: 0) != 0: 1 else: 0) != 0:
+                                if ((not ((context.needs_bitmap != 0))) and ((unsafe: *code_start__goto_2154_14) == 7)):
                                     classwords__goto_2258_17 = (&pop_info.bits.classwords[0] as *mut c_uint)
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    if __goto_pending != 0:
                                         continue
                                     i__goto_2260_16 = 0
-                                    while (if i__goto_2260_16 < 8: 1 else: 0) != 0:
-                                        if (if classwords__goto_2258_17[i__goto_2260_16] != 0: 1 else: 0) != 0:
+                                    while (i__goto_2260_16 < 8):
+                                        if (classwords__goto_2258_17[i__goto_2260_16] != 0):
                                             (context.needs_bitmap = 1)
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            if __goto_pending != 0:
                                                 break
                                             break
-                                            if (if __goto_pending != 0: 1 else: 0) != 0:
+                                            if __goto_pending != 0:
                                                 break
                                         (i__goto_2260_16 = i__goto_2260_16 + 1)
-                                        if (if __goto_pending != 0: 1 else: 0) != 0:
+                                        if __goto_pending != 0:
                                             break
-                                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                                    if __goto_pending != 0:
                                         continue
                                 else:
                                     (context.needs_bitmap = 1)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
                             else:
                                 (pop_info.op_single_type = 5)
                                 ((unsafe: *code_start__goto_2154_14) = pop_info.op_single_type)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
                                 with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *mut c_void) as *i8, ((&context.cb.classbits.classbits[0] as *mut u8) as *const c_void) as *i8, 32 as i64)
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
                                 (pop_info.length = ((((code__goto_2153_14 as usize -% code_start__goto_2154_14 as usize) / sizeof[u8]())) +% extra_length__goto_2156_12))
-                                if (if __goto_pending != 0: 1 else: 0) != 0:
+                                if __goto_pending != 0:
                                     continue
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
-                (pop_info.code_start = (if ((if lengthptr == (null as *mut c_ulong): 1 else: 0)) != 0: code_start__goto_2154_14 else: (null as *mut u8)))
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                (pop_info.code_start = (if (lengthptr == (null as *mut c_ulong)): code_start__goto_2154_14 else: (null as *mut u8)))
+                if __goto_pending != 0:
                     continue
-                if (if lengthptr != (null as *mut c_ulong): 1 else: 0) != 0:
+                if (lengthptr != (null as *mut c_ulong)):
                     (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((code__goto_2153_14 as usize -% code_start__goto_2154_14 as usize) / sizeof[u8]())
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         continue
                     (code__goto_2153_14 = code_start__goto_2154_14)
-                    if (if __goto_pending != 0: 1 else: 0) != 0:
+                    if __goto_pending != 0:
                         continue
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 __pc = 1
                 continue
             1 =>  // DONE
                 (__goto_pending = 0)
                 ((unsafe: *pptr) = ptr__goto_2151_11)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 ((unsafe: *pcode) = code__goto_2153_14)
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
                 return 1
-                if (if __goto_pending != 0: 1 else: 0) != 0:
+                if __goto_pending != 0:
                     continue
             _ => break
 
 fn compile_class_juxtaposition(context: *mut eclass_context, negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int:
     var ptr: *mut c_uint = (unsafe: *pptr)
     var code: *mut u8 = (unsafe: *pcode)
-    if (if compile_class_operand(context, negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), pop_info, lengthptr) != 0: 0 else: 1) != 0:
+    if (not ((compile_class_operand(context, negated, ((&ptr as *const *mut c_uint) as *mut *mut c_uint), ((&code as *const *mut u8) as *mut *mut u8), pop_info, lengthptr) != 0))):
         return 0
 
-    while (if (if (unsafe: *ptr) != 2148335616: 1 else: 0) != 0 and (if ((if (if (unsafe: *ptr) >= 2151940096: 1 else: 0) != 0 and (if (unsafe: *ptr) <= 2152202240: 1 else: 0) != 0: 1 else: 0)) != 0: 0 else: 1) != 0: 1 else: 0) != 0:
+    while (((unsafe: *ptr) != 2148335616) and (not ((((unsafe: *ptr) >= 2151940096) and ((unsafe: *ptr) <= 2152202240))))):
         var op: c_uint
         var rhs_negated: c_int
         var rhs_op_info: eclass_op_info
-        if negated != 0:
+        if (negated != 0):
             (op = 1)
             (rhs_negated = 1)
         else:
             (op = 2)
             (rhs_negated = 0)
         
-        if (if compile_class_operand(context, rhs_negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), (&mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0: 0 else: 1) != 0:
+        if (not ((compile_class_operand(context, rhs_negated, ((&ptr as *const *mut c_uint) as *mut *mut c_uint), ((&code as *const *mut u8) as *mut *mut u8), ((&rhs_op_info as *const eclass_op_info) as *mut eclass_op_info), lengthptr) != 0))):
             return 0
         
-        fold_binary(op, pop_info, (&mut rhs_op_info as *mut eclass_op_info), lengthptr)
-        if (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0:
+        fold_binary(op, pop_info, ((&rhs_op_info as *const eclass_op_info) as *mut eclass_op_info), lengthptr)
+        if (lengthptr == (null as *mut c_ulong)):
             (code = (pop_info.code_start + pop_info.length))
         
 
@@ -819,12 +975,12 @@ fn compile_class_juxtaposition(context: *mut eclass_context, negated: c_int, ppt
 fn compile_class_unary(context: *mut eclass_context, __param_negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int:
     var negated = __param_negated
     var ptr: *mut c_uint = (unsafe: *pptr)
-    while (if (unsafe: *ptr) == 2152202240: 1 else: 0) != 0:
+    while ((unsafe: *ptr) == 2152202240):
         (ptr = ptr + 1)
         (negated = (if negated != 0: 0 else: 1))
 
     ((unsafe: *pptr) = ptr)
-    if (if compile_class_juxtaposition(context, negated, pptr, pcode, pop_info, lengthptr) != 0: 0 else: 1) != 0:
+    if (not ((compile_class_juxtaposition(context, negated, pptr, pcode, pop_info, lengthptr) != 0))):
         return 0
 
     return 1
@@ -832,14 +988,14 @@ fn compile_class_unary(context: *mut eclass_context, __param_negated: c_int, ppt
 fn compile_class_binary_tight(context: *mut eclass_context, negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int:
     var ptr: *mut c_uint = (unsafe: *pptr)
     var code: *mut u8 = (unsafe: *pcode)
-    if (if compile_class_unary(context, negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), pop_info, lengthptr) != 0: 0 else: 1) != 0:
+    if (not ((compile_class_unary(context, negated, ((&ptr as *const *mut c_uint) as *mut *mut c_uint), ((&code as *const *mut u8) as *mut *mut u8), pop_info, lengthptr) != 0))):
         return 0
 
-    while (if (unsafe: *ptr) == 2151940096: 1 else: 0) != 0:
+    while ((unsafe: *ptr) == 2151940096):
         var op: c_uint
         var rhs_negated: c_int
         var rhs_op_info: eclass_op_info
-        if negated != 0:
+        if (negated != 0):
             (op = 2)
             (rhs_negated = 1)
         else:
@@ -847,11 +1003,11 @@ fn compile_class_binary_tight(context: *mut eclass_context, negated: c_int, pptr
             (rhs_negated = 0)
         
         (ptr = ptr + 1)
-        if (if compile_class_unary(context, rhs_negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), (&mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0: 0 else: 1) != 0:
+        if (not ((compile_class_unary(context, rhs_negated, ((&ptr as *const *mut c_uint) as *mut *mut c_uint), ((&code as *const *mut u8) as *mut *mut u8), ((&rhs_op_info as *const eclass_op_info) as *mut eclass_op_info), lengthptr) != 0))):
             return 0
         
-        fold_binary(op, pop_info, (&mut rhs_op_info as *mut eclass_op_info), lengthptr)
-        if (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0:
+        fold_binary(op, pop_info, ((&rhs_op_info as *const eclass_op_info) as *mut eclass_op_info), lengthptr)
+        if (lengthptr == (null as *mut c_ulong)):
             (code = (pop_info.code_start + pop_info.length))
         
 
@@ -862,32 +1018,32 @@ fn compile_class_binary_tight(context: *mut eclass_context, negated: c_int, pptr
 fn compile_class_binary_loose(context: *mut eclass_context, negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int:
     var ptr: *mut c_uint = (unsafe: *pptr)
     var code: *mut u8 = (unsafe: *pcode)
-    if (if compile_class_binary_tight(context, negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), pop_info, lengthptr) != 0: 0 else: 1) != 0:
+    if (not ((compile_class_binary_tight(context, negated, ((&ptr as *const *mut c_uint) as *mut *mut c_uint), ((&code as *const *mut u8) as *mut *mut u8), pop_info, lengthptr) != 0))):
         return 0
 
-    while (if (if (unsafe: *ptr) >= 2152005632: 1 else: 0) != 0 and (if (unsafe: *ptr) <= 2152136704: 1 else: 0) != 0: 1 else: 0) != 0:
+    while (((unsafe: *ptr) >= 2152005632) and ((unsafe: *ptr) <= 2152136704)):
         var op: c_uint
         var op_neg: c_int
         var rhs_negated: c_int
         var rhs_op_info: eclass_op_info
-        if negated != 0:
-            (op = (if ((if (unsafe: *ptr) == 2152005632: 1 else: 0)) != 0: 1 else: (if ((if (unsafe: *ptr) == 2152071168: 1 else: 0)) != 0: 2 else: 3)))
+        if (negated != 0):
+            (op = (if ((unsafe: *ptr) == 2152005632): 1 else: (if ((unsafe: *ptr) == 2152071168): 2 else: 3)))
             (op_neg = ((if (unsafe: *ptr) == 2152136704: 1 else: 0)))
             (rhs_negated = (if (unsafe: *ptr) != 2152071168: 1 else: 0))
         else:
-            (op = (if ((if (unsafe: *ptr) == 2152005632: 1 else: 0)) != 0: 2 else: (if ((if (unsafe: *ptr) == 2152071168: 1 else: 0)) != 0: 1 else: 3)))
+            (op = (if ((unsafe: *ptr) == 2152005632): 2 else: (if ((unsafe: *ptr) == 2152071168): 1 else: 3)))
             (op_neg = 0)
             (rhs_negated = (if (unsafe: *ptr) == 2152071168: 1 else: 0))
         
         (ptr = ptr + 1)
-        if (if compile_class_binary_tight(context, rhs_negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), (&mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0: 0 else: 1) != 0:
+        if (not ((compile_class_binary_tight(context, rhs_negated, ((&ptr as *const *mut c_uint) as *mut *mut c_uint), ((&code as *const *mut u8) as *mut *mut u8), ((&rhs_op_info as *const eclass_op_info) as *mut eclass_op_info), lengthptr) != 0))):
             return 0
         
-        fold_binary(op, pop_info, (&mut rhs_op_info as *mut eclass_op_info), lengthptr)
-        if op_neg != 0:
+        fold_binary(op, pop_info, ((&rhs_op_info as *const eclass_op_info) as *mut eclass_op_info), lengthptr)
+        if (op_neg != 0):
             fold_negation(pop_info, lengthptr, 0)
         
-        if (if lengthptr == (null as *mut c_ulong): 1 else: 0) != 0:
+        if (lengthptr == (null as *mut c_ulong)):
             (code = (pop_info.code_start + pop_info.length))
         
 
@@ -895,350 +1051,3 @@ fn compile_class_binary_loose(context: *mut eclass_context, negated: c_int, pptr
     ((unsafe: *pcode) = code)
     return 1
 
-// untranslatable fn-like macro
-fn BYTES2CU() -> Never:
-    comptime_error("untranslatable C macro: BYTES2CU")
-// untranslatable fn-like macro
-fn CAST_USER_ADDR_T() -> Never:
-    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
-// untranslatable fn-like macro
-fn CHMAX_255() -> Never:
-    comptime_error("untranslatable C macro: CHMAX_255")
-// untranslatable fn-like macro
-fn CLASS_END_CASES() -> Never:
-    comptime_error("untranslatable C macro: CLASS_END_CASES")
-// untranslatable fn-like macro
-fn CLIST_ALIGN_TO() -> Never:
-    comptime_error("untranslatable C macro: CLIST_ALIGN_TO")
-// untranslatable fn-like macro
-fn CU2BYTES() -> Never:
-    comptime_error("untranslatable C macro: CU2BYTES")
-// untranslatable fn-like macro
-fn GET() -> Never:
-    comptime_error("untranslatable C macro: GET")
-// untranslatable fn-like macro
-fn GET2() -> Never:
-    comptime_error("untranslatable C macro: GET2")
-// untranslatable fn-like macro
-fn GETCHAR() -> Never:
-    comptime_error("untranslatable C macro: GETCHAR")
-// untranslatable fn-like macro
-fn GETCHARINC() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINC")
-// untranslatable fn-like macro
-fn GETCHARINCTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINCTEST")
-// untranslatable fn-like macro
-fn GETCHARLEN() -> Never:
-    comptime_error("untranslatable C macro: GETCHARLEN")
-// untranslatable fn-like macro
-fn GETCHARTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARTEST")
-// untranslatable fn-like macro
-fn GETOFFSET() -> Never:
-    comptime_error("untranslatable C macro: GETOFFSET")
-// untranslatable fn-like macro
-fn GETPLUSOFFSET() -> Never:
-    comptime_error("untranslatable C macro: GETPLUSOFFSET")
-// untranslatable fn-like macro
-fn GETUTF8() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8")
-// untranslatable fn-like macro
-fn GETUTF8INC() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8INC")
-// untranslatable fn-like macro
-fn GETUTF8LEN() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8LEN")
-// untranslatable fn-like macro
-fn GET_MAX_CHAR_VALUE() -> Never:
-    comptime_error("untranslatable C macro: GET_MAX_CHAR_VALUE")
-// untranslatable fn-like macro
-fn GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: GET_UCD")
-fn HASUTF8EXTRALEN[T](c: T) -> T:
-    (c >= 0xc0)
-// untranslatable fn-like macro
-fn HTONL() -> Never:
-    comptime_error("untranslatable C macro: HTONL")
-// untranslatable fn-like macro
-fn HTONLL() -> Never:
-    comptime_error("untranslatable C macro: HTONLL")
-// untranslatable fn-like macro
-fn HTONS() -> Never:
-    comptime_error("untranslatable C macro: HTONS")
-fn INT16_C[T](v: T) -> T:
-    v
-fn INT32_C[T](v: T) -> T:
-    v
-fn INT64_C[T](v: T) -> i64:
-    (v as i64)
-fn INT8_C[T](v: T) -> T:
-    v
-fn INTMAX_C[T](v: T) -> i64:
-    (v as i64)
-// untranslatable fn-like macro
-fn IS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: IS_NEWLINE")
-// untranslatable fn-like macro
-fn MAPBIT() -> Never:
-    comptime_error("untranslatable C macro: MAPBIT")
-// untranslatable fn-like macro
-fn MAPSET() -> Never:
-    comptime_error("untranslatable C macro: MAPSET")
-// untranslatable fn-like macro
-fn MAX_255() -> Never:
-    comptime_error("untranslatable C macro: MAX_255")
-fn META_CODE[T](x: T) -> T:
-    (x & 0xffff0000)
-fn META_DATA[T](x: T) -> T:
-    (x & 0x0000ffff)
-// untranslatable fn-like macro
-fn META_DIFF() -> Never:
-    comptime_error("untranslatable C macro: META_DIFF")
-// untranslatable fn-like macro
-fn NAMED_GROUP_GET_HASH() -> Never:
-    comptime_error("untranslatable C macro: NAMED_GROUP_GET_HASH")
-// untranslatable fn-like macro
-fn NTOHL() -> Never:
-    comptime_error("untranslatable C macro: NTOHL")
-// untranslatable fn-like macro
-fn NTOHLL() -> Never:
-    comptime_error("untranslatable C macro: NTOHLL")
-// untranslatable fn-like macro
-fn NTOHS() -> Never:
-    comptime_error("untranslatable C macro: NTOHS")
-// untranslatable fn-like macro
-fn PCRE2_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_ASSERT")
-// untranslatable fn-like macro
-fn PCRE2_DEBUG_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
-// untranslatable fn-like macro
-fn PCRE2_GLUE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_GLUE")
-// untranslatable fn-like macro
-fn PCRE2_JOIN() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_JOIN")
-fn PCRE2_SUFFIX[T](a: T) -> T:
-    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
-// untranslatable fn-like macro
-fn PCRE2_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
-// untranslatable fn-like macro
-fn PRIV() -> Never:
-    comptime_error("untranslatable C macro: PRIV")
-// untranslatable fn-like macro
-fn PUT() -> Never:
-    comptime_error("untranslatable C macro: PUT")
-// untranslatable fn-like macro
-fn PUT2() -> Never:
-    comptime_error("untranslatable C macro: PUT2")
-// untranslatable fn-like macro
-fn PUT2INC() -> Never:
-    comptime_error("untranslatable C macro: PUT2INC")
-// untranslatable fn-like macro
-fn PUTCHAR() -> Never:
-    comptime_error("untranslatable C macro: PUTCHAR")
-// untranslatable fn-like macro
-fn PUTINC() -> Never:
-    comptime_error("untranslatable C macro: PUTINC")
-// untranslatable fn-like macro
-fn PUTOFFSET() -> Never:
-    comptime_error("untranslatable C macro: PUTOFFSET")
-// untranslatable fn-like macro
-fn READPLUSOFFSET() -> Never:
-    comptime_error("untranslatable C macro: READPLUSOFFSET")
-// untranslatable fn-like macro
-fn REAL_GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: REAL_GET_UCD")
-fn SELECT_VALUE8[T](value8: T, value: T) -> T:
-    value8
-// untranslatable fn-like macro
-fn SETBIT() -> Never:
-    comptime_error("untranslatable C macro: SETBIT")
-// untranslatable fn-like macro
-fn SKIPOFFSET() -> Never:
-    comptime_error("untranslatable C macro: SKIPOFFSET")
-// untranslatable fn-like macro
-fn STATIC_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT")
-// untranslatable fn-like macro
-fn STATIC_ASSERT_JOIN() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
-// untranslatable fn-like macro
-fn TABLE_GET() -> Never:
-    comptime_error("untranslatable C macro: TABLE_GET")
-// untranslatable fn-like macro
-fn UCD_ANY_I() -> Never:
-    comptime_error("untranslatable C macro: UCD_ANY_I")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
-// untranslatable fn-like macro
-fn UCD_BPROPS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS")
-// untranslatable fn-like macro
-fn UCD_BPROPS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
-// untranslatable fn-like macro
-fn UCD_CASESET() -> Never:
-    comptime_error("untranslatable C macro: UCD_CASESET")
-// untranslatable fn-like macro
-fn UCD_CATEGORY() -> Never:
-    comptime_error("untranslatable C macro: UCD_CATEGORY")
-// untranslatable fn-like macro
-fn UCD_CHARTYPE() -> Never:
-    comptime_error("untranslatable C macro: UCD_CHARTYPE")
-fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
-fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
-// untranslatable fn-like macro
-fn UCD_GRAPHBREAK() -> Never:
-    comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
-// untranslatable fn-like macro
-fn UCD_OTHERCASE() -> Never:
-    comptime_error("untranslatable C macro: UCD_OTHERCASE")
-// untranslatable fn-like macro
-fn UCD_SCRIPT() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPT")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
-fn UINT16_C[T](v: T) -> T:
-    v
-fn UINT32_C[T](v: T) -> u32:
-    (v as u32)
-fn UINT64_C[T](v: T) -> u64:
-    (v as u64)
-fn UINT8_C[T](v: T) -> T:
-    v
-fn UINTMAX_C[T](v: T) -> u64:
-    (v as u64)
-// untranslatable fn-like macro
-fn WAS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: WAS_NEWLINE")
-// untranslatable fn-like macro
-fn WCOREDUMP() -> Never:
-    comptime_error("untranslatable C macro: WCOREDUMP")
-// untranslatable fn-like macro
-fn WEXITSTATUS() -> Never:
-    comptime_error("untranslatable C macro: WEXITSTATUS")
-// untranslatable fn-like macro
-fn WIFCONTINUED() -> Never:
-    comptime_error("untranslatable C macro: WIFCONTINUED")
-// untranslatable fn-like macro
-fn WIFEXITED() -> Never:
-    comptime_error("untranslatable C macro: WIFEXITED")
-// untranslatable fn-like macro
-fn WIFSIGNALED() -> Never:
-    comptime_error("untranslatable C macro: WIFSIGNALED")
-// untranslatable fn-like macro
-fn WIFSTOPPED() -> Never:
-    comptime_error("untranslatable C macro: WIFSTOPPED")
-// untranslatable fn-like macro
-fn WSTOPSIG() -> Never:
-    comptime_error("untranslatable C macro: WSTOPSIG")
-// untranslatable fn-like macro
-fn WTERMSIG() -> Never:
-    comptime_error("untranslatable C macro: WTERMSIG")
-fn W_EXITCODE[T](ret: T, sig: T) -> T:
-    ((ret << 8) | sig)
-// untranslatable fn-like macro
-fn W_STOPCODE() -> Never:
-    comptime_error("untranslatable C macro: W_STOPCODE")
-// untranslatable fn-like macro
-fn alloca() -> Never:
-    comptime_error("untranslatable C macro: alloca")
-// untranslatable fn-like macro
-fn clearerr_unlocked() -> Never:
-    comptime_error("untranslatable C macro: clearerr_unlocked")
-// untranslatable fn-like macro
-fn feof_unlocked() -> Never:
-    comptime_error("untranslatable C macro: feof_unlocked")
-// untranslatable fn-like macro
-fn ferror_unlocked() -> Never:
-    comptime_error("untranslatable C macro: ferror_unlocked")
-// untranslatable fn-like macro
-fn fileno_unlocked() -> Never:
-    comptime_error("untranslatable C macro: fileno_unlocked")
-// untranslatable fn-like macro
-fn fropen() -> Never:
-    comptime_error("untranslatable C macro: fropen")
-// untranslatable fn-like macro
-fn fwopen() -> Never:
-    comptime_error("untranslatable C macro: fwopen")
-// untranslatable fn-like macro
-fn getc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getc_unlocked")
-// untranslatable fn-like macro
-fn getchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getchar_unlocked")
-// untranslatable fn-like macro
-fn htonl() -> Never:
-    comptime_error("untranslatable C macro: htonl")
-// untranslatable fn-like macro
-fn htonll() -> Never:
-    comptime_error("untranslatable C macro: htonll")
-// untranslatable fn-like macro
-fn htons() -> Never:
-    comptime_error("untranslatable C macro: htons")
-fn memccpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memmove() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memset() -> Never:
-    comptime_error("variadic macro — use direct call")
-// untranslatable fn-like macro
-fn ntohl() -> Never:
-    comptime_error("untranslatable C macro: ntohl")
-// untranslatable fn-like macro
-fn ntohll() -> Never:
-    comptime_error("untranslatable C macro: ntohll")
-// untranslatable fn-like macro
-fn ntohs() -> Never:
-    comptime_error("untranslatable C macro: ntohs")
-// untranslatable fn-like macro
-fn offsetof() -> Never:
-    comptime_error("untranslatable C macro: offsetof")
-// untranslatable fn-like macro
-fn putc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putc_unlocked")
-// untranslatable fn-like macro
-fn putchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putchar_unlocked")
-// untranslatable fn-like macro
-fn sigmask() -> Never:
-    comptime_error("untranslatable C macro: sigmask")
-fn snprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn sprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsnprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsprintf() -> Never:
-    comptime_error("variadic macro — use direct call")

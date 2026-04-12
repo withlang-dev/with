@@ -1337,7 +1337,7 @@ fn AstPool.for_binding_is_pattern(self: &AstPool, node: NodeId) -> bool:
 // Pattern nodes:
 // NodeKind.NK_PAT_WILDCARD:  d0=0, d1=0, d2=0
 // NodeKind.NK_PAT_IDENT:     d0=sym, d1=0, d2=0
-// NodeKind.NK_PAT_INT:       d0=value_low, d1=value_high, d2=0
+// NodeKind.NK_PAT_INT:       d0/d1/d2 = i64 value, encoded with ast_int_part0/1/2 (same as NK_INT_LIT)
 // NodeKind.NK_PAT_BOOL:      d0=value(0/1), d1=0, d2=0
 // NodeKind.NK_PAT_STRING:    d0=sym, d1=0, d2=0
 // NodeKind.NK_PAT_VARIANT:   d0=name(sym), d1=extra_start, d2=binding_count

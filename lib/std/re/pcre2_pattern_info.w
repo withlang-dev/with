@@ -60,7 +60,7 @@ extern fn pcre2_code_copy_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_cod
 extern fn pcre2_code_copy_with_tables_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8
 fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *mut c_void) -> c_int:
     var re: *const pcre2_real_code_8 = (code as *const pcre2_real_code_8)
-    if (if where_ == null: 1 else: 0) != 0:
+    if (where_ == null):
         match what
             0 =>
                 return 8
@@ -73,13 +73,13 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
             _ => 0
         
 
-    if (if re == (null as *const pcre2_real_code_8): 1 else: 0) != 0:
+    if (re == (null as *const pcre2_real_code_8)):
         return (-51)
 
-    if (if re.magic_number != 1346589253: 1 else: 0) != 0:
+    if (re.magic_number != 1346589253):
         return (-31)
 
-    if (if ((re.flags & 1)) == 0: 1 else: 0) != 0:
+    if (((re.flags & 1)) == 0):
         return (-32)
 
     match what
@@ -95,16 +95,16 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
             ((unsafe: *((where_ as *mut c_uint))) = re.top_bracket)
         21 =>
             ((unsafe: *((where_ as *mut c_uint))) = re.limit_depth)
-            if (if re.limit_depth == 4294967295: 1 else: 0) != 0:
+            if (re.limit_depth == 4294967295):
                 return (-55)
         26 =>
             ((unsafe: *((where_ as *mut c_uint))) = re.extra_options)
         6 =>
-            ((unsafe: *((where_ as *mut c_uint))) = (if ((if ((re.flags & 16)) != 0: 1 else: 0)) != 0: 1 else: (if ((if ((re.flags & 512)) != 0: 1 else: 0)) != 0: 2 else: 0)))
+            ((unsafe: *((where_ as *mut c_uint))) = (if (((re.flags & 16)) != 0): 1 else: (if (((re.flags & 512)) != 0): 2 else: 0)))
         5 =>
-            ((unsafe: *((where_ as *mut c_uint))) = (if ((if ((re.flags & 16)) != 0: 1 else: 0)) != 0: re.first_codeunit else: 0))
+            ((unsafe: *((where_ as *mut c_uint))) = (if (((re.flags & 16)) != 0): re.first_codeunit else: 0))
         7 =>
-            ((unsafe: *((where_ as *mut *const u8))) = (if ((if ((re.flags & 64)) != 0: 1 else: 0)) != 0: (&mut ((&re.start_bitmap[0] as *mut u8)[0]) as *const u8) else: (null as *const u8)))
+            ((unsafe: *((where_ as *mut *const u8))) = (if (((re.flags & 64)) != 0): ((&((&re.start_bitmap[0] as *mut u8)[0]) as *const u8) as *const u8) else: (null as *const u8)))
         24 =>
             ((unsafe: *((where_ as *mut c_ulong))) = (120 +% ((re.top_bracket * 2) *% sizeof[c_ulong]())))
         23 =>
@@ -113,21 +113,21 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
             ((unsafe: *((where_ as *mut c_uint))) = (if ((re.flags & 2048)) != 0: 1 else: 0))
         25 =>
             ((unsafe: *((where_ as *mut c_uint))) = re.limit_heap)
-            if (if re.limit_heap == 4294967295: 1 else: 0) != 0:
+            if (re.limit_heap == 4294967295):
                 return (-55)
         9 =>
             ((unsafe: *((where_ as *mut c_uint))) = (if ((re.flags & 1024)) != 0: 1 else: 0))
         10 =>
             ((unsafe: *((where_ as *mut c_ulong))) = 0)
         12 =>
-            ((unsafe: *((where_ as *mut c_uint))) = (if ((if ((re.flags & 128)) != 0: 1 else: 0)) != 0: 1 else: 0))
+            ((unsafe: *((where_ as *mut c_uint))) = (if (((re.flags & 128)) != 0): 1 else: 0))
         11 =>
-            ((unsafe: *((where_ as *mut c_uint))) = (if ((if ((re.flags & 128)) != 0: 1 else: 0)) != 0: re.last_codeunit else: 0))
+            ((unsafe: *((where_ as *mut c_uint))) = (if (((re.flags & 128)) != 0): re.last_codeunit else: 0))
         13 =>
             ((unsafe: *((where_ as *mut c_uint))) = (if ((re.flags & 8192)) != 0: 1 else: 0))
         14 =>
             ((unsafe: *((where_ as *mut c_uint))) = re.limit_match)
-            if (if re.limit_match == 4294967295: 1 else: 0) != 0:
+            if (re.limit_match == 4294967295):
                 return (-55)
         15 =>
             ((unsafe: *((where_ as *mut c_uint))) = re.max_lookbehind)
@@ -152,18 +152,18 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
     var re: *const pcre2_real_code_8 = (code as *const pcre2_real_code_8)
     var cb: pcre2_callout_enumerate_block_8
     var cc: *const u8
-    if (if re == (null as *const pcre2_real_code_8): 1 else: 0) != 0:
+    if (re == (null as *const pcre2_real_code_8)):
         return (-51)
 
-    if (if re.magic_number != 1346589253: 1 else: 0) != 0:
+    if (re.magic_number != 1346589253):
         return (-31)
 
-    if (if ((re.flags & 1)) == 0: 1 else: 0) != 0:
+    if (((re.flags & 1)) == 0):
         return (-32)
 
     (cb.version = 0)
     (cc = ((((re as *mut u8) + re.code_start)) as *const u8))
-    while 1 != 0:
+    while (1 != 0):
         var rc: c_int
         match (unsafe: *cc)
             OP_END =>
@@ -172,20 +172,27 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
             OP_TYPESTAR => 0
             OP_MARK => 0
             OP_CALLOUT =>
+                (cb.pattern_position = ((((((((cc)[1] as c_uint) << 8))) | (cc)[((1) + 1)])) as c_uint))
+                (cb.next_item_length = ((((((((cc)[(1 + 2)] as c_uint) << 8))) | (cc)[(((1 + 2)) + 1)])) as c_uint))
                 (cb.callout_number = cc[(1 + (2 * 2))])
                 (cb.callout_string_offset = 0)
                 (cb.callout_string_length = 0)
                 (cb.callout_string = (null as *const u8))
-                (rc = callback((&mut cb as *mut pcre2_callout_enumerate_block_8), callout_data))
-                if (if rc != 0: 1 else: 0) != 0:
+                (rc = callback(((&cb as *const pcre2_callout_enumerate_block_8) as *mut pcre2_callout_enumerate_block_8), callout_data))
+                if (rc != 0):
                     return rc
                 cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)]
             OP_CALLOUT_STR =>
+                (cb.pattern_position = ((((((((cc)[1] as c_uint) << 8))) | (cc)[((1) + 1)])) as c_uint))
+                (cb.next_item_length = ((((((((cc)[(1 + 2)] as c_uint) << 8))) | (cc)[(((1 + 2)) + 1)])) as c_uint))
                 (cb.callout_number = 0)
+                (cb.callout_string_offset = ((((((((cc)[(1 + (3 * 2))] as c_uint) << 8))) | (cc)[(((1 + (3 * 2))) + 1)])) as c_uint))
+                (cb.callout_string_length = ((((((((((cc)[(1 + (2 * 2))] as c_uint) << 8))) | (cc)[(((1 + (2 * 2))) + 1)])) as c_uint) -% 9) -% 2))
                 (cb.callout_string = ((cc + (((1 + (4 * 2))) as isize as usize)) + (1 as isize as usize)))
-                (rc = callback((&mut cb as *mut pcre2_callout_enumerate_block_8), callout_data))
-                if (if rc != 0: 1 else: 0) != 0:
+                (rc = callback(((&cb as *const pcre2_callout_enumerate_block_8) as *mut pcre2_callout_enumerate_block_8), callout_data))
+                if (rc != 0):
                     return rc
+                cc = cc + ((((((((cc)[(1 + (2 * 2))] as c_uint) << 8))) | (cc)[(((1 + (2 * 2))) + 1)])) as c_uint)
             _ =>
                 cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)]
         
@@ -357,311 +364,3 @@ extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_
 extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
 extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
 extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
-// untranslatable fn-like macro
-fn BYTES2CU() -> Never:
-    comptime_error("untranslatable C macro: BYTES2CU")
-// untranslatable fn-like macro
-fn CAST_USER_ADDR_T() -> Never:
-    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
-// untranslatable fn-like macro
-fn CHMAX_255() -> Never:
-    comptime_error("untranslatable C macro: CHMAX_255")
-// untranslatable fn-like macro
-fn CU2BYTES() -> Never:
-    comptime_error("untranslatable C macro: CU2BYTES")
-// untranslatable fn-like macro
-fn GET() -> Never:
-    comptime_error("untranslatable C macro: GET")
-// untranslatable fn-like macro
-fn GET2() -> Never:
-    comptime_error("untranslatable C macro: GET2")
-// untranslatable fn-like macro
-fn GETCHAR() -> Never:
-    comptime_error("untranslatable C macro: GETCHAR")
-// untranslatable fn-like macro
-fn GETCHARINC() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINC")
-// untranslatable fn-like macro
-fn GETCHARINCTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINCTEST")
-// untranslatable fn-like macro
-fn GETCHARLEN() -> Never:
-    comptime_error("untranslatable C macro: GETCHARLEN")
-// untranslatable fn-like macro
-fn GETCHARTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARTEST")
-// untranslatable fn-like macro
-fn GETUTF8() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8")
-// untranslatable fn-like macro
-fn GETUTF8INC() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8INC")
-// untranslatable fn-like macro
-fn GETUTF8LEN() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8LEN")
-// untranslatable fn-like macro
-fn GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: GET_UCD")
-fn HASUTF8EXTRALEN[T](c: T) -> T:
-    (c >= 0xc0)
-// untranslatable fn-like macro
-fn HTONL() -> Never:
-    comptime_error("untranslatable C macro: HTONL")
-// untranslatable fn-like macro
-fn HTONLL() -> Never:
-    comptime_error("untranslatable C macro: HTONLL")
-// untranslatable fn-like macro
-fn HTONS() -> Never:
-    comptime_error("untranslatable C macro: HTONS")
-fn INT16_C[T](v: T) -> T:
-    v
-fn INT32_C[T](v: T) -> T:
-    v
-fn INT64_C[T](v: T) -> i64:
-    (v as i64)
-fn INT8_C[T](v: T) -> T:
-    v
-fn INTMAX_C[T](v: T) -> i64:
-    (v as i64)
-// untranslatable fn-like macro
-fn IS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: IS_NEWLINE")
-// untranslatable fn-like macro
-fn MAPBIT() -> Never:
-    comptime_error("untranslatable C macro: MAPBIT")
-// untranslatable fn-like macro
-fn MAPSET() -> Never:
-    comptime_error("untranslatable C macro: MAPSET")
-// untranslatable fn-like macro
-fn MAX_255() -> Never:
-    comptime_error("untranslatable C macro: MAX_255")
-// untranslatable fn-like macro
-fn NTOHL() -> Never:
-    comptime_error("untranslatable C macro: NTOHL")
-// untranslatable fn-like macro
-fn NTOHLL() -> Never:
-    comptime_error("untranslatable C macro: NTOHLL")
-// untranslatable fn-like macro
-fn NTOHS() -> Never:
-    comptime_error("untranslatable C macro: NTOHS")
-// untranslatable fn-like macro
-fn PCRE2_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_ASSERT")
-// untranslatable fn-like macro
-fn PCRE2_DEBUG_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
-// untranslatable fn-like macro
-fn PCRE2_GLUE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_GLUE")
-// untranslatable fn-like macro
-fn PCRE2_JOIN() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_JOIN")
-fn PCRE2_SUFFIX[T](a: T) -> T:
-    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
-// untranslatable fn-like macro
-fn PCRE2_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
-// untranslatable fn-like macro
-fn PRIV() -> Never:
-    comptime_error("untranslatable C macro: PRIV")
-// untranslatable fn-like macro
-fn PUT() -> Never:
-    comptime_error("untranslatable C macro: PUT")
-// untranslatable fn-like macro
-fn PUT2() -> Never:
-    comptime_error("untranslatable C macro: PUT2")
-// untranslatable fn-like macro
-fn PUT2INC() -> Never:
-    comptime_error("untranslatable C macro: PUT2INC")
-// untranslatable fn-like macro
-fn PUTCHAR() -> Never:
-    comptime_error("untranslatable C macro: PUTCHAR")
-// untranslatable fn-like macro
-fn PUTINC() -> Never:
-    comptime_error("untranslatable C macro: PUTINC")
-// untranslatable fn-like macro
-fn REAL_GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: REAL_GET_UCD")
-// untranslatable fn-like macro
-fn STATIC_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT")
-// untranslatable fn-like macro
-fn STATIC_ASSERT_JOIN() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
-// untranslatable fn-like macro
-fn TABLE_GET() -> Never:
-    comptime_error("untranslatable C macro: TABLE_GET")
-// untranslatable fn-like macro
-fn UCD_ANY_I() -> Never:
-    comptime_error("untranslatable C macro: UCD_ANY_I")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
-// untranslatable fn-like macro
-fn UCD_BPROPS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS")
-// untranslatable fn-like macro
-fn UCD_BPROPS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
-// untranslatable fn-like macro
-fn UCD_CASESET() -> Never:
-    comptime_error("untranslatable C macro: UCD_CASESET")
-// untranslatable fn-like macro
-fn UCD_CATEGORY() -> Never:
-    comptime_error("untranslatable C macro: UCD_CATEGORY")
-// untranslatable fn-like macro
-fn UCD_CHARTYPE() -> Never:
-    comptime_error("untranslatable C macro: UCD_CHARTYPE")
-fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
-fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
-// untranslatable fn-like macro
-fn UCD_GRAPHBREAK() -> Never:
-    comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
-// untranslatable fn-like macro
-fn UCD_OTHERCASE() -> Never:
-    comptime_error("untranslatable C macro: UCD_OTHERCASE")
-// untranslatable fn-like macro
-fn UCD_SCRIPT() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPT")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
-fn UINT16_C[T](v: T) -> T:
-    v
-fn UINT32_C[T](v: T) -> u32:
-    (v as u32)
-fn UINT64_C[T](v: T) -> u64:
-    (v as u64)
-fn UINT8_C[T](v: T) -> T:
-    v
-fn UINTMAX_C[T](v: T) -> u64:
-    (v as u64)
-// untranslatable fn-like macro
-fn WAS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: WAS_NEWLINE")
-// untranslatable fn-like macro
-fn WCOREDUMP() -> Never:
-    comptime_error("untranslatable C macro: WCOREDUMP")
-// untranslatable fn-like macro
-fn WEXITSTATUS() -> Never:
-    comptime_error("untranslatable C macro: WEXITSTATUS")
-// untranslatable fn-like macro
-fn WIFCONTINUED() -> Never:
-    comptime_error("untranslatable C macro: WIFCONTINUED")
-// untranslatable fn-like macro
-fn WIFEXITED() -> Never:
-    comptime_error("untranslatable C macro: WIFEXITED")
-// untranslatable fn-like macro
-fn WIFSIGNALED() -> Never:
-    comptime_error("untranslatable C macro: WIFSIGNALED")
-// untranslatable fn-like macro
-fn WIFSTOPPED() -> Never:
-    comptime_error("untranslatable C macro: WIFSTOPPED")
-// untranslatable fn-like macro
-fn WSTOPSIG() -> Never:
-    comptime_error("untranslatable C macro: WSTOPSIG")
-// untranslatable fn-like macro
-fn WTERMSIG() -> Never:
-    comptime_error("untranslatable C macro: WTERMSIG")
-fn W_EXITCODE[T](ret: T, sig: T) -> T:
-    ((ret << 8) | sig)
-// untranslatable fn-like macro
-fn W_STOPCODE() -> Never:
-    comptime_error("untranslatable C macro: W_STOPCODE")
-// untranslatable fn-like macro
-fn alloca() -> Never:
-    comptime_error("untranslatable C macro: alloca")
-// untranslatable fn-like macro
-fn clearerr_unlocked() -> Never:
-    comptime_error("untranslatable C macro: clearerr_unlocked")
-// untranslatable fn-like macro
-fn feof_unlocked() -> Never:
-    comptime_error("untranslatable C macro: feof_unlocked")
-// untranslatable fn-like macro
-fn ferror_unlocked() -> Never:
-    comptime_error("untranslatable C macro: ferror_unlocked")
-// untranslatable fn-like macro
-fn fileno_unlocked() -> Never:
-    comptime_error("untranslatable C macro: fileno_unlocked")
-// untranslatable fn-like macro
-fn fropen() -> Never:
-    comptime_error("untranslatable C macro: fropen")
-// untranslatable fn-like macro
-fn fwopen() -> Never:
-    comptime_error("untranslatable C macro: fwopen")
-// untranslatable fn-like macro
-fn getc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getc_unlocked")
-// untranslatable fn-like macro
-fn getchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getchar_unlocked")
-// untranslatable fn-like macro
-fn htonl() -> Never:
-    comptime_error("untranslatable C macro: htonl")
-// untranslatable fn-like macro
-fn htonll() -> Never:
-    comptime_error("untranslatable C macro: htonll")
-// untranslatable fn-like macro
-fn htons() -> Never:
-    comptime_error("untranslatable C macro: htons")
-fn memccpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memmove() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memset() -> Never:
-    comptime_error("variadic macro — use direct call")
-// untranslatable fn-like macro
-fn ntohl() -> Never:
-    comptime_error("untranslatable C macro: ntohl")
-// untranslatable fn-like macro
-fn ntohll() -> Never:
-    comptime_error("untranslatable C macro: ntohll")
-// untranslatable fn-like macro
-fn ntohs() -> Never:
-    comptime_error("untranslatable C macro: ntohs")
-// untranslatable fn-like macro
-fn offsetof() -> Never:
-    comptime_error("untranslatable C macro: offsetof")
-// untranslatable fn-like macro
-fn putc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putc_unlocked")
-// untranslatable fn-like macro
-fn putchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putchar_unlocked")
-// untranslatable fn-like macro
-fn sigmask() -> Never:
-    comptime_error("untranslatable C macro: sigmask")
-fn snprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn sprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsnprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsprintf() -> Never:
-    comptime_error("variadic macro — use direct call")

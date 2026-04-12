@@ -236,8 +236,8 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
     var value: c_uint
     var next_char: *const u8
     (utf = 1)
-    if (if (((unsafe: *(data = data + 1)) & 2)) != 0: 1 else: 0) != 0:
-        if (if c < 256: 1 else: 0) != 0:
+    if ((((unsafe: *(data = data + 1)) & 2)) != 0):
+        if (c < 256):
             return (if ((((data as *const u8))[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0)
         
         data = data + (32 / sizeof[u8]())
@@ -245,47 +245,48 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
     utf
     (type_ = ((((data[0] << 8)) as c_uint) | data[1]))
     data = data + 2
+    (next_char = (char_lists_end - ((((((((((data)[0] as c_uint) << 8))) | (data)[((0) + 1)])) as c_uint) << 1))))
     type_ = type_ & 4095
-    if (if c >= 32768: 1 else: 0) != 0:
+    if (c >= 32768):
         (max_index = (type_ & 3))
-        if (if max_index == 3: 1 else: 0) != 0:
+        if (max_index == 3):
             (max_index = (unsafe: *(next_char as *const c_ushort)))
             next_char = next_char + 2
         
         next_char = next_char + (max_index << 1)
         type_ = type_ >> 3
 
-    if (if c < 65536: 1 else: 0) != 0:
+    if (c < 65536):
         (max_index = (type_ & 3))
         (c = (((((c << 1)) | 1)) as c_ushort))
-        if (if max_index == 3: 1 else: 0) != 0:
+        if (max_index == 3):
             (max_index = (unsafe: *(next_char as *const c_ushort)))
             next_char = next_char + 2
         
-        if (if (if max_index == 0: 1 else: 0) != 0 or (if c < (unsafe: *(next_char as *const c_ushort)): 1 else: 0) != 0: 1 else: 0) != 0:
+        if ((max_index == 0) or (c < (unsafe: *(next_char as *const c_ushort)))):
             return (if ((if ((type_ & 4)) != 0: 1 else: 0)) == not_negated: 1 else: 0)
         
         (min_index = 0)
         (value = ((next_char as *const c_ushort))[(max_index = max_index - 1)])
-        if (if c >= value: 1 else: 0) != 0:
-            return (if ((if (if value == c: 1 else: 0) != 0 or (if ((value & 1)) == 0: 1 else: 0) != 0: 1 else: 0)) == not_negated: 1 else: 0)
+        if (c >= value):
+            return (if ((if (value == c) or (((value & 1)) == 0): 1 else: 0)) == not_negated: 1 else: 0)
         
         (max_index = max_index - 1)
-        while 1 != 0:
+        while (1 != 0):
             var mid_index: c_uint = (((min_index +% max_index)) >> 1)
             (value = ((next_char as *const c_ushort))[mid_index])
-            if (if c < value: 1 else: 0) != 0:
+            if (c < value):
                 (max_index = (mid_index -% 1))
             else:
-                if (if ((next_char as *const c_ushort))[(mid_index +% 1)] <= c: 1 else: 0) != 0:
+                if (((next_char as *const c_ushort))[(mid_index +% 1)] <= c):
                     (min_index = (mid_index +% 1))
                 else:
-                    return (if ((if (if value == c: 1 else: 0) != 0 or (if ((value & 1)) == 0: 1 else: 0) != 0: 1 else: 0)) == not_negated: 1 else: 0)
+                    return (if ((if (value == c) or (((value & 1)) == 0): 1 else: 0)) == not_negated: 1 else: 0)
             
         
 
     (max_index = (type_ & 3))
-    if (if max_index == 3: 1 else: 0) != 0:
+    if (max_index == 3):
         (max_index = (unsafe: *(next_char as *const c_ushort)))
         next_char = next_char + 2
 
@@ -293,29 +294,29 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
     type_ = type_ >> 3
     (max_index = (type_ & 3))
     (c = (((((c << 1)) | 1)) as c_uint))
-    if (if max_index == 3: 1 else: 0) != 0:
+    if (max_index == 3):
         (max_index = (unsafe: *(next_char as *const c_uint)))
         next_char = next_char + 4
 
-    if (if (if max_index == 0: 1 else: 0) != 0 or (if c < (unsafe: *(next_char as *const c_uint)): 1 else: 0) != 0: 1 else: 0) != 0:
+    if ((max_index == 0) or (c < (unsafe: *(next_char as *const c_uint)))):
         return (if ((if ((type_ & 4)) != 0: 1 else: 0)) == not_negated: 1 else: 0)
 
     (min_index = 0)
     (value = ((next_char as *const c_uint))[(max_index = max_index - 1)])
-    if (if c >= value: 1 else: 0) != 0:
-        return (if ((if (if value == c: 1 else: 0) != 0 or (if ((value & 1)) == 0: 1 else: 0) != 0: 1 else: 0)) == not_negated: 1 else: 0)
+    if (c >= value):
+        return (if ((if (value == c) or (((value & 1)) == 0): 1 else: 0)) == not_negated: 1 else: 0)
 
     (max_index = max_index - 1)
-    while 1 != 0:
+    while (1 != 0):
         var mid_index: c_uint = (((min_index +% max_index)) >> 1)
         (value = ((next_char as *const c_uint))[mid_index])
-        if (if c < value: 1 else: 0) != 0:
+        if (c < value):
             (max_index = (mid_index -% 1))
         else:
-            if (if ((next_char as *const c_uint))[(mid_index +% 1)] <= c: 1 else: 0) != 0:
+            if (((next_char as *const c_uint))[(mid_index +% 1)] <= c):
                 (min_index = (mid_index +% 1))
             else:
-                return (if ((if (if value == c: 1 else: 0) != 0 or (if ((value & 1)) == 0: 1 else: 0) != 0: 1 else: 0)) == not_negated: 1 else: 0)
+                return (if ((if (value == c) or (((value & 1)) == 0): 1 else: 0)) == not_negated: 1 else: 0)
         
 
 
@@ -324,14 +325,15 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
     var flags: u8
     var stack: c_uint = 0
     var stack_depth: c_int = 0
-    (flags = (unsafe: *(ptr = ptr + 1)))
-    if (if ((flags & 1)) != 0: 1 else: 0) != 0:
-        if (if c < 256: 1 else: 0) != 0:
+    (flags = (unsafe: *ptr))
+    (ptr = ptr + 1)
+    if (((flags & 1)) != 0):
+        if (c < 256):
             return (if ((((ptr as *const u8))[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0)
         
         ptr = ptr + (32 / sizeof[u8]())
 
-    while (if ptr < data_end: 1 else: 0) != 0:
+    while (ptr < data_end):
         match (unsafe: *ptr)
             1 =>
                 (ptr = ptr + 1)
@@ -350,6 +352,7 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
                 stack = stack ^ (1 as c_uint)
             5 =>
                 var matched: c_uint = _pcre2_xclass_8(c, ((ptr + (1 as isize as usize)) + (2 as isize as usize)), char_lists_end, utf)
+                ptr = ptr + ((((((((ptr)[1] as c_uint) << 8))) | (ptr)[((1) + 1)])) as c_uint)
                 (stack = (((stack << 1)) | matched))
                 (stack_depth = stack_depth + 1)
                 break
@@ -361,311 +364,3 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
     stack_depth
     return (if ((stack & 1)) != 0: 1 else: 0)
 
-// untranslatable fn-like macro
-fn BYTES2CU() -> Never:
-    comptime_error("untranslatable C macro: BYTES2CU")
-// untranslatable fn-like macro
-fn CAST_USER_ADDR_T() -> Never:
-    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
-// untranslatable fn-like macro
-fn CHMAX_255() -> Never:
-    comptime_error("untranslatable C macro: CHMAX_255")
-// untranslatable fn-like macro
-fn CU2BYTES() -> Never:
-    comptime_error("untranslatable C macro: CU2BYTES")
-// untranslatable fn-like macro
-fn GET() -> Never:
-    comptime_error("untranslatable C macro: GET")
-// untranslatable fn-like macro
-fn GET2() -> Never:
-    comptime_error("untranslatable C macro: GET2")
-// untranslatable fn-like macro
-fn GETCHAR() -> Never:
-    comptime_error("untranslatable C macro: GETCHAR")
-// untranslatable fn-like macro
-fn GETCHARINC() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINC")
-// untranslatable fn-like macro
-fn GETCHARINCTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINCTEST")
-// untranslatable fn-like macro
-fn GETCHARLEN() -> Never:
-    comptime_error("untranslatable C macro: GETCHARLEN")
-// untranslatable fn-like macro
-fn GETCHARTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARTEST")
-// untranslatable fn-like macro
-fn GETUTF8() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8")
-// untranslatable fn-like macro
-fn GETUTF8INC() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8INC")
-// untranslatable fn-like macro
-fn GETUTF8LEN() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8LEN")
-// untranslatable fn-like macro
-fn GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: GET_UCD")
-fn HASUTF8EXTRALEN[T](c: T) -> T:
-    (c >= 0xc0)
-// untranslatable fn-like macro
-fn HTONL() -> Never:
-    comptime_error("untranslatable C macro: HTONL")
-// untranslatable fn-like macro
-fn HTONLL() -> Never:
-    comptime_error("untranslatable C macro: HTONLL")
-// untranslatable fn-like macro
-fn HTONS() -> Never:
-    comptime_error("untranslatable C macro: HTONS")
-fn INT16_C[T](v: T) -> T:
-    v
-fn INT32_C[T](v: T) -> T:
-    v
-fn INT64_C[T](v: T) -> i64:
-    (v as i64)
-fn INT8_C[T](v: T) -> T:
-    v
-fn INTMAX_C[T](v: T) -> i64:
-    (v as i64)
-// untranslatable fn-like macro
-fn IS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: IS_NEWLINE")
-// untranslatable fn-like macro
-fn MAPBIT() -> Never:
-    comptime_error("untranslatable C macro: MAPBIT")
-// untranslatable fn-like macro
-fn MAPSET() -> Never:
-    comptime_error("untranslatable C macro: MAPSET")
-// untranslatable fn-like macro
-fn MAX_255() -> Never:
-    comptime_error("untranslatable C macro: MAX_255")
-// untranslatable fn-like macro
-fn NTOHL() -> Never:
-    comptime_error("untranslatable C macro: NTOHL")
-// untranslatable fn-like macro
-fn NTOHLL() -> Never:
-    comptime_error("untranslatable C macro: NTOHLL")
-// untranslatable fn-like macro
-fn NTOHS() -> Never:
-    comptime_error("untranslatable C macro: NTOHS")
-// untranslatable fn-like macro
-fn PCRE2_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_ASSERT")
-// untranslatable fn-like macro
-fn PCRE2_DEBUG_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
-// untranslatable fn-like macro
-fn PCRE2_GLUE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_GLUE")
-// untranslatable fn-like macro
-fn PCRE2_JOIN() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_JOIN")
-fn PCRE2_SUFFIX[T](a: T) -> T:
-    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
-// untranslatable fn-like macro
-fn PCRE2_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
-// untranslatable fn-like macro
-fn PRIV() -> Never:
-    comptime_error("untranslatable C macro: PRIV")
-// untranslatable fn-like macro
-fn PUT() -> Never:
-    comptime_error("untranslatable C macro: PUT")
-// untranslatable fn-like macro
-fn PUT2() -> Never:
-    comptime_error("untranslatable C macro: PUT2")
-// untranslatable fn-like macro
-fn PUT2INC() -> Never:
-    comptime_error("untranslatable C macro: PUT2INC")
-// untranslatable fn-like macro
-fn PUTCHAR() -> Never:
-    comptime_error("untranslatable C macro: PUTCHAR")
-// untranslatable fn-like macro
-fn PUTINC() -> Never:
-    comptime_error("untranslatable C macro: PUTINC")
-// untranslatable fn-like macro
-fn REAL_GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: REAL_GET_UCD")
-// untranslatable fn-like macro
-fn STATIC_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT")
-// untranslatable fn-like macro
-fn STATIC_ASSERT_JOIN() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
-// untranslatable fn-like macro
-fn TABLE_GET() -> Never:
-    comptime_error("untranslatable C macro: TABLE_GET")
-// untranslatable fn-like macro
-fn UCD_ANY_I() -> Never:
-    comptime_error("untranslatable C macro: UCD_ANY_I")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
-// untranslatable fn-like macro
-fn UCD_BPROPS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS")
-// untranslatable fn-like macro
-fn UCD_BPROPS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
-// untranslatable fn-like macro
-fn UCD_CASESET() -> Never:
-    comptime_error("untranslatable C macro: UCD_CASESET")
-// untranslatable fn-like macro
-fn UCD_CATEGORY() -> Never:
-    comptime_error("untranslatable C macro: UCD_CATEGORY")
-// untranslatable fn-like macro
-fn UCD_CHARTYPE() -> Never:
-    comptime_error("untranslatable C macro: UCD_CHARTYPE")
-fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
-fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
-// untranslatable fn-like macro
-fn UCD_GRAPHBREAK() -> Never:
-    comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
-// untranslatable fn-like macro
-fn UCD_OTHERCASE() -> Never:
-    comptime_error("untranslatable C macro: UCD_OTHERCASE")
-// untranslatable fn-like macro
-fn UCD_SCRIPT() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPT")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
-fn UINT16_C[T](v: T) -> T:
-    v
-fn UINT32_C[T](v: T) -> u32:
-    (v as u32)
-fn UINT64_C[T](v: T) -> u64:
-    (v as u64)
-fn UINT8_C[T](v: T) -> T:
-    v
-fn UINTMAX_C[T](v: T) -> u64:
-    (v as u64)
-// untranslatable fn-like macro
-fn WAS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: WAS_NEWLINE")
-// untranslatable fn-like macro
-fn WCOREDUMP() -> Never:
-    comptime_error("untranslatable C macro: WCOREDUMP")
-// untranslatable fn-like macro
-fn WEXITSTATUS() -> Never:
-    comptime_error("untranslatable C macro: WEXITSTATUS")
-// untranslatable fn-like macro
-fn WIFCONTINUED() -> Never:
-    comptime_error("untranslatable C macro: WIFCONTINUED")
-// untranslatable fn-like macro
-fn WIFEXITED() -> Never:
-    comptime_error("untranslatable C macro: WIFEXITED")
-// untranslatable fn-like macro
-fn WIFSIGNALED() -> Never:
-    comptime_error("untranslatable C macro: WIFSIGNALED")
-// untranslatable fn-like macro
-fn WIFSTOPPED() -> Never:
-    comptime_error("untranslatable C macro: WIFSTOPPED")
-// untranslatable fn-like macro
-fn WSTOPSIG() -> Never:
-    comptime_error("untranslatable C macro: WSTOPSIG")
-// untranslatable fn-like macro
-fn WTERMSIG() -> Never:
-    comptime_error("untranslatable C macro: WTERMSIG")
-fn W_EXITCODE[T](ret: T, sig: T) -> T:
-    ((ret << 8) | sig)
-// untranslatable fn-like macro
-fn W_STOPCODE() -> Never:
-    comptime_error("untranslatable C macro: W_STOPCODE")
-// untranslatable fn-like macro
-fn alloca() -> Never:
-    comptime_error("untranslatable C macro: alloca")
-// untranslatable fn-like macro
-fn clearerr_unlocked() -> Never:
-    comptime_error("untranslatable C macro: clearerr_unlocked")
-// untranslatable fn-like macro
-fn feof_unlocked() -> Never:
-    comptime_error("untranslatable C macro: feof_unlocked")
-// untranslatable fn-like macro
-fn ferror_unlocked() -> Never:
-    comptime_error("untranslatable C macro: ferror_unlocked")
-// untranslatable fn-like macro
-fn fileno_unlocked() -> Never:
-    comptime_error("untranslatable C macro: fileno_unlocked")
-// untranslatable fn-like macro
-fn fropen() -> Never:
-    comptime_error("untranslatable C macro: fropen")
-// untranslatable fn-like macro
-fn fwopen() -> Never:
-    comptime_error("untranslatable C macro: fwopen")
-// untranslatable fn-like macro
-fn getc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getc_unlocked")
-// untranslatable fn-like macro
-fn getchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getchar_unlocked")
-// untranslatable fn-like macro
-fn htonl() -> Never:
-    comptime_error("untranslatable C macro: htonl")
-// untranslatable fn-like macro
-fn htonll() -> Never:
-    comptime_error("untranslatable C macro: htonll")
-// untranslatable fn-like macro
-fn htons() -> Never:
-    comptime_error("untranslatable C macro: htons")
-fn memccpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memmove() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memset() -> Never:
-    comptime_error("variadic macro — use direct call")
-// untranslatable fn-like macro
-fn ntohl() -> Never:
-    comptime_error("untranslatable C macro: ntohl")
-// untranslatable fn-like macro
-fn ntohll() -> Never:
-    comptime_error("untranslatable C macro: ntohll")
-// untranslatable fn-like macro
-fn ntohs() -> Never:
-    comptime_error("untranslatable C macro: ntohs")
-// untranslatable fn-like macro
-fn offsetof() -> Never:
-    comptime_error("untranslatable C macro: offsetof")
-// untranslatable fn-like macro
-fn putc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putc_unlocked")
-// untranslatable fn-like macro
-fn putchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putchar_unlocked")
-// untranslatable fn-like macro
-fn sigmask() -> Never:
-    comptime_error("untranslatable C macro: sigmask")
-fn snprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn sprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsnprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsprintf() -> Never:
-    comptime_error("variadic macro — use direct call")

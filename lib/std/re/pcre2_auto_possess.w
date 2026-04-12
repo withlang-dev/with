@@ -213,14 +213,14 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
     var ucp: c_int = (if ((cb.external_options & 131072)) != 0: 1 else: 0)
     while true:
         (c = (unsafe: *code))
-        if (if c >= OP_TABLE_LENGTH: 1 else: 0) != 0:
+        if (c >= OP_TABLE_LENGTH):
             return -1
         
-        if (if (if c >= OP_STAR: 1 else: 0) != 0 and (if c <= OP_TYPEPOSUPTO: 1 else: 0) != 0: 1 else: 0) != 0:
+        if ((c >= OP_STAR) and (c <= OP_TYPEPOSUPTO)):
             c = c - (get_repeat_base(c) - OP_STAR)
-            (end = (if ((if c <= OP_MINUPTO: 1 else: 0)) != 0: get_chr_property_list((code as *const u8), utf, ucp, cb.fcc, (&list[0] as *mut c_uint)) else: (null as *const u8)))
-            ((&list[0] as *mut c_uint)[1] = (if (if (if (if c == OP_STAR: 1 else: 0) != 0 or (if c == OP_PLUS: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == OP_QUERY: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == OP_UPTO: 1 else: 0) != 0: 1 else: 0))
-            if (if (if end != (null as *const u8): 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, ((&list[0] as *mut c_uint) as *const c_uint), end, (&mut rec_limit as *mut c_int)) != 0: 1 else: 0) != 0:
+            (end = (if (c <= OP_MINUPTO): get_chr_property_list((code as *const u8), utf, ucp, cb.fcc, (&list[0] as *mut c_uint)) else: (null as *const u8)))
+            ((&list[0] as *mut c_uint)[1] = (if (((c == OP_STAR) or (c == OP_PLUS)) or (c == OP_QUERY)) or (c == OP_UPTO): 1 else: 0))
+            if ((end != (null as *const u8)) and (compare_opcodes(end, utf, ucp, cb, ((&list[0] as *mut c_uint) as *const c_uint), end, ((&rec_limit as *const c_int) as *mut c_int)) != 0)):
                 match c
                     OP_STAR =>
                         (unsafe: *code) = (unsafe: *code) + (OP_POSSTAR - OP_STAR)
@@ -243,13 +243,13 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
             
             (c = (unsafe: *code))
         else:
-            if (if (if c == OP_CLASS: 1 else: 0) != 0 or (if c == OP_NCLASS: 1 else: 0) != 0: 1 else: 0) != 0:
+            if ((c == OP_CLASS) or (c == OP_NCLASS)):
                 (repeat_opcode = ((code + (1 as isize as usize)) + ((32 / sizeof[u8]()))))
                 (c = (unsafe: *repeat_opcode))
-                if (if (if c >= OP_CRSTAR: 1 else: 0) != 0 and (if c <= OP_CRMINRANGE: 1 else: 0) != 0: 1 else: 0) != 0:
+                if ((c >= OP_CRSTAR) and (c <= OP_CRMINRANGE)):
                     (end = get_chr_property_list((code as *const u8), utf, ucp, cb.fcc, (&list[0] as *mut c_uint)))
                     ((&list[0] as *mut c_uint)[1] = (if ((c & 1)) == 0: 1 else: 0))
-                    if (if (if end != (null as *const u8): 1 else: 0) != 0 and compare_opcodes(end, utf, ucp, cb, ((&list[0] as *mut c_uint) as *const c_uint), end, (&mut rec_limit as *mut c_int)) != 0: 1 else: 0) != 0:
+                    if ((end != (null as *const u8)) and (compare_opcodes(end, utf, ucp, cb, ((&list[0] as *mut c_uint) as *const c_uint), end, ((&rec_limit as *const c_int) as *mut c_int)) != 0)):
                         match c
                             OP_CRSTAR => 0
                             OP_CRPLUS => 0
@@ -266,7 +266,8 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                 return 0
             OP_TYPESTAR => 0
             OP_TYPEUPTO => 0
-            OP_CALLOUT_STR => 0
+            OP_CALLOUT_STR =>
+                code = code + ((((((((code)[(1 + (2 * 2))] as c_uint) << 8))) | (code)[(((1 + (2 * 2))) + 1)])) as c_uint)
             OP_MARK => 0
             _ => 0
         
@@ -299,7 +300,7 @@ extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -
 extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
 var autoposstab: [17][21]u8 = [[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0], [1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1], [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1], [0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0], [0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0], [0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]]
 fn get_repeat_base(c: u8) -> u8:
-    return (if ((if c > OP_TYPEPOSUPTO: 1 else: 0)) != 0: c else: (if ((if c >= OP_TYPESTAR: 1 else: 0)) != 0: OP_TYPESTAR else: (if ((if c >= OP_NOTSTARI: 1 else: 0)) != 0: OP_NOTSTARI else: (if ((if c >= OP_NOTSTAR: 1 else: 0)) != 0: OP_NOTSTAR else: (if ((if c >= OP_STARI: 1 else: 0)) != 0: OP_STARI else: OP_STAR)))))
+    return (if (c > OP_TYPEPOSUPTO): c else: (if (c >= OP_TYPESTAR): OP_TYPESTAR else: (if (c >= OP_NOTSTARI): OP_NOTSTARI else: (if (c >= OP_NOTSTAR): OP_NOTSTAR else: (if (c >= OP_STARI): OP_STARI else: OP_STAR)))))
 
 fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *const u8, list: *mut c_uint) -> *const u8:
     var code = __param_code
@@ -313,13 +314,13 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
     (list[0] = c)
     (list[1] = 0)
     (code = code + 1)
-    if (if (if c >= OP_STAR: 1 else: 0) != 0 and (if c <= OP_TYPEPOSUPTO: 1 else: 0) != 0: 1 else: 0) != 0:
+    if ((c >= OP_STAR) and (c <= OP_TYPEPOSUPTO)):
         (base = get_repeat_base(c))
         c = c - ((base - OP_STAR))
-        if (if (if (if (if c == OP_UPTO: 1 else: 0) != 0 or (if c == OP_MINUPTO: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == OP_EXACT: 1 else: 0) != 0: 1 else: 0) != 0 or (if c == OP_POSUPTO: 1 else: 0) != 0: 1 else: 0) != 0:
+        if ((((c == OP_UPTO) or (c == OP_MINUPTO)) or (c == OP_EXACT)) or (c == OP_POSUPTO)):
             code = code + 2
         
-        (list[1] = ((if (if (if (if c != OP_PLUS: 1 else: 0) != 0 and (if c != OP_MINPLUS: 1 else: 0) != 0: 1 else: 0) != 0 and (if c != OP_EXACT: 1 else: 0) != 0: 1 else: 0) != 0 and (if c != OP_POSPLUS: 1 else: 0) != 0: 1 else: 0)))
+        (list[1] = ((if (((c != OP_PLUS) and (c != OP_MINPLUS)) and (c != OP_EXACT)) and (c != OP_POSPLUS): 1 else: 0)))
         match base
             OP_STAR =>
                 (list[0] = 29)
@@ -348,10 +349,12 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             (list[3] = (4294967295 as c_uint))
             return code
         OP_CHARI =>
+            (chr = (unsafe: *code))
+            (code = code + 1)
             0
             (list[2] = chr)
             (list[3] = fcc[chr])
-            if (if chr == list[3]: 1 else: 0) != 0:
+            if (chr == list[3]):
                 (list[3] = (4294967295 as c_uint))
             else:
                 (list[4] = (4294967295 as c_uint))
@@ -388,30 +391,37 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
     var accepted: c_int
     var invert_bits: c_int
     var entered_a_group: c_int = 0
-    if (if (((unsafe: *rec_limit)) = ((unsafe: *rec_limit)) - 1) <= 0: 1 else: 0) != 0:
+    if ((((unsafe: *rec_limit)) = ((unsafe: *rec_limit)) - 1) <= 0):
         return 0
 
     while true:
         var bracode: *const u8
         (c = (unsafe: *code))
-        if (if c == OP_CALLOUT: 1 else: 0) != 0:
+        if (c == OP_CALLOUT):
             code = code + _pcre2_OP_lengths_8[c]
             continue
         
-        if (if c == OP_CALLOUT_STR: 1 else: 0) != 0:
+        if (c == OP_CALLOUT_STR):
+            code = code + ((((((((code)[(1 + (2 * 2))] as c_uint) << 8))) | (code)[(((1 + (2 * 2))) + 1)])) as c_uint)
             continue
         
-        if (if c == OP_ALT: 1 else: 0) != 0:
+        if (c == OP_ALT):
+            while true:
+                code = code + ((((((((code)[1] as c_uint) << 8))) | (code)[((1) + 1)])) as c_uint)
+                if not (((unsafe: *code) == OP_ALT)):
+                    break
+            
             (c = (unsafe: *code))
         
         match c
             OP_END =>
                 return (if base_list[1] != 0: 1 else: 0)
             OP_KET =>
+                (bracode = (code - ((((((((code)[1] as c_uint) << 8))) | (code)[((1) + 1)])) as c_uint)))
                 match (unsafe: *bracode)
                     OP_CBRA => 0
                     OP_SCRIPT_RUN =>
-                        if (if (if base_list[0] != 29: 1 else: 0) != 0 and (if base_list[0] != 30: 1 else: 0) != 0: 1 else: 0) != 0:
+                        if ((base_list[0] != 29) and (base_list[0] != 30)):
                             return 0
                     OP_ASSERT =>
                         return (if entered_a_group != 0: 0 else: 1)
@@ -422,57 +432,136 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                 code = code + _pcre2_OP_lengths_8[c]
                 continue
                 code = code + _pcre2_OP_lengths_8[c]
-                while (if (unsafe: *next_code) == OP_ALT: 1 else: 0) != 0:
-                    if (if compare_opcodes(code, utf, ucp, cb, base_list, base_end, rec_limit) != 0: 0 else: 1) != 0:
+                while ((unsafe: *next_code) == OP_ALT):
+                    if (not ((compare_opcodes(code, utf, ucp, cb, base_list, base_end, rec_limit) != 0))):
                         return 0
                     
                     (code = ((next_code + (1 as isize as usize)) + (2 as isize as usize)))
+                    next_code = next_code + ((((((((next_code)[1] as c_uint) << 8))) | (next_code)[((1) + 1)])) as c_uint)
                 (entered_a_group = 1)
                 continue
-                if (if (if (if (unsafe: *next_code) != OP_BRA: 1 else: 0) != 0 and (if (unsafe: *next_code) != OP_CBRA: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *next_code) != OP_ONCE: 1 else: 0) != 0: 1 else: 0) != 0:
+                if ((((unsafe: *next_code) != OP_BRA) and ((unsafe: *next_code) != OP_CBRA)) and ((unsafe: *next_code) != OP_ONCE)):
                     return 0
+                while true:
+                    next_code = next_code + ((((((((next_code)[1] as c_uint) << 8))) | (next_code)[((1) + 1)])) as c_uint)
+                    if not (((unsafe: *next_code) == OP_ALT)):
+                        break
                 next_code = next_code + (1 + 2)
-                if (if compare_opcodes(next_code, utf, ucp, cb, base_list, base_end, rec_limit) != 0: 0 else: 1) != 0:
+                if (not ((compare_opcodes(next_code, utf, ucp, cb, base_list, base_end, rec_limit) != 0))):
                     return 0
                 code = code + _pcre2_OP_lengths_8[c]
                 continue
             OP_ONCE =>
                 code = code + _pcre2_OP_lengths_8[c]
-                while (if (unsafe: *next_code) == OP_ALT: 1 else: 0) != 0:
-                    if (if compare_opcodes(code, utf, ucp, cb, base_list, base_end, rec_limit) != 0: 0 else: 1) != 0:
+                while ((unsafe: *next_code) == OP_ALT):
+                    if (not ((compare_opcodes(code, utf, ucp, cb, base_list, base_end, rec_limit) != 0))):
                         return 0
                     
                     (code = ((next_code + (1 as isize as usize)) + (2 as isize as usize)))
+                    next_code = next_code + ((((((((next_code)[1] as c_uint) << 8))) | (next_code)[((1) + 1)])) as c_uint)
                 (entered_a_group = 1)
                 continue
-                if (if (if (if (unsafe: *next_code) != OP_BRA: 1 else: 0) != 0 and (if (unsafe: *next_code) != OP_CBRA: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *next_code) != OP_ONCE: 1 else: 0) != 0: 1 else: 0) != 0:
+                if ((((unsafe: *next_code) != OP_BRA) and ((unsafe: *next_code) != OP_CBRA)) and ((unsafe: *next_code) != OP_ONCE)):
                     return 0
+                while true:
+                    next_code = next_code + ((((((((next_code)[1] as c_uint) << 8))) | (next_code)[((1) + 1)])) as c_uint)
+                    if not (((unsafe: *next_code) == OP_ALT)):
+                        break
                 next_code = next_code + (1 + 2)
-                if (if compare_opcodes(next_code, utf, ucp, cb, base_list, base_end, rec_limit) != 0: 0 else: 1) != 0:
+                if (not ((compare_opcodes(next_code, utf, ucp, cb, base_list, base_end, rec_limit) != 0))):
                     return 0
                 code = code + _pcre2_OP_lengths_8[c]
                 continue
             OP_BRAZERO =>
-                if (if (if (if (unsafe: *next_code) != OP_BRA: 1 else: 0) != 0 and (if (unsafe: *next_code) != OP_CBRA: 1 else: 0) != 0: 1 else: 0) != 0 and (if (unsafe: *next_code) != OP_ONCE: 1 else: 0) != 0: 1 else: 0) != 0:
+                if ((((unsafe: *next_code) != OP_BRA) and ((unsafe: *next_code) != OP_CBRA)) and ((unsafe: *next_code) != OP_ONCE)):
                     return 0
+                while true:
+                    next_code = next_code + ((((((((next_code)[1] as c_uint) << 8))) | (next_code)[((1) + 1)])) as c_uint)
+                    if not (((unsafe: *next_code) == OP_ALT)):
+                        break
                 next_code = next_code + (1 + 2)
-                if (if compare_opcodes(next_code, utf, ucp, cb, base_list, base_end, rec_limit) != 0: 0 else: 1) != 0:
+                if (not ((compare_opcodes(next_code, utf, ucp, cb, base_list, base_end, rec_limit) != 0))):
                     return 0
                 code = code + _pcre2_OP_lengths_8[c]
                 continue
             _ => 0
         
         (code = get_chr_property_list(code, utf, ucp, cb.fcc, (&list[0] as *mut c_uint)))
-        if (if code == (null as *const u8): 1 else: 0) != 0:
+        if (code == (null as *const u8)):
             return 0
         
-        if (if base_list[0] == 29: 1 else: 0) != 0:
+        if (base_list[0] == 29):
             (chr_ptr = (base_list + (2 as isize as usize)))
             (list_ptr = ((&list[0] as *mut c_uint) as *const c_uint))
         else:
-            if (if (&list[0] as *mut c_uint)[0] == 29: 1 else: 0) != 0:
+            if ((&list[0] as *mut c_uint)[0] == 29):
                 (chr_ptr = (((&list[0] as *mut c_uint) + (2 as isize as usize)) as *const c_uint))
                 (list_ptr = base_list)
+            else:
+                if (((base_list[0] == 110) or ((&list[0] as *mut c_uint)[0] == 110)) or ((not ((utf != 0))) and ((base_list[0] == 111) or ((&list[0] as *mut c_uint)[0] == 111)))):
+                    if ((base_list[0] == 110) or ((not ((utf != 0))) and (base_list[0] == 111))):
+                        (set1 = (((base_end - base_list[2])) as *const u8))
+                        (list_ptr = ((&list[0] as *mut c_uint) as *const c_uint))
+                    else:
+                        (set1 = (((code - (&list[0] as *mut c_uint)[2])) as *const u8))
+                        (list_ptr = base_list)
+                    
+                    (invert_bits = 0)
+                    match list_ptr[0]
+                        110 => 0
+                        6 =>
+                            (invert_bits = 1)
+                            (set2 = (((cb.cbits + (64 as isize as usize))) as *const u8))
+                        7 =>
+                            (set2 = (((cb.cbits + (64 as isize as usize))) as *const u8))
+                        8 =>
+                            (invert_bits = 1)
+                            (set2 = (((cb.cbits + (0 as isize as usize))) as *const u8))
+                        9 =>
+                            (set2 = (((cb.cbits + (0 as isize as usize))) as *const u8))
+                        10 =>
+                            (invert_bits = 1)
+                            (set2 = (((cb.cbits + (160 as isize as usize))) as *const u8))
+                        11 =>
+                            (set2 = (((cb.cbits + (160 as isize as usize))) as *const u8))
+                        _ =>
+                            return 0
+                    
+                    (set_end = (set1 + (32 as isize as usize)))
+                    if (invert_bits != 0):
+                        while true:
+                            if ((((unsafe: *(set1 = set1 + 1)) & (0 - ((unsafe: *(set2 = set2 + 1))) - 1))) != 0):
+                                return 0
+                            
+                            if not ((set1 < set_end)):
+                                break
+                        
+                    else:
+                        while true:
+                            if ((((unsafe: *(set1 = set1 + 1)) & (unsafe: *(set2 = set2 + 1)))) != 0):
+                                return 0
+                            
+                            if not ((set1 < set_end)):
+                                break
+                        
+                    
+                    if ((&list[0] as *mut c_uint)[1] == 0):
+                        return 1
+                    
+                    continue
+                else:
+                    var leftop: c_uint
+                    var rightop: c_uint
+                    (leftop = base_list[0])
+                    (rightop = (&list[0] as *mut c_uint)[0])
+                    (accepted = (if ((((leftop >= 6) and (leftop <= 22)) and (rightop >= 6)) and (rightop <= 26)) and ((&(&autoposstab[0] as *mut [21]u8)[(leftop -% 6)][0] as *mut u8)[(rightop -% 6)] != 0): 1 else: 0))
+                    if (not ((accepted != 0))):
+                        return 0
+                    
+                    if ((&list[0] as *mut c_uint)[1] == 0):
+                        return 1
+                    
+                    continue
         
         while true:
             (chr = (unsafe: *chr_ptr))
@@ -480,40 +569,40 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                 29 =>
                     (ochr_ptr = (list_ptr + (2 as isize as usize)))
                     while true:
-                        if (if chr == (unsafe: *ochr_ptr): 1 else: 0) != 0:
+                        if (chr == (unsafe: *ochr_ptr)):
                             return 0
                         
                         (ochr_ptr = ochr_ptr + 1)
-                        if not ((if (unsafe: *ochr_ptr) != 4294967295: 1 else: 0) != 0):
+                        if not (((unsafe: *ochr_ptr) != 4294967295)):
                             break
                 31 =>
                     (ochr_ptr = (list_ptr + (2 as isize as usize)))
                     while true:
-                        if (if chr == (unsafe: *ochr_ptr): 1 else: 0) != 0:
+                        if (chr == (unsafe: *ochr_ptr)):
                             break
                         
                         (ochr_ptr = ochr_ptr + 1)
-                        if not ((if (unsafe: *ochr_ptr) != 4294967295: 1 else: 0) != 0):
+                        if not (((unsafe: *ochr_ptr) != 4294967295)):
                             break
-                    if (if (unsafe: *ochr_ptr) == 4294967295: 1 else: 0) != 0:
+                    if ((unsafe: *ochr_ptr) == 4294967295):
                         return 0
                 7 =>
-                    if (if (if chr < 256: 1 else: 0) != 0 and (if ((cb.ctypes[chr] & 8)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if ((chr < 256) and (((cb.ctypes[chr] & 8)) != 0)):
                         return 0
                 6 =>
-                    if (if (if chr > 255: 1 else: 0) != 0 or (if ((cb.ctypes[chr] & 8)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if ((chr > 255) or (((cb.ctypes[chr] & 8)) == 0)):
                         return 0
                 9 =>
-                    if (if (if chr < 256: 1 else: 0) != 0 and (if ((cb.ctypes[chr] & 1)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if ((chr < 256) and (((cb.ctypes[chr] & 1)) != 0)):
                         return 0
                 8 =>
-                    if (if (if chr > 255: 1 else: 0) != 0 or (if ((cb.ctypes[chr] & 1)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if ((chr > 255) or (((cb.ctypes[chr] & 1)) == 0)):
                         return 0
                 11 =>
-                    if (if (if chr < 255: 1 else: 0) != 0 and (if ((cb.ctypes[chr] & 16)) != 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if ((chr < 255) and (((cb.ctypes[chr] & 16)) != 0)):
                         return 0
                 10 =>
-                    if (if (if chr > 255: 1 else: 0) != 0 or (if ((cb.ctypes[chr] & 16)) == 0: 1 else: 0) != 0: 1 else: 0) != 0:
+                    if ((chr > 255) or (((cb.ctypes[chr] & 16)) == 0)):
                         return 0
                 19 =>
                     match chr
@@ -535,338 +624,29 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                 25 => 0
                 24 => 0
                 111 =>
-                    if (if chr > 255: 1 else: 0) != 0:
+                    if (chr > 255):
                         return 0
-                    if (if chr > 255: 1 else: 0) != 0:
+                    if (chr > 255):
                         break
-                    (class_bitset = (((((if (if list_ptr == ((&list[0] as *mut c_uint) as *const c_uint): 1 else: 0) != 0: code else: base_end)) - list_ptr[2])) as *const u8))
-                    if (if ((class_bitset[(chr >> 3)] & ((1 << ((chr & 7)))))) != 0: 1 else: 0) != 0:
+                    (class_bitset = (((((if (list_ptr == ((&list[0] as *mut c_uint) as *const c_uint)): code else: base_end)) - list_ptr[2])) as *const u8))
+                    if (((class_bitset[(chr >> 3)] & ((1 << ((chr & 7)))))) != 0):
                         return 0
                 110 =>
-                    if (if chr > 255: 1 else: 0) != 0:
+                    if (chr > 255):
                         break
-                    (class_bitset = (((((if (if list_ptr == ((&list[0] as *mut c_uint) as *const c_uint): 1 else: 0) != 0: code else: base_end)) - list_ptr[2])) as *const u8))
-                    if (if ((class_bitset[(chr >> 3)] & ((1 << ((chr & 7)))))) != 0: 1 else: 0) != 0:
+                    (class_bitset = (((((if (list_ptr == ((&list[0] as *mut c_uint) as *const c_uint)): code else: base_end)) - list_ptr[2])) as *const u8))
+                    if (((class_bitset[(chr >> 3)] & ((1 << ((chr & 7)))))) != 0):
                         return 0
                 _ =>
                     return 0
             
             (chr_ptr = chr_ptr + 1)
-            if not ((if (unsafe: *chr_ptr) != 4294967295: 1 else: 0) != 0):
+            if not (((unsafe: *chr_ptr) != 4294967295)):
                 break
         
-        if (if (&list[0] as *mut c_uint)[1] == 0: 1 else: 0) != 0:
+        if ((&list[0] as *mut c_uint)[1] == 0):
             return 1
         
 
     return 0
 
-// untranslatable fn-like macro
-fn BYTES2CU() -> Never:
-    comptime_error("untranslatable C macro: BYTES2CU")
-// untranslatable fn-like macro
-fn CAST_USER_ADDR_T() -> Never:
-    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
-// untranslatable fn-like macro
-fn CHMAX_255() -> Never:
-    comptime_error("untranslatable C macro: CHMAX_255")
-// untranslatable fn-like macro
-fn CU2BYTES() -> Never:
-    comptime_error("untranslatable C macro: CU2BYTES")
-// untranslatable fn-like macro
-fn GET() -> Never:
-    comptime_error("untranslatable C macro: GET")
-// untranslatable fn-like macro
-fn GET2() -> Never:
-    comptime_error("untranslatable C macro: GET2")
-// untranslatable fn-like macro
-fn GETCHAR() -> Never:
-    comptime_error("untranslatable C macro: GETCHAR")
-// untranslatable fn-like macro
-fn GETCHARINC() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINC")
-// untranslatable fn-like macro
-fn GETCHARINCTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINCTEST")
-// untranslatable fn-like macro
-fn GETCHARLEN() -> Never:
-    comptime_error("untranslatable C macro: GETCHARLEN")
-// untranslatable fn-like macro
-fn GETCHARTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARTEST")
-// untranslatable fn-like macro
-fn GETUTF8() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8")
-// untranslatable fn-like macro
-fn GETUTF8INC() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8INC")
-// untranslatable fn-like macro
-fn GETUTF8LEN() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8LEN")
-// untranslatable fn-like macro
-fn GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: GET_UCD")
-fn HASUTF8EXTRALEN[T](c: T) -> T:
-    (c >= 0xc0)
-// untranslatable fn-like macro
-fn HTONL() -> Never:
-    comptime_error("untranslatable C macro: HTONL")
-// untranslatable fn-like macro
-fn HTONLL() -> Never:
-    comptime_error("untranslatable C macro: HTONLL")
-// untranslatable fn-like macro
-fn HTONS() -> Never:
-    comptime_error("untranslatable C macro: HTONS")
-fn INT16_C[T](v: T) -> T:
-    v
-fn INT32_C[T](v: T) -> T:
-    v
-fn INT64_C[T](v: T) -> i64:
-    (v as i64)
-fn INT8_C[T](v: T) -> T:
-    v
-fn INTMAX_C[T](v: T) -> i64:
-    (v as i64)
-// untranslatable fn-like macro
-fn IS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: IS_NEWLINE")
-// untranslatable fn-like macro
-fn MAPBIT() -> Never:
-    comptime_error("untranslatable C macro: MAPBIT")
-// untranslatable fn-like macro
-fn MAPSET() -> Never:
-    comptime_error("untranslatable C macro: MAPSET")
-// untranslatable fn-like macro
-fn MAX_255() -> Never:
-    comptime_error("untranslatable C macro: MAX_255")
-let MAX_LIST: c_int = 8
-// untranslatable fn-like macro
-fn NTOHL() -> Never:
-    comptime_error("untranslatable C macro: NTOHL")
-// untranslatable fn-like macro
-fn NTOHLL() -> Never:
-    comptime_error("untranslatable C macro: NTOHLL")
-// untranslatable fn-like macro
-fn NTOHS() -> Never:
-    comptime_error("untranslatable C macro: NTOHS")
-// untranslatable fn-like macro
-fn PCRE2_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_ASSERT")
-// untranslatable fn-like macro
-fn PCRE2_DEBUG_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
-// untranslatable fn-like macro
-fn PCRE2_GLUE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_GLUE")
-// untranslatable fn-like macro
-fn PCRE2_JOIN() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_JOIN")
-fn PCRE2_SUFFIX[T](a: T) -> T:
-    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
-// untranslatable fn-like macro
-fn PCRE2_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
-// untranslatable fn-like macro
-fn PRIV() -> Never:
-    comptime_error("untranslatable C macro: PRIV")
-// untranslatable fn-like macro
-fn PUT() -> Never:
-    comptime_error("untranslatable C macro: PUT")
-// untranslatable fn-like macro
-fn PUT2() -> Never:
-    comptime_error("untranslatable C macro: PUT2")
-// untranslatable fn-like macro
-fn PUT2INC() -> Never:
-    comptime_error("untranslatable C macro: PUT2INC")
-// untranslatable fn-like macro
-fn PUTCHAR() -> Never:
-    comptime_error("untranslatable C macro: PUTCHAR")
-// untranslatable fn-like macro
-fn PUTINC() -> Never:
-    comptime_error("untranslatable C macro: PUTINC")
-// untranslatable fn-like macro
-fn REAL_GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: REAL_GET_UCD")
-// untranslatable fn-like macro
-fn STATIC_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT")
-// untranslatable fn-like macro
-fn STATIC_ASSERT_JOIN() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
-// untranslatable fn-like macro
-fn TABLE_GET() -> Never:
-    comptime_error("untranslatable C macro: TABLE_GET")
-// untranslatable fn-like macro
-fn UCD_ANY_I() -> Never:
-    comptime_error("untranslatable C macro: UCD_ANY_I")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
-// untranslatable fn-like macro
-fn UCD_BPROPS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS")
-// untranslatable fn-like macro
-fn UCD_BPROPS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
-// untranslatable fn-like macro
-fn UCD_CASESET() -> Never:
-    comptime_error("untranslatable C macro: UCD_CASESET")
-// untranslatable fn-like macro
-fn UCD_CATEGORY() -> Never:
-    comptime_error("untranslatable C macro: UCD_CATEGORY")
-// untranslatable fn-like macro
-fn UCD_CHARTYPE() -> Never:
-    comptime_error("untranslatable C macro: UCD_CHARTYPE")
-fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
-fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
-// untranslatable fn-like macro
-fn UCD_GRAPHBREAK() -> Never:
-    comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
-// untranslatable fn-like macro
-fn UCD_OTHERCASE() -> Never:
-    comptime_error("untranslatable C macro: UCD_OTHERCASE")
-// untranslatable fn-like macro
-fn UCD_SCRIPT() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPT")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
-fn UINT16_C[T](v: T) -> T:
-    v
-fn UINT32_C[T](v: T) -> u32:
-    (v as u32)
-fn UINT64_C[T](v: T) -> u64:
-    (v as u64)
-fn UINT8_C[T](v: T) -> T:
-    v
-fn UINTMAX_C[T](v: T) -> u64:
-    (v as u64)
-// untranslatable fn-like macro
-fn WAS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: WAS_NEWLINE")
-// untranslatable fn-like macro
-fn WCOREDUMP() -> Never:
-    comptime_error("untranslatable C macro: WCOREDUMP")
-// untranslatable fn-like macro
-fn WEXITSTATUS() -> Never:
-    comptime_error("untranslatable C macro: WEXITSTATUS")
-// untranslatable fn-like macro
-fn WIFCONTINUED() -> Never:
-    comptime_error("untranslatable C macro: WIFCONTINUED")
-// untranslatable fn-like macro
-fn WIFEXITED() -> Never:
-    comptime_error("untranslatable C macro: WIFEXITED")
-// untranslatable fn-like macro
-fn WIFSIGNALED() -> Never:
-    comptime_error("untranslatable C macro: WIFSIGNALED")
-// untranslatable fn-like macro
-fn WIFSTOPPED() -> Never:
-    comptime_error("untranslatable C macro: WIFSTOPPED")
-// untranslatable fn-like macro
-fn WSTOPSIG() -> Never:
-    comptime_error("untranslatable C macro: WSTOPSIG")
-// untranslatable fn-like macro
-fn WTERMSIG() -> Never:
-    comptime_error("untranslatable C macro: WTERMSIG")
-fn W_EXITCODE[T](ret: T, sig: T) -> T:
-    ((ret << 8) | sig)
-// untranslatable fn-like macro
-fn W_STOPCODE() -> Never:
-    comptime_error("untranslatable C macro: W_STOPCODE")
-// untranslatable fn-like macro
-fn alloca() -> Never:
-    comptime_error("untranslatable C macro: alloca")
-// untranslatable fn-like macro
-fn clearerr_unlocked() -> Never:
-    comptime_error("untranslatable C macro: clearerr_unlocked")
-// untranslatable fn-like macro
-fn feof_unlocked() -> Never:
-    comptime_error("untranslatable C macro: feof_unlocked")
-// untranslatable fn-like macro
-fn ferror_unlocked() -> Never:
-    comptime_error("untranslatable C macro: ferror_unlocked")
-// untranslatable fn-like macro
-fn fileno_unlocked() -> Never:
-    comptime_error("untranslatable C macro: fileno_unlocked")
-// untranslatable fn-like macro
-fn fropen() -> Never:
-    comptime_error("untranslatable C macro: fropen")
-// untranslatable fn-like macro
-fn fwopen() -> Never:
-    comptime_error("untranslatable C macro: fwopen")
-// untranslatable fn-like macro
-fn getc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getc_unlocked")
-// untranslatable fn-like macro
-fn getchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getchar_unlocked")
-// untranslatable fn-like macro
-fn htonl() -> Never:
-    comptime_error("untranslatable C macro: htonl")
-// untranslatable fn-like macro
-fn htonll() -> Never:
-    comptime_error("untranslatable C macro: htonll")
-// untranslatable fn-like macro
-fn htons() -> Never:
-    comptime_error("untranslatable C macro: htons")
-fn memccpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memmove() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memset() -> Never:
-    comptime_error("variadic macro — use direct call")
-// untranslatable fn-like macro
-fn ntohl() -> Never:
-    comptime_error("untranslatable C macro: ntohl")
-// untranslatable fn-like macro
-fn ntohll() -> Never:
-    comptime_error("untranslatable C macro: ntohll")
-// untranslatable fn-like macro
-fn ntohs() -> Never:
-    comptime_error("untranslatable C macro: ntohs")
-// untranslatable fn-like macro
-fn offsetof() -> Never:
-    comptime_error("untranslatable C macro: offsetof")
-// untranslatable fn-like macro
-fn putc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putc_unlocked")
-// untranslatable fn-like macro
-fn putchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putchar_unlocked")
-// untranslatable fn-like macro
-fn sigmask() -> Never:
-    comptime_error("untranslatable C macro: sigmask")
-fn snprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn sprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsnprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
