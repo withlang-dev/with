@@ -147,6 +147,19 @@ pub fn cimport_var_is_const(s: i64, i: i32) -> i32:
     let _ = i
     0
 
+@[weak] @[c_export("with_cimport_var_storage_class")]
+pub fn cimport_var_storage_class(s: i64, i: i32) -> i32:
+    let _ = s
+    let _ = i
+    0
+
+@[weak] @[c_export("with_ci_cursor_in_file")]
+pub fn ci_cursor_in_file(s: i64, c: i32, path: str) -> i32:
+    let _ = s
+    let _ = c
+    let _ = path
+    0
+
 @[weak] @[c_export("with_cimport_parse_macros")]
 pub fn cimport_parse_macros(h: str) -> i64:
     let _ = h
@@ -227,6 +240,12 @@ pub fn cimport_struct_field_type_translated(s: i64, i: i32, f: i32) -> str:
 
 @[weak] @[c_export("with_cimport_var_type_translated")]
 pub fn cimport_var_type_translated(s: i64, i: i32) -> str:
+    let _ = s
+    let _ = i
+    str_i32()
+
+@[weak] @[c_export("with_cimport_var_storage_type_translated")]
+pub fn cimport_var_storage_type_translated(s: i64, i: i32) -> str:
     let _ = s
     let _ = i
     str_i32()

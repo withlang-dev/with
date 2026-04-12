@@ -597,6 +597,189 @@ EOF
   echo "PASS(cli-selfhost-migrate) assignment_compat"
 }
 
+expect_migrate_rvalue_sequencing() {
+  local case_dir="$tmpdir/migrate_rvalue_sequencing_case"
+  local src="$case_dir/rvalue_sequencing.c"
+  local out_w="$case_dir/rvalue_sequencing.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+typedef unsigned char u8;
+
+static int issue120_id(int x) {
+  return x;
+}
+
+int init_expr(void) {
+  const u8 *buf = (const u8 *)"AB";
+  const u8 *p = buf;
+  int c = *p++;
+  return c * 10 + (int)(p - buf);
+}
+
+int assign_expr(void) {
+  const u8 *buf = (const u8 *)"AB";
+  const u8 *p = buf;
+  int c = 0;
+  c = *p++;
+  return c * 10 + (int)(p - buf);
+}
+
+int binary_expr(void) {
+  const u8 *buf = (const u8 *)"AB";
+  const u8 *p = buf;
+  int c = (*p++) + 0;
+  return c * 10 + (int)(p - buf);
+}
+
+int call_arg_expr(void) {
+  const u8 *buf = (const u8 *)"AB";
+  const u8 *p = buf;
+  int c = issue120_id(*p++);
+  return c * 10 + (int)(p - buf);
+}
+
+#define ISSUE120_GETCHARINCTEST(ch, ptr) \
+  ch = *ptr++;                           \
+  if (utf && ch >= 66u) ch += 1000
+
+int macro_expr(int utf) {
+  const u8 *buf = (const u8 *)"BA";
+  const u8 *p = buf;
+  int c = 0;
+  ISSUE120_GETCHARINCTEST(c, p);
+  return c * 10 + (int)(p - buf);
+}
+
+int main(void) {
+  if (init_expr() != 651) return 1;
+  if (assign_expr() != 651) return 2;
+  if (binary_expr() != 651) return 3;
+  if (call_arg_expr() != 651) return 4;
+  if (macro_expr(0) != 661) return 5;
+  if (macro_expr(1) != 10661) return 6;
+  return 0;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) rvalue_sequencing"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'with 0 as __ci_expr_seq_' "$out_w" \
+    || ! grep -Fq 'var __ci_expr_old_' "$out_w" \
+    || ! grep -Fq '(p = p + 1)' "$out_w" \
+    || ! grep -Fq '(unsafe: *__ci_expr_old_' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) rvalue_sequencing"
+    sed -n '1,260p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) rvalue_sequencing"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$out_w"; then
+    echo "FAIL(cli-selfhost-run) rvalue_sequencing"
+    cat "$tmpdir/out" || true
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) rvalue_sequencing"
+}
+
+expect_migrate_cross_file_global_owner_arrays() {
+  local case_dir="$tmpdir/migrate_cross_file_global_owner_arrays_case"
+  local generated_dir="$case_dir/generated"
+  local header="$case_dir/tables.h"
+  local owner_c="$case_dir/owner.c"
+  local user_c="$case_dir/user.c"
+  mkdir -p "$case_dir"
+
+  cat >"$header" <<'EOF'
+extern const unsigned char issue121_table[];
+int issue121_value(int idx);
+int issue121_sum(void);
+EOF
+
+  cat >"$owner_c" <<'EOF'
+#include "tables.h"
+
+const unsigned char issue121_table[] = {7, 9, 11};
+
+int issue121_value(int idx) {
+  return issue121_table[idx];
+}
+EOF
+
+  cat >"$user_c" <<'EOF'
+#include "tables.h"
+
+int issue121_sum(void) {
+  return issue121_table[2] + issue121_value(1);
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$case_dir" --no-c-export -o "$generated_dir"; then
+    echo "FAIL(cli-selfhost-migrate) cross_file_global_owner_arrays"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Eq '^let issue121_table: \[3\]u8' "$generated_dir/owner.w" \
+    || ! grep -Eq '^extern let issue121_table: \[3\]u8' "$generated_dir/user.w" \
+    || grep -Eq 'issue121_table: \*' "$generated_dir/owner.w" \
+    || grep -Eq 'issue121_table: \*' "$generated_dir/user.w"; then
+    echo "FAIL(cli-selfhost-migrate-output) cross_file_global_owner_arrays"
+    echo "--- owner.w"
+    sed -n '1,200p' "$generated_dir/owner.w" || true
+    echo "--- user.w"
+    sed -n '1,200p' "$generated_dir/user.w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$generated_dir/owner.w"; then
+    echo "FAIL(cli-selfhost-check) cross_file_global_owner_arrays owner"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$generated_dir/user.w"; then
+    echo "FAIL(cli-selfhost-check) cross_file_global_owner_arrays user"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$generated_dir/owner.w" --emit-obj -o "$generated_dir/owner.o"; then
+    echo "FAIL(cli-selfhost-build) cross_file_global_owner_arrays owner"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$generated_dir/user.w" --emit-obj -o "$generated_dir/user.o"; then
+    echo "FAIL(cli-selfhost-build) cross_file_global_owner_arrays user"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) cross_file_global_owner_arrays"
+}
+
 expect_pcre2_prepare_shared_externs() {
   local case_dir="$tmpdir/pcre2_prepare_case"
   local raw_dir="$case_dir/raw"
@@ -1265,6 +1448,8 @@ expect_migrate_global_init_list
 expect_migrate_host_header_compat
 expect_migrate_pcre2_config_template
 expect_migrate_assignment_compat
+expect_migrate_rvalue_sequencing
+expect_migrate_cross_file_global_owner_arrays
 expect_pcre2_prepare_shared_externs
 expect_pcre2_prepare_shared_lets
 expect_std_re_shared_dependency_imports

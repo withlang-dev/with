@@ -21,6 +21,7 @@ extern fn popen(command: *const u8, mode: *const u8) -> *mut u8
 extern fn pclose(stream: *mut u8) -> i32
 extern fn fgets(buf: *mut u8, size: i32, stream: *mut u8) -> *mut u8
 extern fn strtod(str: *const u8, endptr: *mut *mut u8) -> f64
+extern fn realpath(path: *const u8, resolved_name: *mut u8) -> *mut u8
 
 // ── libclang types ──────────────────────────────────────────────
 // Struct layouts match the C ABI exactly.
@@ -69,6 +70,7 @@ extern fn clang_disposeDiagnostic(diag: *mut u8)
 extern fn clang_getTranslationUnitTargetInfo(tu: *mut u8) -> *mut u8
 extern fn clang_TargetInfo_getTriple(ti: *mut u8) -> CXString
 extern fn clang_TargetInfo_dispose(ti: *mut u8)
+extern fn clang_getFile(tu: *mut u8, file_name: *const u8) -> *mut u8
 extern fn clang_getFileContents(tu: *mut u8, file: *mut u8, size: *mut u64) -> *const u8
 extern fn clang_Cursor_getTranslationUnit(cursor: CXCursor) -> *mut u8
 
@@ -132,6 +134,7 @@ extern fn clang_disposeString(s: CXString)
 
 // File
 extern fn clang_getFileLocation(loc: CXSourceLocation, file: *mut *mut u8, line: *mut u32, col: *mut u32, offset: *mut u32)
+extern fn clang_getPresumedLocation(loc: CXSourceLocation, filename: *mut CXString, line: *mut u32, col: *mut u32)
 extern fn clang_File_isEqual(f1: *mut u8, f2: *mut u8) -> i32
 extern fn clang_getFileName(file: *mut u8) -> CXString
 
@@ -643,7 +646,7 @@ fn get_type_spelling(s: *mut CImportSession, ty: CXType) -> str:
 // Forward declaration pattern: translate_fn_type calls translate_type_recursive and vice versa.
 // In With, both are defined at module scope so mutual recursion works.
 
-fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32) -> *mut u8:
+fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32, preserve_incomplete_arrays: i32) -> *mut u8:
     if depth > MAX_TYPE_DEPTH:
         return session_strdup(s, "__UNSUPPORTED:type too complex\0" as *const u8)
     let canonical = clang_getCanonicalType(ty)
@@ -701,7 +704,7 @@ fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_l
             buf_append_str(&mut buf as *mut [64]u8 as *mut u8, &mut pos, 64, " i8\0" as *const u8)
             return session_strdup(s, &buf as *const [64]u8 as *const u8)
         // General pointer
-        let inner = translate_type_recursive(s, pointee, depth + 1, 0)
+        let inner = translate_type_recursive_mode(s, pointee, depth + 1, 0, preserve_incomplete_arrays)
         if inner as i64 == 0 or c_strncmp(inner as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0 or c_strcmp(inner as *const u8, "opaque\0" as *const u8) == 0:
             return session_strdup(s, "*const i8\0" as *const u8)
         var buf: [2048]u8 = [0 as u8; 2048]
@@ -715,7 +718,7 @@ fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_l
     if kind == CXType_ConstantArray:
         let size = clang_getArraySize(canonical)
         let elem = clang_getArrayElementType(canonical)
-        let elem_str = translate_type_recursive(s, elem, depth + 1, 0)
+        let elem_str = translate_type_recursive_mode(s, elem, depth + 1, 0, preserve_incomplete_arrays)
         if elem_str as i64 == 0 or c_strcmp(elem_str as *const u8, "opaque\0" as *const u8) == 0:
             return session_strdup(s, "opaque\0" as *const u8)
         if c_strncmp(elem_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
@@ -730,12 +733,12 @@ fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_l
 
     if kind == CXType_IncompleteArray:
         let elem = clang_getArrayElementType(canonical)
-        let elem_str = translate_type_recursive(s, elem, depth + 1, 0)
+        let elem_str = translate_type_recursive_mode(s, elem, depth + 1, 0, preserve_incomplete_arrays)
         if elem_str as i64 == 0 or c_strncmp(elem_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
             return session_strdup(s, "*const i8\0" as *const u8)
         var buf: [2048]u8 = [0 as u8; 2048]
         var pos: i64 = 0
-        if is_last_struct_field != 0:
+        if preserve_incomplete_arrays != 0 or is_last_struct_field != 0:
             buf_append_str(&mut buf as *mut [2048]u8 as *mut u8, &mut pos, 2048, "[0]\0" as *const u8)
             buf_append_str(&mut buf as *mut [2048]u8 as *mut u8, &mut pos, 2048, elem_str as *const u8)
         else:
@@ -777,7 +780,7 @@ fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_l
     if kind == CXType_Vector or kind == CXType_ExtVector:
         let elem = clang_getElementType(canonical)
         let num_elements = clang_getNumElements(canonical)
-        let elem_str = translate_type_recursive(s, elem, depth + 1, 0)
+        let elem_str = translate_type_recursive_mode(s, elem, depth + 1, 0, preserve_incomplete_arrays)
         if elem_str as i64 != 0 and num_elements > 0:
             var buf: [256]u8 = [0 as u8; 256]
             var pos: i64 = 0
@@ -798,14 +801,40 @@ fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_l
     if kind == CXType_Atomic:
         let inner = clang_Type_getModifiedType(canonical)
         if inner.kind != CXType_Invalid:
-            return translate_type_recursive(s, inner, depth + 1, is_last_struct_field)
+            return translate_type_recursive_mode(s, inner, depth + 1, is_last_struct_field, preserve_incomplete_arrays)
         let inner2 = clang_Type_getValueType(canonical)
         if inner2.kind != CXType_Invalid:
-            return translate_type_recursive(s, inner2, depth + 1, is_last_struct_field)
+            return translate_type_recursive_mode(s, inner2, depth + 1, is_last_struct_field, preserve_incomplete_arrays)
         return session_strdup(s, "c_int\0" as *const u8)
 
     // Default: unsupported
     session_strdup(s, "opaque\0" as *const u8)
+
+fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32) -> *mut u8:
+    translate_type_recursive_mode(s, ty, depth, is_last_struct_field, 0)
+
+fn translate_storage_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32) -> *mut u8:
+    translate_type_recursive_mode(s, ty, depth, is_last_struct_field, 1)
+
+fn cimport_path_to_cstr(path: str) -> *mut u8:
+    let buf = with_alloc(path.len() + 1)
+    if buf as i64 == 0:
+        return 0 as *mut u8
+    var i = 0
+    while i as i64 < path.len():
+        *((buf as i64 + i as i64) as *mut u8) = path.byte_at(i as i64)
+        i = i + 1
+    *((buf as i64 + path.len() as i64) as *mut u8) = 0
+    buf
+
+fn cimport_type_is_const_storage(ty: CXType) -> i32:
+    let canonical = clang_getCanonicalType(ty)
+    if clang_isConstQualifiedType(canonical) != 0:
+        return 1
+    let kind = canonical.kind
+    if kind == CXType_ConstantArray or kind == CXType_IncompleteArray or kind == CXType_VariableArray:
+        return cimport_type_is_const_storage(clang_getArrayElementType(canonical))
+    0
 
 fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32) -> *mut u8:
     if depth > MAX_TYPE_DEPTH:
@@ -1519,7 +1548,14 @@ pub fn cimport_var_is_const(session: i64, idx: i32) -> i32:
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
     let ty = clang_getCursorType(cursor)
-    clang_isConstQualifiedType(ty)
+    cimport_type_is_const_storage(ty)
+
+@[c_export("with_cimport_var_storage_class")]
+pub fn cimport_var_storage_class(session: i64, idx: i32) -> i32:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
+    let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
+    clang_Cursor_getStorageClass(cursor)
 
 @[c_export("with_cimport_var_type_translated")]
 pub fn cimport_var_type_translated(session: i64, idx: i32) -> str:
@@ -1530,6 +1566,85 @@ pub fn cimport_var_type_translated(session: i64, idx: i32) -> str:
     let result = translate_type_recursive(s, ty, 0, 0)
     if result as i64 == 0: return ""
     session_make_str(s, result as *const u8)
+
+@[c_export("with_cimport_var_storage_type_translated")]
+pub fn cimport_var_storage_type_translated(session: i64, idx: i32) -> str:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
+    let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
+    let ty = clang_getCursorType(cursor)
+    let result = translate_storage_type_recursive(s, ty, 0, 0)
+    if result as i64 == 0: return ""
+    session_make_str(s, result as *const u8)
+
+@[c_export("with_ci_cursor_in_file")]
+pub fn ci_cursor_in_file(session: i64, cursor_idx: i32, path: str) -> i32:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count or path.len() == 0:
+        return 0
+    let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+    let loc = clang_getCursorLocation(cursor)
+    var presumed_bits: [2]i64 = [0 as i64; 2]
+    var presumed_line: u32 = 0
+    var presumed_col: u32 = 0
+    clang_getPresumedLocation(loc, &mut presumed_bits as *mut [2]i64 as *mut CXString, &mut presumed_line, &mut presumed_col)
+    let presumed_file = *(&mut presumed_bits as *mut [2]i64 as *mut CXString)
+    let presumed_name = clang_getCString(presumed_file)
+    let c_path = cimport_path_to_cstr(path)
+    if c_path as i64 == 0:
+        clang_disposeString(presumed_file)
+        return 0
+    if presumed_name as i64 != 0 and *presumed_name != 0:
+        let actual_buf = with_alloc(4096)
+        let target_buf = with_alloc(4096)
+        var presumed_matches = 0
+        if actual_buf as i64 != 0 and target_buf as i64 != 0:
+            let actual_real = realpath(presumed_name, actual_buf)
+            let target_real = realpath(c_path as *const u8, target_buf)
+            if actual_real as i64 != 0 and target_real as i64 != 0:
+                presumed_matches = if c_strcmp(actual_real as *const u8, target_real as *const u8) == 0: 1 else: 0
+            else:
+                presumed_matches = if c_strcmp(presumed_name, c_path as *const u8) == 0: 1 else: 0
+        if actual_buf as i64 != 0:
+            with_free(actual_buf)
+        if target_buf as i64 != 0:
+            with_free(target_buf)
+        with_free(c_path)
+        clang_disposeString(presumed_file)
+        if presumed_matches != 0:
+            return 1
+        return 0
+    var file: *mut u8 = 0 as *mut u8
+    clang_getFileLocation(loc, &mut file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
+    if file as i64 == 0:
+        with_free(c_path)
+        clang_disposeString(presumed_file)
+        return 0
+    let target = clang_getFile((*s).tu, c_path as *const u8)
+    if target as i64 != 0 and clang_File_isEqual(file, target) != 0:
+        with_free(c_path)
+        clang_disposeString(presumed_file)
+        return 1
+    let fname = clang_getFileName(file)
+    let fname_str = clang_getCString(fname)
+    let actual_buf = with_alloc(4096)
+    let target_buf = with_alloc(4096)
+    var matches = 0
+    if fname_str as i64 != 0 and actual_buf as i64 != 0 and target_buf as i64 != 0:
+        let actual_real = realpath(fname_str, actual_buf)
+        let target_real = realpath(c_path as *const u8, target_buf)
+        if actual_real as i64 != 0 and target_real as i64 != 0:
+            matches = if c_strcmp(actual_real as *const u8, target_real as *const u8) == 0: 1 else: 0
+        else:
+            matches = if c_strcmp(fname_str, c_path as *const u8) == 0: 1 else: 0
+    clang_disposeString(fname)
+    if actual_buf as i64 != 0:
+        with_free(actual_buf)
+    if target_buf as i64 != 0:
+        with_free(target_buf)
+    with_free(c_path)
+    clang_disposeString(presumed_file)
+    matches
 
 // ── Typedef queries ─────────────────────────────────────────
 
@@ -2383,13 +2498,25 @@ pub fn ci_cursor_location(session: i64, cursor_idx: i32) -> str:
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     let loc = clang_getCursorLocation(cursor)
-    var file: *mut u8 = 0 as *mut u8
+    var presumed_bits: [2]i64 = [0 as i64; 2]
     var line_val: u32 = 0
     var col_val: u32 = 0
-    clang_getFileLocation(loc, &mut file, &mut line_val, &mut col_val, 0 as *mut u32)
-    if file as i64 == 0: return ""
-    let fname = clang_getFileName(file)
-    let fname_str = clang_getCString(fname)
+    clang_getPresumedLocation(loc, &mut presumed_bits as *mut [2]i64 as *mut CXString, &mut line_val, &mut col_val)
+    let presumed_file = *(&mut presumed_bits as *mut [2]i64 as *mut CXString)
+    var fname_str = clang_getCString(presumed_file)
+    var fallback_bits: [2]i64 = [0 as i64; 2]
+    var fallback_active = false
+    if fname_str as i64 == 0 or *fname_str == 0:
+        var file: *mut u8 = 0 as *mut u8
+        clang_getFileLocation(loc, &mut file, &mut line_val, &mut col_val, 0 as *mut u32)
+        if file as i64 == 0:
+            clang_disposeString(presumed_file)
+            return ""
+        let fname = clang_getFileName(file)
+        fname_str = clang_getCString(fname)
+        fallback_bits[0] = fname.data
+        fallback_bits[1] = ((fname.private_flags as u64) | ((fname.pad0 as u64) << 32)) as i64
+        fallback_active = true
     var buf: [1024]u8 = [0 as u8; 1024]
     var pos: i64 = 0
     buf_append_str(&mut buf as *mut [1024]u8 as *mut u8, &mut pos, 1024, if fname_str as i64 != 0: fname_str else: "?\0" as *const u8)
@@ -2397,7 +2524,10 @@ pub fn ci_cursor_location(session: i64, cursor_idx: i32) -> str:
     buf_append_i64(&mut buf as *mut [1024]u8 as *mut u8, &mut pos, 1024, line_val as i64)
     buf_append_str(&mut buf as *mut [1024]u8 as *mut u8, &mut pos, 1024, ":\0" as *const u8)
     buf_append_i64(&mut buf as *mut [1024]u8 as *mut u8, &mut pos, 1024, col_val as i64)
-    clang_disposeString(fname)
+    if fallback_active:
+        let fallback_file = *(&mut fallback_bits as *mut [2]i64 as *mut CXString)
+        clang_disposeString(fallback_file)
+    clang_disposeString(presumed_file)
     session_make_str(s, &buf as *const [1024]u8 as *const u8)
 
 // Returns the start byte offset of a cursor's source range, or -1 if unavailable.

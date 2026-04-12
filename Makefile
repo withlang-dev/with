@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test fixpoint install install-user update-seed clean seed print-version emit-c-test emit-c-fixpoint cross regex-migrate-raw regex-prepare regex-check regex-promote FORCE \
+.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test fixpoint install install-user update-seed clean seed print-version emit-c-test emit-c-fixpoint cross regex-migrate-raw regex-prepare regex-check regex-promote \
 	__build __stage1 __stage2 __stage3 __runtime __selfcheck __smoke __test __fixpoint __install __install-user __update-seed __clean __seed __regex-migrate-raw __regex-prepare __regex-check __regex-promote
 
 ROOT_DIR := $(CURDIR)
@@ -40,10 +40,12 @@ REGEX_GENERATED_DIR := $(OUT)/pcre2_generated
 REGEX_PROMOTE_DIR := lib/std/re
 
 RUNTIME_LINK := $(OUT_BIN_DIR)/runtime
+BOOTSTRAP_RUNTIME_STAMP := $(OUT_GEN_DIR)/.bootstrap-runtime-ready
 EMBEDDED_STDLIB_RUNTIME_SRC := $(OUT_GEN_DIR)/embedded_stdlib_runtime.w
 COMPAT_RUNTIME_SRC := $(OUT_GEN_DIR)/compat_runtime.w
 EMBEDDED_OBJECTS_ASM := $(OUT_LIB_DIR)/embedded_objects.s
 CIMPORT_STUBS_OBJ := $(OUT_LIB_DIR)/cimport_stubs.o
+LEGACY_HELPERS_OBJ := $(OUT_LIB_DIR)/helpers.o
 COMPAT_RUNTIME_OBJ := $(OUT_LIB_DIR)/compat_runtime.o
 PANIC_RUNTIME_OBJ := $(OUT_LIB_DIR)/panic_runtime.o
 FIBER_STUBS_OBJ := $(OUT_LIB_DIR)/fiber_stubs.o
@@ -63,6 +65,8 @@ REGEX_REF_SOURCES := $(shell find $(REGEX_PCRE2_SRC) -type f 2>/dev/null | sort)
 STAGE1_BIN := $(OUT_BIN_DIR)/with-stage1
 STAGE2_BIN := $(OUT_BIN_DIR)/with-stage2
 STAGE3_BIN := $(OUT_BIN_DIR)/with-stage3
+STAGE2_FIXPOINT_OBJ := $(OUT_BIN_DIR)/with-stage2-fixpoint.o
+STAGE3_FIXPOINT_OBJ := $(OUT_BIN_DIR)/with-stage3-fixpoint.o
 CANONICAL_BIN := $(OUT_BIN_DIR)/with
 STAGE1_TMP := $(OUT_BIN_DIR)/with-stage1-build
 STAGE_BUILD_TMP := $(OUT_BIN_DIR)/with-stage-build
@@ -263,7 +267,7 @@ __stage2: $(STAGE2_BIN)
 
 __stage3: $(STAGE3_BIN)
 
-__runtime: $(RUNTIME_LINK)
+__runtime: $(BOOTSTRAP_RUNTIME_STAMP)
 
 __selfcheck: $(STAGE2_BIN)
 	./out/bin/with-stage2 check src/main.w
@@ -317,7 +321,51 @@ __regex-promote: $(REGEX_PREPARE_STAMP) scripts/pcre2_generated_workflow.sh
 $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR) $(OUT_GEN_DIR):
 	@mkdir -p "$@"
 
-$(GEN_STAMP): FORCE | $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR) $(OUT_GEN_DIR)
+STD_SOURCES := $(shell find lib/std -name '*.w' 2>/dev/null | sort)
+EMBED_STD_SOURCES := $(filter-out lib/std/re/%,$(STD_SOURCES))
+COMPILER_W_SOURCES := $(shell find src lib/std -name '*.w' 2>/dev/null | sort)
+GEN_SOURCE_INPUTS := src/main.w src/bootstrap_main.w src/main_emit_temp.w $(VERSION_SOURCE_FILE)
+COMPILER_BUILD_SOURCES := $(filter-out $(GEN_SOURCE_INPUTS),$(COMPILER_W_SOURCES))
+GIT_HEAD_FILE := $(shell git -C "$(ROOT_DIR)" rev-parse --git-path HEAD 2>/dev/null || true)
+GIT_HEAD_REF_FILE := $(shell ref="$$(git -C "$(ROOT_DIR)" symbolic-ref -q HEAD 2>/dev/null || true)"; if [ -n "$$ref" ]; then git -C "$(ROOT_DIR)" rev-parse --git-path "$$ref"; fi)
+GIT_PACKED_REFS_FILE := $(shell git -C "$(ROOT_DIR)" rev-parse --git-path packed-refs 2>/dev/null || true)
+GEN_VERSION_DEPS := $(wildcard $(GIT_HEAD_FILE) $(GIT_HEAD_REF_FILE) $(GIT_PACKED_REFS_FILE))
+STAGE_COMMON_DEPS := $(GEN_STAMP) $(COMPILER_BUILD_SOURCES) Makefile $(BOOTSTRAP_RUNTIME_STAMP)
+
+ifeq ($(origin WITH),command line)
+STAGE0_BIN := $(WITH)
+else ifeq ($(origin WITH),environment)
+STAGE0_BIN := $(WITH)
+else
+STAGE0_BIN := $(shell \
+	if command -v with >/dev/null 2>&1; then \
+		command -v with; \
+	elif [ -x "$(SEED_PATH)" ]; then \
+		printf '%s\n' "$(SEED_PATH)"; \
+	fi)
+endif
+
+BOOTSTRAP_RUNTIME_INPUTS := \
+	$(STAGE0_BIN) \
+	$(COMPAT_RUNTIME_SRC) \
+	rt/cimport_stubs.w \
+	rt/panic_runtime.w \
+	rt/fiber_stubs.w \
+	rt/channel_runtime.w \
+	rt/fiber_runtime.w \
+	$(FIBER_CORE_SRC) \
+	$(FIBER_ASM_SRC) \
+	rt/llvm_bridge.w \
+	rt/clang_bridge.w \
+	scripts/embed_runtime_objects.sh \
+	scripts/check_runtime_c_allowlist.sh \
+	Makefile
+
+BOOTSTRAP_RUNTIME_OUTPUTS := \
+	$(RUNTIME_ARTIFACTS) \
+	$(LEGACY_HELPERS_OBJ)
+
+$(GEN_STAMP): $(GEN_SOURCE_INPUTS) $(GEN_VERSION_DEPS) | $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR) $(OUT_GEN_DIR)
 	@set -euo pipefail; \
 	version="$$( $(MAKE) --no-print-directory -s print-version )"; \
 	escaped="$$version"; \
@@ -331,8 +379,6 @@ $(GEN_STAMP): FORCE | $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR
 	printf '%s\n' "$$version" > "$(GEN_VERSION_FILE)"; \
 	touch "$@"
 
-STD_SOURCES := $(shell find lib/std -name '*.w' 2>/dev/null | sort)
-EMBED_STD_SOURCES := $(filter-out lib/std/re/%,$(STD_SOURCES))
 $(EMBEDDED_STDLIB_RUNTIME_SRC): scripts/generate_embedded_stdlib.py $(EMBED_STD_SOURCES) | $(OUT_GEN_DIR)
 	@for f in $(EMBED_STD_SOURCES); do \
 		sz=$$(wc -c < "$$f"); \
@@ -376,33 +422,34 @@ $(RUNTIME_C_ALLOWLIST_STAMP): scripts/check_runtime_c_allowlist.sh $(wildcard ru
 	@bash "$(ROOT_DIR)/scripts/check_runtime_c_allowlist.sh"
 	@touch "$@"
 
-$(CIMPORT_STUBS_OBJ): rt/cimport_stubs.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
-	$(STAGE2_BIN) build $< --emit-obj --no-prelude -O0 -o $@
+$(CIMPORT_STUBS_OBJ): rt/cimport_stubs.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(COMPAT_RUNTIME_OBJ): $(COMPAT_RUNTIME_SRC) | $(OUT_LIB_DIR)
-	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+$(COMPAT_RUNTIME_OBJ): $(COMPAT_RUNTIME_SRC) $(STAGE0_BIN) | $(OUT_LIB_DIR)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(PANIC_RUNTIME_OBJ): rt/panic_runtime.w | $(OUT_LIB_DIR)
-	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+$(PANIC_RUNTIME_OBJ): rt/panic_runtime.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(FIBER_STUBS_OBJ): rt/fiber_stubs.w | $(OUT_LIB_DIR)
-	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+$(FIBER_STUBS_OBJ): rt/fiber_stubs.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(CHANNEL_RUNTIME_OBJ): rt/channel_runtime.w | $(OUT_LIB_DIR)
-	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+$(CHANNEL_RUNTIME_OBJ): rt/channel_runtime.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(FIBER_RUNTIME_OBJ): rt/fiber_runtime.w | $(OUT_LIB_DIR)
-	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+$(FIBER_RUNTIME_OBJ): rt/fiber_runtime.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(FIBER_OBJ): $(FIBER_CORE_SRC) | $(OUT_LIB_DIR)
+$(FIBER_OBJ): $(FIBER_CORE_SRC) $(STAGE0_BIN) | $(OUT_LIB_DIR)
 	@if [ -z "$(FIBER_CORE_SRC)" ]; then echo "error: unsupported host platform $(UNAME_S)/$(UNAME_M) for fiber runtime" >&2; exit 1; fi
-	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
 $(FIBER_ASM_OBJ): $(FIBER_ASM_SRC) | $(OUT_LIB_DIR)
 	@if [ -z "$(FIBER_ASM_SRC)" ]; then echo "error: unsupported host architecture $(UNAME_M) for fiber_asm.o" >&2; exit 1; fi
@@ -415,7 +462,8 @@ $(RT_CORE_OBJ): rt/rt_core.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
 $(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
-$(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) $(COMPAT_RUNTIME_SRC) rt/panic_runtime.w rt/fiber_stubs.w rt/channel_runtime.w rt/fiber_runtime.w $(FIBER_CORE_SRC) | $(OUT_LIB_DIR) $(OUT_GEN_DIR)
+$(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) $(COMPAT_RUNTIME_SRC) rt/cimport_stubs.w rt/panic_runtime.w rt/fiber_stubs.w rt/channel_runtime.w rt/fiber_runtime.w $(FIBER_CORE_SRC) | $(OUT_LIB_DIR) $(OUT_GEN_DIR)
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/cimport_stubs.w --emit-obj --no-prelude -O0 -o $(CIMPORT_STUBS_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $(COMPAT_RUNTIME_SRC) --emit-obj --no-prelude -O0 -o $(COMPAT_RUNTIME_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/panic_runtime.w --emit-obj --no-prelude -O0 -o $(PANIC_RUNTIME_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/fiber_stubs.w --emit-obj --no-prelude -O0 -o $(FIBER_STUBS_OBJ)
@@ -430,13 +478,13 @@ $(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(CIMPORT_STUBS_OBJ) $
 $(EMBEDDED_OBJECTS_OBJ): $(EMBEDDED_OBJECTS_ASM) | $(OUT_LIB_DIR)
 	$(call HOST_COMPILE,)
 
-$(LLVM_BRIDGE_OBJ): rt/llvm_bridge.w | $(OUT_LIB_DIR)
-	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+$(LLVM_BRIDGE_OBJ): rt/llvm_bridge.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(CLANG_BRIDGE_OBJ): rt/clang_bridge.w | $(OUT_LIB_DIR)
-	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(WITH_BUILD_ENV) $(WITH) build $< --emit-obj --no-prelude -O0 -o $@
+$(CLANG_BRIDGE_OBJ): rt/clang_bridge.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
 $(LLVM_LINK_STAMP): $(LLVM_BRIDGE_OBJ) $(CLANG_BRIDGE_OBJ) | $(OUT_LIB_DIR)
 	@set -euo pipefail; \
@@ -486,9 +534,36 @@ $(LLVM_LINK_STAMP): $(LLVM_BRIDGE_OBJ) $(CLANG_BRIDGE_OBJ) | $(OUT_LIB_DIR)
 	echo "clang bridge: $(CLANG_BRIDGE_OBJ) (libclang c_import support)"; \
 	touch "$@"
 
-$(RUNTIME_LINK): $(RUNTIME_ARTIFACTS) $(RUNTIME_C_ALLOWLIST_STAMP) | $(OUT_BIN_DIR)
-	@if [ -L "$@" ]; then rm -f "$@"; elif [ -e "$@" ]; then rm -rf "$@"; fi
-	@ln -s ../lib "$@"
+$(LEGACY_HELPERS_OBJ): $(CIMPORT_STUBS_OBJ) | $(OUT_LIB_DIR)
+	@set -euo pipefail; \
+	if [ -L "$@" ]; then \
+		target="$$(readlink "$@")"; \
+		if [ "$$target" != "cimport_stubs.o" ]; then \
+			rm -f "$@"; \
+			ln -s cimport_stubs.o "$@"; \
+		fi; \
+	elif [ -e "$@" ]; then \
+		rm -f "$@"; \
+		ln -s cimport_stubs.o "$@"; \
+	else \
+		ln -s cimport_stubs.o "$@"; \
+	fi
+
+$(BOOTSTRAP_RUNTIME_STAMP): $(BOOTSTRAP_RUNTIME_INPUTS) $(RUNTIME_C_ALLOWLIST_STAMP) | $(BOOTSTRAP_RUNTIME_OUTPUTS) $(OUT_BIN_DIR) $(OUT_GEN_DIR)
+	@set -euo pipefail; \
+	if [ -L "$(RUNTIME_LINK)" ]; then \
+		target="$$(readlink "$(RUNTIME_LINK)")"; \
+		if [ "$$target" != "../lib" ]; then \
+			rm -f "$(RUNTIME_LINK)"; \
+			ln -s ../lib "$(RUNTIME_LINK)"; \
+		fi; \
+	elif [ -e "$(RUNTIME_LINK)" ]; then \
+		rm -rf "$(RUNTIME_LINK)"; \
+		ln -s ../lib "$(RUNTIME_LINK)"; \
+	else \
+		ln -s ../lib "$(RUNTIME_LINK)"; \
+	fi
+	@touch "$@"
 
 define build_stage
 	@tmp="$(3)"; \
@@ -534,17 +609,25 @@ define build_stage
 	echo "[$(2)] wrote $@"
 endef
 
-$(STAGE1_BIN): $(GEN_STAMP) $(RUNTIME_LINK)
-	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(call build_stage,$(WITH),stage1,$(STAGE1_TMP),-O0)
+$(STAGE1_BIN): $(STAGE0_BIN) $(STAGE_COMMON_DEPS)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(call build_stage,$(STAGE0_BIN),stage1,$(STAGE1_TMP),-O0)
 
-$(STAGE2_BIN): $(STAGE1_BIN) $(GEN_STAMP) $(RUNTIME_LINK)
+$(STAGE2_BIN): $(STAGE1_BIN) $(STAGE_COMMON_DEPS)
 	@rm -rf "$(HOME)/.cache/with/c_import"
 	$(call build_stage,$(STAGE1_BIN),stage2,$(STAGE_BUILD_TMP),-O0)
 
-$(STAGE3_BIN): $(STAGE2_BIN) $(GEN_STAMP) $(RUNTIME_LINK)
+$(STAGE3_BIN): $(STAGE2_BIN) $(STAGE_COMMON_DEPS)
 	@rm -rf "$(HOME)/.cache/with/c_import"
 	$(call build_stage,$(STAGE2_BIN),stage3,$(STAGE_BUILD_TMP),-O0)
+
+$(STAGE2_FIXPOINT_OBJ): $(STAGE1_BIN) $(STAGE_COMMON_DEPS) | $(OUT_BIN_DIR)
+	@rm -rf "$(HOME)/.cache/with/c_import"
+	$(WITH_BUILD_ENV) $(STAGE1_BIN) build $(GEN_MAIN_ENTRY) --emit-obj -O0 -o $@
+
+$(STAGE3_FIXPOINT_OBJ): $(STAGE2_BIN) $(STAGE_COMMON_DEPS) | $(OUT_BIN_DIR)
+	@rm -rf "$(HOME)/.cache/with/c_import"
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $(GEN_MAIN_ENTRY) --emit-obj -O0 -o $@
 
 # Build the canonical binary with embedded runtime objects.
 # Phase 1 (during EMBEDDED_OBJECTS_ASM): embeds C-compiled objects (helpers, etc.)
@@ -649,8 +732,8 @@ cross: build
 fixpoint: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __fixpoint)
 
-__fixpoint: $(STAGE3_BIN)
-	@diff "$(STAGE2_BIN)" "$(STAGE3_BIN)" && echo "FIXPOINT"
+__fixpoint: $(STAGE2_FIXPOINT_OBJ) $(STAGE3_FIXPOINT_OBJ)
+	@diff "$(STAGE2_FIXPOINT_OBJ)" "$(STAGE3_FIXPOINT_OBJ)" && echo "FIXPOINT"
 
 install: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __install)
@@ -681,5 +764,3 @@ clean: | $(OUT_TMP_DIR)
 __clean:
 	rm -rf "$(OUT)/"
 	rm -f $(STRAY_BUILD_ARTIFACTS)
-
-FORCE:
