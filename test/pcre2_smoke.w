@@ -74,8 +74,8 @@ fn main:
     print("ccontext ok")
 
     // Compile a simple pattern
-    var error_code: c_int
-    var error_offset: c_ulong
+    var error_code: c_int = 0
+    var error_offset: c_ulong = 0
     let pattern = "abc"
     let code = pcre2_compile_8(
         (pattern as *const u8),

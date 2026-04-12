@@ -448,7 +448,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                 once_fudge__goto_128_10 = 0
                 had_recurse__goto_129_6 = 0
                 dupcapused__goto_130_6 = (if ((re.flags & 2097152)) != 0: 1 else: 0)
-                nextbranch__goto_131_12 = (code + ((((((((code)[1] as c_uint) << 8))) | (code)[((1) + 1)])) as c_uint))
+                nextbranch__goto_131_12 = (code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint))
                 cc__goto_132_12 = ((code + (1 as isize as usize)) + (2 as isize as usize))
                 if (((unsafe: *code) >= OP_SBRA) and ((unsafe: *code) <= OP_SCOND)):
                     return 0
@@ -477,6 +477,18 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                         break
                     match op__goto_154_15
                         OP_COND =>
+                            (cs__goto_155_14 = (cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
+                            if ((unsafe: *cs__goto_155_14) != OP_ALT):
+                                (cc__goto_132_12 = ((cs__goto_155_14 + (1 as isize as usize)) + (2 as isize as usize)))
+                                if __goto_pending != 0:
+                                    break
+                                break
+                                if __goto_pending != 0:
+                                    break
+                            __pc = 1
+                            __goto_pending = 1
+                        OP_SCOND =>
+                            (cs__goto_155_14 = (cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
                             if ((unsafe: *cs__goto_155_14) != OP_ALT):
                                 (cc__goto_132_12 = ((cs__goto_155_14 + (1 as isize as usize)) + (2 as isize as usize)))
                                 if __goto_pending != 0:
@@ -497,28 +509,79 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 break
                                 if __goto_pending != 0:
                                     break
+                            (d__goto_153_7 = find_minlength(re, cc__goto_132_12, startcode, utf, recurses, countptr, backref_cache))
                             if (d__goto_153_7 < 0):
                                 return d__goto_153_7
                             branchlength__goto_123_5 = branchlength__goto_123_5 + d__goto_153_7
                             while true:
-                                cc__goto_132_12 = cc__goto_132_12 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
                                 if __goto_pending != 0:
                                     break
                                 if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
                                     break
                             cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
                         OP_ONCE =>
+                            (d__goto_153_7 = find_minlength(re, cc__goto_132_12, startcode, utf, recurses, countptr, backref_cache))
                             if (d__goto_153_7 < 0):
                                 return d__goto_153_7
                             branchlength__goto_123_5 = branchlength__goto_123_5 + d__goto_153_7
                             while true:
-                                cc__goto_132_12 = cc__goto_132_12 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                        OP_SCRIPT_RUN =>
+                            (d__goto_153_7 = find_minlength(re, cc__goto_132_12, startcode, utf, recurses, countptr, backref_cache))
+                            if (d__goto_153_7 < 0):
+                                return d__goto_153_7
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + d__goto_153_7
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                        OP_SBRA =>
+                            (d__goto_153_7 = find_minlength(re, cc__goto_132_12, startcode, utf, recurses, countptr, backref_cache))
+                            if (d__goto_153_7 < 0):
+                                return d__goto_153_7
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + d__goto_153_7
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                        OP_BRAPOS =>
+                            (d__goto_153_7 = find_minlength(re, cc__goto_132_12, startcode, utf, recurses, countptr, backref_cache))
+                            if (d__goto_153_7 < 0):
+                                return d__goto_153_7
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + d__goto_153_7
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                        OP_SBRAPOS =>
+                            (d__goto_153_7 = find_minlength(re, cc__goto_132_12, startcode, utf, recurses, countptr, backref_cache))
+                            if (d__goto_153_7 < 0):
+                                return d__goto_153_7
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + d__goto_153_7
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
                                 if __goto_pending != 0:
                                     break
                                 if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
                                     break
                             cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
                         OP_CBRA =>
+                            (recno__goto_153_15 = (((((((cc__goto_132_12)[(1 + 2)] << 8)) | (cc__goto_132_12)[(((1 + 2)) + 1)])) as c_uint) as c_int))
                             if ((dupcapused__goto_130_6 != 0) or (recno__goto_153_15 != prev_cap_recno__goto_124_5)):
                                 (prev_cap_recno__goto_124_5 = recno__goto_153_15)
                                 if __goto_pending != 0:
@@ -532,50 +595,387 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                     break
                             branchlength__goto_123_5 = branchlength__goto_123_5 + prev_cap_d__goto_125_5
                             while true:
-                                cc__goto_132_12 = cc__goto_132_12 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                        OP_SCBRA =>
+                            (recno__goto_153_15 = (((((((cc__goto_132_12)[(1 + 2)] << 8)) | (cc__goto_132_12)[(((1 + 2)) + 1)])) as c_uint) as c_int))
+                            if ((dupcapused__goto_130_6 != 0) or (recno__goto_153_15 != prev_cap_recno__goto_124_5)):
+                                (prev_cap_recno__goto_124_5 = recno__goto_153_15)
+                                if __goto_pending != 0:
+                                    break
+                                (prev_cap_d__goto_125_5 = find_minlength(re, cc__goto_132_12, startcode, utf, recurses, countptr, backref_cache))
+                                if __goto_pending != 0:
+                                    break
+                                if (prev_cap_d__goto_125_5 < 0):
+                                    return prev_cap_d__goto_125_5
+                                if __goto_pending != 0:
+                                    break
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + prev_cap_d__goto_125_5
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                        OP_CBRAPOS =>
+                            (recno__goto_153_15 = (((((((cc__goto_132_12)[(1 + 2)] << 8)) | (cc__goto_132_12)[(((1 + 2)) + 1)])) as c_uint) as c_int))
+                            if ((dupcapused__goto_130_6 != 0) or (recno__goto_153_15 != prev_cap_recno__goto_124_5)):
+                                (prev_cap_recno__goto_124_5 = recno__goto_153_15)
+                                if __goto_pending != 0:
+                                    break
+                                (prev_cap_d__goto_125_5 = find_minlength(re, cc__goto_132_12, startcode, utf, recurses, countptr, backref_cache))
+                                if __goto_pending != 0:
+                                    break
+                                if (prev_cap_d__goto_125_5 < 0):
+                                    return prev_cap_d__goto_125_5
+                                if __goto_pending != 0:
+                                    break
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + prev_cap_d__goto_125_5
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                        OP_SCBRAPOS =>
+                            (recno__goto_153_15 = (((((((cc__goto_132_12)[(1 + 2)] << 8)) | (cc__goto_132_12)[(((1 + 2)) + 1)])) as c_uint) as c_int))
+                            if ((dupcapused__goto_130_6 != 0) or (recno__goto_153_15 != prev_cap_recno__goto_124_5)):
+                                (prev_cap_recno__goto_124_5 = recno__goto_153_15)
+                                if __goto_pending != 0:
+                                    break
+                                (prev_cap_d__goto_125_5 = find_minlength(re, cc__goto_132_12, startcode, utf, recurses, countptr, backref_cache))
+                                if __goto_pending != 0:
+                                    break
+                                if (prev_cap_d__goto_125_5 < 0):
+                                    return prev_cap_d__goto_125_5
+                                if __goto_pending != 0:
+                                    break
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + prev_cap_d__goto_125_5
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
                                 if __goto_pending != 0:
                                     break
                                 if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
                                     break
                             cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
                         OP_ACCEPT =>
-                            if ((op__goto_154_15 != OP_ALT) or (length__goto_122_5 == 0)):
-                                return length__goto_122_5
-                            (nextbranch__goto_131_12 = (cc__goto_132_12 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
-                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
-                            (branchlength__goto_123_5 = 0)
-                            (had_recurse__goto_129_6 = 0)
+                            return -1
+                        OP_ASSERT_ACCEPT =>
+                            return -1
                         OP_ALT =>
+                            if ((length__goto_122_5 < 0) or ((not ((had_recurse__goto_129_6 != 0))) and (branchlength__goto_123_5 < length__goto_122_5))):
+                                (length__goto_122_5 = branchlength__goto_123_5)
                             if ((op__goto_154_15 != OP_ALT) or (length__goto_122_5 == 0)):
                                 return length__goto_122_5
-                            (nextbranch__goto_131_12 = (cc__goto_132_12 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
+                            (nextbranch__goto_131_12 = (cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
                             cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
                             (branchlength__goto_123_5 = 0)
                             (had_recurse__goto_129_6 = 0)
-                        OP_ASSERT => 0
-                        OP_REVERSE => 0
-                        OP_CALLOUT_STR =>
-                            cc__goto_132_12 = cc__goto_132_12 + ((((((((cc__goto_132_12)[(1 + (2 * 2))] as c_uint) << 8))) | (cc__goto_132_12)[(((1 + (2 * 2))) + 1)])) as c_uint)
-                        OP_BRAZERO =>
+                        OP_KET =>
+                            if ((length__goto_122_5 < 0) or ((not ((had_recurse__goto_129_6 != 0))) and (branchlength__goto_123_5 < length__goto_122_5))):
+                                (length__goto_122_5 = branchlength__goto_123_5)
+                            if ((op__goto_154_15 != OP_ALT) or (length__goto_122_5 == 0)):
+                                return length__goto_122_5
+                            (nextbranch__goto_131_12 = (cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                            (branchlength__goto_123_5 = 0)
+                            (had_recurse__goto_129_6 = 0)
+                        OP_KETRMAX =>
+                            if ((length__goto_122_5 < 0) or ((not ((had_recurse__goto_129_6 != 0))) and (branchlength__goto_123_5 < length__goto_122_5))):
+                                (length__goto_122_5 = branchlength__goto_123_5)
+                            if ((op__goto_154_15 != OP_ALT) or (length__goto_122_5 == 0)):
+                                return length__goto_122_5
+                            (nextbranch__goto_131_12 = (cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                            (branchlength__goto_123_5 = 0)
+                            (had_recurse__goto_129_6 = 0)
+                        OP_KETRMIN =>
+                            if ((length__goto_122_5 < 0) or ((not ((had_recurse__goto_129_6 != 0))) and (branchlength__goto_123_5 < length__goto_122_5))):
+                                (length__goto_122_5 = branchlength__goto_123_5)
+                            if ((op__goto_154_15 != OP_ALT) or (length__goto_122_5 == 0)):
+                                return length__goto_122_5
+                            (nextbranch__goto_131_12 = (cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                            (branchlength__goto_123_5 = 0)
+                            (had_recurse__goto_129_6 = 0)
+                        OP_KETRPOS =>
+                            if ((length__goto_122_5 < 0) or ((not ((had_recurse__goto_129_6 != 0))) and (branchlength__goto_123_5 < length__goto_122_5))):
+                                (length__goto_122_5 = branchlength__goto_123_5)
+                            if ((op__goto_154_15 != OP_ALT) or (length__goto_122_5 == 0)):
+                                return length__goto_122_5
+                            (nextbranch__goto_131_12 = (cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                            (branchlength__goto_123_5 = 0)
+                            (had_recurse__goto_129_6 = 0)
+                        OP_END =>
+                            if ((length__goto_122_5 < 0) or ((not ((had_recurse__goto_129_6 != 0))) and (branchlength__goto_123_5 < length__goto_122_5))):
+                                (length__goto_122_5 = branchlength__goto_123_5)
+                            if ((op__goto_154_15 != OP_ALT) or (length__goto_122_5 == 0)):
+                                return length__goto_122_5
+                            (nextbranch__goto_131_12 = (cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                            (branchlength__goto_123_5 = 0)
+                            (had_recurse__goto_129_6 = 0)
+                        OP_ASSERT =>
                             while true:
-                                cc__goto_132_12 = cc__goto_132_12 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_ASSERT_NOT =>
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_ASSERTBACK =>
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_ASSERTBACK_NOT =>
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_ASSERT_NA =>
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_ASSERT_SCS =>
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_ASSERTBACK_NA =>
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_REVERSE =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_VREVERSE =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_CREF =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_DNCREF =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_RREF =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_DNRREF =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_FALSE =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_TRUE =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_CALLOUT =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_SOD =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_SOM =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_EOD =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_EODN =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_CIRC =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_CIRCM =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_DOLL =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_DOLLM =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_NOT_WORD_BOUNDARY =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_WORD_BOUNDARY =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_NOT_UCP_WORD_BOUNDARY =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_UCP_WORD_BOUNDARY =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                        OP_CALLOUT_STR =>
+                            cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[(1 + (2 * 2))] << 8)) | (cc__goto_132_12)[(((1 + (2 * 2))) + 1)])) as c_uint)
+                        OP_BRAZERO =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                        OP_BRAMINZERO =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                        OP_BRAPOSZERO =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
+                        OP_SKIPZERO =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                            while true:
+                                cc__goto_132_12 = cc__goto_132_12 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
                                 if __goto_pending != 0:
                                     break
                                 if not (((unsafe: *cc__goto_132_12) == OP_ALT)):
                                     break
                             cc__goto_132_12 = cc__goto_132_12 + (1 + 2)
                         OP_CHAR =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_CHARI =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_NOT =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_NOTI =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_PLUS =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_PLUSI =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_MINPLUS =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_MINPLUSI =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_POSPLUS =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_POSPLUSI =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_NOTPLUS =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_NOTPLUSI =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_NOTMINPLUS =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_NOTMINPLUSI =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_NOTPOSPLUS =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                        OP_NOTPOSPLUSI =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
                             cc__goto_132_12 = cc__goto_132_12 + 2
                         OP_TYPEPLUS =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + (if ((cc__goto_132_12[1] == OP_PROP) or (cc__goto_132_12[1] == OP_NOTPROP)): 4 else: 2)
+                        OP_TYPEMINPLUS =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            cc__goto_132_12 = cc__goto_132_12 + (if ((cc__goto_132_12[1] == OP_PROP) or (cc__goto_132_12[1] == OP_NOTPROP)): 4 else: 2)
+                        OP_TYPEPOSPLUS =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
                             cc__goto_132_12 = cc__goto_132_12 + (if ((cc__goto_132_12[1] == OP_PROP) or (cc__goto_132_12[1] == OP_NOTPROP)): 4 else: 2)
                         OP_EXACT =>
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                            cc__goto_132_12 = cc__goto_132_12 + (2 + 2)
+                        OP_EXACTI =>
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                            cc__goto_132_12 = cc__goto_132_12 + (2 + 2)
+                        OP_NOTEXACT =>
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                            cc__goto_132_12 = cc__goto_132_12 + (2 + 2)
+                        OP_NOTEXACTI =>
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
                             cc__goto_132_12 = cc__goto_132_12 + (2 + 2)
                         OP_TYPEEXACT =>
-                            branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                            branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
                             cc__goto_132_12 = cc__goto_132_12 + ((2 + 2) + ((if ((cc__goto_132_12[(1 + 2)] == OP_PROP) or (cc__goto_132_12[(1 + 2)] == OP_NOTPROP)): 2 else: 0)))
                         OP_PROP =>
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_NOTPROP =>
+                            cc__goto_132_12 = cc__goto_132_12 + 2
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
                             (cc__goto_132_12 = cc__goto_132_12 + 1)
                         OP_NOT_DIGIT =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_DIGIT =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_NOT_WHITESPACE =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_WHITESPACE =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_NOT_WORDCHAR =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_WORDCHAR =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_ANY =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_ALLANY =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_EXTUNI =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_HSPACE =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_NOT_HSPACE =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_VSPACE =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                            (cc__goto_132_12 = cc__goto_132_12 + 1)
+                        OP_NOT_VSPACE =>
+                            (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
                             (cc__goto_132_12 = cc__goto_132_12 + 1)
                         OP_ANYNL =>
                             branchlength__goto_123_5 = branchlength__goto_123_5 + 1
@@ -584,22 +984,343 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
                             (cc__goto_132_12 = cc__goto_132_12 + 1)
                         OP_TYPESTAR =>
+                            if ((cc__goto_132_12[1] == OP_PROP) or (cc__goto_132_12[1] == OP_NOTPROP)):
+                                cc__goto_132_12 = cc__goto_132_12 + 2
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_TYPEMINSTAR =>
+                            if ((cc__goto_132_12[1] == OP_PROP) or (cc__goto_132_12[1] == OP_NOTPROP)):
+                                cc__goto_132_12 = cc__goto_132_12 + 2
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_TYPEQUERY =>
+                            if ((cc__goto_132_12[1] == OP_PROP) or (cc__goto_132_12[1] == OP_NOTPROP)):
+                                cc__goto_132_12 = cc__goto_132_12 + 2
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_TYPEMINQUERY =>
+                            if ((cc__goto_132_12[1] == OP_PROP) or (cc__goto_132_12[1] == OP_NOTPROP)):
+                                cc__goto_132_12 = cc__goto_132_12 + 2
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_TYPEPOSSTAR =>
+                            if ((cc__goto_132_12[1] == OP_PROP) or (cc__goto_132_12[1] == OP_NOTPROP)):
+                                cc__goto_132_12 = cc__goto_132_12 + 2
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_TYPEPOSQUERY =>
+                            if ((cc__goto_132_12[1] == OP_PROP) or (cc__goto_132_12[1] == OP_NOTPROP)):
+                                cc__goto_132_12 = cc__goto_132_12 + 2
                             cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
                         OP_TYPEUPTO =>
+                            if ((cc__goto_132_12[(1 + 2)] == OP_PROP) or (cc__goto_132_12[(1 + 2)] == OP_NOTPROP)):
+                                cc__goto_132_12 = cc__goto_132_12 + 2
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_TYPEMINUPTO =>
+                            if ((cc__goto_132_12[(1 + 2)] == OP_PROP) or (cc__goto_132_12[(1 + 2)] == OP_NOTPROP)):
+                                cc__goto_132_12 = cc__goto_132_12 + 2
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_TYPEPOSUPTO =>
+                            if ((cc__goto_132_12[(1 + 2)] == OP_PROP) or (cc__goto_132_12[(1 + 2)] == OP_NOTPROP)):
+                                cc__goto_132_12 = cc__goto_132_12 + 2
                             cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
                         OP_CLASS =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[OP_CLASS]
                             match (unsafe: *cc__goto_132_12)
-                                OP_CRPLUS => 0
-                                OP_CRSTAR => 0
+                                OP_CRPLUS =>
+                                    (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRMINPLUS =>
+                                    (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPOSPLUS =>
+                                    (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRSTAR =>
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRMINSTAR =>
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRQUERY =>
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRMINQUERY =>
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPOSSTAR =>
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPOSQUERY =>
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
                                 OP_CRRANGE =>
+                                    branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                    cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
+                                OP_CRMINRANGE =>
+                                    branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                    cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
+                                OP_CRPOSRANGE =>
+                                    branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                    cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
+                                _ =>
+                                    (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                        OP_NCLASS =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[OP_CLASS]
+                            match (unsafe: *cc__goto_132_12)
+                                OP_CRPLUS =>
+                                    (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRMINPLUS =>
+                                    (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPOSPLUS =>
+                                    (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRSTAR =>
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRMINSTAR =>
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRQUERY =>
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRMINQUERY =>
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPOSSTAR =>
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPOSQUERY =>
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRRANGE =>
+                                    branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                    cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
+                                OP_CRMINRANGE =>
+                                    branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
+                                    cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
+                                OP_CRPOSRANGE =>
+                                    branchlength__goto_123_5 = branchlength__goto_123_5 + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)
                                     cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
                                 _ =>
                                     (branchlength__goto_123_5 = branchlength__goto_123_5 + 1)
                         OP_DNREF =>
+                            if ((not ((dupcapused__goto_130_6 != 0))) and (((re.overall_options & 512)) == 0)):
+                                count__goto_497_11 = ((((((cc__goto_132_12)[(1 + 2)] << 8)) | (cc__goto_132_12)[(((1 + 2)) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                slot__goto_498_18 = (((((re as *const u8) + sizeof[pcre2_real_code_8]())) as *const u8) + (((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint) *% re.name_entry_size))
+                                if __goto_pending != 0:
+                                    break
+                                (d__goto_153_7 = 2147483647)
+                                if __goto_pending != 0:
+                                    break
+                                while ((count__goto_497_11 = count__goto_497_11 - 1) > 0):
+                                    (recno__goto_153_15 = ((((((slot__goto_498_18)[0] << 8)) | (slot__goto_498_18)[((0) + 1)])) as c_uint))
+                                    if __goto_pending != 0:
+                                        break
+                                    if ((recno__goto_153_15 <= backref_cache[0]) and (backref_cache[recno__goto_153_15] >= 0)):
+                                        (dd__goto_508_13 = backref_cache[recno__goto_153_15])
+                                    else:
+                                        (cs__goto_155_14 = _pcre2_find_bracket_8(startcode, utf, recno__goto_153_15))
+                                        (ce__goto_155_18 = cs__goto_155_14)
+                                        if __goto_pending != 0:
+                                            break
+                                        if (cs__goto_155_14 == (((0 as *mut c_void)) as *const u8)):
+                                            return -2
+                                        if __goto_pending != 0:
+                                            break
+                                        while true:
+                                            ce__goto_155_18 = ce__goto_155_18 + ((((((ce__goto_155_18)[1] << 8)) | (ce__goto_155_18)[((1) + 1)])) as c_uint)
+                                            if __goto_pending != 0:
+                                                break
+                                            if not (((unsafe: *ce__goto_155_18) == OP_ALT)):
+                                                break
+                                        if __goto_pending != 0:
+                                            break
+                                        (dd__goto_508_13 = 0)
+                                        if __goto_pending != 0:
+                                            break
+                                        if ((not ((dupcapused__goto_130_6 != 0))) or (_pcre2_find_bracket_8(ce__goto_155_18, utf, recno__goto_153_15) == (((0 as *mut c_void)) as *const u8))):
+                                            if ((cc__goto_132_12 > cs__goto_155_14) and (cc__goto_132_12 < ce__goto_155_18)):
+                                                (had_recurse__goto_129_6 = 1)
+                                                if __goto_pending != 0:
+                                                    break
+                                            else:
+                                                r__goto_528_30 = recurses
+                                                if __goto_pending != 0:
+                                                    break
+                                                (r__goto_528_30 = recurses)
+                                                while (r__goto_528_30 != (((0 as *mut c_void)) as *mut recurse_check)):
+                                                    if (r__goto_528_30.group == cs__goto_155_14):
+                                                        break
+                                                    (r__goto_528_30 = r__goto_528_30.prev)
+                                                    if __goto_pending != 0:
+                                                        break
+                                                if __goto_pending != 0:
+                                                    break
+                                                if (r__goto_528_30 != (((0 as *mut c_void)) as *mut recurse_check)):
+                                                    (had_recurse__goto_129_6 = 1)
+                                                    if __goto_pending != 0:
+                                                        break
+                                                else:
+                                                    (this_recurse__goto_133_15.prev = recurses)
+                                                    if __goto_pending != 0:
+                                                        break
+                                                    (this_recurse__goto_133_15.group = cs__goto_155_14)
+                                                    if __goto_pending != 0:
+                                                        break
+                                                    (dd__goto_508_13 = find_minlength(re, cs__goto_155_14, startcode, utf, ((&this_recurse__goto_133_15 as *const recurse_check) as *mut recurse_check), countptr, backref_cache))
+                                                    if __goto_pending != 0:
+                                                        break
+                                                    if (dd__goto_508_13 < 0):
+                                                        return dd__goto_508_13
+                                                    if __goto_pending != 0:
+                                                        break
+                                                if __goto_pending != 0:
+                                                    break
+                                            if __goto_pending != 0:
+                                                break
+                                        if __goto_pending != 0:
+                                            break
+                                        (backref_cache[recno__goto_153_15] = dd__goto_508_13)
+                                        if __goto_pending != 0:
+                                            break
+                                        (i__goto_508_17 = (backref_cache[0] + 1))
+                                        while (i__goto_508_17 < recno__goto_153_15):
+                                            (backref_cache[i__goto_508_17] = -1)
+                                            (i__goto_508_17 = i__goto_508_17 + 1)
+                                            if __goto_pending != 0:
+                                                break
+                                        if __goto_pending != 0:
+                                            break
+                                        (backref_cache[0] = recno__goto_153_15)
+                                        if __goto_pending != 0:
+                                            break
+                                    if __goto_pending != 0:
+                                        break
+                                    if (dd__goto_508_13 < d__goto_153_7):
+                                        (d__goto_153_7 = dd__goto_508_13)
+                                    if __goto_pending != 0:
+                                        break
+                                    if (d__goto_153_7 <= 0):
+                                        break
+                                    if __goto_pending != 0:
+                                        break
+                                    slot__goto_498_18 = slot__goto_498_18 + re.name_entry_size
+                                    if __goto_pending != 0:
+                                        break
+                                    if __goto_pending != 0:
+                                        break
+                                if __goto_pending != 0:
+                                    break
+                            else:
+                                (d__goto_153_7 = 0)
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                            __pc = 2
+                            __goto_pending = 1
+                        OP_DNREFI =>
+                            if ((not ((dupcapused__goto_130_6 != 0))) and (((re.overall_options & 512)) == 0)):
+                                count__goto_497_11 = ((((((cc__goto_132_12)[(1 + 2)] << 8)) | (cc__goto_132_12)[(((1 + 2)) + 1)])) as c_uint)
+                                if __goto_pending != 0:
+                                    break
+                                slot__goto_498_18 = (((((re as *const u8) + sizeof[pcre2_real_code_8]())) as *const u8) + (((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint) *% re.name_entry_size))
+                                if __goto_pending != 0:
+                                    break
+                                (d__goto_153_7 = 2147483647)
+                                if __goto_pending != 0:
+                                    break
+                                while ((count__goto_497_11 = count__goto_497_11 - 1) > 0):
+                                    (recno__goto_153_15 = ((((((slot__goto_498_18)[0] << 8)) | (slot__goto_498_18)[((0) + 1)])) as c_uint))
+                                    if __goto_pending != 0:
+                                        break
+                                    if ((recno__goto_153_15 <= backref_cache[0]) and (backref_cache[recno__goto_153_15] >= 0)):
+                                        (dd__goto_508_13 = backref_cache[recno__goto_153_15])
+                                    else:
+                                        (cs__goto_155_14 = _pcre2_find_bracket_8(startcode, utf, recno__goto_153_15))
+                                        (ce__goto_155_18 = cs__goto_155_14)
+                                        if __goto_pending != 0:
+                                            break
+                                        if (cs__goto_155_14 == (((0 as *mut c_void)) as *const u8)):
+                                            return -2
+                                        if __goto_pending != 0:
+                                            break
+                                        while true:
+                                            ce__goto_155_18 = ce__goto_155_18 + ((((((ce__goto_155_18)[1] << 8)) | (ce__goto_155_18)[((1) + 1)])) as c_uint)
+                                            if __goto_pending != 0:
+                                                break
+                                            if not (((unsafe: *ce__goto_155_18) == OP_ALT)):
+                                                break
+                                        if __goto_pending != 0:
+                                            break
+                                        (dd__goto_508_13 = 0)
+                                        if __goto_pending != 0:
+                                            break
+                                        if ((not ((dupcapused__goto_130_6 != 0))) or (_pcre2_find_bracket_8(ce__goto_155_18, utf, recno__goto_153_15) == (((0 as *mut c_void)) as *const u8))):
+                                            if ((cc__goto_132_12 > cs__goto_155_14) and (cc__goto_132_12 < ce__goto_155_18)):
+                                                (had_recurse__goto_129_6 = 1)
+                                                if __goto_pending != 0:
+                                                    break
+                                            else:
+                                                r__goto_528_30 = recurses
+                                                if __goto_pending != 0:
+                                                    break
+                                                (r__goto_528_30 = recurses)
+                                                while (r__goto_528_30 != (((0 as *mut c_void)) as *mut recurse_check)):
+                                                    if (r__goto_528_30.group == cs__goto_155_14):
+                                                        break
+                                                    (r__goto_528_30 = r__goto_528_30.prev)
+                                                    if __goto_pending != 0:
+                                                        break
+                                                if __goto_pending != 0:
+                                                    break
+                                                if (r__goto_528_30 != (((0 as *mut c_void)) as *mut recurse_check)):
+                                                    (had_recurse__goto_129_6 = 1)
+                                                    if __goto_pending != 0:
+                                                        break
+                                                else:
+                                                    (this_recurse__goto_133_15.prev = recurses)
+                                                    if __goto_pending != 0:
+                                                        break
+                                                    (this_recurse__goto_133_15.group = cs__goto_155_14)
+                                                    if __goto_pending != 0:
+                                                        break
+                                                    (dd__goto_508_13 = find_minlength(re, cs__goto_155_14, startcode, utf, ((&this_recurse__goto_133_15 as *const recurse_check) as *mut recurse_check), countptr, backref_cache))
+                                                    if __goto_pending != 0:
+                                                        break
+                                                    if (dd__goto_508_13 < 0):
+                                                        return dd__goto_508_13
+                                                    if __goto_pending != 0:
+                                                        break
+                                                if __goto_pending != 0:
+                                                    break
+                                            if __goto_pending != 0:
+                                                break
+                                        if __goto_pending != 0:
+                                            break
+                                        (backref_cache[recno__goto_153_15] = dd__goto_508_13)
+                                        if __goto_pending != 0:
+                                            break
+                                        (i__goto_508_17 = (backref_cache[0] + 1))
+                                        while (i__goto_508_17 < recno__goto_153_15):
+                                            (backref_cache[i__goto_508_17] = -1)
+                                            (i__goto_508_17 = i__goto_508_17 + 1)
+                                            if __goto_pending != 0:
+                                                break
+                                        if __goto_pending != 0:
+                                            break
+                                        (backref_cache[0] = recno__goto_153_15)
+                                        if __goto_pending != 0:
+                                            break
+                                    if __goto_pending != 0:
+                                        break
+                                    if (dd__goto_508_13 < d__goto_153_7):
+                                        (d__goto_153_7 = dd__goto_508_13)
+                                    if __goto_pending != 0:
+                                        break
+                                    if (d__goto_153_7 <= 0):
+                                        break
+                                    if __goto_pending != 0:
+                                        break
+                                    slot__goto_498_18 = slot__goto_498_18 + re.name_entry_size
+                                    if __goto_pending != 0:
+                                        break
+                                    if __goto_pending != 0:
+                                        break
+                                if __goto_pending != 0:
+                                    break
+                            else:
+                                (d__goto_153_7 = 0)
                             cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
                             __pc = 2
                             __goto_pending = 1
                         OP_REF =>
+                            (recno__goto_153_15 = ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint))
                             if ((recno__goto_153_15 <= backref_cache[0]) and (backref_cache[recno__goto_153_15] >= 0)):
                                 (d__goto_153_7 = backref_cache[recno__goto_153_15])
                             else:
@@ -611,19 +1332,19 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                     (ce__goto_155_18 = cs__goto_155_14)
                                     if __goto_pending != 0:
                                         break
-                                    if (cs__goto_155_14 == (null as *const u8)):
+                                    if (cs__goto_155_14 == (((0 as *mut c_void)) as *const u8)):
                                         return -2
                                     if __goto_pending != 0:
                                         break
                                     while true:
-                                        ce__goto_155_18 = ce__goto_155_18 + ((((((((ce__goto_155_18)[1] as c_uint) << 8))) | (ce__goto_155_18)[((1) + 1)])) as c_uint)
+                                        ce__goto_155_18 = ce__goto_155_18 + ((((((ce__goto_155_18)[1] << 8)) | (ce__goto_155_18)[((1) + 1)])) as c_uint)
                                         if __goto_pending != 0:
                                             break
                                         if not (((unsafe: *ce__goto_155_18) == OP_ALT)):
                                             break
                                     if __goto_pending != 0:
                                         break
-                                    if ((not ((dupcapused__goto_130_6 != 0))) or (_pcre2_find_bracket_8(ce__goto_155_18, utf, recno__goto_153_15) == (null as *const u8))):
+                                    if ((not ((dupcapused__goto_130_6 != 0))) or (_pcre2_find_bracket_8(ce__goto_155_18, utf, recno__goto_153_15) == (((0 as *mut c_void)) as *const u8))):
                                         if ((cc__goto_132_12 > cs__goto_155_14) and (cc__goto_132_12 < ce__goto_155_18)):
                                             (had_recurse__goto_129_6 = 1)
                                             if __goto_pending != 0:
@@ -633,7 +1354,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                             if __goto_pending != 0:
                                                 break
                                             (r__goto_587_28 = recurses)
-                                            while (r__goto_587_28 != (null as *mut recurse_check)):
+                                            while (r__goto_587_28 != (((0 as *mut c_void)) as *mut recurse_check)):
                                                 if (r__goto_587_28.group == cs__goto_155_14):
                                                     break
                                                 (r__goto_587_28 = r__goto_587_28.prev)
@@ -641,7 +1362,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                                     break
                                             if __goto_pending != 0:
                                                 break
-                                            if (r__goto_587_28 != (null as *mut recurse_check)):
+                                            if (r__goto_587_28 != (((0 as *mut c_void)) as *mut recurse_check)):
                                                 (had_recurse__goto_129_6 = 1)
                                                 if __goto_pending != 0:
                                                     break
@@ -684,10 +1405,167 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
                             match (unsafe: *cc__goto_132_12)
                                 OP_CRSTAR =>
+                                    (min__goto_153_10 = 0)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRMINSTAR =>
+                                    (min__goto_153_10 = 0)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRQUERY =>
+                                    (min__goto_153_10 = 0)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRMINQUERY =>
+                                    (min__goto_153_10 = 0)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPOSSTAR =>
+                                    (min__goto_153_10 = 0)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPOSQUERY =>
+                                    (min__goto_153_10 = 0)
                                     (cc__goto_132_12 = cc__goto_132_12 + 1)
                                 OP_CRPLUS =>
+                                    (min__goto_153_10 = 1)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRMINPLUS =>
+                                    (min__goto_153_10 = 1)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPOSPLUS =>
+                                    (min__goto_153_10 = 1)
                                     (cc__goto_132_12 = cc__goto_132_12 + 1)
                                 OP_CRRANGE =>
+                                    (min__goto_153_10 = ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint))
+                                    cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
+                                OP_CRMINRANGE =>
+                                    (min__goto_153_10 = ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint))
+                                    cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
+                                OP_CRPOSRANGE =>
+                                    (min__goto_153_10 = ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint))
+                                    cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
+                                _ =>
+                                    (min__goto_153_10 = 1)
+                            if (((d__goto_153_7 > 0) and (((2147483647 / d__goto_153_7)) < min__goto_153_10)) or (((65535 as c_int) - branchlength__goto_123_5) < (min__goto_153_10 * d__goto_153_7))):
+                                (branchlength__goto_123_5 = 65535)
+                            else:
+                                branchlength__goto_123_5 = branchlength__goto_123_5 + (min__goto_153_10 * d__goto_153_7)
+                        OP_REFI =>
+                            (recno__goto_153_15 = ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint))
+                            if ((recno__goto_153_15 <= backref_cache[0]) and (backref_cache[recno__goto_153_15] >= 0)):
+                                (d__goto_153_7 = backref_cache[recno__goto_153_15])
+                            else:
+                                (d__goto_153_7 = 0)
+                                if __goto_pending != 0:
+                                    break
+                                if (((re.overall_options & 512)) == 0):
+                                    (cs__goto_155_14 = _pcre2_find_bracket_8(startcode, utf, recno__goto_153_15))
+                                    (ce__goto_155_18 = cs__goto_155_14)
+                                    if __goto_pending != 0:
+                                        break
+                                    if (cs__goto_155_14 == (((0 as *mut c_void)) as *const u8)):
+                                        return -2
+                                    if __goto_pending != 0:
+                                        break
+                                    while true:
+                                        ce__goto_155_18 = ce__goto_155_18 + ((((((ce__goto_155_18)[1] << 8)) | (ce__goto_155_18)[((1) + 1)])) as c_uint)
+                                        if __goto_pending != 0:
+                                            break
+                                        if not (((unsafe: *ce__goto_155_18) == OP_ALT)):
+                                            break
+                                    if __goto_pending != 0:
+                                        break
+                                    if ((not ((dupcapused__goto_130_6 != 0))) or (_pcre2_find_bracket_8(ce__goto_155_18, utf, recno__goto_153_15) == (((0 as *mut c_void)) as *const u8))):
+                                        if ((cc__goto_132_12 > cs__goto_155_14) and (cc__goto_132_12 < ce__goto_155_18)):
+                                            (had_recurse__goto_129_6 = 1)
+                                            if __goto_pending != 0:
+                                                break
+                                        else:
+                                            r__goto_587_28 = recurses
+                                            if __goto_pending != 0:
+                                                break
+                                            (r__goto_587_28 = recurses)
+                                            while (r__goto_587_28 != (((0 as *mut c_void)) as *mut recurse_check)):
+                                                if (r__goto_587_28.group == cs__goto_155_14):
+                                                    break
+                                                (r__goto_587_28 = r__goto_587_28.prev)
+                                                if __goto_pending != 0:
+                                                    break
+                                            if __goto_pending != 0:
+                                                break
+                                            if (r__goto_587_28 != (((0 as *mut c_void)) as *mut recurse_check)):
+                                                (had_recurse__goto_129_6 = 1)
+                                                if __goto_pending != 0:
+                                                    break
+                                            else:
+                                                (this_recurse__goto_133_15.prev = recurses)
+                                                if __goto_pending != 0:
+                                                    break
+                                                (this_recurse__goto_133_15.group = cs__goto_155_14)
+                                                if __goto_pending != 0:
+                                                    break
+                                                (d__goto_153_7 = find_minlength(re, cs__goto_155_14, startcode, utf, ((&this_recurse__goto_133_15 as *const recurse_check) as *mut recurse_check), countptr, backref_cache))
+                                                if __goto_pending != 0:
+                                                    break
+                                                if (d__goto_153_7 < 0):
+                                                    return d__goto_153_7
+                                                if __goto_pending != 0:
+                                                    break
+                                            if __goto_pending != 0:
+                                                break
+                                        if __goto_pending != 0:
+                                            break
+                                    if __goto_pending != 0:
+                                        break
+                                if __goto_pending != 0:
+                                    break
+                                (backref_cache[recno__goto_153_15] = d__goto_153_7)
+                                if __goto_pending != 0:
+                                    break
+                                (i__goto_570_11 = (backref_cache[0] + 1))
+                                while (i__goto_570_11 < recno__goto_153_15):
+                                    (backref_cache[i__goto_570_11] = -1)
+                                    (i__goto_570_11 = i__goto_570_11 + 1)
+                                    if __goto_pending != 0:
+                                        break
+                                if __goto_pending != 0:
+                                    break
+                                (backref_cache[0] = recno__goto_153_15)
+                                if __goto_pending != 0:
+                                    break
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_132_12)]
+                            match (unsafe: *cc__goto_132_12)
+                                OP_CRSTAR =>
+                                    (min__goto_153_10 = 0)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRMINSTAR =>
+                                    (min__goto_153_10 = 0)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRQUERY =>
+                                    (min__goto_153_10 = 0)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRMINQUERY =>
+                                    (min__goto_153_10 = 0)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPOSSTAR =>
+                                    (min__goto_153_10 = 0)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPOSQUERY =>
+                                    (min__goto_153_10 = 0)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPLUS =>
+                                    (min__goto_153_10 = 1)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRMINPLUS =>
+                                    (min__goto_153_10 = 1)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRPOSPLUS =>
+                                    (min__goto_153_10 = 1)
+                                    (cc__goto_132_12 = cc__goto_132_12 + 1)
+                                OP_CRRANGE =>
+                                    (min__goto_153_10 = ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint))
+                                    cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
+                                OP_CRMINRANGE =>
+                                    (min__goto_153_10 = ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint))
+                                    cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
+                                OP_CRPOSRANGE =>
+                                    (min__goto_153_10 = ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint))
                                     cc__goto_132_12 = cc__goto_132_12 + (1 + (2 * 2))
                                 _ =>
                                     (min__goto_153_10 = 1)
@@ -696,16 +1574,16 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             else:
                                 branchlength__goto_123_5 = branchlength__goto_123_5 + (min__goto_153_10 * d__goto_153_7)
                         OP_RECURSE =>
-                            (ce__goto_155_18 = (startcode + ((((((((cc__goto_132_12)[1] as c_uint) << 8))) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
+                            (ce__goto_155_18 = (startcode + ((((((cc__goto_132_12)[1] << 8)) | (cc__goto_132_12)[((1) + 1)])) as c_uint)))
                             (cs__goto_155_14 = ce__goto_155_18)
-                            (recno__goto_153_15 = ((((((((cs__goto_155_14)[(1 + 2)] as c_uint) << 8))) | (cs__goto_155_14)[(((1 + 2)) + 1)])) as c_uint))
+                            (recno__goto_153_15 = ((((((cs__goto_155_14)[(1 + 2)] << 8)) | (cs__goto_155_14)[(((1 + 2)) + 1)])) as c_uint))
                             if (recno__goto_153_15 == prev_recurse_recno__goto_126_5):
                                 branchlength__goto_123_5 = branchlength__goto_123_5 + prev_recurse_d__goto_127_5
                                 if __goto_pending != 0:
                                     break
                             else:
                                 while true:
-                                    ce__goto_155_18 = ce__goto_155_18 + ((((((((ce__goto_155_18)[1] as c_uint) << 8))) | (ce__goto_155_18)[((1) + 1)])) as c_uint)
+                                    ce__goto_155_18 = ce__goto_155_18 + ((((((ce__goto_155_18)[1] << 8)) | (ce__goto_155_18)[((1) + 1)])) as c_uint)
                                     if __goto_pending != 0:
                                         break
                                     if not (((unsafe: *ce__goto_155_18) == OP_ALT)):
@@ -719,7 +1597,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                     if __goto_pending != 0:
                                         break
                                     (r__goto_673_24 = recurses)
-                                    while (r__goto_673_24 != (null as *mut recurse_check)):
+                                    while (r__goto_673_24 != (((0 as *mut c_void)) as *mut recurse_check)):
                                         if (r__goto_673_24.group == cs__goto_155_14):
                                             break
                                         (r__goto_673_24 = r__goto_673_24.prev)
@@ -727,7 +1605,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                             break
                                     if __goto_pending != 0:
                                         break
-                                    if (r__goto_673_24 != (null as *mut recurse_check)):
+                                    if (r__goto_673_24 != (((0 as *mut c_void)) as *mut recurse_check)):
                                         (had_recurse__goto_129_6 = 1)
                                     else:
                                         (this_recurse__goto_133_15.prev = recurses)
@@ -755,9 +1633,102 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                     break
                             cc__goto_132_12 = cc__goto_132_12 + (3 +% once_fudge__goto_128_10)
                             (once_fudge__goto_128_10 = 0)
-                        OP_UPTO => 0
-                        OP_MARK => 0
-                        OP_CLOSE => 0
+                        OP_UPTO =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_UPTOI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTUPTO =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTUPTOI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_MINUPTO =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_MINUPTOI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTMINUPTO =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTMINUPTOI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_POSUPTO =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_POSUPTOI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTPOSUPTO =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTPOSUPTOI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_STAR =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_STARI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTSTAR =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTSTARI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_MINSTAR =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_MINSTARI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTMINSTAR =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTMINSTARI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_POSSTAR =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_POSSTARI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTPOSSTAR =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTPOSSTARI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_QUERY =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_QUERYI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTQUERY =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTQUERYI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_MINQUERY =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_MINQUERYI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTMINQUERY =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTMINQUERYI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_POSQUERY =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_POSQUERYI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTPOSQUERY =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_NOTPOSQUERYI =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_MARK =>
+                            cc__goto_132_12 = cc__goto_132_12 + (_pcre2_OP_lengths_8[op__goto_154_15] + cc__goto_132_12[1])
+                        OP_COMMIT_ARG =>
+                            cc__goto_132_12 = cc__goto_132_12 + (_pcre2_OP_lengths_8[op__goto_154_15] + cc__goto_132_12[1])
+                        OP_PRUNE_ARG =>
+                            cc__goto_132_12 = cc__goto_132_12 + (_pcre2_OP_lengths_8[op__goto_154_15] + cc__goto_132_12[1])
+                        OP_SKIP_ARG =>
+                            cc__goto_132_12 = cc__goto_132_12 + (_pcre2_OP_lengths_8[op__goto_154_15] + cc__goto_132_12[1])
+                        OP_THEN_ARG =>
+                            cc__goto_132_12 = cc__goto_132_12 + (_pcre2_OP_lengths_8[op__goto_154_15] + cc__goto_132_12[1])
+                        OP_CLOSE =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_COMMIT =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_FAIL =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_PRUNE =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_SET_SOM =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_SKIP =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
+                        OP_THEN =>
+                            cc__goto_132_12 = cc__goto_132_12 + _pcre2_OP_lengths_8[op__goto_154_15]
                         _ =>
                             return -3
                     if __goto_pending != 0:
@@ -818,10 +1789,152 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
         while (try_next != 0):
             var rc: c_int
             var ncode: *const u8
-            var classmap: *const u8 = (null as *const u8)
+            var classmap: *const u8 = (((0 as *mut c_void)) as *const u8)
             match (unsafe: *tcode)
                 OP_ACCEPT =>
-                    tcode = tcode + _pcre2_OP_lengths_8[OP_CIRC]
+                    return SSB_FAIL
+                OP_ASSERT_ACCEPT =>
+                    return SSB_FAIL
+                OP_ALLANY =>
+                    return SSB_FAIL
+                OP_ANY =>
+                    return SSB_FAIL
+                OP_ANYBYTE =>
+                    return SSB_FAIL
+                OP_CIRCM =>
+                    return SSB_FAIL
+                OP_CLOSE =>
+                    return SSB_FAIL
+                OP_COMMIT =>
+                    return SSB_FAIL
+                OP_COMMIT_ARG =>
+                    return SSB_FAIL
+                OP_COND =>
+                    return SSB_FAIL
+                OP_CREF =>
+                    return SSB_FAIL
+                OP_FALSE =>
+                    return SSB_FAIL
+                OP_TRUE =>
+                    return SSB_FAIL
+                OP_DNCREF =>
+                    return SSB_FAIL
+                OP_DNREF =>
+                    return SSB_FAIL
+                OP_DNREFI =>
+                    return SSB_FAIL
+                OP_DNRREF =>
+                    return SSB_FAIL
+                OP_DOLL =>
+                    return SSB_FAIL
+                OP_DOLLM =>
+                    return SSB_FAIL
+                OP_END =>
+                    return SSB_FAIL
+                OP_EOD =>
+                    return SSB_FAIL
+                OP_EODN =>
+                    return SSB_FAIL
+                OP_EXTUNI =>
+                    return SSB_FAIL
+                OP_FAIL =>
+                    return SSB_FAIL
+                OP_MARK =>
+                    return SSB_FAIL
+                OP_NOT =>
+                    return SSB_FAIL
+                OP_NOTEXACT =>
+                    return SSB_FAIL
+                OP_NOTEXACTI =>
+                    return SSB_FAIL
+                OP_NOTI =>
+                    return SSB_FAIL
+                OP_NOTMINPLUS =>
+                    return SSB_FAIL
+                OP_NOTMINPLUSI =>
+                    return SSB_FAIL
+                OP_NOTMINQUERY =>
+                    return SSB_FAIL
+                OP_NOTMINQUERYI =>
+                    return SSB_FAIL
+                OP_NOTMINSTAR =>
+                    return SSB_FAIL
+                OP_NOTMINSTARI =>
+                    return SSB_FAIL
+                OP_NOTMINUPTO =>
+                    return SSB_FAIL
+                OP_NOTMINUPTOI =>
+                    return SSB_FAIL
+                OP_NOTPLUS =>
+                    return SSB_FAIL
+                OP_NOTPLUSI =>
+                    return SSB_FAIL
+                OP_NOTPOSPLUS =>
+                    return SSB_FAIL
+                OP_NOTPOSPLUSI =>
+                    return SSB_FAIL
+                OP_NOTPOSQUERY =>
+                    return SSB_FAIL
+                OP_NOTPOSQUERYI =>
+                    return SSB_FAIL
+                OP_NOTPOSSTAR =>
+                    return SSB_FAIL
+                OP_NOTPOSSTARI =>
+                    return SSB_FAIL
+                OP_NOTPOSUPTO =>
+                    return SSB_FAIL
+                OP_NOTPOSUPTOI =>
+                    return SSB_FAIL
+                OP_NOTPROP =>
+                    return SSB_FAIL
+                OP_NOTQUERY =>
+                    return SSB_FAIL
+                OP_NOTQUERYI =>
+                    return SSB_FAIL
+                OP_NOTSTAR =>
+                    return SSB_FAIL
+                OP_NOTSTARI =>
+                    return SSB_FAIL
+                OP_NOTUPTO =>
+                    return SSB_FAIL
+                OP_NOTUPTOI =>
+                    return SSB_FAIL
+                OP_NOT_HSPACE =>
+                    return SSB_FAIL
+                OP_NOT_VSPACE =>
+                    return SSB_FAIL
+                OP_PRUNE =>
+                    return SSB_FAIL
+                OP_PRUNE_ARG =>
+                    return SSB_FAIL
+                OP_RECURSE =>
+                    return SSB_FAIL
+                OP_REF =>
+                    return SSB_FAIL
+                OP_REFI =>
+                    return SSB_FAIL
+                OP_REVERSE =>
+                    return SSB_FAIL
+                OP_VREVERSE =>
+                    return SSB_FAIL
+                OP_RREF =>
+                    return SSB_FAIL
+                OP_SCOND =>
+                    return SSB_FAIL
+                OP_SET_SOM =>
+                    return SSB_FAIL
+                OP_SKIP =>
+                    return SSB_FAIL
+                OP_SKIP_ARG =>
+                    return SSB_FAIL
+                OP_SOD =>
+                    return SSB_FAIL
+                OP_SOM =>
+                    return SSB_FAIL
+                OP_THEN =>
+                    return SSB_FAIL
+                OP_THEN_ARG =>
+                    return SSB_FAIL
                 OP_CIRC =>
                     tcode = tcode + _pcre2_OP_lengths_8[OP_CIRC]
                 OP_PROP =>
@@ -836,23 +1949,69 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                         
                     
                     (try_next = 0)
-                OP_WORD_BOUNDARY => 0
+                OP_WORD_BOUNDARY =>
+                    (tcode = tcode + 1)
+                OP_NOT_WORD_BOUNDARY =>
+                    (tcode = tcode + 1)
+                OP_UCP_WORD_BOUNDARY =>
+                    (tcode = tcode + 1)
+                OP_NOT_UCP_WORD_BOUNDARY =>
+                    (tcode = tcode + 1)
                 OP_ASSERT =>
+                    (ncode = (tcode + ((((((tcode)[1] << 8)) | (tcode)[((1) + 1)])) as c_uint)))
                     while ((unsafe: *ncode) == OP_ALT):
-                        ncode = ncode + ((((((((ncode)[1] as c_uint) << 8))) | (ncode)[((1) + 1)])) as c_uint)
+                        ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
                     ncode = ncode + (1 + 2)
                     var done: c_int = 0
                     while (not ((done != 0))):
                         match (unsafe: *ncode)
                             OP_ASSERT =>
+                                ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
                                 while ((unsafe: *ncode) == OP_ALT):
-                                    ncode = ncode + ((((((((ncode)[1] as c_uint) << 8))) | (ncode)[((1) + 1)])) as c_uint)
+                                    ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
                                 ncode = ncode + (1 + 2)
-                            OP_WORD_BOUNDARY => 0
+                            OP_ASSERT_NOT =>
+                                ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
+                                while ((unsafe: *ncode) == OP_ALT):
+                                    ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
+                                ncode = ncode + (1 + 2)
+                            OP_ASSERTBACK =>
+                                ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
+                                while ((unsafe: *ncode) == OP_ALT):
+                                    ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
+                                ncode = ncode + (1 + 2)
+                            OP_ASSERTBACK_NOT =>
+                                ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
+                                while ((unsafe: *ncode) == OP_ALT):
+                                    ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
+                                ncode = ncode + (1 + 2)
+                            OP_ASSERT_NA =>
+                                ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
+                                while ((unsafe: *ncode) == OP_ALT):
+                                    ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
+                                ncode = ncode + (1 + 2)
+                            OP_ASSERTBACK_NA =>
+                                ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
+                                while ((unsafe: *ncode) == OP_ALT):
+                                    ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
+                                ncode = ncode + (1 + 2)
+                            OP_ASSERT_SCS =>
+                                ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
+                                while ((unsafe: *ncode) == OP_ALT):
+                                    ncode = ncode + ((((((ncode)[1] << 8)) | (ncode)[((1) + 1)])) as c_uint)
+                                ncode = ncode + (1 + 2)
+                            OP_WORD_BOUNDARY =>
+                                (ncode = ncode + 1)
+                            OP_NOT_WORD_BOUNDARY =>
+                                (ncode = ncode + 1)
+                            OP_UCP_WORD_BOUNDARY =>
+                                (ncode = ncode + 1)
+                            OP_NOT_UCP_WORD_BOUNDARY =>
+                                (ncode = ncode + 1)
                             OP_CALLOUT =>
                                 ncode = ncode + _pcre2_OP_lengths_8[OP_CALLOUT]
                             OP_CALLOUT_STR =>
-                                ncode = ncode + ((((((((ncode)[(1 + (2 * 2))] as c_uint) << 8))) | (ncode)[(((1 + (2 * 2))) + 1)])) as c_uint)
+                                ncode = ncode + ((((((ncode)[(1 + (2 * 2))] << 8)) | (ncode)[(((1 + (2 * 2))) + 1)])) as c_uint)
                             _ =>
                                 (done = 1)
                         
@@ -860,131 +2019,5 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                         OP_PROP =>
                             if (ncode[1] != 9):
                                 break
-                            continue
-                        OP_ANYNL =>
-                            continue
-                        _ => 0
-                    if (rc == SSB_DONE):
-                        (try_next = 0)
-                    else:
-                        if (rc == SSB_CONTINUE):
-                            while true:
-                                tcode = tcode + ((((((((tcode)[1] as c_uint) << 8))) | (tcode)[((1) + 1)])) as c_uint)
-                                if not (((unsafe: *tcode) == OP_ALT)):
-                                    break
-                            
-                            tcode = tcode + (1 + 2)
-                        else:
-                            return rc
-                OP_BRA =>
-                    if (rc == SSB_DONE):
-                        (try_next = 0)
-                    else:
-                        if (rc == SSB_CONTINUE):
-                            while true:
-                                tcode = tcode + ((((((((tcode)[1] as c_uint) << 8))) | (tcode)[((1) + 1)])) as c_uint)
-                                if not (((unsafe: *tcode) == OP_ALT)):
-                                    break
-                            
-                            tcode = tcode + (1 + 2)
-                        else:
-                            return rc
-                OP_ALT =>
-                    (yield_ = SSB_CONTINUE)
-                    (try_next = 0)
-                OP_KET =>
-                    tcode = tcode + _pcre2_OP_lengths_8[OP_CALLOUT]
-                OP_CALLOUT =>
-                    tcode = tcode + _pcre2_OP_lengths_8[OP_CALLOUT]
-                OP_CALLOUT_STR =>
-                    tcode = tcode + ((((((((tcode)[(1 + (2 * 2))] as c_uint) << 8))) | (tcode)[(((1 + (2 * 2))) + 1)])) as c_uint)
-                OP_ASSERT_NOT =>
-                    tcode = tcode + (1 + 2)
-                OP_BRAZERO =>
-                    if (((rc == SSB_FAIL) or (rc == SSB_UNKNOWN)) or (rc == SSB_TOODEEP)):
-                        return rc
-                    while true:
-                        tcode = tcode + ((((((((tcode)[1] as c_uint) << 8))) | (tcode)[((1) + 1)])) as c_uint)
-                        if not (((unsafe: *tcode) == OP_ALT)):
-                            break
-                    tcode = tcode + (1 + 2)
-                OP_SKIPZERO =>
-                    (tcode = tcode + 1)
-                    while true:
-                        tcode = tcode + ((((((((tcode)[1] as c_uint) << 8))) | (tcode)[((1) + 1)])) as c_uint)
-                        if not (((unsafe: *tcode) == OP_ALT)):
-                            break
-                    tcode = tcode + (1 + 2)
-                OP_STAR => 0
-                OP_STARI => 0
-                OP_UPTO => 0
-                OP_UPTOI => 0
-                OP_EXACT =>
-                    tcode = tcode + 2
-                    (try_next = 0)
-                OP_CHAR =>
-                    (try_next = 0)
-                OP_EXACTI =>
-                    tcode = tcode + 2
-                    (try_next = 0)
-                OP_CHARI =>
-                    (try_next = 0)
-                OP_HSPACE =>
-                    (&re.start_bitmap[0] as *mut u8)[((9) / 8)] = (&re.start_bitmap[0] as *mut u8)[((9) / 8)] | ((1 << (((9) & 7))))
-                    (&re.start_bitmap[0] as *mut u8)[((32) / 8)] = (&re.start_bitmap[0] as *mut u8)[((32) / 8)] | ((1 << (((32) & 7))))
-                    (&re.start_bitmap[0] as *mut u8)[(160 / 8)] = (&re.start_bitmap[0] as *mut u8)[(160 / 8)] | ((1 << ((160 & 7))))
-                    (try_next = 0)
-                OP_ANYNL =>
-                    (&re.start_bitmap[0] as *mut u8)[((11) / 8)] = (&re.start_bitmap[0] as *mut u8)[((11) / 8)] | ((1 << (((11) & 7))))
-                    (&re.start_bitmap[0] as *mut u8)[((12) / 8)] = (&re.start_bitmap[0] as *mut u8)[((12) / 8)] | ((1 << (((12) & 7))))
-                    (&re.start_bitmap[0] as *mut u8)[((13) / 8)] = (&re.start_bitmap[0] as *mut u8)[((13) / 8)] | ((1 << (((13) & 7))))
-                    (&re.start_bitmap[0] as *mut u8)[(133 / 8)] = (&re.start_bitmap[0] as *mut u8)[(133 / 8)] | ((1 << ((133 & 7))))
-                    (try_next = 0)
-                OP_NOT_DIGIT =>
-                    set_nottype_bits(re, 64, table_limit)
-                    (try_next = 0)
-                OP_DIGIT =>
-                    set_type_bits(re, 64, table_limit)
-                    (try_next = 0)
-                OP_NOT_WHITESPACE =>
-                    set_nottype_bits(re, 0, table_limit)
-                    (try_next = 0)
-                OP_WHITESPACE =>
-                    set_type_bits(re, 0, table_limit)
-                    (try_next = 0)
-                OP_NOT_WORDCHAR =>
-                    set_nottype_bits(re, 160, table_limit)
-                    (try_next = 0)
-                OP_WORDCHAR =>
-                    set_type_bits(re, 160, table_limit)
-                    (try_next = 0)
-                OP_TYPEPLUS => 0
-                OP_TYPEEXACT =>
-                    tcode = tcode + (1 + 2)
-                OP_TYPEUPTO =>
-                    tcode = tcode + 2
-                OP_TYPESTAR =>
-                    tcode = tcode + 2
-                OP_NCLASS =>
-                    if (classmap != (null as *const u8)):
-                        (c = 0)
-                        while (c < 32):
-                            (&re.start_bitmap[0] as *mut u8)[c] = (&re.start_bitmap[0] as *mut u8)[c] | classmap[c]
-                            (c = c + 1)
-                        
-                        
-                    match (unsafe: *tcode)
-                        OP_CRSTAR => 0
-                        OP_CRRANGE => 0
-                        _ =>
-                            (try_next = 0)
-                _ =>
-                    return SSB_UNKNOWN
-            
-        
-        code = code + ((((((((code)[1] as c_uint) << 8))) | (code)[((1) + 1)])) as c_uint)
-        if not (((unsafe: *code) == OP_ALT)):
-            break
-
-    return yield_
+                            (tcode = ncode)
 
