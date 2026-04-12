@@ -4819,6 +4819,10 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32, 
     // For each case, walk forward through the remaining switch body,
     // collecting all statements until break/return. This means a case
     // that falls through includes the next case's statements too.
+    //
+    // Nested case AST: in libclang, `case A: case B: stmt;` is represented
+    // as CaseStmt(A) → sub_stmt = CaseStmt(B) → sub_stmt = stmt. We emit
+    // each nested case value as its own match arm sharing the same body.
     var parts: Vec[str] = Vec.new()
     parts.push("match ")
     parts.push(cond)
@@ -4830,22 +4834,54 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32, 
         let child = with_ci_child(session, body_cursor, i)
         let ck = with_ci_cursor_kind(session, child)
         if ck == CXK_CASE_STMT:
-            // Collect case value(s) — chase nested case/default chains
-            let case_nc = with_ci_num_children(session, child)
-            if case_nc >= 1:
-                let case_val = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
-                if case_val.len() > 0:
-                    // Walk forward from this case's body through remaining switch body
-                    let prong_body = ci_trans_switch_prong_forward(session, body_cursor, i, nc, indent + 2, scope)
+            // Collect this case's value plus any nested case/default values
+            let prong_body = ci_trans_switch_prong_forward(session, body_cursor, i, nc, indent + 2, scope)
+            // Emit one match arm per case value in the nested chain
+            var chain_cur = child
+            var chain_done = false
+            while not chain_done:
+                let chain_kind = with_ci_cursor_kind(session, chain_cur)
+                if chain_kind == CXK_CASE_STMT:
+                    let chain_nc = with_ci_num_children(session, chain_cur)
+                    if chain_nc >= 1:
+                        let case_val = ci_trans_expr(session, with_ci_child(session, chain_cur, 0), scope)
+                        if case_val.len() > 0:
+                            if prong_body.len() > 0:
+                                parts.push(arm_indent)
+                                parts.push(case_val)
+                                parts.push(" =>\n")
+                                parts.push(prong_body)
+                            else:
+                                parts.push(arm_indent)
+                                parts.push(case_val)
+                                parts.push(" => 0\n")
+                    var advanced = false
+                    if chain_nc >= 2:
+                        let next = with_ci_child(session, chain_cur, 1)
+                        let nk = with_ci_cursor_kind(session, next)
+                        if nk == CXK_CASE_STMT or nk == CXK_DEFAULT_STMT:
+                            chain_cur = next
+                            advanced = true
+                    if not advanced:
+                        chain_done = true
+                else if chain_kind == CXK_DEFAULT_STMT:
+                    has_default = true
                     if prong_body.len() > 0:
-                        parts.push(arm_indent)
-                        parts.push(case_val)
-                        parts.push(" =>\n")
-                        parts.push(prong_body)
+                        default_prong = arm_indent ++ "_ =>\n" ++ prong_body
                     else:
-                        parts.push(arm_indent)
-                        parts.push(case_val)
-                        parts.push(" => 0\n")
+                        default_prong = arm_indent ++ "_ => 0\n"
+                    let chain_nc = with_ci_num_children(session, chain_cur)
+                    var advanced = false
+                    if chain_nc >= 1:
+                        let next = with_ci_child(session, chain_cur, 0)
+                        let nk = with_ci_cursor_kind(session, next)
+                        if nk == CXK_CASE_STMT or nk == CXK_DEFAULT_STMT:
+                            chain_cur = next
+                            advanced = true
+                    if not advanced:
+                        chain_done = true
+                else:
+                    chain_done = true
         else if ck == CXK_DEFAULT_STMT:
             has_default = true
             let prong_body = ci_trans_switch_prong_forward(session, body_cursor, i, nc, indent + 2, scope)
@@ -4853,6 +4889,31 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32, 
                 default_prong = arm_indent ++ "_ =>\n" ++ prong_body
             else:
                 default_prong = arm_indent ++ "_ => 0\n"
+            // Drill any nested cases/defaults under default into separate arms too
+            let dnc = with_ci_num_children(session, child)
+            if dnc >= 1:
+                var nested = with_ci_child(session, child, 0)
+                var nested_kind = with_ci_cursor_kind(session, nested)
+                var nested_done = false
+                while not nested_done:
+                    if nested_kind == CXK_CASE_STMT:
+                        let nnc = with_ci_num_children(session, nested)
+                        if nnc >= 1:
+                            let case_val = ci_trans_expr(session, with_ci_child(session, nested, 0), scope)
+                            if case_val.len() > 0 and prong_body.len() > 0:
+                                parts.push(arm_indent)
+                                parts.push(case_val)
+                                parts.push(" =>\n")
+                                parts.push(prong_body)
+                        if nnc >= 2:
+                            nested = with_ci_child(session, nested, 1)
+                            nested_kind = with_ci_cursor_kind(session, nested)
+                            if nested_kind != CXK_CASE_STMT and nested_kind != CXK_DEFAULT_STMT:
+                                nested_done = true
+                        else:
+                            nested_done = true
+                    else:
+                        nested_done = true
         i = i + 1
     if has_default:
         parts.push(default_prong)
@@ -4861,50 +4922,55 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32, 
         parts.push("_ => 0\n")
     parts.join("")
 
+// Drill through nested CaseStmt/DefaultStmt sub-statements to find the
+// innermost non-case statement. Given a CaseStmt whose sub-stmt is another
+// CaseStmt (the C `case A: case B: stmt;` pattern), follows the chain down
+// to `stmt`. Returns -1 if there's no non-case statement to drill to.
+fn ci_drill_innermost_case_substmt(session: i64, case_cursor: i32) -> i32:
+    var cur = case_cursor
+    while true:
+        let ck = with_ci_cursor_kind(session, cur)
+        let cnc = with_ci_num_children(session, cur)
+        let body_idx = if ck == CXK_CASE_STMT: 1 else: 0
+        if cnc <= body_idx: return -1
+        let body_child = with_ci_child(session, cur, body_idx)
+        let bk = with_ci_cursor_kind(session, body_child)
+        if bk != CXK_CASE_STMT and bk != CXK_DEFAULT_STMT:
+            return body_child
+        cur = body_child
+    -1
+
 // Walk forward from case at position `start_idx` through the switch body,
 // translating all statements until break/return (Zig-style duplication).
 // In libclang's AST, case bodies and break statements are siblings in the
 // switch's compound body. A CaseStmt's child[1] is just its first
 // statement — subsequent statements (including break) are siblings.
+//
+// Special case: in a fall-through chain like `case A: case B: stmt;`,
+// libclang nests CaseStmt(B) as the sub-stmt of CaseStmt(A), with the real
+// `stmt` deepest in the chain. We drill through these nested cases to find
+// the real first statement.
 fn ci_trans_switch_prong_forward(session: i64, body_cursor: i32, start_idx: i32, total: i32, indent: i32, scope: str) -> str:
     var parts: Vec[str] = Vec.new()
 
-    // First: translate the case/default's own body child
+    // First: translate the case/default's own body child (drilling through
+    // any nested cases to find the innermost non-case statement).
     let start_child = with_ci_child(session, body_cursor, start_idx)
     let start_kind = with_ci_cursor_kind(session, start_child)
-    if start_kind == CXK_CASE_STMT:
-        let cnc = with_ci_num_children(session, start_child)
-        if cnc >= 2:
-            let body_child = with_ci_child(session, start_child, 1)
-            let bk = with_ci_cursor_kind(session, body_child)
+    if start_kind == CXK_CASE_STMT or start_kind == CXK_DEFAULT_STMT:
+        let inner = ci_drill_innermost_case_substmt(session, start_child)
+        if inner >= 0:
+            let bk = with_ci_cursor_kind(session, inner)
             if bk == CXK_BREAK_STMT:
                 return parts.join("")
             if bk == CXK_RETURN_STMT:
-                let s = ci_trans_stmt(session, body_child, 0, scope)
+                let s = ci_trans_stmt(session, inner, 0, scope)
                 if s.len() > 0:
                     parts.push(ci_indent_block(s, indent))
                 return parts.join("")
-            // Chase nested case/default: skip (handled separately)
-            if bk != CXK_CASE_STMT and bk != CXK_DEFAULT_STMT:
-                let s = ci_trans_stmt(session, body_child, 0, scope)
-                if s.len() > 0:
-                    parts.push(ci_indent_block(s, indent))
-    else if start_kind == CXK_DEFAULT_STMT:
-        let cnc = with_ci_num_children(session, start_child)
-        if cnc >= 1:
-            let body_child = with_ci_child(session, start_child, 0)
-            let bk = with_ci_cursor_kind(session, body_child)
-            if bk == CXK_BREAK_STMT:
-                return parts.join("")
-            if bk == CXK_RETURN_STMT:
-                let s = ci_trans_stmt(session, body_child, 0, scope)
-                if s.len() > 0:
-                    parts.push(ci_indent_block(s, indent))
-                return parts.join("")
-            if bk != CXK_CASE_STMT and bk != CXK_DEFAULT_STMT:
-                let s = ci_trans_stmt(session, body_child, 0, scope)
-                if s.len() > 0:
-                    parts.push(ci_indent_block(s, indent))
+            let s = ci_trans_stmt(session, inner, 0, scope)
+            if s.len() > 0:
+                parts.push(ci_indent_block(s, indent))
 
     // Now walk forward through siblings in the switch body
     var j = start_idx + 1
@@ -4996,20 +5062,56 @@ fn ci_trans_switch_body_goto(session: i64, body_cursor: i32, cond: str, indent: 
         let child = with_ci_child(session, body_cursor, i)
         let ck = with_ci_cursor_kind(session, child)
         if ck == CXK_CASE_STMT:
-            let case_nc = with_ci_num_children(session, child)
-            if case_nc >= 1:
-                let case_val = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
-                if case_val.len() > 0:
-                    let prong_body = ci_trans_switch_prong_forward_goto(session, body_cursor, i, nc, indent + 2, scope, label_map, loop_depth)
+            // Collect this case's value plus any nested case/default values.
+            // Nested case AST: `case A: case B: stmt;` is represented as
+            // CaseStmt(A) → sub_stmt = CaseStmt(B) → sub_stmt = stmt. We
+            // emit each nested value as its own match arm sharing the body.
+            let prong_body = ci_trans_switch_prong_forward_goto(session, body_cursor, i, nc, indent + 2, scope, label_map, loop_depth)
+            var chain_cur = child
+            var chain_done = false
+            while not chain_done:
+                let chain_kind = with_ci_cursor_kind(session, chain_cur)
+                if chain_kind == CXK_CASE_STMT:
+                    let chain_nc = with_ci_num_children(session, chain_cur)
+                    if chain_nc >= 1:
+                        let case_val = ci_trans_expr(session, with_ci_child(session, chain_cur, 0), scope)
+                        if case_val.len() > 0:
+                            if prong_body.len() > 0:
+                                parts.push(arm_indent)
+                                parts.push(case_val)
+                                parts.push(" =>\n")
+                                parts.push(prong_body)
+                            else:
+                                parts.push(arm_indent)
+                                parts.push(case_val)
+                                parts.push(" => 0\n")
+                    var advanced = false
+                    if chain_nc >= 2:
+                        let next = with_ci_child(session, chain_cur, 1)
+                        let nk = with_ci_cursor_kind(session, next)
+                        if nk == CXK_CASE_STMT or nk == CXK_DEFAULT_STMT:
+                            chain_cur = next
+                            advanced = true
+                    if not advanced:
+                        chain_done = true
+                else if chain_kind == CXK_DEFAULT_STMT:
+                    has_default = true
                     if prong_body.len() > 0:
-                        parts.push(arm_indent)
-                        parts.push(case_val)
-                        parts.push(" =>\n")
-                        parts.push(prong_body)
+                        default_prong = arm_indent ++ "_ =>\n" ++ prong_body
                     else:
-                        parts.push(arm_indent)
-                        parts.push(case_val)
-                        parts.push(" => 0\n")
+                        default_prong = arm_indent ++ "_ => 0\n"
+                    let chain_nc = with_ci_num_children(session, chain_cur)
+                    var advanced = false
+                    if chain_nc >= 1:
+                        let next = with_ci_child(session, chain_cur, 0)
+                        let nk = with_ci_cursor_kind(session, next)
+                        if nk == CXK_CASE_STMT or nk == CXK_DEFAULT_STMT:
+                            chain_cur = next
+                            advanced = true
+                    if not advanced:
+                        chain_done = true
+                else:
+                    chain_done = true
         else if ck == CXK_DEFAULT_STMT:
             has_default = true
             let prong_body = ci_trans_switch_prong_forward_goto(session, body_cursor, i, nc, indent + 2, scope, label_map, loop_depth)
@@ -5017,6 +5119,31 @@ fn ci_trans_switch_body_goto(session: i64, body_cursor: i32, cond: str, indent: 
                 default_prong = arm_indent ++ "_ =>\n" ++ prong_body
             else:
                 default_prong = arm_indent ++ "_ => 0\n"
+            // Drill any nested cases/defaults under default into separate arms too
+            let dnc = with_ci_num_children(session, child)
+            if dnc >= 1:
+                var nested = with_ci_child(session, child, 0)
+                var nested_kind = with_ci_cursor_kind(session, nested)
+                var nested_done = false
+                while not nested_done:
+                    if nested_kind == CXK_CASE_STMT:
+                        let nnc = with_ci_num_children(session, nested)
+                        if nnc >= 1:
+                            let case_val = ci_trans_expr(session, with_ci_child(session, nested, 0), scope)
+                            if case_val.len() > 0 and prong_body.len() > 0:
+                                parts.push(arm_indent)
+                                parts.push(case_val)
+                                parts.push(" =>\n")
+                                parts.push(prong_body)
+                        if nnc >= 2:
+                            nested = with_ci_child(session, nested, 1)
+                            nested_kind = with_ci_cursor_kind(session, nested)
+                            if nested_kind != CXK_CASE_STMT and nested_kind != CXK_DEFAULT_STMT:
+                                nested_done = true
+                        else:
+                            nested_done = true
+                    else:
+                        nested_done = true
         i = i + 1
     if has_default:
         parts.push(default_prong)
@@ -5028,53 +5155,29 @@ fn ci_trans_switch_body_goto(session: i64, body_cursor: i32, cond: str, indent: 
 fn ci_trans_switch_prong_forward_goto(session: i64, body_cursor: i32, start_idx: i32, total: i32, indent: i32, scope: str, label_map: str, loop_depth: i32) -> str:
     var parts: Vec[str] = Vec.new()
 
+    // Drill through nested CaseStmt/DefaultStmt sub-statements to find the
+    // innermost non-case statement (matches the C pattern `case A: case B: stmt;`).
     let start_child = with_ci_child(session, body_cursor, start_idx)
     let start_kind = with_ci_cursor_kind(session, start_child)
-    if start_kind == CXK_CASE_STMT:
-        let cnc = with_ci_num_children(session, start_child)
-        if cnc >= 2:
-            let body_child = with_ci_child(session, start_child, 1)
-            let bk = with_ci_cursor_kind(session, body_child)
+    if start_kind == CXK_CASE_STMT or start_kind == CXK_DEFAULT_STMT:
+        let inner = ci_drill_innermost_case_substmt(session, start_child)
+        if inner >= 0:
+            let bk = with_ci_cursor_kind(session, inner)
             if bk == CXK_BREAK_STMT:
                 return parts.join("")
             if bk == CXK_RETURN_STMT:
-                let s = ci_trans_stmt_goto(session, body_child, 0, scope, label_map, loop_depth)
-                if s.len() > 0:
-                    parts.push(ci_indent_block(s, indent))
-                return parts.join("")
-            // Goto terminates the prong: PCRE2 uses `case X: ...; goto FAILED;`
-            // heavily, and without this check the forward walker would
-            // accumulate following case bodies into this arm.
-            if bk == CXK_GOTO_STMT:
-                let s = ci_trans_stmt_goto(session, body_child, 0, scope, label_map, loop_depth)
-                if s.len() > 0:
-                    parts.push(ci_indent_block(s, indent))
-                return parts.join("")
-            if bk != CXK_CASE_STMT and bk != CXK_DEFAULT_STMT:
-                let s = ci_trans_stmt_goto(session, body_child, 0, scope, label_map, loop_depth)
-                if s.len() > 0:
-                    parts.push(ci_indent_block(s, indent))
-    else if start_kind == CXK_DEFAULT_STMT:
-        let cnc = with_ci_num_children(session, start_child)
-        if cnc >= 1:
-            let body_child = with_ci_child(session, start_child, 0)
-            let bk = with_ci_cursor_kind(session, body_child)
-            if bk == CXK_BREAK_STMT:
-                return parts.join("")
-            if bk == CXK_RETURN_STMT:
-                let s = ci_trans_stmt_goto(session, body_child, 0, scope, label_map, loop_depth)
+                let s = ci_trans_stmt_goto(session, inner, 0, scope, label_map, loop_depth)
                 if s.len() > 0:
                     parts.push(ci_indent_block(s, indent))
                 return parts.join("")
             if bk == CXK_GOTO_STMT:
-                let s = ci_trans_stmt_goto(session, body_child, 0, scope, label_map, loop_depth)
+                let s = ci_trans_stmt_goto(session, inner, 0, scope, label_map, loop_depth)
                 if s.len() > 0:
                     parts.push(ci_indent_block(s, indent))
                 return parts.join("")
-            if bk != CXK_CASE_STMT and bk != CXK_DEFAULT_STMT:
-                let s = ci_trans_stmt_goto(session, body_child, 0, scope, label_map, loop_depth)
-                if s.len() > 0:
-                    parts.push(ci_indent_block(s, indent))
+            let s = ci_trans_stmt_goto(session, inner, 0, scope, label_map, loop_depth)
+            if s.len() > 0:
+                parts.push(ci_indent_block(s, indent))
 
     var j = start_idx + 1
     while j < total:
