@@ -126,50 +126,50 @@ fn pcre2_regcomp(preg: *mut regex_t, pattern: *const i8, cflags: c_int) -> c_int
     var re_nsub: c_int = 0
     (preg.re_match_data = null)
     (preg.re_pcre2_code = null)
-    (patlen = (if ((if ((cflags & 2048)) != 0: 1 else: 0)) != 0: ((((preg.re_endp as usize -% pattern as usize) / sizeof[c_char]())) as c_ulong) else: ((0 -% 1))))
-    if (if ((cflags & 1)) != 0: 1 else: 0) != 0:
+    (patlen = (if (((cflags & 2048)) != 0): ((((preg.re_endp as usize -% pattern as usize) / sizeof[c_char]())) as c_ulong) else: ((0 - (0 as c_ulong) - 1))))
+    if (((cflags & 1)) != 0):
         options = options | 8
 
-    if (if ((cflags & 2)) != 0: 1 else: 0) != 0:
+    if (((cflags & 2)) != 0):
         options = options | 1024
 
-    if (if ((cflags & 16)) != 0: 1 else: 0) != 0:
+    if (((cflags & 16)) != 0):
         options = options | 32
 
-    if (if ((cflags & 4096)) != 0: 1 else: 0) != 0:
+    if (((cflags & 4096)) != 0):
         options = options | 33554432
 
-    if (if ((cflags & 64)) != 0: 1 else: 0) != 0:
+    if (((cflags & 64)) != 0):
         options = options | 524288
 
-    if (if ((cflags & 1024)) != 0: 1 else: 0) != 0:
+    if (((cflags & 1024)) != 0):
         options = options | 131072
 
-    if (if ((cflags & 512)) != 0: 1 else: 0) != 0:
+    if (((cflags & 512)) != 0):
         options = options | 262144
 
     (preg.re_cflags = cflags)
-    (preg.re_pcre2_code = (pcre2_compile_8((pattern as *const u8), patlen, options, (&mut errorcode as *mut c_int), (&mut erroffset as *mut c_ulong), (null as *mut pcre2_real_compile_context_8)) as *mut c_void))
+    (preg.re_pcre2_code = (pcre2_compile_8((pattern as *const u8), patlen, options, ((&errorcode as *const c_int) as *mut c_int), ((&erroffset as *const c_ulong) as *mut c_ulong), (null as *mut pcre2_real_compile_context_8)) as *mut c_void))
     (preg.re_erroffset = erroffset)
-    if (if preg.re_pcre2_code == null: 1 else: 0) != 0:
+    if (preg.re_pcre2_code == null):
         var i: c_uint
-        if (if errorcode < 100: 1 else: 0) != 0:
+        if (errorcode < 100):
             return REG_BADPAT
         
         errorcode = errorcode - 100
         (i = 0)
         while true:
-            if (if errorcode == (&eint2[0] as *mut c_int)[i]: 1 else: 0) != 0:
+            if (errorcode == (&eint2[0] as *mut c_int)[i]):
                 return (&eint2[0] as *mut c_int)[(i +% 1)]
             i = i + 2
         
         return REG_BADPAT
 
-    pcre2_pattern_info_8((preg.re_pcre2_code as *const pcre2_real_code_8), 4, ((&mut re_nsub as *mut c_int) as *mut c_void))
+    pcre2_pattern_info_8((preg.re_pcre2_code as *const pcre2_real_code_8), 4, (((&re_nsub as *const c_int) as *mut c_int) as *mut c_void))
     (preg.re_nsub = (re_nsub as c_ulong))
     (preg.re_match_data = (pcre2_match_data_create_8((re_nsub + 1), (null as *mut pcre2_real_general_context_8)) as *mut c_void))
     (preg.re_erroffset = ((-1) as c_ulong))
-    if (if preg.re_match_data == null: 1 else: 0) != 0:
+    if (preg.re_match_data == null):
         pcre2_code_free_8((preg.re_pcre2_code as *mut pcre2_real_code_8))
         (preg.re_pcre2_code = null)
         return REG_ESPACE
@@ -183,23 +183,23 @@ fn pcre2_regexec(preg: *const regex_t, string: *const i8, __param_nmatch: c_ulon
     var eo: c_int
     var options: c_int = 0
     var md: *mut pcre2_real_match_data_8 = (preg.re_match_data as *mut pcre2_real_match_data_8)
-    if (if string == (null as *const i8): 1 else: 0) != 0:
+    if (string == (null as *const i8)):
         return REG_INVARG
 
-    if (if ((eflags & 4)) != 0: 1 else: 0) != 0:
+    if (((eflags & 4)) != 0):
         options = options | 1
 
-    if (if ((eflags & 8)) != 0: 1 else: 0) != 0:
+    if (((eflags & 8)) != 0):
         options = options | 2
 
-    if (if ((eflags & 256)) != 0: 1 else: 0) != 0:
+    if (((eflags & 256)) != 0):
         options = options | 4
 
-    if (if (if ((preg.re_cflags & 32)) != 0: 1 else: 0) != 0 or (if pmatch == null: 1 else: 0) != 0: 1 else: 0) != 0:
+    if ((((preg.re_cflags & 32)) != 0) or (pmatch == null)):
         (nmatch = 0)
 
-    if (if ((eflags & 128)) != 0: 1 else: 0) != 0:
-        if (if pmatch == null: 1 else: 0) != 0:
+    if (((eflags & 128)) != 0):
+        if (pmatch == null):
             return REG_INVARG
         
         (so = pmatch[0].rm_so)
@@ -209,26 +209,26 @@ fn pcre2_regexec(preg: *const regex_t, string: *const i8, __param_nmatch: c_ulon
         (eo = (string_len(string) as c_int))
 
     (rc = pcre2_match_8((preg.re_pcre2_code as *const pcre2_real_code_8), ((string as *const u8) + (so as isize as usize)), ((eo - so)), 0, options, md, (null as *mut pcre2_real_match_context_8)))
-    if (if rc >= 0: 1 else: 0) != 0:
+    if (rc >= 0):
         var i: c_ulong
         var ovector: *mut c_ulong = pcre2_get_ovector_pointer_8(md)
-        if (if (rc as c_ulong) > nmatch: 1 else: 0) != 0:
+        if ((rc as c_ulong) > nmatch):
             (rc = (nmatch as c_int))
         
         (i = 0)
-        while (if i < (rc as c_ulong): 1 else: 0) != 0:
-            (pmatch[i].rm_so = (if ((if ovector[(i *% 2)] == ((0 -% 1)): 1 else: 0)) != 0: -1 else: (((ovector[(i *% 2)] +% so)) as c_int)))
-            (pmatch[i].rm_eo = (if ((if ovector[((i *% 2) +% 1)] == ((0 -% 1)): 1 else: 0)) != 0: -1 else: (((ovector[((i *% 2) +% 1)] +% so)) as c_int)))
+        while (i < (rc as c_ulong)):
+            (pmatch[i].rm_so = (if (ovector[(i *% 2)] == ((0 - (0 as c_ulong) - 1))): -1 else: (((ovector[(i *% 2)] +% so)) as c_int)))
+            (pmatch[i].rm_eo = (if (ovector[((i *% 2) +% 1)] == ((0 - (0 as c_ulong) - 1))): -1 else: (((ovector[((i *% 2) +% 1)] +% so)) as c_int)))
             (i = i + 1)
         
-        while (if i < nmatch: 1 else: 0) != 0:
+        while (i < nmatch):
             (pmatch[i].rm_eo = -1)
             (pmatch[i].rm_so = pmatch[i].rm_eo)
             (i = i + 1)
         
         return 0
 
-    if (if (if rc <= (-3): 1 else: 0) != 0 and (if rc >= (-23): 1 else: 0) != 0: 1 else: 0) != 0:
+    if ((rc <= (-3)) and (rc >= (-23))):
         return REG_INVARG
 
     match rc
@@ -260,20 +260,24 @@ fn pcre2_regerror(errcode: c_int, preg: *const regex_t, errbuf: *mut i8, errbuf_
     var snprintf_rc: c_int
     var have_offset: c_int = 0
     var i: c_ulong
+    if ((((preg != (null as *const regex_t)) and (preg.re_erroffset != ((-1) as c_ulong))) and (((snprintf_rc = 0 // __builtin___snprintf_chk((&offset_buf[0] as *mut c_char), (23 * sizeof[c_char]()), 0, 0, " at offset %d", (preg.re_erroffset as c_int)))) > 0)) and (snprintf_rc < ((23 * sizeof[c_char]()) as c_int))):
+        (have_offset = 1)
+        ((&offset_buf[0] as *mut c_char)[((23 * sizeof[c_char]()) -% 1)] = 0)
+
     (i = 0)
-    while (if (unsafe: *message) != 0: 1 else: 0) != 0:
-        if (if (i +% 1) < errbuf_size: 1 else: 0) != 0:
+    while ((unsafe: *message) != 0):
+        if ((i +% 1) < errbuf_size):
             (errbuf[i] = (unsafe: *message))
 
-    if have_offset != 0:
+    if (have_offset != 0):
         (message = ((&offset_buf[0] as *mut c_char) as *const i8))
-        while (if (unsafe: *message) != 0: 1 else: 0) != 0:
-            if (if (i +% 1) < errbuf_size: 1 else: 0) != 0:
+        while ((unsafe: *message) != 0):
+            if ((i +% 1) < errbuf_size):
                 (errbuf[i] = (unsafe: *message))
         
 
-    if (if errbuf_size > 0: 1 else: 0) != 0:
-        (errbuf[(if ((if i < errbuf_size: 1 else: 0)) != 0: i else: (errbuf_size -% 1))] = 0)
+    if (errbuf_size > 0):
+        (errbuf[(if (i < errbuf_size): i else: (errbuf_size -% 1))] = 0)
 
     (i = i + 1)
     return (i as c_int)
@@ -285,206 +289,3 @@ fn pcre2_regfree(preg: *mut regex_t):
 var eint1: [24]c_int = [0, REG_EESCAPE, REG_EESCAPE, REG_EESCAPE, REG_BADBR, REG_BADBR, REG_EBRACK, REG_ECTYPE, REG_ERANGE, REG_BADRPT, REG_ASSERT, REG_BADPAT, REG_BADPAT, REG_BADPAT, REG_EPAREN, REG_ESUBREG, REG_INVARG, REG_INVARG, REG_EPAREN, REG_ESIZE, REG_ESIZE, REG_ESPACE, REG_EPAREN, REG_ASSERT]
 var eint2: [16]c_int = [30, REG_ECTYPE, 32, REG_INVARG, 37, REG_EESCAPE, 56, REG_INVARG, 92, REG_INVARG, 98, REG_EESCAPE, 99, REG_EESCAPE, 102, REG_EESCAPE]
 var pstring: [18]*const i8 = ["", "internal error", "invalid repeat counts in {}", "pattern error", "? * + invalid", "unbalanced {}", "unbalanced []", "collation error - not relevant", "bad class", "bad escape sequence", "empty expression", "unbalanced ()", "bad range inside []", "expression too big", "failed to get memory", "bad back reference", "bad argument", "match failed"]
-// untranslatable fn-like macro
-fn ARR_SIZE() -> Never:
-    comptime_error("untranslatable C macro: ARR_SIZE")
-// untranslatable fn-like macro
-fn CAST_USER_ADDR_T() -> Never:
-    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
-// untranslatable fn-like macro
-fn HTONL() -> Never:
-    comptime_error("untranslatable C macro: HTONL")
-// untranslatable fn-like macro
-fn HTONLL() -> Never:
-    comptime_error("untranslatable C macro: HTONLL")
-// untranslatable fn-like macro
-fn HTONS() -> Never:
-    comptime_error("untranslatable C macro: HTONS")
-fn INT16_C[T](v: T) -> T:
-    v
-fn INT32_C[T](v: T) -> T:
-    v
-fn INT64_C[T](v: T) -> i64:
-    (v as i64)
-fn INT8_C[T](v: T) -> T:
-    v
-fn INTMAX_C[T](v: T) -> i64:
-    (v as i64)
-// untranslatable fn-like macro
-fn NTOHL() -> Never:
-    comptime_error("untranslatable C macro: NTOHL")
-// untranslatable fn-like macro
-fn NTOHLL() -> Never:
-    comptime_error("untranslatable C macro: NTOHLL")
-// untranslatable fn-like macro
-fn NTOHS() -> Never:
-    comptime_error("untranslatable C macro: NTOHS")
-// untranslatable fn-like macro
-fn PCRE2_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_ASSERT")
-// untranslatable fn-like macro
-fn PCRE2_DEBUG_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
-// untranslatable fn-like macro
-fn PCRE2_GLUE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_GLUE")
-// untranslatable fn-like macro
-fn PCRE2_JOIN() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_JOIN")
-fn PCRE2_SUFFIX[T](a: T) -> T:
-    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
-// untranslatable fn-like macro
-fn PCRE2_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
-let PCRE2regcomp: c_int = pcre2_regcomp
-let PCRE2regerror: c_int = pcre2_regerror
-let PCRE2regexec: c_int = pcre2_regexec
-let PCRE2regfree: c_int = pcre2_regfree
-fn PRIV[T](name: T) -> T:
-    name
-let REG_DOTALL: c_int = 0x0010
-let REG_EXTENDED: c_int = 0
-let REG_ICASE: c_int = 0x0001
-let REG_NEWLINE: c_int = 0x0002
-let REG_NOSPEC: c_int = 0x1000
-let REG_NOSUB: c_int = 0x0020
-let REG_NOTBOL: c_int = 0x0004
-let REG_NOTEMPTY: c_int = 0x0100
-let REG_NOTEOL: c_int = 0x0008
-let REG_PEND: c_int = 0x0800
-let REG_STARTEND: c_int = 0x0080
-let REG_UCP: c_int = 0x0400
-let REG_UNGREEDY: c_int = 0x0200
-let REG_UTF: c_int = 0x0040
-fn UINT16_C[T](v: T) -> T:
-    v
-fn UINT32_C[T](v: T) -> u32:
-    (v as u32)
-fn UINT64_C[T](v: T) -> u64:
-    (v as u64)
-fn UINT8_C[T](v: T) -> T:
-    v
-fn UINTMAX_C[T](v: T) -> u64:
-    (v as u64)
-// untranslatable fn-like macro
-fn WCOREDUMP() -> Never:
-    comptime_error("untranslatable C macro: WCOREDUMP")
-// untranslatable fn-like macro
-fn WEXITSTATUS() -> Never:
-    comptime_error("untranslatable C macro: WEXITSTATUS")
-// untranslatable fn-like macro
-fn WIFCONTINUED() -> Never:
-    comptime_error("untranslatable C macro: WIFCONTINUED")
-// untranslatable fn-like macro
-fn WIFEXITED() -> Never:
-    comptime_error("untranslatable C macro: WIFEXITED")
-// untranslatable fn-like macro
-fn WIFSIGNALED() -> Never:
-    comptime_error("untranslatable C macro: WIFSIGNALED")
-// untranslatable fn-like macro
-fn WIFSTOPPED() -> Never:
-    comptime_error("untranslatable C macro: WIFSTOPPED")
-// untranslatable fn-like macro
-fn WSTOPSIG() -> Never:
-    comptime_error("untranslatable C macro: WSTOPSIG")
-// untranslatable fn-like macro
-fn WTERMSIG() -> Never:
-    comptime_error("untranslatable C macro: WTERMSIG")
-fn W_EXITCODE[T](ret: T, sig: T) -> T:
-    ((ret << 8) | sig)
-// untranslatable fn-like macro
-fn W_STOPCODE() -> Never:
-    comptime_error("untranslatable C macro: W_STOPCODE")
-// untranslatable fn-like macro
-fn alloca() -> Never:
-    comptime_error("untranslatable C macro: alloca")
-// untranslatable fn-like macro
-fn clearerr_unlocked() -> Never:
-    comptime_error("untranslatable C macro: clearerr_unlocked")
-// untranslatable fn-like macro
-fn feof_unlocked() -> Never:
-    comptime_error("untranslatable C macro: feof_unlocked")
-// untranslatable fn-like macro
-fn ferror_unlocked() -> Never:
-    comptime_error("untranslatable C macro: ferror_unlocked")
-// untranslatable fn-like macro
-fn fileno_unlocked() -> Never:
-    comptime_error("untranslatable C macro: fileno_unlocked")
-// untranslatable fn-like macro
-fn fropen() -> Never:
-    comptime_error("untranslatable C macro: fropen")
-// untranslatable fn-like macro
-fn fwopen() -> Never:
-    comptime_error("untranslatable C macro: fwopen")
-// untranslatable fn-like macro
-fn getc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getc_unlocked")
-// untranslatable fn-like macro
-fn getchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getchar_unlocked")
-// untranslatable fn-like macro
-fn htonl() -> Never:
-    comptime_error("untranslatable C macro: htonl")
-// untranslatable fn-like macro
-fn htonll() -> Never:
-    comptime_error("untranslatable C macro: htonll")
-// untranslatable fn-like macro
-fn htons() -> Never:
-    comptime_error("untranslatable C macro: htons")
-fn memccpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memmove() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memset() -> Never:
-    comptime_error("variadic macro — use direct call")
-// untranslatable fn-like macro
-fn ntohl() -> Never:
-    comptime_error("untranslatable C macro: ntohl")
-// untranslatable fn-like macro
-fn ntohll() -> Never:
-    comptime_error("untranslatable C macro: ntohll")
-// untranslatable fn-like macro
-fn ntohs() -> Never:
-    comptime_error("untranslatable C macro: ntohs")
-// untranslatable fn-like macro
-fn offsetof() -> Never:
-    comptime_error("untranslatable C macro: offsetof")
-// untranslatable fn-like macro
-fn putc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putc_unlocked")
-// untranslatable fn-like macro
-fn putchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putchar_unlocked")
-let regcomp: c_int = pcre2_regcomp
-let regerror: c_int = pcre2_regerror
-let regexec: c_int = pcre2_regexec
-let regfree: c_int = pcre2_regfree
-// untranslatable fn-like macro
-fn sigmask() -> Never:
-    comptime_error("untranslatable C macro: sigmask")
-fn snprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn sprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsnprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsprintf() -> Never:
-    comptime_error("variadic macro — use direct call")

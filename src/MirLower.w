@@ -1916,6 +1916,15 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_GROUPED:
         return self.lower_expr_place(self.ast.get_data0(node))
 
+    // Transparent pass-through. lower_expr already does this for the rvalue
+    // case (line 4043); the place version was missing the same handling, so
+    // `(unsafe: *p) = expr` would fall through to the materialize-as-temp
+    // fallback below — silently dropping the store. The migrator emits this
+    // pattern for every C struct assignment `*p = q`, so the breakage was
+    // load-bearing for PCRE2.
+    if kind == NodeKind.NK_UNSAFE_BLOCK:
+        return self.lower_expr_place(self.ast.get_data0(node))
+
     // Fallback: materialize value into temp local and return its place.
     let op = self.lower_expr(node)
     let ty = self.expr_type(node)
@@ -2889,9 +2898,16 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         return
 
     let scrutinee_op = self.body.new_operand(OperandKind.OK_COPY, scrutinee_place)
+    // Lower int-literal patterns at the scrutinee's type, not hardcoded i32.
+    // Hardcoding i32 truncated values >= 2^31 (e.g. PCRE2's META_END = 0x80000000)
+    // to negative i32, so the comparison against a u32 scrutinee always failed
+    // and every meta-code match fell through to the default — surfacing as
+    // ERR89 ("unknown code in parsed pattern") on every PCRE2 compile.
+    let scrut_ty = self.place_local_type(scrutinee_place)
+    let pat_int_ty = if scrut_ty != 0 and scrut_ty != self.sema.ty_void as i32: scrut_ty else: self.sema.ty_i32
     if pk == NodeKind.NK_PAT_INT or pk == NodeKind.NK_PAT_BOOL or pk == NodeKind.NK_PAT_STRING:
         let lit = if pk == NodeKind.NK_PAT_INT:
-            self.lower_int_lit(self.ast.int_lit_value(pat_node), self.sema.ty_i32)
+            self.lower_int_lit(self.ast.int_lit_value(pat_node), pat_int_ty)
         else if pk == NodeKind.NK_PAT_BOOL:
             self.lower_bool_lit(self.ast.get_data0(pat_node))
         else:
@@ -2903,8 +2919,8 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         let range_lo = self.ast.get_data0(pat_node)
         let range_hi = self.ast.get_data1(pat_node)
         let inclusive = self.ast.get_data2(pat_node)
-        let lo_lit = self.lower_int_lit(range_lo as i64, self.sema.ty_i32)
-        let hi_lit = self.lower_int_lit(range_hi as i64, self.sema.ty_i32)
+        let lo_lit = self.lower_int_lit(range_lo as i64, pat_int_ty)
+        let hi_lit = self.lower_int_lit(range_hi as i64, pat_int_ty)
         let ge_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_GTE, scrutinee_op, lo_lit)
         let ge_tmp = self.new_temp(self.sema.ty_bool)
         let ge_place = self.place_for_local(ge_tmp)
@@ -4199,12 +4215,32 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 
     if kind == NodeKind.NK_ASSIGN:
         let target = self.ast.get_data0(node)
-        self.lower_assign(target, self.ast.get_data1(node))
-        let target_place = self.lower_expr_place(target)
+        let rhs_node = self.ast.get_data1(node)
+        // Lower the RHS first so we have its value available, then perform the
+        // assignment. The expression value of `lhs = rhs` is `rhs` per C/With
+        // semantics — NOT a re-load of `*lhs`. The previous code did
+        // `lower_assign(target, rhs); lower_expr_place(target); OK_COPY`,
+        // which emitted an unconditional load through `*lhs` after the store.
+        // For `*lengthptr = *lengthptr + length`, that meant a third
+        // `load i64, ptr lengthptr` that LLVM treated as an unconditional
+        // dereference, propagating "lengthptr is non-null" out of the guarded
+        // block and constant-folding the surrounding null check.
+        let saved_expected = self.expected_type
         let target_ty = self.expr_type(target)
-        if self.sema.is_copy(target_ty) != 0:
-            return self.body.new_operand(OperandKind.OK_COPY, target_place)
-        return self.body.new_operand(OperandKind.OK_MOVE, target_place)
+        if target_ty != 0 and target_ty != self.sema.ty_void as i32:
+            self.expected_type = target_ty
+        let rhs_op = self.lower_expr(rhs_node)
+        self.expected_type = saved_expected
+        let place = self.lower_expr_place(target)
+        if target_ty != 0 and self.sema.is_copy(target_ty) == 0:
+            let resolved_ty = self.sema.resolve_alias(target_ty)
+            let tk = self.sema.get_type_kind(resolved_ty)
+            if tk == TypeKind.TY_STRUCT:
+                let type_name = self.sema.get_type_d0(resolved_ty)
+                if self.sema.has_drop_method(type_name) != 0:
+                    self.body.push_stmt(self.cur_bb, StmtKind.Drop, place, 0, self.ast.get_start(target))
+        self.assign_operand_to_place(place, rhs_op, self.ast.get_start(target))
+        return rhs_op
 
     if kind == NodeKind.NK_IF_EXPR:
         return self.lower_if(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node)

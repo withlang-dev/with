@@ -1054,7 +1054,7 @@ fn ComptimeEvaluator.match_pattern(self: ComptimeEvaluator, diags: &mut Diagnost
     if kind == NodeKind.NK_PAT_INT:
         if comptime_value_is_intlike(value) == 0:
             return 0
-        if comptime_value_intlike(value) == ast_int_from_parts(self.ast.get_data0(pat), self.ast.get_data1(pat), 0):
+        if comptime_value_intlike(value) == self.ast.int_lit_value(pat):
             return 1
         return 0
     if kind == NodeKind.NK_PAT_BOOL:

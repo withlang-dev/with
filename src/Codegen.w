@@ -960,7 +960,17 @@ fn Codegen.deinit(self: Codegen):
 // ── Public API (called by Driver) ─────────────────────────────────
 
 fn Codegen.optimize(self: Codegen, level: i32):
+    let dump_pre = with_getenv_str("WITH_DUMP_LLIR_PRE")
+    if dump_pre.len() > 0:
+        with_eprint("===== PRE-OPTIMIZE LLVM IR =====\n")
+        wl_print_ir(self.llmod)
+        with_eprint("===== END PRE-OPTIMIZE LLVM IR =====\n")
     wl_optimize(self.llmod, self.target_machine, level)
+    let dump_post = with_getenv_str("WITH_DUMP_LLIR_POST")
+    if dump_post.len() > 0:
+        with_eprint("===== POST-OPTIMIZE LLVM IR =====\n")
+        wl_print_ir(self.llmod)
+        with_eprint("===== END POST-OPTIMIZE LLVM IR =====\n")
 
 fn Codegen.emit_object_file(self: Codegen, path: str) -> i32:
     wl_emit_object(self.target_machine, self.llmod, path)

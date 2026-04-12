@@ -21,7 +21,7 @@ type struct_pcre2_substitute_callout_block_8 = pcre2_substitute_callout_block_8
 extern fn pcre2_config_8(p0: c_uint, p1: *mut c_void) -> c_int
 fn pcre2_general_context_copy_8(gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_general_context_8:
     var newcontext: *mut pcre2_real_general_context_8 = (gcontext.memctl.malloc(sizeof[pcre2_real_general_context_8](), gcontext.memctl.memory_data) as *mut pcre2_real_general_context_8)
-    if (if newcontext == (null as *mut pcre2_real_general_context_8): 1 else: 0) != 0:
+    if (newcontext == (null as *mut pcre2_real_general_context_8)):
         return (null as *mut pcre2_real_general_context_8)
 
     with_memcpy((newcontext as *mut c_void) as *i8, (gcontext as *const c_void) as *i8, sizeof[pcre2_real_general_context_8]() as i64)
@@ -31,14 +31,14 @@ fn pcre2_general_context_create_8(__param_private_malloc: *const fn(c_ulong, *mu
     var private_malloc = __param_private_malloc
     var private_free = __param_private_free
     var gcontext: *mut pcre2_real_general_context_8
-    if (if private_malloc == (null as *const fn(c_ulong, *mut c_void) -> *mut c_void): 1 else: 0) != 0:
+    if (private_malloc == (null as *const fn(c_ulong, *mut c_void) -> *mut c_void)):
         (private_malloc = default_malloc)
 
-    if (if private_free == (null as *const fn(*mut c_void, *mut c_void) -> void): 1 else: 0) != 0:
+    if (private_free == (null as *const fn(*mut c_void, *mut c_void) -> void)):
         (private_free = default_free)
 
     (gcontext = (private_malloc(sizeof[pcre2_real_general_context_8](), memory_data) as *mut pcre2_real_general_context_8))
-    if (if gcontext == (null as *mut pcre2_real_general_context_8): 1 else: 0) != 0:
+    if (gcontext == (null as *mut pcre2_real_general_context_8)):
         return (null as *mut pcre2_real_general_context_8)
 
     (gcontext.memctl.malloc = private_malloc)
@@ -47,13 +47,13 @@ fn pcre2_general_context_create_8(__param_private_malloc: *const fn(c_ulong, *mu
     return gcontext
 
 fn pcre2_general_context_free_8(gcontext: *mut pcre2_real_general_context_8):
-    if (if gcontext != (null as *mut pcre2_real_general_context_8): 1 else: 0) != 0:
+    if (gcontext != (null as *mut pcre2_real_general_context_8)):
         gcontext.memctl.free((gcontext as *mut c_void), gcontext.memctl.memory_data)
 
 
 fn pcre2_compile_context_copy_8(ccontext: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_compile_context_8:
     var newcontext: *mut pcre2_real_compile_context_8 = (ccontext.memctl.malloc(sizeof[pcre2_real_compile_context_8](), ccontext.memctl.memory_data) as *mut pcre2_real_compile_context_8)
-    if (if newcontext == (null as *mut pcre2_real_compile_context_8): 1 else: 0) != 0:
+    if (newcontext == (null as *mut pcre2_real_compile_context_8)):
         return (null as *mut pcre2_real_compile_context_8)
 
     with_memcpy((newcontext as *mut c_void) as *i8, (ccontext as *const c_void) as *i8, sizeof[pcre2_real_compile_context_8]() as i64)
@@ -61,17 +61,17 @@ fn pcre2_compile_context_copy_8(ccontext: *mut pcre2_real_compile_context_8) -> 
 
 fn pcre2_compile_context_create_8(gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_compile_context_8:
     var ccontext: *mut pcre2_real_compile_context_8 = (_pcre2_memctl_malloc_8(sizeof[pcre2_real_compile_context_8](), (gcontext as *mut pcre2_memctl)) as *mut pcre2_real_compile_context_8)
-    if (if ccontext == (null as *mut pcre2_real_compile_context_8): 1 else: 0) != 0:
+    if (ccontext == (null as *mut pcre2_real_compile_context_8)):
         return (null as *mut pcre2_real_compile_context_8)
 
     ((unsafe: *ccontext) = _pcre2_default_compile_context_8)
-    if (if gcontext != (null as *mut pcre2_real_general_context_8): 1 else: 0) != 0:
+    if (gcontext != (null as *mut pcre2_real_general_context_8)):
         ((unsafe: *((ccontext as *mut pcre2_memctl))) = (unsafe: *((gcontext as *mut pcre2_memctl))))
 
     return ccontext
 
 fn pcre2_compile_context_free_8(ccontext: *mut pcre2_real_compile_context_8):
-    if (if ccontext != (null as *mut pcre2_real_compile_context_8): 1 else: 0) != 0:
+    if (ccontext != (null as *mut pcre2_real_compile_context_8)):
         ccontext.memctl.free((ccontext as *mut c_void), ccontext.memctl.memory_data)
 
 
@@ -121,7 +121,7 @@ fn pcre2_set_compile_recursion_guard_8(ccontext: *mut pcre2_real_compile_context
     return 0
 
 fn pcre2_set_optimize_8(ccontext: *mut pcre2_real_compile_context_8, directive: c_uint) -> c_int:
-    if (if ccontext == (null as *mut pcre2_real_compile_context_8): 1 else: 0) != 0:
+    if (ccontext == (null as *mut pcre2_real_compile_context_8)):
         return (-51)
 
     match directive
@@ -130,8 +130,8 @@ fn pcre2_set_optimize_8(ccontext: *mut pcre2_real_compile_context_8, directive: 
         1 =>
             (ccontext.optimization_flags = 7)
         _ =>
-            if (if (if directive >= 64: 1 else: 0) != 0 and (if directive <= 69: 1 else: 0) != 0: 1 else: 0) != 0:
-                if (if ((directive & 1)) != 0: 1 else: 0) != 0:
+            if ((directive >= 64) and (directive <= 69)):
+                if (((directive & 1)) != 0):
                     ccontext.optimization_flags = ccontext.optimization_flags & (0 - ((1 << ((((directive >> 1)) -% 32)))) - 1)
                 else:
                     ccontext.optimization_flags = ccontext.optimization_flags | (1 << ((((directive >> 1)) -% 32)))
@@ -143,7 +143,7 @@ fn pcre2_set_optimize_8(ccontext: *mut pcre2_real_compile_context_8, directive: 
 
 fn pcre2_convert_context_copy_8(ccontext: *mut pcre2_real_convert_context_8) -> *mut pcre2_real_convert_context_8:
     var newcontext: *mut pcre2_real_convert_context_8 = (ccontext.memctl.malloc(sizeof[pcre2_real_convert_context_8](), ccontext.memctl.memory_data) as *mut pcre2_real_convert_context_8)
-    if (if newcontext == (null as *mut pcre2_real_convert_context_8): 1 else: 0) != 0:
+    if (newcontext == (null as *mut pcre2_real_convert_context_8)):
         return (null as *mut pcre2_real_convert_context_8)
 
     with_memcpy((newcontext as *mut c_void) as *i8, (ccontext as *const c_void) as *i8, sizeof[pcre2_real_convert_context_8]() as i64)
@@ -151,29 +151,29 @@ fn pcre2_convert_context_copy_8(ccontext: *mut pcre2_real_convert_context_8) -> 
 
 fn pcre2_convert_context_create_8(gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_convert_context_8:
     var ccontext: *mut pcre2_real_convert_context_8 = (_pcre2_memctl_malloc_8(sizeof[pcre2_real_convert_context_8](), (gcontext as *mut pcre2_memctl)) as *mut pcre2_real_convert_context_8)
-    if (if ccontext == (null as *mut pcre2_real_convert_context_8): 1 else: 0) != 0:
+    if (ccontext == (null as *mut pcre2_real_convert_context_8)):
         return (null as *mut pcre2_real_convert_context_8)
 
     ((unsafe: *ccontext) = _pcre2_default_convert_context_8)
-    if (if gcontext != (null as *mut pcre2_real_general_context_8): 1 else: 0) != 0:
+    if (gcontext != (null as *mut pcre2_real_general_context_8)):
         ((unsafe: *((ccontext as *mut pcre2_memctl))) = (unsafe: *((gcontext as *mut pcre2_memctl))))
 
     return ccontext
 
 fn pcre2_convert_context_free_8(ccontext: *mut pcre2_real_convert_context_8):
-    if (if ccontext != (null as *mut pcre2_real_convert_context_8): 1 else: 0) != 0:
+    if (ccontext != (null as *mut pcre2_real_convert_context_8)):
         ccontext.memctl.free((ccontext as *mut c_void), ccontext.memctl.memory_data)
 
 
 fn pcre2_set_glob_escape_8(ccontext: *mut pcre2_real_convert_context_8, escape: c_uint) -> c_int:
-    if (if (if escape > 255: 1 else: 0) != 0 or ((if (if escape != 0: 1 else: 0) != 0 and (if string_find_char(globpunct, escape) == (null as *mut i8): 1 else: 0) != 0: 1 else: 0)) != 0: 1 else: 0) != 0:
+    if ((escape > 255) or ((escape != 0) and (string_find_char(globpunct, escape) == (null as *mut i8)))):
         return (-29)
 
     (ccontext.glob_escape = escape)
     return 0
 
 fn pcre2_set_glob_separator_8(ccontext: *mut pcre2_real_convert_context_8, separator: c_uint) -> c_int:
-    if (if (if (if separator != 47: 1 else: 0) != 0 and (if separator != 92: 1 else: 0) != 0: 1 else: 0) != 0 and (if separator != 46: 1 else: 0) != 0: 1 else: 0) != 0:
+    if (((separator != 47) and (separator != 92)) and (separator != 46)):
         return (-29)
 
     (ccontext.glob_separator = separator)
@@ -183,7 +183,7 @@ extern fn pcre2_pattern_convert_8(p0: *const u8, p1: c_ulong, p2: c_uint, p3: *m
 extern fn pcre2_converted_pattern_free_8(p0: *mut u8) -> void
 fn pcre2_match_context_copy_8(mcontext: *mut pcre2_real_match_context_8) -> *mut pcre2_real_match_context_8:
     var newcontext: *mut pcre2_real_match_context_8 = (mcontext.memctl.malloc(sizeof[pcre2_real_match_context_8](), mcontext.memctl.memory_data) as *mut pcre2_real_match_context_8)
-    if (if newcontext == (null as *mut pcre2_real_match_context_8): 1 else: 0) != 0:
+    if (newcontext == (null as *mut pcre2_real_match_context_8)):
         return (null as *mut pcre2_real_match_context_8)
 
     with_memcpy((newcontext as *mut c_void) as *i8, (mcontext as *const c_void) as *i8, sizeof[pcre2_real_match_context_8]() as i64)
@@ -191,17 +191,17 @@ fn pcre2_match_context_copy_8(mcontext: *mut pcre2_real_match_context_8) -> *mut
 
 fn pcre2_match_context_create_8(gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_context_8:
     var mcontext: *mut pcre2_real_match_context_8 = (_pcre2_memctl_malloc_8(sizeof[pcre2_real_match_context_8](), (gcontext as *mut pcre2_memctl)) as *mut pcre2_real_match_context_8)
-    if (if mcontext == (null as *mut pcre2_real_match_context_8): 1 else: 0) != 0:
+    if (mcontext == (null as *mut pcre2_real_match_context_8)):
         return (null as *mut pcre2_real_match_context_8)
 
     ((unsafe: *mcontext) = _pcre2_default_match_context_8)
-    if (if gcontext != (null as *mut pcre2_real_general_context_8): 1 else: 0) != 0:
+    if (gcontext != (null as *mut pcre2_real_general_context_8)):
         ((unsafe: *((mcontext as *mut pcre2_memctl))) = (unsafe: *((gcontext as *mut pcre2_memctl))))
 
     return mcontext
 
 fn pcre2_match_context_free_8(mcontext: *mut pcre2_real_match_context_8):
-    if (if mcontext != (null as *mut pcre2_real_match_context_8): 1 else: 0) != 0:
+    if (mcontext != (null as *mut pcre2_real_match_context_8)):
         mcontext.memctl.free((mcontext as *mut c_void), mcontext.memctl.memory_data)
 
 
@@ -406,12 +406,12 @@ extern fn _pcre2_jit_get_size_8(p0: *mut c_void) -> c_ulong
 extern fn _pcre2_jit_get_target_8() -> *const i8
 fn _pcre2_memctl_malloc_8(size: c_ulong, memctl: *mut pcre2_memctl) -> *mut c_void:
     var newmemctl: *mut pcre2_memctl
-    var yield_: *mut c_void = (if ((if memctl == (null as *mut pcre2_memctl): 1 else: 0)) != 0: (with_alloc(size as i64) as *mut c_void) else: memctl.malloc(size, memctl.memory_data))
-    if (if yield_ == null: 1 else: 0) != 0:
+    var yield_: *mut c_void = (if (memctl == (null as *mut pcre2_memctl)): (with_alloc(size as i64) as *mut c_void) else: memctl.malloc(size, memctl.memory_data))
+    if (yield_ == null):
         return null
 
     (newmemctl = (yield_ as *mut pcre2_memctl))
-    if (if memctl == (null as *mut pcre2_memctl): 1 else: 0) != 0:
+    if (memctl == (null as *mut pcre2_memctl)):
         (newmemctl.malloc = default_malloc)
         (newmemctl.free = default_free)
         (newmemctl.memory_data = null)
@@ -442,311 +442,3 @@ fn default_free(block: *mut c_void, data: *mut c_void):
     with_free(block as *i8)
 
 var globpunct: *const i8
-// untranslatable fn-like macro
-fn BYTES2CU() -> Never:
-    comptime_error("untranslatable C macro: BYTES2CU")
-// untranslatable fn-like macro
-fn CAST_USER_ADDR_T() -> Never:
-    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
-// untranslatable fn-like macro
-fn CHMAX_255() -> Never:
-    comptime_error("untranslatable C macro: CHMAX_255")
-// untranslatable fn-like macro
-fn CU2BYTES() -> Never:
-    comptime_error("untranslatable C macro: CU2BYTES")
-// untranslatable fn-like macro
-fn GET() -> Never:
-    comptime_error("untranslatable C macro: GET")
-// untranslatable fn-like macro
-fn GET2() -> Never:
-    comptime_error("untranslatable C macro: GET2")
-// untranslatable fn-like macro
-fn GETCHAR() -> Never:
-    comptime_error("untranslatable C macro: GETCHAR")
-// untranslatable fn-like macro
-fn GETCHARINC() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINC")
-// untranslatable fn-like macro
-fn GETCHARINCTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINCTEST")
-// untranslatable fn-like macro
-fn GETCHARLEN() -> Never:
-    comptime_error("untranslatable C macro: GETCHARLEN")
-// untranslatable fn-like macro
-fn GETCHARTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARTEST")
-// untranslatable fn-like macro
-fn GETUTF8() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8")
-// untranslatable fn-like macro
-fn GETUTF8INC() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8INC")
-// untranslatable fn-like macro
-fn GETUTF8LEN() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8LEN")
-// untranslatable fn-like macro
-fn GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: GET_UCD")
-fn HASUTF8EXTRALEN[T](c: T) -> T:
-    (c >= 0xc0)
-// untranslatable fn-like macro
-fn HTONL() -> Never:
-    comptime_error("untranslatable C macro: HTONL")
-// untranslatable fn-like macro
-fn HTONLL() -> Never:
-    comptime_error("untranslatable C macro: HTONLL")
-// untranslatable fn-like macro
-fn HTONS() -> Never:
-    comptime_error("untranslatable C macro: HTONS")
-fn INT16_C[T](v: T) -> T:
-    v
-fn INT32_C[T](v: T) -> T:
-    v
-fn INT64_C[T](v: T) -> i64:
-    (v as i64)
-fn INT8_C[T](v: T) -> T:
-    v
-fn INTMAX_C[T](v: T) -> i64:
-    (v as i64)
-// untranslatable fn-like macro
-fn IS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: IS_NEWLINE")
-// untranslatable fn-like macro
-fn MAPBIT() -> Never:
-    comptime_error("untranslatable C macro: MAPBIT")
-// untranslatable fn-like macro
-fn MAPSET() -> Never:
-    comptime_error("untranslatable C macro: MAPSET")
-// untranslatable fn-like macro
-fn MAX_255() -> Never:
-    comptime_error("untranslatable C macro: MAX_255")
-// untranslatable fn-like macro
-fn NTOHL() -> Never:
-    comptime_error("untranslatable C macro: NTOHL")
-// untranslatable fn-like macro
-fn NTOHLL() -> Never:
-    comptime_error("untranslatable C macro: NTOHLL")
-// untranslatable fn-like macro
-fn NTOHS() -> Never:
-    comptime_error("untranslatable C macro: NTOHS")
-// untranslatable fn-like macro
-fn PCRE2_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_ASSERT")
-// untranslatable fn-like macro
-fn PCRE2_DEBUG_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
-// untranslatable fn-like macro
-fn PCRE2_GLUE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_GLUE")
-// untranslatable fn-like macro
-fn PCRE2_JOIN() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_JOIN")
-fn PCRE2_SUFFIX[T](a: T) -> T:
-    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
-// untranslatable fn-like macro
-fn PCRE2_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
-// untranslatable fn-like macro
-fn PRIV() -> Never:
-    comptime_error("untranslatable C macro: PRIV")
-// untranslatable fn-like macro
-fn PUT() -> Never:
-    comptime_error("untranslatable C macro: PUT")
-// untranslatable fn-like macro
-fn PUT2() -> Never:
-    comptime_error("untranslatable C macro: PUT2")
-// untranslatable fn-like macro
-fn PUT2INC() -> Never:
-    comptime_error("untranslatable C macro: PUT2INC")
-// untranslatable fn-like macro
-fn PUTCHAR() -> Never:
-    comptime_error("untranslatable C macro: PUTCHAR")
-// untranslatable fn-like macro
-fn PUTINC() -> Never:
-    comptime_error("untranslatable C macro: PUTINC")
-// untranslatable fn-like macro
-fn REAL_GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: REAL_GET_UCD")
-// untranslatable fn-like macro
-fn STATIC_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT")
-// untranslatable fn-like macro
-fn STATIC_ASSERT_JOIN() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
-// untranslatable fn-like macro
-fn TABLE_GET() -> Never:
-    comptime_error("untranslatable C macro: TABLE_GET")
-// untranslatable fn-like macro
-fn UCD_ANY_I() -> Never:
-    comptime_error("untranslatable C macro: UCD_ANY_I")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
-// untranslatable fn-like macro
-fn UCD_BPROPS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS")
-// untranslatable fn-like macro
-fn UCD_BPROPS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
-// untranslatable fn-like macro
-fn UCD_CASESET() -> Never:
-    comptime_error("untranslatable C macro: UCD_CASESET")
-// untranslatable fn-like macro
-fn UCD_CATEGORY() -> Never:
-    comptime_error("untranslatable C macro: UCD_CATEGORY")
-// untranslatable fn-like macro
-fn UCD_CHARTYPE() -> Never:
-    comptime_error("untranslatable C macro: UCD_CHARTYPE")
-fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
-fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
-// untranslatable fn-like macro
-fn UCD_GRAPHBREAK() -> Never:
-    comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
-// untranslatable fn-like macro
-fn UCD_OTHERCASE() -> Never:
-    comptime_error("untranslatable C macro: UCD_OTHERCASE")
-// untranslatable fn-like macro
-fn UCD_SCRIPT() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPT")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
-fn UINT16_C[T](v: T) -> T:
-    v
-fn UINT32_C[T](v: T) -> u32:
-    (v as u32)
-fn UINT64_C[T](v: T) -> u64:
-    (v as u64)
-fn UINT8_C[T](v: T) -> T:
-    v
-fn UINTMAX_C[T](v: T) -> u64:
-    (v as u64)
-// untranslatable fn-like macro
-fn WAS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: WAS_NEWLINE")
-// untranslatable fn-like macro
-fn WCOREDUMP() -> Never:
-    comptime_error("untranslatable C macro: WCOREDUMP")
-// untranslatable fn-like macro
-fn WEXITSTATUS() -> Never:
-    comptime_error("untranslatable C macro: WEXITSTATUS")
-// untranslatable fn-like macro
-fn WIFCONTINUED() -> Never:
-    comptime_error("untranslatable C macro: WIFCONTINUED")
-// untranslatable fn-like macro
-fn WIFEXITED() -> Never:
-    comptime_error("untranslatable C macro: WIFEXITED")
-// untranslatable fn-like macro
-fn WIFSIGNALED() -> Never:
-    comptime_error("untranslatable C macro: WIFSIGNALED")
-// untranslatable fn-like macro
-fn WIFSTOPPED() -> Never:
-    comptime_error("untranslatable C macro: WIFSTOPPED")
-// untranslatable fn-like macro
-fn WSTOPSIG() -> Never:
-    comptime_error("untranslatable C macro: WSTOPSIG")
-// untranslatable fn-like macro
-fn WTERMSIG() -> Never:
-    comptime_error("untranslatable C macro: WTERMSIG")
-fn W_EXITCODE[T](ret: T, sig: T) -> T:
-    ((ret << 8) | sig)
-// untranslatable fn-like macro
-fn W_STOPCODE() -> Never:
-    comptime_error("untranslatable C macro: W_STOPCODE")
-// untranslatable fn-like macro
-fn alloca() -> Never:
-    comptime_error("untranslatable C macro: alloca")
-// untranslatable fn-like macro
-fn clearerr_unlocked() -> Never:
-    comptime_error("untranslatable C macro: clearerr_unlocked")
-// untranslatable fn-like macro
-fn feof_unlocked() -> Never:
-    comptime_error("untranslatable C macro: feof_unlocked")
-// untranslatable fn-like macro
-fn ferror_unlocked() -> Never:
-    comptime_error("untranslatable C macro: ferror_unlocked")
-// untranslatable fn-like macro
-fn fileno_unlocked() -> Never:
-    comptime_error("untranslatable C macro: fileno_unlocked")
-// untranslatable fn-like macro
-fn fropen() -> Never:
-    comptime_error("untranslatable C macro: fropen")
-// untranslatable fn-like macro
-fn fwopen() -> Never:
-    comptime_error("untranslatable C macro: fwopen")
-// untranslatable fn-like macro
-fn getc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getc_unlocked")
-// untranslatable fn-like macro
-fn getchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getchar_unlocked")
-// untranslatable fn-like macro
-fn htonl() -> Never:
-    comptime_error("untranslatable C macro: htonl")
-// untranslatable fn-like macro
-fn htonll() -> Never:
-    comptime_error("untranslatable C macro: htonll")
-// untranslatable fn-like macro
-fn htons() -> Never:
-    comptime_error("untranslatable C macro: htons")
-fn memccpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memmove() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memset() -> Never:
-    comptime_error("variadic macro — use direct call")
-// untranslatable fn-like macro
-fn ntohl() -> Never:
-    comptime_error("untranslatable C macro: ntohl")
-// untranslatable fn-like macro
-fn ntohll() -> Never:
-    comptime_error("untranslatable C macro: ntohll")
-// untranslatable fn-like macro
-fn ntohs() -> Never:
-    comptime_error("untranslatable C macro: ntohs")
-// untranslatable fn-like macro
-fn offsetof() -> Never:
-    comptime_error("untranslatable C macro: offsetof")
-// untranslatable fn-like macro
-fn putc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putc_unlocked")
-// untranslatable fn-like macro
-fn putchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putchar_unlocked")
-// untranslatable fn-like macro
-fn sigmask() -> Never:
-    comptime_error("untranslatable C macro: sigmask")
-fn snprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn sprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsnprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsprintf() -> Never:
-    comptime_error("variadic macro — use direct call")

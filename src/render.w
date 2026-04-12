@@ -722,7 +722,7 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: NodeId) -> str:
         return intern.resolve(pool.get_data0(node))
 
     if kind == NodeKind.NK_PAT_INT:
-        return f"{pool.get_data0(node)}"
+        return f"{pool.int_lit_value(node)}"
 
     if kind == NodeKind.NK_PAT_BOOL:
         if pool.get_data0(node) != 0:
