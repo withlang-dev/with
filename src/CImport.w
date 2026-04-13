@@ -5691,6 +5691,9 @@ fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, scope: str) -> str
         let id = stmts.continue_()
         return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
 
+    if kind == CXK_NULL_STMT:
+        return ""
+
     if kind == CXK_RETURN_STMT:
         let nc = with_ci_num_children(session, cursor)
         if nc == 0:
@@ -5728,6 +5731,8 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
             let ir_result = ci_trans_stmt_via_ir(session, cursor, kind, scope)
             if ir_result.len() > 0:
                 return ir_result
+        if kind == CXK_NULL_STMT:
+            return ""
 
     // Compound statement (block) — new scope level
     if kind == CXK_COMPOUND_STMT:
