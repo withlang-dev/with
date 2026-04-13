@@ -6219,7 +6219,7 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
 
     // Compound statement with gotos (B8a). The legacy transforms
     // the whole body into a `while true: match __pc: ...` state
-    // machine via ci_trans_goto_body. For the first step of B8 we
+    // machine via ci_lower_goto_body. For the first step of B8 we
     // call the legacy transformer through the cache bypass and
     // wrap the result as a CIS_RAW_STRING — this at least pulls
     // goto-containing bodies into the IR pipeline so every
@@ -6229,7 +6229,7 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
     if kind == CXK_COMPOUND_STMT and ci_has_goto(session, cursor):
         let prev = g_migrate_ir_enabled_cache
         g_migrate_ir_enabled_cache = 0
-        let goto_body = ci_trans_goto_body(session, cursor, 0, scope)
+        let goto_body = ci_lower_goto_body(session, cursor, 0, scope)
         g_migrate_ir_enabled_cache = prev
         if goto_body.len() > 0:
             return stmts.raw_string(goto_body)
@@ -7056,7 +7056,7 @@ fn ci_trans_switch_prong_forward(session: i64, body_cursor: i32, start_idx: i32,
         j = j + 1
     parts.join("")
 
-fn ci_trans_switch_body_goto(session: i64, body_cursor: i32, cond: str, indent: i32, scope: str, label_map: str, loop_depth: i32) -> str:
+fn ci_lower_switch_body_goto_aware(session: i64, body_cursor: i32, cond: str, indent: i32, scope: str, label_map: str, loop_depth: i32) -> str:
     let nc = with_ci_num_children(session, body_cursor)
 
     var has_fallthrough = false
@@ -7093,7 +7093,7 @@ fn ci_trans_switch_body_goto(session: i64, body_cursor: i32, cond: str, indent: 
                 let case_nc = with_ci_num_children(session, child)
                 if case_nc >= 2:
                     let case_val = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
-                    let case_body = ci_trans_stmt_strip_break_goto(session, with_ci_child(session, child, 1), indent + 2, scope, label_map, loop_depth)
+                    let case_body = ci_lower_stmt_strip_break_goto(session, with_ci_child(session, child, 1), indent + 2, scope, label_map, loop_depth)
                     if case_val.len() > 0 and case_body.len() > 0:
                         parts.push(arm_indent)
                         parts.push(case_val)
@@ -7102,7 +7102,7 @@ fn ci_trans_switch_body_goto(session: i64, body_cursor: i32, cond: str, indent: 
             else if ck == CXK_DEFAULT_STMT:
                 let case_nc = with_ci_num_children(session, child)
                 if case_nc >= 1:
-                    let case_body = ci_trans_stmt_strip_break_goto(session, with_ci_child(session, child, 0), indent + 2, scope, label_map, loop_depth)
+                    let case_body = ci_lower_stmt_strip_break_goto(session, with_ci_child(session, child, 0), indent + 2, scope, label_map, loop_depth)
                     if case_body.len() > 0:
                         default_body = arm_indent ++ "_ =>\n" ++ case_body
             i = i + 1
@@ -7225,16 +7225,16 @@ fn ci_trans_switch_prong_forward_goto(session: i64, body_cursor: i32, start_idx:
             if bk == CXK_BREAK_STMT:
                 return parts.join("")
             if bk == CXK_RETURN_STMT:
-                let s = ci_trans_stmt_goto(session, inner, 0, scope, label_map, loop_depth)
+                let s = ci_lower_stmt_goto_aware(session, inner, 0, scope, label_map, loop_depth)
                 if s.len() > 0:
                     parts.push(ci_indent_block(s, indent))
                 return parts.join("")
             if bk == CXK_GOTO_STMT:
-                let s = ci_trans_stmt_goto(session, inner, 0, scope, label_map, loop_depth)
+                let s = ci_lower_stmt_goto_aware(session, inner, 0, scope, label_map, loop_depth)
                 if s.len() > 0:
                     parts.push(ci_indent_block(s, indent))
                 return parts.join("")
-            let s = ci_trans_stmt_goto(session, inner, 0, scope, label_map, loop_depth)
+            let s = ci_lower_stmt_goto_aware(session, inner, 0, scope, label_map, loop_depth)
             if s.len() > 0:
                 parts.push(ci_indent_block(s, indent))
 
@@ -7245,26 +7245,26 @@ fn ci_trans_switch_prong_forward_goto(session: i64, body_cursor: i32, start_idx:
         if next_kind == CXK_BREAK_STMT:
             return parts.join("")
         if next_kind == CXK_RETURN_STMT:
-            let s = ci_trans_stmt_goto(session, next_child, 0, scope, label_map, loop_depth)
+            let s = ci_lower_stmt_goto_aware(session, next_child, 0, scope, label_map, loop_depth)
             if s.len() > 0:
                 parts.push(ci_indent_block(s, indent))
             return parts.join("")
         if next_kind == CXK_GOTO_STMT:
-            let s = ci_trans_stmt_goto(session, next_child, 0, scope, label_map, loop_depth)
+            let s = ci_lower_stmt_goto_aware(session, next_child, 0, scope, label_map, loop_depth)
             if s.len() > 0:
                 parts.push(ci_indent_block(s, indent))
             return parts.join("")
         if next_kind == CXK_CASE_STMT or next_kind == CXK_DEFAULT_STMT:
             parts.push(ci_trans_switch_prong_forward_goto(session, body_cursor, j, total, indent, scope, label_map, loop_depth))
             return parts.join("")
-        let s = ci_trans_stmt_goto(session, next_child, 0, scope, label_map, loop_depth)
+        let s = ci_lower_stmt_goto_aware(session, next_child, 0, scope, label_map, loop_depth)
         if s.len() > 0:
             parts.push(ci_indent_block(s, indent))
         j = j + 1
     parts.join("")
 
-fn ci_trans_stmt_strip_break_goto(session: i64, cursor: i32, indent: i32, scope: str, label_map: str, loop_depth: i32) -> str:
-    let result = ci_trans_stmt_goto(session, cursor, indent, scope, label_map, loop_depth)
+fn ci_lower_stmt_strip_break_goto(session: i64, cursor: i32, indent: i32, scope: str, label_map: str, loop_depth: i32) -> str:
+    let result = ci_lower_stmt_goto_aware(session, cursor, indent, scope, label_map, loop_depth)
     if result.len() == 0:
         return ""
     let break_needle = ci_indent_str(indent) ++ "break\n"
@@ -9321,7 +9321,7 @@ fn ci_collect_var_decls(session: i64, cursor: i32, decls: &mut Vec[CiHoistedVarD
 
 // Translate a goto-containing function body as a state machine.
 // Emits: hoisted vars, var __pc = 0, while true: match __pc: arms
-fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -> str:
+fn ci_lower_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -> str:
     let label_map = ci_collect_labels(session, body_cursor)
 
     // Collect and hoist variable declarations.
@@ -9419,7 +9419,7 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
                         body_scope = decl_lowered.updated_scope
                         s = decl_lowered.entry_stmt
                     else:
-                        s = ci_trans_stmt_goto(session, label_body, 0, body_scope, label_map, 0)
+                        s = ci_lower_stmt_goto_aware(session, label_body, 0, body_scope, label_map, 0)
                     if s.len() > 0:
                         parts.push(ci_indent_block(s, indent + 3))
                         parts.push(indent_s3)
@@ -9454,7 +9454,7 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
                 arm_has_content = true
 
         else:
-            let s = ci_trans_stmt_goto(session, child, 0, body_scope, label_map, 0)
+            let s = ci_lower_stmt_goto_aware(session, child, 0, body_scope, label_map, 0)
             if s.len() > 0:
                 parts.push(ci_indent_block(s, indent + 3))
                 parts.push(indent_s3)
@@ -9478,7 +9478,7 @@ fn ci_trans_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -
 // Translate a statement inside a goto-containing function.
 // Same as ci_trans_stmt but replaces goto with __pc = N; continue
 // and labels with state transitions.
-fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_map: str, loop_depth: i32) -> str:
+fn ci_lower_stmt_goto_aware(session: i64, cursor: i32, indent: i32, scope: str, label_map: str, loop_depth: i32) -> str:
     let kind = with_ci_cursor_kind(session, cursor)
 
     // Goto → state transition
@@ -9499,7 +9499,7 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
     if kind == CXK_LABEL_STMT:
         let lnc = with_ci_num_children(session, cursor)
         if lnc > 0:
-            return ci_trans_stmt_goto(session, with_ci_child(session, cursor, 0), indent, scope, label_map, loop_depth)
+            return ci_lower_stmt_goto_aware(session, with_ci_child(session, cursor, 0), indent, scope, label_map, loop_depth)
         return ""
 
     // Compound statement — recurse into children with goto awareness
@@ -9523,7 +9523,7 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
                     parts.push(break_or_continue)
                     parts.push("\n")
             else:
-                let s = ci_trans_stmt_goto(session, child, 0, block_scope, label_map, loop_depth)
+                let s = ci_lower_stmt_goto_aware(session, child, 0, block_scope, label_map, loop_depth)
                 if s.len() > 0:
                     parts.push(ci_indent_block(s, indent))
                     parts.push(ci_indent_str(indent))
@@ -9540,7 +9540,7 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
         if nc >= 2:
             let cond_cursor = with_ci_child(session, cursor, 0)
             let then_child = with_ci_child(session, cursor, 1)
-            let then_body = ci_trans_stmt_goto(session, then_child, 0, scope, label_map, loop_depth)
+            let then_body = ci_lower_stmt_goto_aware(session, then_child, 0, scope, label_map, loop_depth)
             if then_body.len() > 0:
                 let then_text = ci_indent_block(then_body, indent + 1)
                 if ci_condition_needs_stmt_eval(session, cond_cursor):
@@ -9551,7 +9551,7 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
                         result = result ++ ci_indent_str(indent) ++ "if " ++ cond_name ++ ":\n" ++ then_text
                         if nc > 2:
                             let else_child = with_ci_child(session, cursor, 2)
-                            let else_body = ci_trans_stmt_goto(session, else_child, 0, scope, label_map, loop_depth)
+                            let else_body = ci_lower_stmt_goto_aware(session, else_child, 0, scope, label_map, loop_depth)
                             if else_body.len() > 0:
                                 let else_text = ci_indent_block(else_body, indent + 1)
                                 result = result ++ ci_indent_str(indent) ++ "else:\n" ++ else_text
@@ -9561,7 +9561,7 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
                     var result = "if " ++ cond ++ ":\n" ++ then_text
                     if nc > 2:
                         let else_child = with_ci_child(session, cursor, 2)
-                        let else_body = ci_trans_stmt_goto(session, else_child, 0, scope, label_map, loop_depth)
+                        let else_body = ci_lower_stmt_goto_aware(session, else_child, 0, scope, label_map, loop_depth)
                         if else_body.len() > 0:
                             let else_text = ci_indent_block(else_body, indent + 1)
                             result = result ++ ci_indent_str(indent) ++ "else:\n" ++ else_text
@@ -9573,7 +9573,7 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
             let cond_cursor = with_ci_child(session, cursor, 0)
-            let body = ci_trans_stmt_goto(session, with_ci_child(session, cursor, 1), 0, scope, label_map, loop_depth + 1)
+            let body = ci_lower_stmt_goto_aware(session, with_ci_child(session, cursor, 1), 0, scope, label_map, loop_depth + 1)
             if body.len() > 0:
                 let body_text = ci_indent_block(body, indent + 1)
                 if ci_condition_needs_stmt_eval(session, cond_cursor):
@@ -9678,7 +9678,7 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
                     loop_scope = decl_lowered.updated_scope
                     init_str = decl_lowered.entry_stmt
                 else:
-                    init_str = ci_trans_stmt_goto(session, init_cursor, indent, loop_scope, label_map, loop_depth)
+                    init_str = ci_lower_stmt_goto_aware(session, init_cursor, indent, loop_scope, label_map, loop_depth)
             if cond_cursor >= 0:
                 if ci_condition_needs_stmt_eval(session, cond_cursor):
                     cond_name = ci_condition_temp_name(session, cond_cursor, "for")
@@ -9692,7 +9692,7 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
             if inc_cursor >= 0:
                 inc_str = ci_lowering_to_effect_stmt_text(ci_lower_rvalue_expr(session, inc_cursor, loop_scope))
 
-            let body = ci_trans_stmt_goto(session, body_cursor, 0, loop_scope, label_map, loop_depth + 1)
+            let body = ci_lower_stmt_goto_aware(session, body_cursor, 0, loop_scope, label_map, loop_depth + 1)
             if body.len() == 0:
                 return ""
 
@@ -9719,7 +9719,7 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
     if kind == CXK_DO_STMT:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
-            let body = ci_trans_stmt_goto(session, with_ci_child(session, cursor, 0), 0, scope, label_map, loop_depth + 1)
+            let body = ci_lower_stmt_goto_aware(session, with_ci_child(session, cursor, 0), 0, scope, label_map, loop_depth + 1)
             let cond_cursor = with_ci_child(session, cursor, 1)
             if body.len() > 0:
                 let body_text = ci_indent_block(body, indent + 1)
@@ -9752,7 +9752,7 @@ fn ci_trans_stmt_goto(session: i64, cursor: i32, indent: i32, scope: str, label_
             let cond_lowered = ci_prepare_stmt_subject(session, cond_cursor, scope, "switch")
             if ci_lowering_valid(cond_lowered):
                 let body_cursor = with_ci_child(session, cursor, 1)
-                let body = ci_trans_switch_body_goto(session, body_cursor, cond_lowered.value, indent, scope, label_map, loop_depth)
+                let body = ci_lower_switch_body_goto_aware(session, body_cursor, cond_lowered.value, indent, scope, label_map, loop_depth)
                 if body.len() > 0:
                     if cond_lowered.setup.len() > 0:
                         return cond_lowered.setup ++ "\n" ++ body
