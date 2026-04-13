@@ -6229,10 +6229,9 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
     if kind == CXK_COMPOUND_STMT and ci_has_goto(session, cursor):
         let prev = g_migrate_ir_enabled_cache
         g_migrate_ir_enabled_cache = 0
-        let goto_body = ci_lower_goto_body(session, cursor, 0, scope)
+        let id = ci_lower_goto_body_structural(session, cursor, scope, stmts, exprs, types)
         g_migrate_ir_enabled_cache = prev
-        if goto_body.len() > 0:
-            return stmts.raw_string(goto_body)
+        return id
 
     // Structural compound statement (B5h). Iterates children,
     // threading block_scope through decl_stmts just like the
@@ -7527,12 +7526,19 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
         if prpos2 < prlen2 and cursor_params.byte_at(prpos2 as i64) == 124:
             prpos2 = prpos2 + 1
 
-    // Always route through ci_trans_stmt — the goto-body path is
-    // picked up by ci_lower_stmt_ir's CXK_COMPOUND_STMT arm when
-    // it detects a goto-containing compound (B8a plumbing). This
-    // gets goto bodies into the IR pipeline so later B8 commits
-    // can replace the raw-string state machine with structural
-    // IR nodes.
+    // Goto-containing bodies: the IR path (WITH_MIGRATE_IR=1)
+    // picks them up via ci_lower_stmt_ir's CXK_COMPOUND_STMT +
+    // ci_has_goto check and builds a CIS_GOTO_BODY structural
+    // node. The legacy path (WITH_MIGRATE_IR=0) still needs the
+    // explicit ci_has_goto branch here so plain ci_trans_stmt
+    // doesn't emit `comptime_error("goto not supported")` for
+    // the individual goto children.
+    if not ci_migrate_ir_enabled() and ci_has_goto(session, body_cursor):
+        let body = ci_lower_goto_body(session, body_cursor, 1, init_scope)
+        if body.len() == 0:
+            return ""
+        return param_rebinds ++ body
+
     let body = ci_trans_stmt(session, body_cursor, 1, init_scope)
     if body.len() == 0:
         return ""
@@ -9319,8 +9325,201 @@ fn ci_collect_var_decls(session: i64, cursor: i32, decls: &mut Vec[CiHoistedVarD
         ci_collect_var_decls(session, with_ci_child(session, cursor, ci), decls)
         ci = ci + 1
 
-// Translate a goto-containing function body as a state machine.
-// Emits: hoisted vars, var __pc = 0, while true: match __pc: arms
+// Translate a goto-containing function body as a structural
+// state-machine (CIS_GOTO_BODY). Replaces the old text-based
+// ci_lower_goto_body which built the state machine by pushing
+// strings into a parts vec. The new helper builds the arm
+// bodies as CIS_BLOCK nodes + raw-string statement wrappers and
+// hands a single CIS_GOTO_BODY node to the caller; the printer
+// takes care of indentation and the outer state-machine frame.
+//
+// `indent` is ignored — the printer applies depth at print time.
+fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool) -> CiStmtId:
+    let label_map = ci_collect_labels(session, body_cursor)
+
+    // Collect and hoist variable declarations.
+    let hoisted_decls: Vec[CiHoistedVarDecl] = Vec.new()
+    ci_collect_var_decls(session, body_cursor, &mut hoisted_decls)
+
+    // Build hoisted-decl raw-string nodes (one per decl).
+    var hoisted_ids: Vec[i32] = Vec.new()
+    var hvi: i32 = 0
+    while hvi < hoisted_decls.len() as i32:
+        let decl = hoisted_decls.get(hvi as i64)
+        let default_val = ci_default_for_type(decl.ty)
+        var line = "var " ++ decl.name ++ ": " ++ decl.ty
+        if default_val.len() > 0:
+            line = line ++ " = " ++ default_val
+        let raw_id = stmts.raw_string(line)
+        hoisted_ids.push(raw_id as i32)
+        hvi = hvi + 1
+
+    // Walk body children and group into arms. Each arm holds a
+    // flat Vec of child statement ids (raw-string wrappers). The
+    // arm records are then flattened into `arms_data` with layout
+    // `[state, label_str_idx, child_count, child_0, ..., child_(K-1)]`
+    // for each arm — matching the inline layout the CIS_GOTO_BODY
+    // printer expects.
+    let nc = with_ci_num_children(session, body_cursor)
+
+    // Collected arm records as parallel vectors. Each index `a`
+    // describes arm `a`'s state/label + its children slice in
+    // `arm_children_flat`.
+    var arm_states: Vec[i32] = Vec.new()
+    var arm_labels: Vec[i32] = Vec.new()
+    var arm_child_starts: Vec[i32] = Vec.new()
+    var arm_child_counts: Vec[i32] = Vec.new()
+    var arm_children_flat: Vec[i32] = Vec.new()
+
+    var body_scope = scope
+    var cur_state: i32 = 0
+    var cur_label_str_idx: i32 = 0
+    var cur_children: Vec[i32] = Vec.new()
+    var cur_has_content = false
+
+    // Helper: commit the in-progress arm to the arm records.
+    // Prepends `(__goto_pending = 0)` as the arm's first child
+    // (matching legacy's per-arm entry line). Inserts a
+    // `// empty` filler if the arm has no real content.
+    // Inlined below via direct Vec manipulation.
+
+    var i: i32 = 0
+    while i < nc:
+        let child = with_ci_child(session, body_cursor, i)
+        let kind = with_ci_cursor_kind(session, child)
+
+        if kind == CXK_LABEL_STMT:
+            let label_name = with_ci_cursor_spelling(session, child)
+            let target_state = ci_label_state(label_map, label_name)
+            if target_state >= 0:
+                if not cur_has_content:
+                    let empty_raw = stmts.raw_string("// empty")
+                    cur_children.push(empty_raw as i32)
+                let fall_id = ci_goto_arm_fallthrough(stmts, target_state)
+                cur_children.push(fall_id as i32)
+                // Commit the current arm: prepend entry line,
+                // then push children inline onto the flat arena.
+                let entry_raw = stmts.raw_string("(__goto_pending = 0)")
+                let start_idx = arm_children_flat.len() as i32
+                arm_children_flat.push(entry_raw as i32)
+                var cpi: i64 = 0
+                while cpi < cur_children.len():
+                    arm_children_flat.push(cur_children.get(cpi))
+                    cpi = cpi + 1
+                arm_states.push(cur_state)
+                arm_labels.push(cur_label_str_idx)
+                arm_child_starts.push(start_idx)
+                arm_child_counts.push((arm_children_flat.len() as i32) - start_idx)
+                cur_state = target_state
+                cur_label_str_idx = stmts.add_string(label_name)
+                cur_children = Vec.new()
+                cur_has_content = false
+            let lnc = with_ci_num_children(session, child)
+            if lnc > 0:
+                let label_body = with_ci_child(session, child, 0)
+                let lbk = with_ci_cursor_kind(session, label_body)
+                if lbk != CXK_LABEL_STMT:
+                    var s = ""
+                    if lbk == CXK_DECL_STMT:
+                        let decl_lowered = ci_lower_decl_stmt(session, label_body, body_scope, true)
+                        body_scope = decl_lowered.updated_scope
+                        s = decl_lowered.entry_stmt
+                    else:
+                        s = ci_lower_stmt_goto_aware(session, label_body, 0, body_scope, label_map, 0)
+                    if s.len() > 0:
+                        let stmt_raw = stmts.raw_string(s)
+                        cur_children.push(stmt_raw as i32)
+                        let check_id = ci_goto_arm_pending_check(stmts)
+                        cur_children.push(check_id as i32)
+                        cur_has_content = true
+
+        else if kind == CXK_GOTO_STMT:
+            var target_label = ""
+            let gnc = with_ci_num_children(session, child)
+            if gnc > 0:
+                target_label = with_ci_cursor_spelling(session, with_ci_child(session, child, 0))
+            if target_label.len() == 0:
+                target_label = with_ci_cursor_spelling(session, child)
+            let target_state = ci_label_state(label_map, target_label)
+            if target_state >= 0:
+                let fall_id = ci_goto_arm_fallthrough(stmts, target_state)
+                cur_children.push(fall_id as i32)
+                cur_has_content = true
+
+        else if kind == CXK_DECL_STMT:
+            let decl_lowered = ci_lower_decl_stmt(session, child, body_scope, true)
+            body_scope = decl_lowered.updated_scope
+            if decl_lowered.entry_stmt.len() > 0:
+                let raw_id = stmts.raw_string(decl_lowered.entry_stmt)
+                cur_children.push(raw_id as i32)
+                cur_has_content = true
+
+        else:
+            let s = ci_lower_stmt_goto_aware(session, child, 0, body_scope, label_map, 0)
+            if s.len() > 0:
+                let stmt_raw = stmts.raw_string(s)
+                cur_children.push(stmt_raw as i32)
+                let check_id = ci_goto_arm_pending_check(stmts)
+                cur_children.push(check_id as i32)
+                cur_has_content = true
+
+        i = i + 1
+
+    // Close the final arm. No fallthrough — the `_ => break`
+    // default arm in the printer handles exhaustion.
+    if not cur_has_content:
+        let empty_raw = stmts.raw_string("// empty")
+        cur_children.push(empty_raw as i32)
+    let entry_raw_f = stmts.raw_string("(__goto_pending = 0)")
+    let fstart_idx = arm_children_flat.len() as i32
+    arm_children_flat.push(entry_raw_f as i32)
+    var fcpi: i64 = 0
+    while fcpi < cur_children.len():
+        arm_children_flat.push(cur_children.get(fcpi))
+        fcpi = fcpi + 1
+    arm_states.push(cur_state)
+    arm_labels.push(cur_label_str_idx)
+    arm_child_starts.push(fstart_idx)
+    arm_child_counts.push((arm_children_flat.len() as i32) - fstart_idx)
+
+    let arm_count = arm_states.len() as i32
+    let hoisted_count = hoisted_ids.len() as i32
+
+    // Push meta contiguously: hoisted ids then arm records in
+    // inline layout `[state, label, child_count, children...]`.
+    let meta_start = stmts.extra.len() as i32
+    var hj: i64 = 0
+    while hj < hoisted_ids.len():
+        let _ = stmts.add_extra(hoisted_ids.get(hj))
+        hj = hj + 1
+    var aj: i32 = 0
+    while aj < arm_count:
+        let _ = stmts.add_extra(arm_states.get(aj as i64))
+        let _ = stmts.add_extra(arm_labels.get(aj as i64))
+        let cc = arm_child_counts.get(aj as i64)
+        let _ = stmts.add_extra(cc)
+        let cs = arm_child_starts.get(aj as i64)
+        var ck: i32 = 0
+        while ck < cc:
+            let _ = stmts.add_extra(arm_children_flat.get((cs + ck) as i64))
+            ck = ck + 1
+        aj = aj + 1
+
+    stmts.add(CiStmtKind.CIS_GOTO_BODY, meta_start, hoisted_count, arm_count, 0)
+
+// Build the per-statement break-guard: `if __goto_pending != 0:\n    continue`
+// emitted as a single CIS_RAW_STRING so its layout matches the
+// legacy output byte-for-byte.
+fn ci_goto_arm_pending_check(stmts: &mut CiStmtPool) -> CiStmtId:
+    stmts.raw_string("if __goto_pending != 0:\n    continue")
+
+// Build the tail `__pc = N; continue` transition for an arm.
+fn ci_goto_arm_fallthrough(stmts: &mut CiStmtPool, state_num: i32) -> CiStmtId:
+    stmts.raw_string("__pc = " ++ i64_to_string(state_num as i64) ++ "\ncontinue")
+
+// Text-based legacy version kept only as a fallback during the
+// B8b transition. Used by ci_lower_stmt_ir when the new
+// structural path isn't enabled. Will be deleted in B8e.
 fn ci_lower_goto_body(session: i64, body_cursor: i32, indent: i32, scope: str) -> str:
     let label_map = ci_collect_labels(session, body_cursor)
 
