@@ -388,6 +388,33 @@ enum CiStmtKind: i32:
     CIS_GOTO_SYM = 14        // d0 = label_sym — resolved by B8a
     CIS_GOTO_STATE = 15      // d0 = state_num (rewritten in B8b from CIS_GOTO_SYM)
 
+    // Complete goto state-machine body (B8b structural lowering).
+    // d0 = meta_extra_start into the stmt pool's `extra` Vec
+    // d1 = hoisted_decl_count
+    // d2 = arm_count (excluding the implicit `_ => break` default
+    //                  which the printer emits automatically)
+    //
+    // Meta layout in extra (all i32):
+    //   [hoisted_decl_0_stmt_id, ..., hoisted_decl_(N-1)_stmt_id,
+    //    arm_0_state, arm_0_label_str_idx, arm_0_child_count,
+    //    arm_0_child_0, arm_0_child_1, ..., arm_0_child_(K-1),
+    //    arm_1_state, arm_1_label_str_idx, arm_1_child_count,
+    //    arm_1_child_0, ..., arm_1_child_(L-1),
+    //    ...]
+    //
+    // Arm children are concatenated inline by the printer with
+    // no CIS_BLOCK trailing separators — goto state-machine arms
+    // compact their statements directly onto consecutive lines,
+    // matching the legacy ci_lower_goto_body output.
+    //
+    // Each child is typically a CIS_RAW_STRING holding a single
+    // translated statement (with internal newlines) or the
+    // `if __goto_pending != 0:\n    continue` break-guard.
+    //
+    // label_str_idx is an index into the stmt pool's strings Vec;
+    // 0 means the entry arm (no label comment on the arm header).
+    CIS_GOTO_BODY = 16
+
     // Phase-B escape hatch — deleted in B11.
     CIS_RAW_STRING = 90      // d0 = string_idx of verbatim With source
 
