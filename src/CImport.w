@@ -4124,6 +4124,14 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         if (uop_id as i32) != 0:
             return uop_id
 
+    // Implicit cast — only the sub-kinds whose lowering is
+    // structurally simple (B3d). Cases that need type resolution
+    // or the ci_render_cast_expr machinery fall back to legacy.
+    if kind == CXK_IMPLICIT_CAST:
+        let cast_id = ci_lower_implicit_cast(session, cursor, exprs, types, scope)
+        if (cast_id as i32) != 0:
+            return cast_id
+
     // Legacy fallback: bypass the cache, lower via the string path,
     // and embed the result as a verbatim raw-string node.
     let legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
@@ -4237,6 +4245,57 @@ fn ci_lower_unary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, type
     // UO_DEREF — the printer wraps in `(unsafe: *...)`.
     exprs.add(CiExprKind.CIE_DEREF, child_id as i32, 0, 0, 0 as CiTypeId)
 
+fn ci_lower_implicit_cast(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 1:
+        return 0 as CiExprId
+    let cast_kind = with_ci_implicit_cast_kind(session, cursor)
+    let inner_cursor = with_ci_child(session, cursor, 0)
+
+    // NULL_TO_PTR — emit `null` verbatim (legacy: `return "null"`).
+    // The child cursor isn't referenced by the legacy output.
+    if cast_kind == CI_CAST_NULL_TO_PTR:
+        return exprs.null_ptr(0 as CiTypeId)
+
+    // NOOP / FUNCTION_TO_PTR / LVALUE_TO_RVALUE / UNKNOWN fall
+    // through to the legacy's `return inner` tail — the cast is a
+    // structural no-op, just return the child id.
+    if cast_kind == CI_CAST_NOOP or cast_kind == CI_CAST_FUNCTION_TO_PTR or cast_kind == CI_CAST_LVALUE_TO_RVALUE or cast_kind == CI_CAST_UNKNOWN:
+        return ci_lower_expr_ir(session, inner_cursor, exprs, types, scope)
+
+    // *_TO_BOOL variants: emit `(inner != 0)` / `(inner != null)` /
+    // `(inner != 0.0)` via CIE_BINARY.
+    if cast_kind == CI_CAST_INT_TO_BOOL:
+        let inner_id = ci_lower_expr_ir(session, inner_cursor, exprs, types, scope)
+        if (inner_id as i32) == 0:
+            return 0 as CiExprId
+        let zero_s = exprs.add_string("0")
+        let zero = exprs.int_lit(zero_s, 0 as CiTypeId)
+        return exprs.binary(CiBinOp.CIBO_NEQ, inner_id, zero, 0 as CiTypeId)
+
+    if cast_kind == CI_CAST_PTR_TO_BOOL:
+        let inner_id = ci_lower_expr_ir(session, inner_cursor, exprs, types, scope)
+        if (inner_id as i32) == 0:
+            return 0 as CiExprId
+        let null_e = exprs.null_ptr(0 as CiTypeId)
+        return exprs.binary(CiBinOp.CIBO_NEQ, inner_id, null_e, 0 as CiTypeId)
+
+    if cast_kind == CI_CAST_FLOAT_TO_BOOL:
+        let inner_id = ci_lower_expr_ir(session, inner_cursor, exprs, types, scope)
+        if (inner_id as i32) == 0:
+            return 0 as CiExprId
+        let zero_s = exprs.add_string("0.0")
+        let zero = exprs.add(CiExprKind.CIE_FLOAT_LIT, zero_s, 0, 0, 0 as CiTypeId)
+        return exprs.binary(CiBinOp.CIBO_NEQ, inner_id, zero, 0 as CiTypeId)
+
+    // Remaining kinds (ARRAY_TO_PTR, INT_TO_PTR, PTR_TO_INT,
+    // BITCAST/PTR_CAST, INT_WIDEN*, INT_TRUNC, FLOAT_WIDEN/TRUNC,
+    // FLOAT_TO_INT, INT_TO_FLOAT) all funnel through the legacy
+    // ci_render_cast_expr and need type-string resolution we
+    // don't yet have in the lowering pass. Bail and let legacy
+    // handle them.
+    0 as CiExprId
+
 fn ci_lower_literal_or_ref(session: i64, cursor: i32, kind: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     if kind == CXK_INT_LITERAL:
         var text: str = ""
@@ -4312,7 +4371,7 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     // didn't produce a node, so we fall through to the legacy code
     // below. The set of detoured kinds grows commit by commit.
     if ci_migrate_ir_enabled():
-        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP or kind == CXK_UNARY_OP:
+        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP or kind == CXK_UNARY_OP or kind == CXK_IMPLICIT_CAST:
             let ir_result = ci_trans_expr_via_ir(session, cursor, scope)
             if ir_result.len() > 0:
                 return ir_result
