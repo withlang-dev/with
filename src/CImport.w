@@ -8432,13 +8432,14 @@ pub fn migrate_set_no_c_export(val: i32):
 // Phase-B IR migration flag, latched from the WITH_MIGRATE_IR env var
 // the first time it is queried. Sentinel -1 = not yet checked.
 //
-// When the flag is on, function-body translation routes through a
-// CiStmt IR node whose printer arm just emits the legacy text
-// verbatim (CIS_RAW_STRING). This is the B1 plumbing-only step:
-// output is byte-identical to the legacy path, but we have proven
-// the IR pool, printer, and shim integration end-to-end. Subsequent
-// B-phase commits replace pieces of the body string with real IR
-// nodes one kind at a time.
+// B10 (this commit) flipped the default to ON — every expression
+// and statement cursor kind now flows through ci_lower_expr_ir /
+// ci_trans_stmt_via_ir unless WITH_MIGRATE_IR=0 is set explicitly.
+// The legacy path still exists behind the cache bypass helpers
+// (ci_trans_expr_legacy_for_ir / ci_trans_stmt_legacy_for_ir),
+// which CIE_RAW_STRING / CIS_RAW_STRING fallbacks invoke when a
+// structural lowering isn't available yet. Those bypass sites are
+// the remaining work for B11's legacy deletion.
 extern fn with_getenv_str(name: str) -> str
 
 var g_migrate_ir_enabled_cache: i32 = 0 - 1
@@ -8446,10 +8447,10 @@ var g_migrate_ir_enabled_cache: i32 = 0 - 1
 fn ci_migrate_ir_enabled() -> bool:
     if g_migrate_ir_enabled_cache == 0 - 1:
         let v = with_getenv_str("WITH_MIGRATE_IR")
-        if v == "1":
-            g_migrate_ir_enabled_cache = 1
-        else:
+        if v == "0":
             g_migrate_ir_enabled_cache = 0
+        else:
+            g_migrate_ir_enabled_cache = 1
     g_migrate_ir_enabled_cache != 0
 
 // (ci_ir_shim_stmt was removed in B5e — B5d's statement-level
