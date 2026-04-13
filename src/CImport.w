@@ -4103,14 +4103,20 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
                 return exprs.add(CiExprKind.CIE_PAREN, inner_id as i32, 0, 0, 0 as CiTypeId)
 
     // Binary operator — simple non-pointer non-array arithmetic /
-    // bitwise cases (B3b). Pointer arith, comparisons, logical
-    // and/or, shifts, assignments, and large-decimal coercion all
-    // fall back to legacy below for now; subsequent commits add
-    // them one arm at a time.
+    // bitwise / assignment (B3b/B3e), plus comparison (B3l) and
+    // short-circuit logical ops (B3m). Pointer arith, shifts,
+    // and large-decimal coercion fall back to legacy below for
+    // now.
     if kind == CXK_BINARY_OP:
         let bin_id = ci_lower_binary_simple(session, cursor, exprs, types, scope)
         if (bin_id as i32) != 0:
             return bin_id
+        let cmp_id = ci_lower_binary_comparison(session, cursor, exprs, types, scope)
+        if (cmp_id as i32) != 0:
+            return cmp_id
+        let log_id = ci_lower_binary_logical(session, cursor, exprs, types, scope)
+        if (log_id as i32) != 0:
+            return log_id
 
     // Unary operator — only the trivial cases for now (B3c).
     // UO_PLUS and UO_DEREF are byte-identical to the legacy without
@@ -4322,6 +4328,80 @@ fn ci_lower_binary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
         ci_op = CiBinOp.CIBO_ASSIGN
 
     exprs.binary(ci_op, lhs_id, rhs_id, 0 as CiTypeId)
+
+fn ci_lower_binary_comparison(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 2:
+        return 0 as CiExprId
+    let op = with_ci_binary_op(session, cursor)
+    if op != BO_EQ and op != BO_NE and op != BO_LT and op != BO_GT and op != BO_LE and op != BO_GE:
+        return 0 as CiExprId
+
+    let lhs_cursor = with_ci_child(session, cursor, 0)
+    let rhs_cursor = with_ci_child(session, cursor, 1)
+
+    // Legacy comparison takes the raw (already-string) operands
+    // and wraps in `(if lhs OP rhs: 1 else: 0)`. We recursively
+    // lower both operands, print them, then assemble a raw-string
+    // condition so the CIE_TERNARY printer doesn't add extra parens
+    // around the comparison.
+    let lhs_id = ci_lower_expr_ir(session, lhs_cursor, exprs, types, scope)
+    if (lhs_id as i32) == 0:
+        return 0 as CiExprId
+    let rhs_id = ci_lower_expr_ir(session, rhs_cursor, exprs, types, scope)
+    if (rhs_id as i32) == 0:
+        return 0 as CiExprId
+    let lhs_str = ci_print_expr(exprs, types, lhs_id, 0, 0)
+    let rhs_str = ci_print_expr(exprs, types, rhs_id, 0, 0)
+
+    // Large-decimal operands get the `(... as c_uint)` cast treatment
+    // in the legacy's non-comparison path, but the comparison path
+    // ignores them. Still, bail if either is a large decimal to stay
+    // consistent with the non-comparison arm.
+    if ci_is_large_decimal(lhs_str):
+        return 0 as CiExprId
+    if ci_is_large_decimal(rhs_str):
+        return 0 as CiExprId
+
+    let is_unsigned = with_ci_type_is_unsigned(session, cursor)
+    let op_str = ci_bo_to_str_typed(op, is_unsigned)
+    if op_str.len() == 0:
+        return 0 as CiExprId
+    let cond_str = lhs_str ++ " " ++ op_str ++ " " ++ rhs_str
+    let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
+    let one_s = exprs.add_string("1")
+    let zero_s = exprs.add_string("0")
+    let one = exprs.int_lit(one_s, 0 as CiTypeId)
+    let zero = exprs.int_lit(zero_s, 0 as CiTypeId)
+    exprs.add(CiExprKind.CIE_TERNARY, cond_id as i32, one as i32, zero as i32, 0 as CiTypeId)
+
+fn ci_lower_binary_logical(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 2:
+        return 0 as CiExprId
+    let op = with_ci_binary_op(session, cursor)
+    if op != BO_LAND and op != BO_LOR:
+        return 0 as CiExprId
+
+    // Legacy: `(if bool_lhs and bool_rhs: 1 else: 0)`. The bool
+    // operands come from ci_trans_bool_expr (unwraps parens/casts
+    // and short-circuits on comparisons). We call the same helper
+    // for the operands — they're string-only, so the result goes
+    // into a raw-string condition.
+    let lhs_cursor = with_ci_child(session, cursor, 0)
+    let rhs_cursor = with_ci_child(session, cursor, 1)
+    let bool_lhs = ci_trans_bool_expr(session, lhs_cursor, scope)
+    let bool_rhs = ci_trans_bool_expr(session, rhs_cursor, scope)
+    if bool_lhs.len() == 0 or bool_rhs.len() == 0:
+        return 0 as CiExprId
+    let log_op = if op == BO_LAND: "and" else: "or"
+    let cond_str = bool_lhs ++ " " ++ log_op ++ " " ++ bool_rhs
+    let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
+    let one_s = exprs.add_string("1")
+    let zero_s = exprs.add_string("0")
+    let one = exprs.int_lit(one_s, 0 as CiTypeId)
+    let zero = exprs.int_lit(zero_s, 0 as CiTypeId)
+    exprs.add(CiExprKind.CIE_TERNARY, cond_id as i32, one as i32, zero as i32, 0 as CiTypeId)
 
 fn ci_compound_to_ci_binop(op: i32) -> i32:
     if op == BO_ADD_ASSIGN: return CiBinOp.CIBO_ADD
