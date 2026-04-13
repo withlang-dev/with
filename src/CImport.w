@@ -4112,6 +4112,18 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         if (bin_id as i32) != 0:
             return bin_id
 
+    // Unary operator — only the trivial cases for now (B3c).
+    // UO_PLUS and UO_DEREF are byte-identical to the legacy without
+    // any precedence or coercion gymnastics. UO_MINUS, UO_NOT,
+    // UO_LNOT, UO_ADDR, and the inc/dec ops carry literal-folding
+    // / ternary expansion / address-of variants that need a more
+    // expressive printer to reproduce byte-for-byte; they get
+    // later sub-commits.
+    if kind == CXK_UNARY_OP:
+        let uop_id = ci_lower_unary_simple(session, cursor, exprs, types, scope)
+        if (uop_id as i32) != 0:
+            return uop_id
+
     // Legacy fallback: bypass the cache, lower via the string path,
     // and embed the result as a verbatim raw-string node.
     let legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
@@ -4198,6 +4210,33 @@ fn ci_lower_binary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
 
     exprs.binary(ci_op, lhs_id, rhs_id, 0 as CiTypeId)
 
+fn ci_lower_unary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 1:
+        return 0 as CiExprId
+    let op = with_ci_unary_op(session, cursor)
+    if op < 0:
+        return 0 as CiExprId
+
+    // Only lower the trivial ops for now. The legacy emits
+    // operand-only for UO_PLUS and `(unsafe: *operand)` for
+    // UO_DEREF — both of which the IR nodes already match
+    // byte-for-byte. Everything else falls back.
+    if op != UO_PLUS and op != UO_DEREF:
+        return 0 as CiExprId
+
+    let child_cursor = with_ci_child(session, cursor, 0)
+    let child_id = ci_lower_expr_ir(session, child_cursor, exprs, types, scope)
+    if (child_id as i32) == 0:
+        return 0 as CiExprId
+
+    // UO_PLUS is a no-op in the legacy — return the child id directly.
+    if op == UO_PLUS:
+        return child_id
+
+    // UO_DEREF — the printer wraps in `(unsafe: *...)`.
+    exprs.add(CiExprKind.CIE_DEREF, child_id as i32, 0, 0, 0 as CiTypeId)
+
 fn ci_lower_literal_or_ref(session: i64, cursor: i32, kind: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     if kind == CXK_INT_LITERAL:
         var text: str = ""
@@ -4273,7 +4312,7 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     // didn't produce a node, so we fall through to the legacy code
     // below. The set of detoured kinds grows commit by commit.
     if ci_migrate_ir_enabled():
-        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP:
+        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP or kind == CXK_UNARY_OP:
             let ir_result = ci_trans_expr_via_ir(session, cursor, scope)
             if ir_result.len() > 0:
                 return ir_result
