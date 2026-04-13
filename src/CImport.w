@@ -4362,11 +4362,8 @@ fn ci_lower_unary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, type
     if op < 0:
         return 0 as CiExprId
 
-    // Only lower the trivial ops for now. The legacy emits
-    // operand-only for UO_PLUS and `(unsafe: *operand)` for
-    // UO_DEREF — both of which the IR nodes already match
-    // byte-for-byte. Everything else falls back.
-    if op != UO_PLUS and op != UO_DEREF:
+    // Pre/Post inc/dec are side-effecting and belong to B6.
+    if op == UO_PRE_INC or op == UO_PRE_DEC or op == UO_POST_INC or op == UO_POST_DEC:
         return 0 as CiExprId
 
     let child_cursor = with_ci_child(session, cursor, 0)
@@ -4374,12 +4371,64 @@ fn ci_lower_unary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, type
     if (child_id as i32) == 0:
         return 0 as CiExprId
 
-    // UO_PLUS is a no-op in the legacy — return the child id directly.
+    // UO_PLUS: no-op — return the child id directly.
     if op == UO_PLUS:
         return child_id
 
-    // UO_DEREF — the printer wraps in `(unsafe: *...)`.
-    exprs.add(CiExprKind.CIE_DEREF, child_id as i32, 0, 0, 0 as CiTypeId)
+    // UO_DEREF: `(unsafe: *operand)`.
+    if op == UO_DEREF:
+        return exprs.add(CiExprKind.CIE_DEREF, child_id as i32, 0, 0, 0 as CiTypeId)
+
+    // UO_MINUS: three sub-cases.
+    //   (a) operand text is a bare integer string → prepend "-"
+    //   (b) cursor type unsigned → `(0 -% operand)`
+    //   (c) otherwise → `(0 - operand)`
+    // The outer-paren emission matches the legacy's final byte form.
+    if op == UO_MINUS:
+        let child_str = ci_print_expr(exprs, types, child_id, 0, 0)
+        if ci_is_integer_string(child_str):
+            return exprs.raw_string("-" ++ child_str, 0 as CiTypeId)
+        let zero_s = exprs.add_string("0")
+        let zero = exprs.int_lit(zero_s, 0 as CiTypeId)
+        if with_ci_type_is_unsigned(session, cursor) != 0:
+            return exprs.binary(CiBinOp.CIBO_SUB_WRAP, zero, child_id, 0 as CiTypeId)
+        return exprs.binary(CiBinOp.CIBO_SUB, zero, child_id, 0 as CiTypeId)
+
+    // UO_NOT (bitwise): legacy emits `(0 - operand - 1)` which
+    // left-associates to `(0 - operand) - 1`. Nesting two
+    // CIE_BINARYs would wrap the inner with its own parens
+    // (`((0 - op) - 1)`), so we assemble the string manually
+    // and stash as CIE_RAW_STRING.
+    if op == UO_NOT:
+        let child_str = ci_print_expr(exprs, types, child_id, 0, 0)
+        return exprs.raw_string("(0 - " ++ child_str ++ " - 1)", 0 as CiTypeId)
+
+    // UO_LNOT (logical): `(not operand)` on bool, otherwise
+    // `(if operand != 0: 0 else: 1)`. The bool case lowers to
+    // CIE_UNARY(CIUO_LOGICAL_NOT); the int case synthesises a
+    // CIE_TERNARY with a raw-string condition to avoid the
+    // CIE_BINARY paren-wrapping.
+    if op == UO_LNOT:
+        if with_ci_type_is_bool(session, child_cursor):
+            return exprs.unary(CiUnaryOp.CIUO_LOGICAL_NOT, child_id, 0 as CiTypeId)
+        let child_str = ci_print_expr(exprs, types, child_id, 0, 0)
+        let cond_id = exprs.raw_string(child_str ++ " != 0", 0 as CiTypeId)
+        let zero_s = exprs.add_string("0")
+        let one_s = exprs.add_string("1")
+        let zero = exprs.int_lit(zero_s, 0 as CiTypeId)
+        let one = exprs.int_lit(one_s, 0 as CiTypeId)
+        return exprs.add(CiExprKind.CIE_TERNARY, cond_id as i32, zero as i32, one as i32, 0 as CiTypeId)
+
+    // UO_ADDR: legacy delegates to ci_render_addr_of_expr with
+    // the operand cursor and printed operand text. We reuse the
+    // helper verbatim.
+    if op == UO_ADDR:
+        let child_str = ci_print_expr(exprs, types, child_id, 0, 0)
+        let rendered = ci_render_addr_of_expr(session, cursor, child_cursor, child_str)
+        if rendered.len() > 0:
+            return exprs.raw_string(rendered, 0 as CiTypeId)
+
+    0 as CiExprId
 
 fn ci_lower_implicit_cast(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
