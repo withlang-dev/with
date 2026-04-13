@@ -4783,17 +4783,24 @@ fn ci_lower_implicit_cast(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
     0 as CiExprId
 
 fn ci_call_callee_name(session: i64, cursor: i32) -> str:
-    // Walk through IMPLICIT_CAST wrappers to find the DECL_REF at
-    // the head of a call expression. Returns the (unescaped) name
-    // or "" if the callee isn't a plain direct reference.
+    // Walk through transparent wrappers (IMPLICIT_CAST, PAREN_EXPR,
+    // and libclang's kind-100 UnexposedExpr which is what CALL_EXPR
+    // callees typically show up as) to find the DECL_REF at the
+    // head of a call expression. Returns the (unescaped) name or
+    // "" if the callee isn't a plain direct reference.
+    //
+    // When libclang reports kind 100 at any level, fall through to
+    // with_ci_cursor_spelling — the unexposed cursor preserves the
+    // function name even when the inner DECL_REF isn't visible.
     var c = cursor
     while with_ci_cursor_kind(session, c) == CXK_IMPLICIT_CAST or with_ci_cursor_kind(session, c) == CXK_PAREN_EXPR:
         if with_ci_num_children(session, c) < 1:
             return ""
         c = with_ci_child(session, c, 0)
-    if with_ci_cursor_kind(session, c) != CXK_DECL_REF:
-        return ""
-    with_ci_cursor_spelling(session, c)
+    let final_kind = with_ci_cursor_kind(session, c)
+    if final_kind == CXK_DECL_REF or final_kind == 100:
+        return with_ci_cursor_spelling(session, c)
+    ""
 
 fn ci_lower_call_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
