@@ -7486,6 +7486,41 @@ var g_migrate_no_c_export: i32 = 0
 pub fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val
 
+// Phase-B IR migration flag, latched from the WITH_MIGRATE_IR env var
+// the first time it is queried. Sentinel -1 = not yet checked.
+//
+// When the flag is on, function-body translation routes through a
+// CiStmt IR node whose printer arm just emits the legacy text
+// verbatim (CIS_RAW_STRING). This is the B1 plumbing-only step:
+// output is byte-identical to the legacy path, but we have proven
+// the IR pool, printer, and shim integration end-to-end. Subsequent
+// B-phase commits replace pieces of the body string with real IR
+// nodes one kind at a time.
+extern fn with_getenv_str(name: str) -> str
+
+var g_migrate_ir_enabled_cache: i32 = 0 - 1
+
+fn ci_migrate_ir_enabled() -> bool:
+    if g_migrate_ir_enabled_cache == 0 - 1:
+        let v = with_getenv_str("WITH_MIGRATE_IR")
+        if v == "1":
+            g_migrate_ir_enabled_cache = 1
+        else:
+            g_migrate_ir_enabled_cache = 0
+    g_migrate_ir_enabled_cache != 0
+
+// Wrap a legacy translated function-body string in a CIS_RAW_STRING
+// IR node and print it back through the CiPrint pipeline. The output
+// is byte-identical to the input by construction (CIS_RAW_STRING's
+// printer arm is verbatim). Phase-B commits replace this shim's
+// callers with real IR construction one statement kind at a time.
+fn ci_ir_shim_stmt(text: str) -> str:
+    var types = CiTypePool.new()
+    var exprs = CiExprPool.new()
+    var stmts = CiStmtPool.new()
+    let id = stmts.raw_string(text)
+    ci_print_stmt(&stmts, &exprs, &types, id, 0)
+
 pub fn migrate_add_define(define: str):
     // define is "NAME=VALUE" or just "NAME"
     if ci_str_contains(define, "="):
@@ -8062,7 +8097,8 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     let body = ci_try_translate_fn_body(session, idx)
     if body.len() > 0:
         let ret_suffix = if ret == "void": "" else: " -> " ++ ret
-        return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body ++ "\n"
+        let body_emitted = if ci_migrate_ir_enabled(): ci_ir_shim_stmt(body) else: body
+        return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body_emitted ++ "\n"
 
     // Body translation failed — emit as extern fn (system header function
     // or function with untranslatable body).
