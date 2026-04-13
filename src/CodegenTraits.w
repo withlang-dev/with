@@ -936,11 +936,18 @@ fn Codegen.record_module_binding_global(self: Codegen, name_sym: i32, global_ty:
         return self.declare_module_binding_global(name_sym, global_ty, is_mut)
     self.define_module_binding_global(name_sym, global_ty, init, is_mut)
 
+fn Codegen.record_runtime_init_storage_global(self: Codegen, name_sym: i32, global_ty: i64) -> i64:
+    // Runtime-initialized module constants are still language-level `const`
+    // bindings, but their backing storage must remain writable until the
+    // wrapper main populates them via __with_init_const_* helpers.
+    self.record_module_binding_global(name_sym, global_ty, self.build_default_value(global_ty), 1)
+
 fn Codegen.queue_module_runtime_init(self: Codegen, name_sym: i32, value_node: i32, result_tid: i32, is_mut: i32) -> bool:
+    let _ = is_mut
     let global_ty = self.sema_type_to_llvm(result_tid)
     if global_ty == 0:
         return false
-    let _ = self.record_module_binding_global(name_sym, global_ty, self.build_default_value(global_ty), is_mut)
+    let _ = self.record_runtime_init_storage_global(name_sym, global_ty)
     if self.current_decl_is_imported_module_symbol():
         return true
     self.module_runtime_init_syms.push(name_sym)

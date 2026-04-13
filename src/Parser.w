@@ -51,6 +51,14 @@ type Parser {
     last_where_count: i32,
 }
 
+type InterpolatedExprParseAttempt {
+    node: NodeId,
+    consumed_all: i32,
+    had_errors: i32,
+    pool: AstPool,
+    intern: InternPool,
+}
+
 fn Parser.init(tokens: TokenList, source: str, file_id: i32, intern: InternPool, diags: DiagnosticList) -> Parser:
     Parser.init_with_pool(tokens, source, file_id, intern, diags, AstPool.new())
 
@@ -2710,7 +2718,10 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
                 seg_kinds.push(FStringSegmentKind.LITERAL)
                 seg_data1.push(sym)
                 seg_data2.push(0)
-            // Find matching } while tracking colon for format spec
+            // Find matching }. Track the first top-level colon as a fallback
+            // format-spec split point, but give the whole hole expression
+            // precedence later so constructs like `unsafe: *p` parse as real
+            // expressions instead of being mistaken for `{expr:spec}`.
             var depth = 1
             var expr_start_pos = i + 1
             var j = expr_start_pos
@@ -2761,16 +2772,24 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
                 if depth == 1 and jch == 58 and colon_pos == -1:
                     colon_pos = j
                 if depth > 0: j = j + 1
-            // Extract expression text and parse it (may add to extra pool)
-            var expr_end_pos = j
-            if colon_pos > 0:
-                expr_end_pos = colon_pos
-            let expr_text = content.slice(expr_start_pos as i64, expr_end_pos as i64)
-            let expr_node = self.parse_interpolated_expr(expr_text, start)
             var spec_node: NodeId = 0 as NodeId
+            let hole_text = content.slice(expr_start_pos as i64, j as i64)
+            var expr_node: NodeId = 0 as NodeId
             if colon_pos > 0:
-                let spec_text = content.slice((colon_pos + 1) as i64, j as i64)
-                spec_node = self.parse_format_spec_text(spec_text, start, end)
+                // Parse the full hole first. Only fall back to `{expr:spec}`
+                // splitting when the full text is not a complete expression.
+                let full_attempt = self.parse_interpolated_expr_attempt(hole_text, 0)
+                self.intern = full_attempt.intern
+                self.pool = full_attempt.pool
+                if full_attempt.consumed_all != 0 and full_attempt.had_errors == 0:
+                    expr_node = full_attempt.node
+                else:
+                    let expr_text = content.slice(expr_start_pos as i64, colon_pos as i64)
+                    expr_node = self.parse_interpolated_expr(expr_text, start)
+                    let spec_text = content.slice((colon_pos + 1) as i64, j as i64)
+                    spec_node = self.parse_format_spec_text(spec_text, start, end)
+            else:
+                expr_node = self.parse_interpolated_expr(hole_text, start)
             seg_kinds.push(FStringSegmentKind.EXPR)
             seg_data1.push(expr_node as i32)
             seg_data2.push(spec_node as i32)
@@ -2933,16 +2952,30 @@ fn Parser.parse_format_spec_text(self: Parser, spec_text: str, start: i32, end: 
     self.pool.add_node(NodeKind.NK_FSTRING_SPEC, start, end, flags, width, precision)
 
 fn Parser.parse_interpolated_expr(self: Parser, expr_text: str, base_start: i32) -> NodeId:
-    // Re-lex and parse the expression text
+    let attempt = self.parse_interpolated_expr_attempt(expr_text, 1)
+    self.intern = attempt.intern
+    self.pool = attempt.pool
+    attempt.node
+
+fn Parser.parse_interpolated_expr_attempt(self: Parser, expr_text: str, use_shared_diags: i32) -> InterpolatedExprParseAttempt:
+    // Re-lex and parse the expression text.
     let source_text = self.interp_normalize_expr_text(expr_text)
     var lexer = Lexer.init(source_text, 0)
     let tokens = lexer.tokenize()
-    var sub_parser = Parser.init_with_pool(tokens, source_text, 0, self.intern, self.diags, self.pool)
+    let local_diags = DiagnosticList.init()
+    let parse_diags = if use_shared_diags != 0: self.diags else: local_diags
+    var sub_parser = Parser.init_with_pool(tokens, source_text, 0, self.intern, parse_diags, self.pool)
     let result = sub_parser.parse_expr()
-    // Sync the intern pool back
-    self.intern = sub_parser.intern
-    self.pool = sub_parser.pool
-    result
+    sub_parser.skip_newlines()
+    let consumed_all = if sub_parser.peek() == TokenKind.TK_EOF: 1 else: 0
+    let had_errors = if use_shared_diags != 0: 0 else: if local_diags.has_errors(): 1 else: 0
+    InterpolatedExprParseAttempt {
+        node: result,
+        consumed_all,
+        had_errors,
+        pool: sub_parser.pool,
+        intern: sub_parser.intern,
+    }
 
 fn Parser.parse_c_string_literal(self: Parser) -> NodeId:
     let start = self.current_start()

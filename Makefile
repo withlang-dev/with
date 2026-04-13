@@ -400,7 +400,7 @@ $(REGEX_RAW_STAMP): $(CANONICAL_BIN) $(REGEX_REF_SOURCES) scripts/prepare_pcre2_
 	bash "$(ROOT_DIR)/scripts/prepare_pcre2_reference.sh" "$$src"; \
 	rm -rf "$$out"; \
 	mkdir -p "$$out"; \
-	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$out/" --no-c-export -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1 || true; \
+	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$out/" --no-c-export -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1; \
 	count=$$(ls "$$out"/*.w 2>/dev/null | wc -l); \
 	if [ "$$count" -lt 30 ]; then \
 		echo "error: only $$count files migrated — expected at least 30" >&2; \

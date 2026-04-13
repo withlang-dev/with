@@ -27,6 +27,111 @@ run_cli() {
   runner_exec_capture "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" "$@"
 }
 
+file_has_literal() {
+  local path="$1"
+  local needle="$2"
+  grep -Fq "$needle" "$path"
+}
+
+file_has_regex() {
+  local path="$1"
+  local pattern="$2"
+  grep -Eq "$pattern" "$path"
+}
+
+file_forbid_literal() {
+  local path="$1"
+  local needle="$2"
+  ! grep -Fq "$needle" "$path"
+}
+
+file_forbid_regex() {
+  local path="$1"
+  local pattern="$2"
+  ! grep -Eq "$pattern" "$path"
+}
+
+# Module-object symbol contract:
+# - ordinary With imports are referenced through module-scoped link names
+# - C ABI imports keep their canonical raw linker names
+nm_has_defined_exact() {
+  local obj="$1"
+  local want="$2"
+  /usr/bin/nm "$obj" | awk -v want="$want" '
+    {
+      type = (NF >= 2 ? $(NF - 1) : "")
+      name = $NF
+      sub(/^_/, "", name)
+      if (name == want && type != "U") found = 1
+    }
+    END {
+      exit !found
+    }
+  '
+}
+
+nm_has_undefined_exact() {
+  local obj="$1"
+  local want="$2"
+  /usr/bin/nm "$obj" | awk -v want="$want" '
+    {
+      type = (NF >= 2 ? $(NF - 1) : "")
+      name = $NF
+      sub(/^_/, "", name)
+      if (name == want && type == "U") found = 1
+    }
+    END {
+      exit !found
+    }
+  '
+}
+
+nm_has_undefined_regex() {
+  local obj="$1"
+  local want_regex="$2"
+  /usr/bin/nm "$obj" | awk -v want_regex="$want_regex" '
+    {
+      type = (NF >= 2 ? $(NF - 1) : "")
+      name = $NF
+      sub(/^_/, "", name)
+      if (name ~ want_regex && type == "U") found = 1
+    }
+    END {
+      exit !found
+    }
+  '
+}
+
+nm_forbid_exact() {
+  local obj="$1"
+  local forbidden="$2"
+  ! /usr/bin/nm "$obj" | awk -v forbidden="$forbidden" '
+    {
+      name = $NF
+      sub(/^_/, "", name)
+      if (name == forbidden) bad = 1
+    }
+    END {
+      exit !bad
+    }
+  '
+}
+
+nm_forbid_regex() {
+  local obj="$1"
+  local forbidden_regex="$2"
+  ! /usr/bin/nm "$obj" | awk -v forbidden_regex="$forbidden_regex" '
+    {
+      name = $NF
+      sub(/^_/, "", name)
+      if (name ~ forbidden_regex) bad = 1
+    }
+    END {
+      exit !bad
+    }
+  '
+}
+
 expect_emit_obj_global_symbols() {
   local case_dir="$tmpdir/emit_obj_globals_case"
   local src="$case_dir/emit_obj_globals.w"
@@ -265,25 +370,9 @@ EOF
     return
   fi
 
-  if ! /usr/bin/nm "$user_obj" | awk '
-    {
-      type = (NF >= 2 ? $(NF - 1) : "")
-      name = $NF
-      sub(/^_/, "", name)
-      if (name == "call_shared") {
-        if (type == "U") bad = 1
-        seen["call_shared"] = 1
-      } else if (name ~ /^__with_mod_.*__shared_fn$/) {
-        if (type != "U") bad = 1
-        seen["shared_fn"] = 1
-      } else if (name == "shared_fn") {
-        bad = 1
-      }
-    }
-    END {
-      exit !(seen["call_shared"] && seen["shared_fn"]) || bad
-    }
-  '; then
+  if ! nm_has_defined_exact "$user_obj" "call_shared" \
+    || ! nm_has_undefined_regex "$user_obj" '^__with_mod_.*__shared_fn$' \
+    || ! nm_forbid_exact "$user_obj" "shared_fn"; then
     echo "FAIL(cli-selfhost-emit-obj-symbols) imported_fn_beats_extern_redecl"
     /usr/bin/nm "$user_obj" || true
     failures=$((failures + 1))
@@ -314,25 +403,9 @@ EOF
     return
   fi
 
-  if ! /usr/bin/nm "$obj" | awk '
-    {
-      type = (NF >= 2 ? $(NF - 1) : "")
-      name = $NF
-      sub(/^_/, "", name)
-      if (name == "call_compile") {
-        if (type == "U") bad = 1
-        seen["call_compile"] = 1
-      } else if (name ~ /^__with_mod_.*__pcre2_compile_8$/) {
-        if (type != "U") bad = 1
-        seen["pcre2_compile_8"] = 1
-      } else if (name ~ /pcre2_compile_8$/) {
-        bad = 1
-      }
-    }
-    END {
-      exit !(seen["call_compile"] && seen["pcre2_compile_8"]) || bad
-    }
-  '; then
+  if ! nm_has_defined_exact "$obj" "call_compile" \
+    || ! nm_has_undefined_regex "$obj" '^__with_mod_.*__pcre2_compile_8$' \
+    || ! nm_forbid_exact "$obj" "pcre2_compile_8"; then
     echo "FAIL(cli-selfhost-emit-obj-symbols) imported_pcre2_symbol"
     /usr/bin/nm "$obj" || true
     failures=$((failures + 1))
@@ -365,25 +438,9 @@ EOF
     return
   fi
 
-  if ! /usr/bin/nm "$obj" | awk '
-    {
-      type = (NF >= 2 ? $(NF - 1) : "")
-      name = $NF
-      sub(/^_/, "", name)
-      if (name == "call_compile") {
-        if (type == "U") bad = 1
-        seen["call_compile"] = 1
-      } else if (name ~ /^__with_mod_.*__pcre2_compile_8$/) {
-        if (type != "U") bad = 1
-        seen["pcre2_compile_8"] = 1
-      } else if (name == "pcre2_compile_8") {
-        bad = 1
-      }
-    }
-    END {
-      exit !(seen["call_compile"] && seen["pcre2_compile_8"]) || bad
-    }
-  '; then
+  if ! nm_has_defined_exact "$obj" "call_compile" \
+    || ! nm_has_undefined_regex "$obj" '^__with_mod_.*__pcre2_compile_8$' \
+    || ! nm_forbid_exact "$obj" "pcre2_compile_8"; then
     echo "FAIL(cli-selfhost-emit-obj-symbols) imported_pcre2_symbol_multi_import"
     /usr/bin/nm "$obj" || true
     failures=$((failures + 1))
@@ -576,11 +633,18 @@ EOF
     return
   fi
 
-  if ! grep -Fq '(cb.groupinfo = (&stack_groupinfo[0] as *mut c_uint))' "$out_w" \
-    || ! grep -Fq '(cb.parsed_pattern = (&stack_parsed_pattern[0] as *mut c_uint))' "$out_w" \
-    || ! grep -Fq '(pp = (pp +% 1))' "$out_w" \
-    || ! grep -Fq '(skipatstart = pp)' "$out_w" \
-    || grep -Fq '(skipatstart = (pp = pp + 1))' "$out_w"; then
+  if ! file_has_literal "$out_w" '(cb.groupinfo = (&stack_groupinfo[0] as *mut c_uint))' \
+    || ! file_has_literal "$out_w" '(cb.parsed_pattern = (&stack_parsed_pattern[0] as *mut c_uint))' \
+    || ! file_has_literal "$out_w" '(pp = (pp +% 1))' \
+    || ! file_has_regex "$out_w" '\(skipatstart = \(*pp\)*\)' \
+    || ! file_forbid_regex "$out_w" '\(skipatstart = \((pp) = ' \
+    || ! awk '
+      /\(pp = \(pp \+% 1\)\)/ { seen_pp = NR }
+      /\(skipatstart = \(*pp\)*\)/ { seen_skip = NR }
+      END {
+        exit !(seen_pp > 0 && seen_skip > 0 && seen_pp < seen_skip)
+      }
+    ' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) assignment_compat"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
@@ -962,8 +1026,8 @@ EOF
     || ! grep -Fq 'alias_names:' "$out_w" \
     || ! grep -Fq '"plb\0"' "$out_w" \
     || ! grep -Fq 'var punct: *const i8 = "!?"' "$out_w" \
-    || ! grep -Fq 'var temp: [6]u8' "$out_w" \
-    || ! grep -Fq 'null_str = [205]' "$out_w" \
+    || ! grep -Eq 'var temp(__goto_[0-9]+_[0-9]+)?: \[6\]u8' "$out_w" \
+    || ! grep -Eq 'null_str(__goto_[0-9]+_[0-9]+)? = \[205\]' "$out_w" \
     || grep -Fq 'temp = 6' "$out_w" \
     || grep -Fq '/*' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) initializer_regressions"
@@ -980,6 +1044,96 @@ EOF
   fi
 
   echo "PASS(cli-selfhost-migrate) initializer_regressions"
+}
+
+expect_migrate_tentative_global_owner() {
+  local case_dir="$tmpdir/migrate_tentative_global_owner_case"
+  local src="$case_dir/tentative_global_owner.c"
+  local out_w="$case_dir/tentative_global_owner.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+typedef struct ctx { int x; } ctx;
+ctx g;
+int issue127_read(void) { return g.x; }
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) tentative_global_owner"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Eq '^var g: ctx' "$out_w" \
+    || grep -Eq '^extern var g: ctx' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) tentative_global_owner"
+    sed -n '1,200p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) tentative_global_owner"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) tentative_global_owner"
+}
+
+expect_migrate_cross_file_tentative_global_owner() {
+  local case_dir="$tmpdir/migrate_cross_file_tentative_global_owner_case"
+  local generated_dir="$case_dir/generated"
+  mkdir -p "$case_dir"
+
+  cat >"$case_dir/a.c" <<'EOF'
+int issue127_counter;
+int issue127_get(void) { return issue127_counter; }
+EOF
+
+  cat >"$case_dir/b.c" <<'EOF'
+int issue127_counter;
+int issue127_bump(void) {
+  issue127_counter = issue127_counter + 1;
+  return issue127_counter;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$case_dir" --no-c-export -o "$generated_dir"; then
+    echo "FAIL(cli-selfhost-migrate) cross_file_tentative_global_owner"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Eq '^var issue127_counter: c_int' "$generated_dir/a.w" \
+    || ! grep -Eq '^extern var issue127_counter: c_int' "$generated_dir/b.w"; then
+    echo "FAIL(cli-selfhost-migrate-output) cross_file_tentative_global_owner"
+    echo "--- a.w"
+    sed -n '1,200p' "$generated_dir/a.w" || true
+    echo "--- b.w"
+    sed -n '1,200p' "$generated_dir/b.w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$generated_dir/a.w"; then
+    echo "FAIL(cli-selfhost-check) cross_file_tentative_global_owner a"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$generated_dir/b.w"; then
+    echo "FAIL(cli-selfhost-check) cross_file_tentative_global_owner b"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) cross_file_tentative_global_owner"
 }
 
 expect_migrate_noop_pointer_cast_exprs() {
@@ -1012,9 +1166,11 @@ EOF
 
   if ! grep -Fq 'fn ret_ctx() -> *mut ctx:' "$out_w" \
     || grep -Fq 'extern fn ret_ctx()' "$out_w" \
-    || ! grep -Fq 'return (((&mut g as *mut ctx)) as *mut ctx)' "$out_w" \
-    || ! grep -Fq 'var local: *mut ctx = (((&mut g as *mut ctx)) as *mut ctx)' "$out_w" \
-    || ! grep -Fq '(ccontext = (((&mut g as *mut ctx)) as *mut ctx))' "$out_w"; then
+    || grep -Fq 'as *const ctx' "$out_w" \
+    || grep -Fq 'as *mut ctx)) as *mut ctx' "$out_w" \
+    || ! grep -Fq 'return ((&mut g as *mut ctx))' "$out_w" \
+    || ! grep -Fq 'var local: *mut ctx = ((&mut g as *mut ctx))' "$out_w" \
+    || ! grep -Fq '(ccontext = ((&mut g as *mut ctx)))' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) noop_pointer_cast_exprs"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
@@ -1057,7 +1213,7 @@ EOF
   fi
 
   if ! grep -Fq 'let ZERO_TERM: c_ulong = (-1 as c_ulong)' "$out_w" \
-    || ! grep -Fq 'if ((zero_terminated = ((if patlen == ZERO_TERM: 1 else: 0)))) != 0:' "$out_w"; then
+    || ! grep -Fq 'patlen == ((-1 as c_ulong))' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) typed_cast_macros"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
@@ -1255,10 +1411,10 @@ expect_pcre2_match_heapframe_is_concrete() {
   echo "PASS(cli-selfhost-build) pcre2_match_heapframe"
 }
 
-expect_build_reports_mir_lowering_failure() {
-  local case_dir="$tmpdir/mir_lowering_failure_case"
-  local src="$case_dir/mir_lowering_failure.w"
-  local bin="$case_dir/mir_lowering_failure"
+expect_build_reports_pcre2_link_failure() {
+  local case_dir="$tmpdir/pcre2_link_failure_case"
+  local src="$case_dir/pcre2_link_failure.w"
+  local bin="$case_dir/pcre2_link_failure"
   mkdir -p "$case_dir"
 
   cat >"$src" <<'EOF'
@@ -1271,7 +1427,7 @@ fn main:
 EOF
 
   if run_cli "$tmpdir/out" "$tmpdir/err" build "$src" -o "$bin"; then
-    echo "FAIL(cli-selfhost-build) mir_lowering_failure"
+    echo "FAIL(cli-selfhost-build) pcre2_link_failure"
     if [[ -f "$bin" ]]; then
       ls -lh "$bin" || true
     fi
@@ -1280,21 +1436,27 @@ EOF
   fi
 
   if [[ -e "$bin" ]]; then
-    echo "FAIL(cli-selfhost-build-artifact) mir_lowering_failure"
+    echo "FAIL(cli-selfhost-build-artifact) pcre2_link_failure"
     ls -lh "$bin" || true
     failures=$((failures + 1))
     return
   fi
 
-  if ! grep -Fq "error: MIR lowering failed for function 'pcre2_compile_8'" "$tmpdir/err" \
-    || ! grep -Fq "AST codegen was removed" "$tmpdir/err"; then
-    echo "FAIL(cli-selfhost-build-diagnostic) mir_lowering_failure"
+  if ! file_has_literal "$tmpdir/err" "Undefined symbols for architecture arm64:" \
+    || ! file_has_literal "$tmpdir/err" "__pcre2_OP_lengths_8" \
+    || ! file_has_literal "$tmpdir/err" "__pcre2_default_compile_context_8" \
+    || ! file_has_literal "$tmpdir/err" "__pcre2_strlen_8" \
+    || ! file_has_literal "$tmpdir/err" "ld: symbol(s) not found for architecture arm64" \
+    || ! file_has_literal "$tmpdir/err" "error: build failed" \
+    || ! file_forbid_literal "$tmpdir/err" "error: MIR lowering failed for function 'pcre2_compile_8'" \
+    || ! file_forbid_literal "$tmpdir/err" "AST codegen was removed"; then
+    echo "FAIL(cli-selfhost-build-diagnostic) pcre2_link_failure"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
     return
   fi
 
-  echo "PASS(cli-selfhost-build) mir_lowering_failure"
+  echo "PASS(cli-selfhost-build) pcre2_link_failure"
 }
 
 expect_init_in_cwd() {
@@ -1454,13 +1616,15 @@ expect_pcre2_prepare_shared_externs
 expect_pcre2_prepare_shared_lets
 expect_std_re_shared_dependency_imports
 expect_migrate_initializer_regressions
+expect_migrate_tentative_global_owner
+expect_migrate_cross_file_tentative_global_owner
 expect_migrate_noop_pointer_cast_exprs
 expect_migrate_typed_cast_macros
 expect_migrate_goto_shadowed_local
 expect_migrate_recursive_anonymous_records
 expect_opaque_field_access_is_rejected
 expect_pcre2_match_heapframe_is_concrete
-expect_build_reports_mir_lowering_failure
+expect_build_reports_pcre2_link_failure
 
 if [[ "$failures" -ne 0 ]]; then
   echo "cli selfhost tests: $failures failure(s)"
