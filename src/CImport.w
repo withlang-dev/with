@@ -4132,6 +4132,30 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         if (cast_id as i32) != 0:
             return cast_id
 
+    // Member access — `base.field` with With-reserved keyword
+    // escaping on the field name (B4a).
+    if kind == CXK_MEMBER_REF:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            let base_cursor = with_ci_child(session, cursor, 0)
+            let base_id = ci_lower_expr_ir(session, base_cursor, exprs, types, scope)
+            let field = with_ci_member_field_name(session, cursor)
+            if (base_id as i32) != 0 and field.len() > 0:
+                let escaped = ci_escape_reserved(field)
+                let field_idx = exprs.add_string(escaped)
+                return exprs.add(CiExprKind.CIE_FIELD, base_id as i32, field_idx, 0, 0 as CiTypeId)
+
+    // Array subscript — `base[idx]` (B4a).
+    if kind == CXK_ARRAY_SUBSCRIPT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 2:
+            let arr_cursor = with_ci_child(session, cursor, 0)
+            let idx_cursor = with_ci_child(session, cursor, 1)
+            let arr_id = ci_lower_expr_ir(session, arr_cursor, exprs, types, scope)
+            let idx_id = ci_lower_expr_ir(session, idx_cursor, exprs, types, scope)
+            if (arr_id as i32) != 0 and (idx_id as i32) != 0:
+                return exprs.add(CiExprKind.CIE_INDEX, arr_id as i32, idx_id as i32, 0, 0 as CiTypeId)
+
     // Legacy fallback: bypass the cache, lower via the string path,
     // and embed the result as a verbatim raw-string node.
     let legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
@@ -4371,7 +4395,7 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     // didn't produce a node, so we fall through to the legacy code
     // below. The set of detoured kinds grows commit by commit.
     if ci_migrate_ir_enabled():
-        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP or kind == CXK_UNARY_OP or kind == CXK_IMPLICIT_CAST:
+        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP or kind == CXK_UNARY_OP or kind == CXK_IMPLICIT_CAST or kind == CXK_MEMBER_REF or kind == CXK_ARRAY_SUBSCRIPT:
             let ir_result = ci_trans_expr_via_ir(session, cursor, scope)
             if ir_result.len() > 0:
                 return ir_result
