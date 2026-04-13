@@ -8418,17 +8418,9 @@ fn ci_migrate_ir_enabled() -> bool:
             g_migrate_ir_enabled_cache = 0
     g_migrate_ir_enabled_cache != 0
 
-// Wrap a legacy translated function-body string in a CIS_RAW_STRING
-// IR node and print it back through the CiPrint pipeline. The output
-// is byte-identical to the input by construction (CIS_RAW_STRING's
-// printer arm is verbatim). Phase-B commits replace this shim's
-// callers with real IR construction one statement kind at a time.
-fn ci_ir_shim_stmt(text: str) -> str:
-    var types = CiTypePool.new()
-    var exprs = CiExprPool.new()
-    var stmts = CiStmtPool.new()
-    let id = stmts.raw_string(text)
-    ci_print_stmt(&stmts, &exprs, &types, id, 0)
+// (ci_ir_shim_stmt was removed in B5e — B5d's statement-level
+// detour covers the same path at finer granularity, so the
+// function-body-level shim is redundant.)
 
 pub fn migrate_add_define(define: str):
     // define is "NAME=VALUE" or just "NAME"
@@ -9002,12 +8994,15 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     // @[c_export] for non-static functions (preserves C ABI)
     let export_prefix = if g_migrate_no_c_export != 0 or storage == CX_SC_STATIC: "" else: "@[c_export(\"" ++ name ++ "\")]\n"
 
-    // Try to translate the function body
+    // Try to translate the function body. Each ci_trans_stmt call
+    // inside ci_try_translate_fn_body already flows through the
+    // Phase-B IR detour (B5d), so the body string is the
+    // cumulative output of the statement-level lowering — no
+    // extra function-body-level shim is needed.
     let body = ci_try_translate_fn_body(session, idx)
     if body.len() > 0:
         let ret_suffix = if ret == "void": "" else: " -> " ++ ret
-        let body_emitted = if ci_migrate_ir_enabled(): ci_ir_shim_stmt(body) else: body
-        return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body_emitted ++ "\n"
+        return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body ++ "\n"
 
     // Body translation failed — emit as extern fn (system header function
     // or function with untranslatable body).
