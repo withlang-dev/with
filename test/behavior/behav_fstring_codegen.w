@@ -54,6 +54,12 @@ fn test_fstring_expression:
     assert(f"{2 * 3 + 1}" == "7")
     assert(f"{10 - 3}" == "7")
 
+fn test_fstring_colon_exprs:
+    var x = 7
+    let p = &mut x
+    assert(f"{unsafe: *p}" == "7")
+    assert(f"{if true: 1 else: 2}" == "1")
+
 fn test_fstring_nested_calls:
     let arr = [10, 20, 30]
     assert(f"arr[1]={arr[1]}" == "arr[1]=20")
@@ -82,6 +88,7 @@ fn main:
     test_fstring_bool_coercion()
     test_fstring_str_passthrough()
     test_fstring_expression()
+    test_fstring_colon_exprs()
     test_fstring_nested_calls()
     test_fstring_with_fn_call()
     test_fstring_concatenation()

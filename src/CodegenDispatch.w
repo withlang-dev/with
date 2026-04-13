@@ -7643,15 +7643,12 @@ fn Codegen.declare_async_function(self: Codegen, fn_node: i32):
     self.ensure_async_runtime_declared()
 
     let name_sym = self.pool.get_data0(fn_node)
-    let name_str = self.intern.resolve(name_sym)
     if name_sym == 0: return
 
     let meta = self.pool.find_fn_meta(fn_node)
     if meta < 0: return
 
     let i32_ty = wl_i32_type(self.context)
-    let void_ty = wl_void_type(self.context)
-    let ptr_ty = wl_ptr_type(self.context)
 
     let ret_type_node = self.pool.fn_meta_ret(meta)
     let param_start = self.pool.fn_meta_param_start(meta)
@@ -7688,27 +7685,9 @@ fn Codegen.declare_async_function(self: Codegen, fn_node: i32):
     if self.current_decl_is_imported_module_symbol():
         return
 
-    // 1. Declare implementation function: name_async(params) -> ret_type
-    let impl_fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, 0)
-    let impl_name = self.current_decl_module_link_name(name_str ++ "_async")
-    let impl_fn = wl_add_function(self.llmod, impl_name, impl_fn_type)
-    wl_set_linkage(impl_fn, wl_internal_linkage())
-    self.apply_noalias_param_attrs(impl_fn, param_start, param_count)
-    let impl_sym = self.intern.intern(impl_name)
-    self.fn_values.insert(impl_sym, impl_fn)
-    self.fn_fn_types.insert(impl_sym, impl_fn_type)
-
-    // 2. Create args struct type
+    // Keep only the metadata the current async spawn path still consumes.
     var args_struct_type = wl_struct_type(self.context, vec_data_i64(&param_types), param_count, 0)
     self.async_fn_args_struct_types.insert(name_sym, args_struct_type)
-
-    // 3. Declare fiber trampoline: name_fiber(arg: *void) -> void
-    let tramp_params: Vec[i64] = Vec.new()
-    tramp_params.push(ptr_ty)
-    let tramp_fn_type = wl_function_type(void_ty, vec_data_i64(&tramp_params), 1, 0)
-    let tramp_name = self.current_decl_module_link_name(name_str ++ "_fiber")
-    let tramp_fn = wl_add_function(self.llmod, tramp_name, tramp_fn_type)
-    wl_set_linkage(tramp_fn, wl_internal_linkage())
 
 // ── Async expressions ─────────────────────────────────────────────
 

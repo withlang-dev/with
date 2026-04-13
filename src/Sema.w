@@ -128,6 +128,9 @@ type SemaMethodLookup {
     fn_lookup: HashMap[i64, i32],
 }
 
+const GLOBAL_VALUE_DECL_DEF: i32 = 1
+const GLOBAL_VALUE_DECL_EXTERN: i32 = 2
+
 // ── Sema state ───────────────────────────────────────────────────
 
 type Sema {
@@ -244,6 +247,7 @@ type Sema {
     task_fns: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
     mutable_global_syms: HashMap[i32, i32],
+    global_value_decl_kinds: HashMap[i32, i32],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
     syms: SemaBuiltinSymbols,
@@ -593,6 +597,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let task_fns = sema_new_map_i32_i32()
     let fn_stack_sizes = sema_new_map_i32_i32()
     let mutable_global_syms = sema_new_map_i32_i32()
+    let global_value_decl_kinds = sema_new_map_i32_i32()
     let method_impl_nodes = sema_new_map_i32_i32()
     let method_decl_origins = sema_new_map_i32_i32()
     let method_has_inherent = sema_new_map_i32_i32()
@@ -684,6 +689,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         task_fns,
         fn_stack_sizes,
         mutable_global_syms,
+        global_value_decl_kinds,
         syms: sema_builtin_symbols_zero(),
         method_impl_nodes,
         method_decl_origins,
@@ -1810,13 +1816,7 @@ fn Sema.is_discard_binding_symbol(self: Sema, sym: i32) -> i32:
 fn Sema.scope_put(self: Sema, sym: i32, tid: i32, is_mut: i32):
     self.scope_put_at(sym, tid, is_mut, 0)
 
-fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
-    if self.is_discard_binding_symbol(sym) != 0:
-        return
-    if self.scope_lookup(sym) >= 0:
-        let name = self.pool_resolve(sym)
-        self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
-        return
+fn Sema.scope_insert_at(self: Sema, sym: i32, tid: i32, is_mut: i32):
     let idx = self.bind_names.len() as i32
     self.bind_names.push(sym)
     self.bind_types.push(tid)
@@ -1826,6 +1826,69 @@ fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
     self.bind_is_scoped_task.push(0)
     self.bind_is_ephemeral_task.push(0)
     self.scope_name_map.insert(sym, idx)
+
+fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
+    if self.is_discard_binding_symbol(sym) != 0:
+        return
+    if self.scope_lookup(sym) >= 0:
+        let name = self.pool_resolve(sym)
+        self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
+        return
+    self.scope_insert_at(sym, tid, is_mut)
+
+fn Sema.global_value_decl_kind(self: Sema, sym: i32) -> i32:
+    let opt = self.global_value_decl_kinds.get(sym)
+    if opt.is_some():
+        return opt.unwrap()
+    0
+
+fn Sema.global_value_decl_types_compatible(self: Sema, existing_tid: i32, new_tid: i32) -> i32:
+    if existing_tid == 0 or new_tid == 0:
+        return 1
+    let existing_resolved = self.resolve_alias(existing_tid as TypeId) as i32
+    let new_resolved = self.resolve_alias(new_tid as TypeId) as i32
+    if existing_resolved != 0 and existing_resolved == new_resolved:
+        return 1
+    0
+
+fn Sema.register_top_level_global_decl(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32, decl_kind: i32):
+    if self.is_discard_binding_symbol(sym) != 0:
+        return
+    let existing_opt = self.scope_name_map.get(sym)
+    if not existing_opt.is_some():
+        self.scope_insert_at(sym, tid, is_mut)
+        self.global_value_decl_kinds.insert(sym, decl_kind)
+        return
+
+    let existing_idx = existing_opt.unwrap()
+    let existing_kind = self.global_value_decl_kind(sym)
+    if existing_kind == 0:
+        let name = self.pool_resolve(sym)
+        self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
+        return
+
+    if existing_kind == GLOBAL_VALUE_DECL_DEF and decl_kind == GLOBAL_VALUE_DECL_DEF:
+        let name = self.pool_resolve(sym)
+        self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
+        return
+
+    let existing_mut = self.bind_muts.get(existing_idx as i64)
+    if existing_mut != is_mut:
+        let name = self.pool_resolve(sym)
+        self.emit_error("conflicting global declaration for '" ++ name ++ "'", node)
+        return
+
+    let existing_tid = self.bind_types.get(existing_idx as i64)
+    if self.global_value_decl_types_compatible(existing_tid, tid) == 0:
+        let name = self.pool_resolve(sym)
+        self.emit_error("conflicting global declaration for '" ++ name ++ "'", node)
+        return
+
+    if existing_tid == 0 and tid != 0:
+        self.bind_types.set_i32(existing_idx as i64, tid)
+
+    if existing_kind == GLOBAL_VALUE_DECL_EXTERN and decl_kind == GLOBAL_VALUE_DECL_DEF:
+        self.global_value_decl_kinds.insert(sym, GLOBAL_VALUE_DECL_DEF)
 
 fn Sema.scope_lookup(self: Sema, sym: i32) -> i32:
     let opt = self.scope_name_map.get(sym)

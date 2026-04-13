@@ -1076,7 +1076,9 @@ fn Sema.collect_extern_var(self: Sema, node: i32, is_local: i32):
         self.emit_error("opaque types cannot be declared as extern values; use a pointer or reference", type_node)
     // Register the extern var for scope lookup
     let is_mut = if self.ast.get_data2(node) != 0: 1 else: 0
-    self.scope_put_at(name, tid, is_mut, node)
+    if is_mut != 0:
+        self.mutable_global_syms.insert(name, 1)
+    self.register_top_level_global_decl(name, tid, is_mut, node, GLOBAL_VALUE_DECL_EXTERN)
 
 fn sema_str_find_char(text: str, needle: i32) -> i32:
     for i in 0..text.len() as i32:
@@ -1156,7 +1158,7 @@ fn Sema.collect_let_decl(self: Sema, node: i32, is_local: i32):
             self.emit_error("opaque values cannot be stored by value; use a pointer or reference", type_node)
         if self.type_expr_is_collection_with_ref(type_node) != 0:
             self.emit_error("ephemeral references cannot be stored in generic containers", node)
-    self.scope_put_at(name, bind_ty as i32, is_mut, node)
+    self.register_top_level_global_decl(name, bind_ty as i32, is_mut, node, GLOBAL_VALUE_DECL_DEF)
     self.typed_binding_types.insert(node, bind_ty as i32)
     self.typed_binding_names.insert(node, name)
     self.typed_binding_muts.insert(node, is_mut)
