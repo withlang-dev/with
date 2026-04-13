@@ -6168,6 +6168,44 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
             if (val_id as i32) != 0:
                 return stmts.return_(val_id)
 
+    // Structural if statement (B5i). Bails to the generic
+    // fallback if the condition needs statement-level lowering
+    // (side-effect temp vars — legacy uses ci_trans_condition_
+    // prepare + a local bool temp). Otherwise stashes the
+    // legacy ci_trans_bool_expr result as a raw cond, recurses
+    // on then/else through ci_lower_stmt_ir, and emits a
+    // CIS_IF whose printer handles the per-level re-indent.
+    if kind == CXK_IF_STMT:
+        let ifnc = with_ci_num_children(session, cursor)
+        if ifnc >= 2:
+            let cond_cursor = with_ci_child(session, cursor, 0)
+            if not ci_condition_needs_stmt_eval(session, cond_cursor):
+                let then_child = with_ci_child(session, cursor, 1)
+                let cond_str = ci_trans_bool_expr(session, cond_cursor, scope)
+                if cond_str.len() > 0:
+                    let then_id = ci_lower_stmt_ir(session, then_child, stmts, exprs, types, 0, scope)
+                    var else_id: CiStmtId = 0 as CiStmtId
+                    if ifnc > 2:
+                        let else_child = with_ci_child(session, cursor, 2)
+                        else_id = ci_lower_stmt_ir(session, else_child, stmts, exprs, types, 0, scope)
+                    let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
+                    return stmts.if_stmt(cond_id, then_id, else_id)
+
+    // Structural while statement (B5j). Same bail-out as CIS_IF
+    // for complex conditions.
+    if kind == CXK_WHILE_STMT:
+        let wnc = with_ci_num_children(session, cursor)
+        if wnc >= 2:
+            let cond_cursor = with_ci_child(session, cursor, 0)
+            if not ci_condition_needs_stmt_eval(session, cond_cursor):
+                let body_cursor = with_ci_child(session, cursor, 1)
+                let cond_str = ci_trans_bool_expr(session, cond_cursor, scope)
+                if cond_str.len() > 0:
+                    let body_id = ci_lower_stmt_ir(session, body_cursor, stmts, exprs, types, 0, scope)
+                    if (body_id as i32) != 0:
+                        let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
+                        return stmts.while_stmt(cond_id, body_id)
+
     // Structural compound statement (B5h). Iterates children,
     // threading block_scope through decl_stmts just like the
     // legacy compound_stmt arm. Non-decl children recurse through
