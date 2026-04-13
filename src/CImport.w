@@ -4061,12 +4061,97 @@ fn ci_literal_token_text(session: i64, cursor: i32) -> str:
         return token_text
     with_ci_cursor_source_text(session, cursor)
 
+// ── Phase-B IR lowering for leaf expressions ─────────────────
+//
+// B2 covers literals + DeclRef. The lowering builds a CiExpr node
+// whose stored payload mirrors the legacy ci_trans_expr text byte
+// for byte, so output stays identical under the WITH_MIGRATE_IR
+// flag. Future B-phase commits add Binary/Unary/Cast/Call/etc.
+// arms in ci_lower_expr_ir; ci_trans_expr_via_ir grows alongside
+// them and the legacy literal arms get deleted in B11.
+//
+// Returns 0 (the null sentinel) when the cursor kind is not yet
+// supported, signaling the caller to fall back to the legacy path.
+
+fn ci_lower_literal_or_ref(session: i64, cursor: i32, kind: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    if kind == CXK_INT_LITERAL:
+        var text: str = ""
+        if with_ci_eval_int_valid(session, cursor) != 0:
+            text = i64_to_string(with_ci_eval_int_value(session, cursor))
+        else:
+            text = with_ci_cursor_source_text(session, cursor)
+        let s = exprs.add_string(text)
+        return exprs.int_lit(s, 0 as CiTypeId)
+
+    if kind == CXK_FLOAT_LITERAL:
+        var src = with_ci_cursor_source_text(session, cursor)
+        if src.len() > 0:
+            let last = src.byte_at(src.len() - 1)
+            if last == 102 or last == 70 or last == 108 or last == 76:
+                src = src.slice(0, src.len() - 1)
+        let s = exprs.add_string(src)
+        return exprs.add(CiExprKind.CIE_FLOAT_LIT, s, 0, 0, 0 as CiTypeId)
+
+    if kind == CXK_STRING_LITERAL:
+        let literal_src = ci_literal_token_text(session, cursor)
+        var text = literal_src
+        if ci_is_concatenated_string(literal_src):
+            text = ci_concat_strings(literal_src)
+        else:
+            if literal_src.len() > 0 and literal_src.byte_at(0) != 34:
+                let stringify_val = ci_try_expand_stringify_call(session, literal_src)
+                if stringify_val.len() > 0:
+                    text = stringify_val
+        let s = exprs.add_string(text)
+        return exprs.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
+
+    if kind == CXK_CHAR_LITERAL:
+        var text: str = ""
+        if with_ci_eval_int_valid(session, cursor) != 0:
+            text = i64_to_string(with_ci_eval_int_value(session, cursor))
+        else:
+            text = with_ci_cursor_source_text(session, cursor)
+        let s = exprs.add_string(text)
+        return exprs.add(CiExprKind.CIE_CHAR_LIT, s, 0, 0, 0 as CiTypeId)
+
+    if kind == CXK_DECL_REF:
+        let name = with_ci_cursor_spelling(session, cursor)
+        let escaped = ci_escape_reserved(name)
+        let mangled = ci_scope_lookup(scope, escaped)
+        var text = ""
+        if mangled.len() > 0:
+            text = mangled
+        else:
+            text = escaped
+        let s = exprs.add_string(text)
+        return exprs.ident(s, 0 as CiTypeId)
+
+    0 as CiExprId
+
+fn ci_trans_expr_via_ir(session: i64, cursor: i32, kind: i32, scope: str) -> str:
+    var types = CiTypePool.new()
+    var exprs = CiExprPool.new()
+    let id = ci_lower_literal_or_ref(session, cursor, kind, &mut exprs, &mut types, scope)
+    if (id as i32) == 0:
+        return ""
+    ci_print_expr(&exprs, &types, id, 0, 0)
+
 fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     let kind = with_ci_cursor_kind(session, cursor)
     let src = with_ci_cursor_source_text(session, cursor)
     let expanded_src = ci_expand_string_macro_sequence(session, src)
     if expanded_src.len() > 0:
         return expanded_src
+
+    // Phase-B IR detour: route the kinds that ci_lower_literal_or_ref
+    // owns through CiIR + CiPrint. An empty result means the lowering
+    // didn't produce a node (e.g. the kind isn't yet supported), so we
+    // fall through to the legacy code below.
+    if ci_migrate_ir_enabled():
+        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF:
+            let ir_result = ci_trans_expr_via_ir(session, cursor, kind, scope)
+            if ir_result.len() > 0:
+                return ir_result
 
     // Integer literal
     if kind == CXK_INT_LITERAL:
