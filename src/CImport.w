@@ -6217,6 +6217,23 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
                         let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
                         return stmts.while_stmt(cond_id, body_id)
 
+    // Compound statement with gotos (B8a). The legacy transforms
+    // the whole body into a `while true: match __pc: ...` state
+    // machine via ci_trans_goto_body. For the first step of B8 we
+    // call the legacy transformer through the cache bypass and
+    // wrap the result as a CIS_RAW_STRING — this at least pulls
+    // goto-containing bodies into the IR pipeline so every
+    // structural node in a function flows through ci_lower_stmt_ir.
+    // Subsequent B8 sub-commits replace the raw-string with real
+    // IR nodes one shape at a time.
+    if kind == CXK_COMPOUND_STMT and ci_has_goto(session, cursor):
+        let prev = g_migrate_ir_enabled_cache
+        g_migrate_ir_enabled_cache = 0
+        let goto_body = ci_trans_goto_body(session, cursor, 0, scope)
+        g_migrate_ir_enabled_cache = prev
+        if goto_body.len() > 0:
+            return stmts.raw_string(goto_body)
+
     // Structural compound statement (B5h). Iterates children,
     // threading block_scope through decl_stmts just like the
     // legacy compound_stmt arm. Non-decl children recurse through
@@ -7510,14 +7527,12 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
         if prpos2 < prlen2 and cursor_params.byte_at(prpos2 as i64) == 124:
             prpos2 = prpos2 + 1
 
-    // Check for gotos — use state machine transform if present
-    if ci_has_goto(session, body_cursor):
-        let body = ci_trans_goto_body(session, body_cursor, 1, init_scope)
-        if body.len() == 0:
-            return ""
-        return param_rebinds ++ body
-
-    // Normal structured translation
+    // Always route through ci_trans_stmt — the goto-body path is
+    // picked up by ci_lower_stmt_ir's CXK_COMPOUND_STMT arm when
+    // it detects a goto-containing compound (B8a plumbing). This
+    // gets goto bodies into the IR pipeline so later B8 commits
+    // can replace the raw-string state machine with structural
+    // IR nodes.
     let body = ci_trans_stmt(session, body_cursor, 1, init_scope)
     if body.len() == 0:
         return ""
