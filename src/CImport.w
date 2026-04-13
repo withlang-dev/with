@@ -6134,53 +6134,60 @@ fn ci_strip_trailing_newline(s: str) -> str:
         return s.slice(0, s.len() - 1)
     s
 
+// Recursive statement lowering helper: produces a CiStmtId from a
+// cursor. Specific handlers build real CIS_* nodes for kinds we
+// own structurally; everything else bails to the legacy bypass
+// and wraps the string in CIS_RAW_STRING. Returns 0 for the empty
+// case (CXK_NULL_STMT and bypass-returns-empty).
+fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, indent: i32, scope: str) -> CiStmtId:
+    let kind = with_ci_cursor_kind(session, cursor)
+
+    if kind == CXK_BREAK_STMT:
+        return stmts.break_()
+    if kind == CXK_CONTINUE_STMT:
+        return stmts.continue_()
+    if kind == CXK_NULL_STMT:
+        return 0 as CiStmtId
+
+    if kind == CXK_RETURN_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc == 0:
+            return stmts.return_(0 as CiExprId)
+        let ret_child = with_ci_child(session, cursor, 0)
+        let ret_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, ret_child))
+        let is_array_ret = ret_ty_str.len() > 0 and ret_ty_str.byte_at(0) == 91
+        if not ci_rvalue_needs_lowering(session, ret_child) and not is_array_ret:
+            let val_id = ci_lower_expr_ir(session, ret_child, exprs, types, scope)
+            if (val_id as i32) != 0:
+                return stmts.return_(val_id)
+
+    // Legacy fallback: bypass the cache, call the legacy
+    // ci_trans_stmt at the provided indent, and wrap the result in
+    // a CIS_RAW_STRING. The caller's indent is preserved so the
+    // legacy's ci_indent_block output matches the surrounding
+    // context byte-for-byte.
+    let legacy = ci_trans_stmt_legacy_for_ir(session, cursor, indent, scope)
+    if legacy.len() == 0:
+        return 0 as CiStmtId
+    stmts.raw_string(legacy)
+
 fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope: str) -> str:
     var types = CiTypePool.new()
     var exprs = CiExprPool.new()
     var stmts = CiStmtPool.new()
 
-    if kind == CXK_BREAK_STMT:
-        let id = stmts.break_()
-        return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
-
-    if kind == CXK_CONTINUE_STMT:
-        let id = stmts.continue_()
-        return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
-
-    if kind == CXK_NULL_STMT:
+    let id = ci_lower_stmt_ir(session, cursor, &mut stmts, &mut exprs, &mut types, indent, scope)
+    if (id as i32) == 0:
+        // CXK_NULL_STMT and empty-bypass map to empty string.
         return ""
 
-    if kind == CXK_RETURN_STMT:
-        let nc = with_ci_num_children(session, cursor)
-        if nc == 0:
-            let id = stmts.return_(0 as CiExprId)
-            return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
-        let ret_child = with_ci_child(session, cursor, 0)
-
-        // Attempt structural lowering — bails (to the generic
-        // fallback below) if the return expression needs setup-
-        // level rvalue lowering or if the return type is an array
-        // (legacy adds a decay cast the printer doesn't yet
-        // produce).
-        let ret_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, ret_child))
-        let is_array_ret = ret_ty_str.len() > 0 and ret_ty_str.byte_at(0) == 91
-        if not ci_rvalue_needs_lowering(session, ret_child) and not is_array_ret:
-            let val_id = ci_lower_expr_ir(session, ret_child, &mut exprs, &mut types, scope)
-            if (val_id as i32) != 0:
-                let id = stmts.return_(val_id)
-                return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
-
-    // Generic fallback: call the legacy ci_trans_stmt via the cache
-    // bypass, wrap the result in a CIS_RAW_STRING, and print it
-    // back verbatim. This ensures every statement kind flows
-    // through the IR pipeline even when the lowering pass doesn't
-    // yet have a structural handler for it — the trailing newline
-    // is not stripped because the legacy's multi-line output
-    // already matches ci_indent_block's caller-prefix convention.
-    let legacy = ci_trans_stmt_legacy_for_ir(session, cursor, indent, scope)
-    if legacy.len() == 0:
-        return ""
-    let id = stmts.raw_string(legacy)
+    // Simple single-line stmt kinds (break / continue / return)
+    // get their trailing newline stripped to match the legacy's
+    // bare-string convention. Multi-line and raw-string kinds
+    // keep their newlines intact.
+    let sk = stmts.kind(id)
+    if sk == CiStmtKind.CIS_BREAK or sk == CiStmtKind.CIS_CONTINUE or sk == CiStmtKind.CIS_RETURN:
+        return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
     ci_print_stmt(&stmts, &exprs, &types, id, 0)
 
 fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
