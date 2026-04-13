@@ -51,9 +51,12 @@ fn ci_bin_op_prec(op: i32) -> i32:
     if op == CiBinOp.CIBO_SHR: return 8
     if op == CiBinOp.CIBO_ADD: return 9
     if op == CiBinOp.CIBO_SUB: return 9
+    if op == CiBinOp.CIBO_ADD_WRAP: return 9
+    if op == CiBinOp.CIBO_SUB_WRAP: return 9
     if op == CiBinOp.CIBO_MUL: return 10
     if op == CiBinOp.CIBO_DIV: return 10
     if op == CiBinOp.CIBO_MOD: return 10
+    if op == CiBinOp.CIBO_MUL_WRAP: return 10
     0
 
 fn ci_bin_op_str(op: i32) -> str:
@@ -75,6 +78,9 @@ fn ci_bin_op_str(op: i32) -> str:
     if op == CiBinOp.CIBO_BIT_XOR: return "^"
     if op == CiBinOp.CIBO_SHL: return "<<"
     if op == CiBinOp.CIBO_SHR: return ">>"
+    if op == CiBinOp.CIBO_ADD_WRAP: return "+%"
+    if op == CiBinOp.CIBO_SUB_WRAP: return "-%"
+    if op == CiBinOp.CIBO_MUL_WRAP: return "*%"
     "?binop?"
 
 fn ci_unary_op_str(op: i32) -> str:

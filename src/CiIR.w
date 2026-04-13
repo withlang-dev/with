@@ -225,6 +225,13 @@ enum CiBinOp: i32:
     CIBO_BIT_XOR = 15
     CIBO_SHL = 16
     CIBO_SHR = 17
+    // Wrap-on-overflow arithmetic for unsigned operands. With's
+    // regular +/-/* trap on overflow; the legacy migrator emits
+    // +% / -% / *% for unsigned arithmetic to preserve C
+    // wraparound semantics.
+    CIBO_ADD_WRAP = 18
+    CIBO_SUB_WRAP = 19
+    CIBO_MUL_WRAP = 20
 
 enum CiUnaryOp: i32:
     CIUO_NEG = 0

@@ -4102,12 +4102,101 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
             if (inner_id as i32) != 0:
                 return exprs.add(CiExprKind.CIE_PAREN, inner_id as i32, 0, 0, 0 as CiTypeId)
 
+    // Binary operator — simple non-pointer non-array arithmetic /
+    // bitwise cases (B3b). Pointer arith, comparisons, logical
+    // and/or, shifts, assignments, and large-decimal coercion all
+    // fall back to legacy below for now; subsequent commits add
+    // them one arm at a time.
+    if kind == CXK_BINARY_OP:
+        let bin_id = ci_lower_binary_simple(session, cursor, exprs, types, scope)
+        if (bin_id as i32) != 0:
+            return bin_id
+
     // Legacy fallback: bypass the cache, lower via the string path,
     // and embed the result as a verbatim raw-string node.
     let legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
     if legacy.len() == 0:
         return 0 as CiExprId
     exprs.raw_string(legacy, 0 as CiTypeId)
+
+fn ci_lower_binary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 2:
+        return 0 as CiExprId
+    let op = with_ci_binary_op(session, cursor)
+
+    // Only the arithmetic / bitwise non-shift ops. Shift, comparison,
+    // logical, and assignment all need bigger structural work and
+    // belong to later sub-commits.
+    if op != BO_ADD and op != BO_SUB and op != BO_MUL and op != BO_DIV and op != BO_REM and op != BO_AND and op != BO_OR and op != BO_XOR:
+        return 0 as CiExprId
+
+    let lhs_cursor = with_ci_child(session, cursor, 0)
+    let rhs_cursor = with_ci_child(session, cursor, 1)
+
+    // Bail on pointer or array operands; legacy has dedicated arms
+    // for pointer arith and array-decay handling.
+    if with_ci_type_is_pointer(session, lhs_cursor) != 0:
+        return 0 as CiExprId
+    if with_ci_type_is_pointer(session, rhs_cursor) != 0:
+        return 0 as CiExprId
+    let lhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
+    let rhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_cursor))
+    if lhs_ty_str.len() > 0 and lhs_ty_str.byte_at(0) == 91:
+        return 0 as CiExprId
+    if rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91:
+        return 0 as CiExprId
+
+    // Bail when either bare operand is a "large decimal" — the
+    // legacy wraps these in `(... as c_uint)`. Subsequent commits
+    // can lift the cast into IR; for now, defer.
+    let lhs_src = with_ci_cursor_source_text(session, lhs_cursor)
+    let rhs_src = with_ci_cursor_source_text(session, rhs_cursor)
+    if ci_is_large_decimal(lhs_src):
+        return 0 as CiExprId
+    if ci_is_large_decimal(rhs_src):
+        return 0 as CiExprId
+
+    // Recursively lower operands. If either lowering bails we have
+    // to bail too — we can't construct a partial CIE_BINARY.
+    let lhs_id = ci_lower_expr_ir(session, lhs_cursor, exprs, types, scope)
+    if (lhs_id as i32) == 0:
+        return 0 as CiExprId
+    let rhs_id = ci_lower_expr_ir(session, rhs_cursor, exprs, types, scope)
+    if (rhs_id as i32) == 0:
+        return 0 as CiExprId
+
+    // Pick the wrap variant for unsigned arithmetic on +, -, *.
+    // Division, modulo, and bitwise ops never wrap in the legacy.
+    let is_unsigned = with_ci_type_is_unsigned(session, cursor)
+    var ci_op: i32 = 0
+    if op == BO_ADD:
+        if is_unsigned != 0:
+            ci_op = CiBinOp.CIBO_ADD_WRAP
+        else:
+            ci_op = CiBinOp.CIBO_ADD
+    if op == BO_SUB:
+        if is_unsigned != 0:
+            ci_op = CiBinOp.CIBO_SUB_WRAP
+        else:
+            ci_op = CiBinOp.CIBO_SUB
+    if op == BO_MUL:
+        if is_unsigned != 0:
+            ci_op = CiBinOp.CIBO_MUL_WRAP
+        else:
+            ci_op = CiBinOp.CIBO_MUL
+    if op == BO_DIV:
+        ci_op = CiBinOp.CIBO_DIV
+    if op == BO_REM:
+        ci_op = CiBinOp.CIBO_MOD
+    if op == BO_AND:
+        ci_op = CiBinOp.CIBO_BIT_AND
+    if op == BO_OR:
+        ci_op = CiBinOp.CIBO_BIT_OR
+    if op == BO_XOR:
+        ci_op = CiBinOp.CIBO_BIT_XOR
+
+    exprs.binary(ci_op, lhs_id, rhs_id, 0 as CiTypeId)
 
 fn ci_lower_literal_or_ref(session: i64, cursor: i32, kind: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     if kind == CXK_INT_LITERAL:
@@ -4184,7 +4273,7 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     // didn't produce a node, so we fall through to the legacy code
     // below. The set of detoured kinds grows commit by commit.
     if ci_migrate_ir_enabled():
-        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR:
+        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP:
             let ir_result = ci_trans_expr_via_ir(session, cursor, scope)
             if ir_result.len() > 0:
                 return ir_result
