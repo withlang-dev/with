@@ -6168,6 +6168,41 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
             if (val_id as i32) != 0:
                 return stmts.return_(val_id)
 
+    // Structural compound statement (B5h). Iterates children,
+    // threading block_scope through decl_stmts just like the
+    // legacy compound_stmt arm. Non-decl children recurse through
+    // ci_lower_stmt_ir. The CIS_BLOCK printer takes care of
+    // re-indentation and the blank-line separators at print time.
+    if kind == CXK_COMPOUND_STMT:
+        let ccn = with_ci_num_children(session, cursor)
+        var child_ids: Vec[i32] = Vec.new()
+        var block_scope = scope
+        var ci = 0
+        while ci < ccn:
+            let child = with_ci_child(session, cursor, ci)
+            if with_ci_cursor_kind(session, child) == CXK_DECL_STMT:
+                let decl_lowered = ci_lower_decl_stmt(session, child, block_scope, false)
+                block_scope = decl_lowered.updated_scope
+                if decl_lowered.local_stmt.len() > 0:
+                    let raw_id = stmts.raw_string(decl_lowered.local_stmt)
+                    child_ids.push(raw_id as i32)
+            else:
+                let child_id = ci_lower_stmt_ir(session, child, stmts, exprs, types, 0, block_scope)
+                if (child_id as i32) != 0:
+                    child_ids.push(child_id as i32)
+            ci = ci + 1
+
+        // Push child ids into stmts.extra contiguously after all
+        // recursive lowering completes — inner calls may have
+        // pushed their own extra entries.
+        let extra_start = stmts.extra.len() as i32
+        let count = child_ids.len() as i32
+        var cj: i64 = 0
+        while cj < child_ids.len():
+            let _ = stmts.add_extra(child_ids.get(cj))
+            cj = cj + 1
+        return stmts.block(extra_start, count)
+
     // Legacy fallback: bypass the cache, call the legacy
     // ci_trans_stmt at indent=0, and wrap the result in a
     // CIS_RAW_STRING. The printer re-indents at print time based
