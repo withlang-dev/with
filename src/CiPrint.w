@@ -176,15 +176,19 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
         return "<ci:expr:0>"
     let kind = exprs.kind(id)
 
-    // Literals
+    // Literals — d0 indexes into the expr-pool string table, which
+    // holds the already-formatted text (decimal digits, suffix-
+    // stripped float, full quoted string, etc.). The lowering pass
+    // is responsible for producing identical bytes to the legacy
+    // path; the printer is verbatim.
     if kind == CiExprKind.CIE_INT_LIT:
         return exprs.get_string(exprs.get_d0(id))
     if kind == CiExprKind.CIE_FLOAT_LIT:
         return exprs.get_string(exprs.get_d0(id))
     if kind == CiExprKind.CIE_CHAR_LIT:
-        return i32_to_string(exprs.get_d0(id))
+        return exprs.get_string(exprs.get_d0(id))
     if kind == CiExprKind.CIE_STRING_LIT:
-        return "\"" ++ exprs.get_string(exprs.get_d0(id)) ++ "\""
+        return exprs.get_string(exprs.get_d0(id))
     if kind == CiExprKind.CIE_BOOL_LIT:
         if exprs.get_d0(id) != 0:
             return "true"
@@ -479,6 +483,7 @@ fn ci_roundtrip_exprs -> i32:
     var exprs = CiExprPool.new()
     let i32_ty = types.ty_int(32, 0)
     let u8_ty = types.ty_int(8, 1)
+    let f32_ty = types.ty_float(32)
     let lit_idx = exprs.add_string("42")
     let lit = exprs.int_lit(lit_idx, i32_ty)
     let a_idx = exprs.add_string("a")
@@ -488,12 +493,24 @@ fn ci_roundtrip_exprs -> i32:
     let add = exprs.binary(CiBinOp.CIBO_ADD, a, b, i32_ty)
     let neg = exprs.unary(CiUnaryOp.CIUO_NEG, lit, i32_ty)
     let cast_u8 = exprs.cast(u8_ty, a)
+    // CIE_FLOAT_LIT, CIE_CHAR_LIT, CIE_STRING_LIT all use string-table
+    // indirect storage; the lowering pass owns formatting and the
+    // printer is verbatim.
+    let float_idx = exprs.add_string("3.14")
+    let float_lit = exprs.add(CiExprKind.CIE_FLOAT_LIT, float_idx, 0, 0, f32_ty)
+    let char_idx = exprs.add_string("65")
+    let char_lit = exprs.add(CiExprKind.CIE_CHAR_LIT, char_idx, 0, 0, i32_ty)
+    let str_idx = exprs.add_string("\"hello\"")
+    let str_lit = exprs.add(CiExprKind.CIE_STRING_LIT, str_idx, 0, 0, 0 as CiTypeId)
     var fails: i32 = 0
     fails = fails + ci_expect_eq("expr_int_lit", ci_print_expr(&exprs, &types, lit, 0, 0), "42")
     fails = fails + ci_expect_eq("expr_ident", ci_print_expr(&exprs, &types, a, 0, 0), "a")
     fails = fails + ci_expect_eq("expr_binary_add", ci_print_expr(&exprs, &types, add, 0, 0), "(a + b)")
     fails = fails + ci_expect_eq("expr_unary_neg", ci_print_expr(&exprs, &types, neg, 0, 0), "(-42)")
     fails = fails + ci_expect_eq("expr_cast_u8", ci_print_expr(&exprs, &types, cast_u8, 0, 0), "(a as u8)")
+    fails = fails + ci_expect_eq("expr_float_lit", ci_print_expr(&exprs, &types, float_lit, 0, 0), "3.14")
+    fails = fails + ci_expect_eq("expr_char_lit", ci_print_expr(&exprs, &types, char_lit, 0, 0), "65")
+    fails = fails + ci_expect_eq("expr_string_lit", ci_print_expr(&exprs, &types, str_lit, 0, 0), "\"hello\"")
     fails
 
 fn ci_roundtrip_fn_decl -> i32:

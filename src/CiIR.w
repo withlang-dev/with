@@ -154,11 +154,15 @@ fn CiTypePool.ty_fn_ptr(self: &mut CiTypePool, ret: CiTypeId, params_start: i32,
 type CiExprId = distinct i32
 
 enum CiExprKind: i32:
-    // Literals
-    CIE_INT_LIT = 1          // d0 = string_idx of literal text, d1 = ci_int_suffix
-    CIE_FLOAT_LIT = 2        // d0 = string_idx of literal text
-    CIE_CHAR_LIT = 3         // d0 = codepoint
-    CIE_STRING_LIT = 4       // d0 = string_idx (raw bytes, pre-escaped)
+    // Literals — d0 = string_idx of the already-formatted literal
+    // text (decimal digits for ints/chars, suffix-stripped float
+    // text, full quoted form for string literals). Printer is
+    // verbatim; the lowering pass owns formatting decisions so the
+    // result matches the legacy migrator byte-for-byte.
+    CIE_INT_LIT = 1          // d0 = string_idx
+    CIE_FLOAT_LIT = 2        // d0 = string_idx
+    CIE_CHAR_LIT = 3         // d0 = string_idx (decimal codepoint as text)
+    CIE_STRING_LIT = 4       // d0 = string_idx (full quoted form)
     CIE_BOOL_LIT = 5         // d0 = 0 or 1
     CIE_NULL_PTR = 6         // no data — represents C NULL / With null
 
