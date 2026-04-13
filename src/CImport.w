@@ -4298,16 +4298,6 @@ fn ci_lower_binary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
     if rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91:
         return 0 as CiExprId
 
-    // Bail when either bare operand is a "large decimal" — the
-    // legacy wraps these in `(... as c_uint)`. Subsequent commits
-    // can lift the cast into IR; for now, defer.
-    let lhs_src = with_ci_cursor_source_text(session, lhs_cursor)
-    let rhs_src = with_ci_cursor_source_text(session, rhs_cursor)
-    if ci_is_large_decimal(lhs_src):
-        return 0 as CiExprId
-    if ci_is_large_decimal(rhs_src):
-        return 0 as CiExprId
-
     // Recursively lower operands. If either lowering bails we have
     // to bail too — we can't construct a partial CIE_BINARY.
     let lhs_id = ci_lower_expr_ir(session, lhs_cursor, exprs, types, scope)
@@ -4348,6 +4338,21 @@ fn ci_lower_binary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
         ci_op = CiBinOp.CIBO_BIT_XOR
     if op == BO_ASSIGN:
         ci_op = CiBinOp.CIBO_ASSIGN
+
+    // Large-decimal coercion (B3r): the legacy wraps a bare-
+    // integer-literal operand in `(... as c_uint)` when its source
+    // text exceeds i32 max, so the arithmetic uses c_uint semantics.
+    // Assignment is exempt (legacy doesn't apply the coercion there).
+    if op != BO_ASSIGN:
+        let lhs_str = ci_print_expr(exprs, types, lhs_id, 0, 0)
+        let rhs_str = ci_print_expr(exprs, types, rhs_id, 0, 0)
+        let op_str_typed = ci_bo_to_str_typed(op, is_unsigned)
+        if ci_is_large_decimal(lhs_str):
+            let result = "((" ++ lhs_str ++ " as c_uint) " ++ op_str_typed ++ " " ++ rhs_str ++ ")"
+            return exprs.raw_string(result, 0 as CiTypeId)
+        if ci_is_large_decimal(rhs_str):
+            let result = "(" ++ lhs_str ++ " " ++ op_str_typed ++ " (" ++ rhs_str ++ " as c_uint))"
+            return exprs.raw_string(result, 0 as CiTypeId)
 
     exprs.binary(ci_op, lhs_id, rhs_id, 0 as CiTypeId)
 
