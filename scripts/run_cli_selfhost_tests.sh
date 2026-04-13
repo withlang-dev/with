@@ -900,6 +900,82 @@ EOF
   echo "PASS(cli-selfhost-regex) shared_externs"
 }
 
+expect_pcre2_prepare_width_prunes_whole_decls() {
+  local case_dir="$tmpdir/pcre2_prepare_width_prune_case"
+  local raw_dir="$case_dir/raw"
+  local generated_dir="$case_dir/generated"
+  local wrapper="$case_dir/wrapper.w"
+  mkdir -p "$raw_dir"
+
+  cat >"$raw_dir/pcre2_tables.w" <<'EOF'
+// raw tables
+type c_void = opaque
+type c_int = i32
+type c_uint = u32
+type c_ushort = u16
+extern fn strlen(s: *const i8) -> i64
+extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void
+extern fn preamble_helper() -> void
+type BOOL = c_int
+type PCRE2_UCHAR16 = c_ushort
+EOF
+
+  cat >"$raw_dir/pcre2_compile.w" <<'EOF'
+// raw compile
+type c_int = i32
+type c_uint = u32
+extern fn preamble_helper() -> void
+type BOOL = c_int
+type PCRE2_UCHAR16 = c_ushort
+extern fn _pcre2_keep_8(ch: c_uint) -> c_uint
+extern fn pcre2_drop_16(ch: c_uint) -> c_uint
+fn keep_body(flag: c_int) -> c_int:
+    var c__goto_6350_16: c_uint = 0
+    if flag != 0:
+        (c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))
+    else:
+        (c__goto_6350_16 = 1)
+    (c__goto_6350_16 as c_int)
+EOF
+
+  if ! bash "$ROOT_DIR/scripts/pcre2_generated_workflow.sh" prepare "$raw_dir" "$generated_dir" >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-regex-prepare) width_prunes_whole_decls"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if grep -Fq 'pcre2_drop_16' "$generated_dir/pcre2_compile.w" \
+    || grep -Fq 'PCRE2_UCHAR16' "$generated_dir/pcre2_compile.w" \
+    || ! grep -Fq '(c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))' "$generated_dir/pcre2_compile.w" \
+    || ! grep -Fq 'else:' "$generated_dir/pcre2_compile.w"; then
+    echo "FAIL(cli-selfhost-regex-output) width_prunes_whole_decls"
+    find "$generated_dir" -maxdepth 1 -type f -print | sort | while read -r f; do
+      echo "--- $f"
+      sed -n '1,120p' "$f"
+    done
+    failures=$((failures + 1))
+    return
+  fi
+
+  {
+    tail -n +2 "$generated_dir/defs.w"
+    tail -n +3 "$generated_dir/pcre2_compile.w"
+    printf '\nfn main: print("ok")\n'
+  } >"$wrapper"
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$wrapper"; then
+    echo "FAIL(cli-selfhost-check) width_prunes_whole_decls"
+    cat "$tmpdir/err" || true
+    echo "--- wrapper"
+    sed -n '1,160p' "$wrapper" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-regex) width_prunes_whole_decls"
+}
+
 expect_pcre2_prepare_shared_lets() {
   local case_dir="$tmpdir/pcre2_prepare_shared_lets_case"
   local raw_dir="$case_dir/raw"
@@ -1613,6 +1689,7 @@ expect_migrate_assignment_compat
 expect_migrate_rvalue_sequencing
 expect_migrate_cross_file_global_owner_arrays
 expect_pcre2_prepare_shared_externs
+expect_pcre2_prepare_width_prunes_whole_decls
 expect_pcre2_prepare_shared_lets
 expect_std_re_shared_dependency_imports
 expect_migrate_initializer_regressions
