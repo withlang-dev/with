@@ -47,13 +47,17 @@ fn ci_make_indent(n: i32) -> str:
 fn ci_reindent_spaces(text: str, spaces: i32) -> str:
     if text.len() == 0:
         return ""
-    if spaces <= 0:
-        return text
     var prefix = ""
     var k: i32 = 0
     while k < spaces:
         prefix = prefix ++ " "
         k = k + 1
+    // Always loop through lines, even at spaces=0, so reindent_spaces
+    // matches ci_indent_block's normalization: every line ends with
+    // a trailing newline, including the last. This is crucial for
+    // CIS_BLOCK's child-separator convention — the legacy
+    // `ci_indent_block(s, indent) ++ push("\n")` pattern produces
+    // two trailing newlines after each child, and we need the same.
     var parts: Vec[str] = Vec.new()
     var start = 0
     let tlen = text.len() as i32

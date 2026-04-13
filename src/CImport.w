@@ -6184,12 +6184,23 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
                 let cond_str = ci_trans_bool_expr(session, cond_cursor, scope)
                 if cond_str.len() > 0:
                     let then_id = ci_lower_stmt_ir(session, then_child, stmts, exprs, types, 0, scope)
-                    var else_id: CiStmtId = 0 as CiStmtId
-                    if ifnc > 2:
-                        let else_child = with_ci_child(session, cursor, 2)
-                        else_id = ci_lower_stmt_ir(session, else_child, stmts, exprs, types, 0, scope)
-                    let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
-                    return stmts.if_stmt(cond_id, then_id, else_id)
+                    // If the then body is empty (NULL_STMT,
+                    // legacy bypass returned empty, or an empty
+                    // compound `{}` like the FWRITE_IGNORE macro
+                    // expansion), fall through to the legacy
+                    // fallback — legacy drops the whole if
+                    // statement when then_body is empty.
+                    var then_empty = (then_id as i32) == 0
+                    if not then_empty and stmts.kind(then_id) == CiStmtKind.CIS_BLOCK:
+                        if stmts.get_d1(then_id) == 0:
+                            then_empty = true
+                    if not then_empty:
+                        var else_id: CiStmtId = 0 as CiStmtId
+                        if ifnc > 2:
+                            let else_child = with_ci_child(session, cursor, 2)
+                            else_id = ci_lower_stmt_ir(session, else_child, stmts, exprs, types, 0, scope)
+                        let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
+                        return stmts.if_stmt(cond_id, then_id, else_id)
 
     // Structural while statement (B5j). Same bail-out as CIS_IF
     // for complex conditions.
