@@ -4174,6 +4174,27 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         if (compound_id as i32) != 0:
             return compound_id
 
+    // Ternary / conditional operator (B3g). The legacy calls
+    // ci_trans_bool_expr on the condition (to get the bool-aware
+    // form that doesn't wrap comparisons in `(if ... : 1 else: 0)`)
+    // and ci_trans_expr on the then/else arms. We match that by
+    // wrapping the legacy's bool-condition string in a CIE_RAW_STRING
+    // and recursively lowering then/else via ci_lower_expr_ir.
+    if kind == CXK_COND_OP:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 3:
+            let cond_cursor = with_ci_child(session, cursor, 0)
+            let then_cursor = with_ci_child(session, cursor, 1)
+            let else_cursor = with_ci_child(session, cursor, 2)
+            let cond_str = ci_trans_bool_expr(session, cond_cursor, scope)
+            if cond_str.len() > 0:
+                let then_id = ci_lower_expr_ir(session, then_cursor, exprs, types, scope)
+                if (then_id as i32) != 0:
+                    let else_id = ci_lower_expr_ir(session, else_cursor, exprs, types, scope)
+                    if (else_id as i32) != 0:
+                        let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
+                        return exprs.add(CiExprKind.CIE_TERNARY, cond_id as i32, then_id as i32, else_id as i32, 0 as CiTypeId)
+
     // Legacy fallback: bypass the cache, lower via the string path,
     // and embed the result as a verbatim raw-string node.
     let legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
@@ -4521,7 +4542,7 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     // didn't produce a node, so we fall through to the legacy code
     // below. The set of detoured kinds grows commit by commit.
     if ci_migrate_ir_enabled():
-        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP or kind == CXK_UNARY_OP or kind == CXK_IMPLICIT_CAST or kind == CXK_MEMBER_REF or kind == CXK_ARRAY_SUBSCRIPT or kind == CXK_CALL_EXPR or kind == CXK_COMPOUND_ASSIGN_OP:
+        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP or kind == CXK_UNARY_OP or kind == CXK_IMPLICIT_CAST or kind == CXK_MEMBER_REF or kind == CXK_ARRAY_SUBSCRIPT or kind == CXK_CALL_EXPR or kind == CXK_COMPOUND_ASSIGN_OP or kind == CXK_COND_OP:
             let ir_result = ci_trans_expr_via_ir(session, cursor, scope)
             if ir_result.len() > 0:
                 return ir_result
