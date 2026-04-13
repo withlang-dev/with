@@ -4208,6 +4208,16 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
                         let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
                         return exprs.add(CiExprKind.CIE_TERNARY, cond_id as i32, then_id as i32, else_id as i32, 0 as CiTypeId)
 
+    // Compound literal (B3o). Legacy always returns the inner
+    // expression translation, so the IR just unwraps to child 0.
+    if kind == CXK_COMPOUND_LITERAL:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            let child_cursor = with_ci_child(session, cursor, 0)
+            let child_id = ci_lower_expr_ir(session, child_cursor, exprs, types, scope)
+            if (child_id as i32) != 0:
+                return child_id
+
     // sizeof expression (B3h). CXK_UNARY_EXPR covers both
     // sizeof-expression and sizeof-type. The legacy identifies the
     // sizeof form by source prefix, extracts the operand type, and
