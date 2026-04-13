@@ -4213,6 +4213,28 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
                 if rendered.len() > 0:
                     return exprs.raw_string(rendered, 0 as CiTypeId)
 
+    // C-style cast (B3i). The legacy delegates to
+    // ci_render_cast_expr with the inner expression text, the inner
+    // type string, and the target type string. We recursively lower
+    // the inner child through ci_lower_expr_ir, print it to get the
+    // text form, then call ci_render_cast_expr and wrap the result
+    // in a CIE_RAW_STRING. The recursion keeps as much of the sub-
+    // expression tree in IR as possible; only the cast-specific
+    // formatting stays in string space.
+    if kind == CXK_CSTYLE_CAST:
+        let inner_child = ci_find_last_expr_child(session, cursor)
+        if inner_child >= 0:
+            let inner_id = ci_lower_expr_ir(session, inner_child, exprs, types, scope)
+            if (inner_id as i32) != 0:
+                let inner_str = ci_print_expr(exprs, types, inner_id, 0, 0)
+                if inner_str.len() > 0:
+                    let target_ty = with_ci_cursor_type(session, cursor)
+                    let target_str = with_ci_type_translated(session, target_ty)
+                    let inner_ty = with_ci_type_translated(session, with_ci_cursor_type(session, inner_child))
+                    let rendered = ci_render_cast_expr(inner_str, inner_ty, target_str)
+                    if rendered.len() > 0:
+                        return exprs.raw_string(rendered, 0 as CiTypeId)
+
     // Legacy fallback: bypass the cache, lower via the string path,
     // and embed the result as a verbatim raw-string node.
     let legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
@@ -4560,7 +4582,7 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     // didn't produce a node, so we fall through to the legacy code
     // below. The set of detoured kinds grows commit by commit.
     if ci_migrate_ir_enabled():
-        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP or kind == CXK_UNARY_OP or kind == CXK_IMPLICIT_CAST or kind == CXK_MEMBER_REF or kind == CXK_ARRAY_SUBSCRIPT or kind == CXK_CALL_EXPR or kind == CXK_COMPOUND_ASSIGN_OP or kind == CXK_COND_OP or kind == CXK_UNARY_EXPR:
+        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP or kind == CXK_UNARY_OP or kind == CXK_IMPLICIT_CAST or kind == CXK_MEMBER_REF or kind == CXK_ARRAY_SUBSCRIPT or kind == CXK_CALL_EXPR or kind == CXK_COMPOUND_ASSIGN_OP or kind == CXK_COND_OP or kind == CXK_UNARY_EXPR or kind == CXK_CSTYLE_CAST:
             let ir_result = ci_trans_expr_via_ir(session, cursor, scope)
             if ir_result.len() > 0:
                 return ir_result
