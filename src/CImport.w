@@ -4086,6 +4086,13 @@ fn ci_trans_expr_legacy_for_ir(session: i64, cursor: i32, scope: str) -> str:
     g_migrate_ir_enabled_cache = prev
     result
 
+fn ci_trans_stmt_legacy_for_ir(session: i64, cursor: i32, indent: i32, scope: str) -> str:
+    let prev = g_migrate_ir_enabled_cache
+    g_migrate_ir_enabled_cache = 0
+    let result = ci_trans_stmt(session, cursor, indent, scope)
+    g_migrate_ir_enabled_cache = prev
+    result
+
 fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     let kind = with_ci_cursor_kind(session, cursor)
 
@@ -5947,7 +5954,7 @@ fn ci_strip_trailing_newline(s: str) -> str:
         return s.slice(0, s.len() - 1)
     s
 
-fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, scope: str) -> str:
+fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope: str) -> str:
     var types = CiTypePool.new()
     var exprs = CiExprPool.new()
     var stmts = CiStmtPool.new()
@@ -5970,38 +5977,44 @@ fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, scope: str) -> str
             return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
         let ret_child = with_ci_child(session, cursor, 0)
 
-        // Bail if the return expression needs setup-level lowering
-        // (side effects that need to be hoisted out of the rvalue
-        // position) or if the return type is an array (needs
-        // decay cast the printer doesn't yet produce).
-        if ci_rvalue_needs_lowering(session, ret_child):
-            return ""
+        // Attempt structural lowering — bails (to the generic
+        // fallback below) if the return expression needs setup-
+        // level rvalue lowering or if the return type is an array
+        // (legacy adds a decay cast the printer doesn't yet
+        // produce).
         let ret_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, ret_child))
-        if ret_ty_str.len() > 0 and ret_ty_str.byte_at(0) == 91:
-            return ""
+        let is_array_ret = ret_ty_str.len() > 0 and ret_ty_str.byte_at(0) == 91
+        if not ci_rvalue_needs_lowering(session, ret_child) and not is_array_ret:
+            let val_id = ci_lower_expr_ir(session, ret_child, &mut exprs, &mut types, scope)
+            if (val_id as i32) != 0:
+                let id = stmts.return_(val_id)
+                return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
 
-        let val_id = ci_lower_expr_ir(session, ret_child, &mut exprs, &mut types, scope)
-        if (val_id as i32) == 0:
-            return ""
-        let id = stmts.return_(val_id)
-        return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
-
-    ""
+    // Generic fallback: call the legacy ci_trans_stmt via the cache
+    // bypass, wrap the result in a CIS_RAW_STRING, and print it
+    // back verbatim. This ensures every statement kind flows
+    // through the IR pipeline even when the lowering pass doesn't
+    // yet have a structural handler for it — the trailing newline
+    // is not stripped because the legacy's multi-line output
+    // already matches ci_indent_block's caller-prefix convention.
+    let legacy = ci_trans_stmt_legacy_for_ir(session, cursor, indent, scope)
+    if legacy.len() == 0:
+        return ""
+    let id = stmts.raw_string(legacy)
+    ci_print_stmt(&stmts, &exprs, &types, id, 0)
 
 fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     let kind = with_ci_cursor_kind(session, cursor)
 
-    // Phase-B IR detour for simple statement kinds. The detour
-    // grows commit by commit as lowering arms land. CXK_NULL_STMT
-    // stays in the legacy path — it returns "" which is trivially
-    // byte-identical.
+    // Phase-B IR detour: every statement cursor kind flows through
+    // ci_trans_stmt_via_ir. Kinds with specific lowering build a
+    // real CiStmt node; anything else falls through to the legacy-
+    // bypass tail which wraps the legacy-translated string in a
+    // CIS_RAW_STRING. Matches the completeness discipline
+    // established for expressions in B3n.
     if ci_migrate_ir_enabled():
-        if kind == CXK_BREAK_STMT or kind == CXK_CONTINUE_STMT or kind == CXK_RETURN_STMT:
-            let ir_result = ci_trans_stmt_via_ir(session, cursor, kind, scope)
-            if ir_result.len() > 0:
-                return ir_result
-        if kind == CXK_NULL_STMT:
-            return ""
+        let ir_result = ci_trans_stmt_via_ir(session, cursor, kind, indent, scope)
+        return ir_result
 
     // Compound statement (block) — new scope level
     if kind == CXK_COMPOUND_STMT:
