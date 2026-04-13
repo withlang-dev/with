@@ -421,7 +421,49 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         return indent ++ "<ci:unimpl:FOR>\n"
 
     if kind == CiStmtKind.CIS_MATCH:
-        return indent ++ "<ci:unimpl:MATCH>\n"
+        // Legacy match emission format:
+        //     match SUBJECT
+        //         VALUE =>
+        //             BODY
+        //         _ => DEFAULT_BODY
+        //
+        // The goto state machine uses this kind with
+        // SUBJECT = raw ident "__pc" and arms keyed on
+        // state numbers, plus a default `_ => break` arm.
+        //
+        // Arm layout in stmts.extra (from CiIR.w comment):
+        //     [value_count, value0_expr, value1_expr, ...,
+        //      body_stmt_id]
+        // Default arms have value_count == 0.
+        let subject = (stmts.get_d0(id)) as CiExprId
+        let arms_start = stmts.get_d1(id)
+        let arm_count = stmts.get_d2(id)
+        var out = indent ++ "match " ++ ci_print_expr(exprs, types, subject, 0, 0) ++ "\n"
+        var cursor: i32 = arms_start
+        var ai: i32 = 0
+        while ai < arm_count:
+            let value_count = stmts.get_extra(cursor)
+            cursor = cursor + 1
+            // Compose the arm header (value patterns or `_`)
+            var arm_head = ""
+            if value_count == 0:
+                arm_head = "_"
+            else:
+                var vi: i32 = 0
+                while vi < value_count:
+                    if vi > 0:
+                        arm_head = arm_head ++ " | "
+                    let v_id = (stmts.get_extra(cursor)) as CiExprId
+                    arm_head = arm_head ++ ci_print_expr(exprs, types, v_id, 0, 0)
+                    cursor = cursor + 1
+                    vi = vi + 1
+            let body_id = (stmts.get_extra(cursor)) as CiStmtId
+            cursor = cursor + 1
+            out = out ++ ci_make_indent(depth + 4) ++ arm_head ++ " =>\n"
+            let body_text = ci_print_stmt(stmts, exprs, types, body_id, 0)
+            out = out ++ ci_reindent_spaces(body_text, depth + 8)
+            ai = ai + 1
+        return out
 
     if kind == CiStmtKind.CIS_BREAK:
         return indent ++ "break\n"
