@@ -1435,6 +1435,28 @@ EOF
   echo "PASS(cli-selfhost-migrate) recursive_anonymous_records"
 }
 
+expect_migrate_ir_roundtrip() {
+  # Exercises CiIR constructors and CiPrint output against golden strings.
+  # Phase-A harness: grows as Phase-B lowering arms land. Invoked via the
+  # hidden `with migrate --ir-roundtrip` developer flag.
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate --ir-roundtrip; then
+    echo "FAIL(cli-selfhost-migrate) ir_roundtrip (nonzero exit)"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq "ci-roundtrip: PASS" "$tmpdir/out"; then
+    echo "FAIL(cli-selfhost-migrate) ir_roundtrip (missing PASS marker)"
+    echo "stdout:"; cat "$tmpdir/out" || true
+    echo "stderr:"; cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) ir_roundtrip"
+}
+
 expect_opaque_field_access_is_rejected() {
   local case_dir="$tmpdir/opaque_field_access_case"
   local src="$case_dir/opaque_field_access.w"
@@ -1699,6 +1721,7 @@ expect_migrate_noop_pointer_cast_exprs
 expect_migrate_typed_cast_macros
 expect_migrate_goto_shadowed_local
 expect_migrate_recursive_anonymous_records
+expect_migrate_ir_roundtrip
 expect_opaque_field_access_is_rejected
 expect_pcre2_match_heapframe_is_concrete
 expect_build_reports_pcre2_link_failure
