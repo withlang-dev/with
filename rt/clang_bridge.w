@@ -128,17 +128,23 @@ extern fn clang_getEnumConstantDeclValue(cursor: CXCursor) -> i64
 // Visitor
 extern fn clang_visitChildren(parent: CXCursor, visitor: *const u8, data: *mut u8) -> u32
 
+// libclang CX_StorageClass values.
+let CX_SC_EXTERN: i32 = 2
+
 // String
 extern fn clang_getCString(s: CXString) -> *const u8
 extern fn clang_disposeString(s: CXString)
 
 // File
 extern fn clang_getFileLocation(loc: CXSourceLocation, file: *mut *mut u8, line: *mut u32, col: *mut u32, offset: *mut u32)
+extern fn clang_getExpansionLocation(loc: CXSourceLocation, file: *mut *mut u8, line: *mut u32, col: *mut u32, offset: *mut u32)
+extern fn clang_getLocationForOffset(tu: *mut u8, file: *mut u8, offset: u32) -> CXSourceLocation
 extern fn clang_getPresumedLocation(loc: CXSourceLocation, filename: *mut CXString, line: *mut u32, col: *mut u32)
 extern fn clang_File_isEqual(f1: *mut u8, f2: *mut u8) -> i32
 extern fn clang_getFileName(file: *mut u8) -> CXString
 
 // Source range
+extern fn clang_getRange(begin: CXSourceLocation, end: CXSourceLocation) -> CXSourceRange
 extern fn clang_getRangeStart(range: CXSourceRange) -> CXSourceLocation
 extern fn clang_getRangeEnd(range: CXSourceRange) -> CXSourceLocation
 
@@ -1557,6 +1563,67 @@ pub fn cimport_var_storage_class(session: i64, idx: i32) -> i32:
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
     clang_Cursor_getStorageClass(cursor)
 
+fn cimport_var_decl_has_initializer_text(s: str) -> i32:
+    let slen = s.len() as i32
+    var paren_depth = 0
+    var bracket_depth = 0
+    var brace_depth = 0
+    var i = 0
+    while i < slen:
+        let c = s.byte_at(i as i64)
+        if c == 47 and i + 1 < slen:
+            let next = s.byte_at((i + 1) as i64)
+            if next == 47:
+                i = i + 2
+                while i < slen and s.byte_at(i as i64) != 10:
+                    i = i + 1
+                continue
+            if next == 42:
+                i = i + 2
+                while i + 1 < slen:
+                    if s.byte_at(i as i64) == 42 and s.byte_at((i + 1) as i64) == 47:
+                        i = i + 2
+                        break
+                    i = i + 1
+                continue
+        if c == 34 or c == 39:
+            let quote = c
+            i = i + 1
+            while i < slen:
+                let inner = s.byte_at(i as i64)
+                if inner == 92:
+                    i = i + 2
+                    continue
+                if inner == quote:
+                    break
+                i = i + 1
+            i = i + 1
+            continue
+        if c == 40: paren_depth = paren_depth + 1
+        if c == 41 and paren_depth > 0: paren_depth = paren_depth - 1
+        if c == 91: bracket_depth = bracket_depth + 1
+        if c == 93 and bracket_depth > 0: bracket_depth = bracket_depth - 1
+        if c == 123: brace_depth = brace_depth + 1
+        if c == 125 and brace_depth > 0: brace_depth = brace_depth - 1
+        if c == 61 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
+            let prev = if i > 0: s.byte_at((i - 1) as i64) else: 0
+            let next = if i + 1 < slen: s.byte_at((i + 1) as i64) else: 0
+            if prev != 61 and prev != 33 and prev != 60 and prev != 62 and next != 61:
+                return 1
+        i = i + 1
+    0
+
+@[c_export("with_cimport_var_definition_kind")]
+pub fn cimport_var_definition_kind(session: i64, idx: i32) -> i32:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
+    let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
+    if cimport_var_decl_has_initializer_text(cursor_source_text_from_cursor(s, cursor)) != 0:
+        return 2
+    if clang_Cursor_getStorageClass(cursor) == CX_SC_EXTERN:
+        return 0
+    1
+
 @[c_export("with_cimport_var_type_translated")]
 pub fn cimport_var_type_translated(session: i64, idx: i32) -> str:
     let s = session as *mut CImportSession
@@ -1841,6 +1908,190 @@ pub fn cimport_parse_macros(header_code: str) -> i64:
     let _ = pclose(p)
     let _ = unlink(&c_path as *const [64]u8 as *const u8)
     ms as i64
+
+@[c_export("with_cimport_preprocess_text")]
+pub fn cimport_preprocess_text(source_code: str) -> str:
+    var template_path: [40]u8 = [0 as u8; 40]
+    let tmpl = "/tmp/with_cimport_pp_XXXXXX\0"
+    let tp = *(&tmpl as *const *const u8)
+    with_memcpy(&mut template_path as *mut [40]u8 as *mut u8, tp, 28)
+    let fd = mkstemp(&mut template_path as *mut [40]u8 as *mut u8)
+    if fd < 0:
+        return ""
+
+    let src_ptr = *(&source_code as *const *const u8)
+    let _ = write(fd, src_ptr, source_code.len() as u64)
+    let _ = write(fd, "\n\0" as *const u8, 1 as u64)
+    let _ = close(fd)
+
+    var c_path: [64]u8 = [0 as u8; 64]
+    with_memcpy(&mut c_path as *mut [64]u8 as *mut u8, &template_path as *const [40]u8 as *const u8, 40)
+    let tlen = c_strlen(&template_path as *const [40]u8 as *const u8)
+    *(((&mut c_path) as i64 + tlen) as *mut u8) = 46
+    *(((&mut c_path) as i64 + tlen + 1) as *mut u8) = 99
+    *(((&mut c_path) as i64 + tlen + 2) as *mut u8) = 0
+    let _ = rename(&template_path as *const [40]u8 as *const u8, &c_path as *const [64]u8 as *const u8)
+
+    var cmd: [1024]u8 = [0 as u8; 1024]
+    var cpos: i64 = 0
+    let sysroot = get_sdk_path()
+    if sysroot as i64 != 0:
+        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "cc -isysroot '\0" as *const u8)
+        buf_append_shell_escaped(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, sysroot)
+        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "'\0" as *const u8)
+    else:
+        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "cc\0" as *const u8)
+    var ip: i32 = 0
+    while ip < g_cimport_include_count:
+        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, " -I '\0" as *const u8)
+        buf_append_shell_escaped(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, g_cimport_include_paths[ip as i64] as *const u8)
+        buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "'\0" as *const u8)
+        ip = ip + 1
+    buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, " -E '\0" as *const u8)
+    buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, &c_path as *const [64]u8 as *const u8)
+    buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "' 2>/dev/null\0" as *const u8)
+
+    let p = popen(&cmd as *const [1024]u8 as *const u8, "r\0" as *const u8)
+    if p as i64 == 0:
+        let _ = unlink(&c_path as *const [64]u8 as *const u8)
+        return ""
+
+    var output: *mut u8 = 0 as *mut u8
+    var out_len: i64 = 0
+    var out_cap: i64 = 0
+    var line: [4096]u8 = [0 as u8; 4096]
+    while true:
+        let line_ptr = fgets(&mut line as *mut [4096]u8 as *mut u8, 4096, p)
+        if line_ptr as i64 == 0:
+            break
+        let line_len = c_strlen(line_ptr as *const u8)
+        if out_len + line_len + 1 > out_cap:
+            var new_cap = if out_cap > 0: out_cap * 2 else: 8192
+            while new_cap < out_len + line_len + 1:
+                new_cap = new_cap * 2
+            let new_buf = with_alloc(new_cap)
+            if new_buf as i64 == 0:
+                if output as i64 != 0:
+                    with_free(output)
+                let _ = pclose(p)
+                let _ = unlink(&c_path as *const [64]u8 as *const u8)
+                return ""
+            if output as i64 != 0 and out_len > 0:
+                with_memcpy(new_buf, output as *const u8, out_len)
+                with_free(output)
+            output = new_buf
+            out_cap = new_cap
+        with_memcpy((output as i64 + out_len) as *mut u8, line_ptr as *const u8, line_len)
+        out_len = out_len + line_len
+    let _ = pclose(p)
+    let _ = unlink(&c_path as *const [64]u8 as *const u8)
+
+    if output as i64 == 0 or out_len == 0:
+        if output as i64 != 0:
+            with_free(output)
+        return ""
+    *((output as i64 + out_len) as *mut u8) = 0
+    let result = make_str(output as *const u8)
+    with_free(output)
+    result
+
+@[c_export("with_cimport_collect_object_macro_types")]
+pub fn cimport_collect_object_macro_types(header_code: str, macro_names: str) -> str:
+    if macro_names.len() == 0:
+        return ""
+
+    let size = 232  // sizeof(CImportSession)
+    let s = with_alloc(size) as *mut CImportSession
+    if s as i64 == 0:
+        return ""
+    with_memset(s as *mut u8, 0, size)
+
+    var template_path: [32]u8 = [0 as u8; 32]
+    let tmpl = "/tmp/with_cimport_XXXXXX\0"
+    let tp = *(&tmpl as *const *const u8)
+    with_memcpy(&mut template_path as *mut [32]u8 as *mut u8, tp, 25)
+    let fd = mkstemp(&mut template_path as *mut [32]u8 as *mut u8)
+    if fd < 0:
+        cimport_dispose(s as i64)
+        return ""
+
+    let src_ptr = *(&header_code as *const *const u8)
+    let _ = write(fd, src_ptr, header_code.len() as u64)
+    let _ = write(fd, "\n\0" as *const u8, 1 as u64)
+
+    var pos: i32 = 0
+    while pos < macro_names.len() as i32:
+        while pos < macro_names.len() as i32 and macro_names.byte_at(pos as i64) == 124:
+            pos = pos + 1
+        let start = pos
+        while pos < macro_names.len() as i32 and macro_names.byte_at(pos as i64) != 124:
+            pos = pos + 1
+        if pos > start:
+            let name = macro_names.slice(start as i64, pos as i64)
+            let probe_line = "__typeof__(" ++ name ++ ") __with_macro_probe_" ++ name ++ ";\n"
+            let probe_ptr = *(&probe_line as *const *const u8)
+            let _ = write(fd, probe_ptr, probe_line.len() as u64)
+    let _ = close(fd)
+
+    var c_path_buf: [64]u8 = [0 as u8; 64]
+    with_memcpy(&mut c_path_buf as *mut [64]u8 as *mut u8, &template_path as *const [32]u8 as *const u8, 32)
+    let tlen = c_strlen(&template_path as *const [32]u8 as *const u8)
+    *(((&mut c_path_buf) as i64 + tlen) as *mut u8) = 46
+    *(((&mut c_path_buf) as i64 + tlen + 1) as *mut u8) = 99
+    *(((&mut c_path_buf) as i64 + tlen + 2) as *mut u8) = 0
+    let _ = rename(&template_path as *const [32]u8 as *const u8, &c_path_buf as *const [64]u8 as *const u8)
+    (*s).tmp_path = c_strdup(&c_path_buf as *const [64]u8 as *const u8)
+
+    var args: [64]*const u8 = [0 as *const u8; 64]
+    var nargs: i32 = 0
+    let sysroot = get_sdk_path()
+    if sysroot as i64 != 0:
+        args[nargs as i64] = "-isysroot\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = sysroot
+        nargs = nargs + 1
+    let resdir = get_clang_resource_dir()
+    if resdir as i64 != 0:
+        args[nargs as i64] = "-resource-dir\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = resdir
+        nargs = nargs + 1
+    var ip: i32 = 0
+    while ip < g_cimport_include_count and nargs < 62:
+        args[nargs as i64] = "-I\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = g_cimport_include_paths[ip as i64] as *const u8
+        nargs = nargs + 1
+        ip = ip + 1
+
+    (*s).index = clang_createIndex(0, 0)
+    (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
+    if (*s).tu as i64 == 0:
+        cimport_dispose(s as i64)
+        return ""
+
+    (*s).header_file = clang_getFile((*s).tu, (*s).tmp_path as *const u8)
+    let root = clang_getTranslationUnitCursor((*s).tu)
+    let _ = clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
+
+    let prefix = "__with_macro_probe_"
+    var result = ""
+    var i: i32 = 0
+    while i < (*s).decl_count:
+        let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
+        if clang_getCursorKind(cursor) == CXCursor_VarDecl:
+            let spelling = clang_str_to_with(s, clang_getCursorSpelling(cursor))
+            if spelling.len() > prefix.len() and spelling.slice(0, prefix.len()) == prefix:
+                let macro_name = spelling.slice(prefix.len(), spelling.len())
+                let translated = translate_type_recursive(s, clang_getCursorType(cursor), 0, 0)
+                if translated as i64 != 0 and c_strncmp(translated as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) != 0:
+                    let macro_ty = session_make_str(s, translated as *const u8)
+                    if macro_ty.len() > 0:
+                        result = result ++ "|" ++ macro_name ++ "=" ++ macro_ty ++ "|"
+        i = i + 1
+
+    cimport_dispose(s as i64)
+    result
 
 @[c_export("with_cimport_macro_count")]
 pub fn cimport_macro_count(session: i64) -> i32:
@@ -2530,6 +2781,23 @@ pub fn ci_cursor_location(session: i64, cursor_idx: i32) -> str:
     clang_disposeString(presumed_file)
     session_make_str(s, &buf as *const [1024]u8 as *const u8)
 
+fn source_location_expansion_offset(loc: CXSourceLocation, file: *mut *mut u8, offset: *mut u32):
+    clang_getExpansionLocation(loc, file, 0 as *mut u32, 0 as *mut u32, offset)
+    if (*file as i64) == 0:
+        clang_getFileLocation(loc, file, 0 as *mut u32, 0 as *mut u32, offset)
+
+fn source_range_expansion_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
+    var start_file: *mut u8 = 0 as *mut u8
+    var end_file: *mut u8 = 0 as *mut u8
+    source_location_expansion_offset(clang_getRangeStart(range), &mut start_file, start_off)
+    source_location_expansion_offset(clang_getRangeEnd(range), &mut end_file, end_off)
+    if start_file as i64 == 0 or end_file as i64 == 0:
+        return 0
+    if clang_File_isEqual(start_file, end_file) == 0:
+        return 0
+    *file = start_file
+    1
+
 // Returns the start byte offset of a cursor's source range, or -1 if unavailable.
 // Used by the for-loop handler to classify children as init/cond/inc by position.
 @[c_export("with_ci_cursor_start_offset")]
@@ -2541,24 +2809,18 @@ pub fn ci_cursor_start_offset(session: i64, cursor_idx: i32) -> i32:
     let start_loc = clang_getRangeStart(range)
     var file: *mut u8 = 0 as *mut u8
     var start_off: u32 = 0
-    clang_getFileLocation(start_loc, &mut file, 0 as *mut u32, 0 as *mut u32, &mut start_off)
+    source_location_expansion_offset(start_loc, &mut file, &mut start_off)
     if file as i64 == 0: return -1
     start_off as i32
 
-@[c_export("with_ci_cursor_source_text")]
-pub fn ci_cursor_source_text(session: i64, cursor_idx: i32) -> str:
-    let s = session as *mut CImportSession
-    if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
-    let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+fn cursor_source_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let range = clang_getCursorExtent(cursor)
-    let start_loc = clang_getRangeStart(range)
-    let end_loc = clang_getRangeEnd(range)
     var file: *mut u8 = 0 as *mut u8
     var start_off: u32 = 0
     var end_off: u32 = 0
-    clang_getFileLocation(start_loc, &mut file, 0 as *mut u32, 0 as *mut u32, &mut start_off)
-    clang_getFileLocation(end_loc, 0 as *mut *mut u8, 0 as *mut u32, 0 as *mut u32, &mut end_off)
-    if file as i64 == 0 or end_off <= start_off: return ""
+    if source_range_expansion_offsets(range, &mut file, &mut start_off, &mut end_off) == 0:
+        return ""
+    if end_off <= start_off: return ""
     var buf_size: u64 = 0
     let contents = clang_getFileContents((*s).tu, file, &mut buf_size)
     if contents as i64 == 0 or end_off as u64 > buf_size: return ""
@@ -2569,6 +2831,79 @@ pub fn ci_cursor_source_text(session: i64, cursor_idx: i32) -> str:
     let result = session_make_str(s, text as *const u8)
     with_free(text)
     result
+
+fn cursor_token_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
+    let tu = clang_Cursor_getTranslationUnit(cursor)
+    if tu as i64 == 0:
+        return ""
+    let cursor_range = clang_getCursorExtent(cursor)
+    var file: *mut u8 = 0 as *mut u8
+    var start_off: u32 = 0
+    var end_off: u32 = 0
+    if source_range_expansion_offsets(cursor_range, &mut file, &mut start_off, &mut end_off) == 0:
+        return ""
+    let begin_loc = clang_getLocationForOffset(tu, file, start_off)
+    let end_loc = clang_getLocationForOffset(tu, file, end_off)
+    let range = clang_getRange(begin_loc, end_loc)
+    var tokens: *mut CXToken = 0 as *mut CXToken
+    var token_count: u32 = 0
+    clang_tokenize(tu, range, &mut tokens, &mut token_count)
+    if tokens as i64 == 0 or token_count == 0:
+        return ""
+
+    var total_len: i64 = 0
+    var ti: u32 = 0
+    while ti < token_count:
+        let tok = *((tokens as i64 + ti as i64 * 24) as *const CXToken)
+        let spelling = clang_getTokenSpelling(tu, tok)
+        let cstr = clang_getCString(spelling)
+        if cstr as i64 != 0:
+            total_len = total_len + c_strlen(cstr)
+            if ti + 1 < token_count:
+                total_len = total_len + 1
+        clang_disposeString(spelling)
+        ti = ti + 1
+
+    let text = with_alloc(total_len + 1)
+    if text as i64 == 0:
+        clang_disposeTokens(tu, tokens, token_count)
+        return ""
+
+    var pos: i64 = 0
+    ti = 0
+    while ti < token_count:
+        let tok = *((tokens as i64 + ti as i64 * 24) as *const CXToken)
+        let spelling = clang_getTokenSpelling(tu, tok)
+        let cstr = clang_getCString(spelling)
+        if cstr as i64 != 0:
+            let slen = c_strlen(cstr)
+            if slen > 0:
+                with_memcpy((text as i64 + pos) as *mut u8, cstr, slen)
+                pos = pos + slen
+            if ti + 1 < token_count:
+                *((text as i64 + pos) as *mut u8) = 32
+                pos = pos + 1
+        clang_disposeString(spelling)
+        ti = ti + 1
+    *((text as i64 + pos) as *mut u8) = 0
+    clang_disposeTokens(tu, tokens, token_count)
+    let result = session_make_str(s, text as *const u8)
+    with_free(text)
+    result
+
+@[c_export("with_ci_cursor_source_text")]
+pub fn ci_cursor_source_text(session: i64, cursor_idx: i32) -> str:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
+    let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+    cursor_source_text_from_cursor(s, cursor)
+
+@[c_export("with_ci_cursor_token_text")]
+pub fn ci_cursor_token_text(session: i64, cursor_idx: i32) -> str:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
+    let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+    cursor_token_text_from_cursor(s, cursor)
 
 @[c_export("with_ci_cursor_pointee_type")]
 pub fn ci_cursor_pointee_type(session: i64, cursor_idx: i32) -> str:
@@ -2591,14 +2926,12 @@ pub fn ci_member_is_arrow(session: i64, cursor_idx: i32) -> i32:
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     let range = clang_getCursorExtent(cursor)
-    let start_loc = clang_getRangeStart(range)
-    let end_loc = clang_getRangeEnd(range)
     var start_off: u32 = 0
     var end_off: u32 = 0
     var file: *mut u8 = 0 as *mut u8
-    clang_getFileLocation(start_loc, &mut file, 0 as *mut u32, 0 as *mut u32, &mut start_off)
-    clang_getFileLocation(end_loc, 0 as *mut *mut u8, 0 as *mut u32, 0 as *mut u32, &mut end_off)
-    if file as i64 == 0 or end_off <= start_off: return 0
+    if source_range_expansion_offsets(range, &mut file, &mut start_off, &mut end_off) == 0:
+        return 0
+    if end_off <= start_off: return 0
     var buf_size: u64 = 0
     let contents = clang_getFileContents((*s).tu, file, &mut buf_size)
     if contents as i64 == 0: return 0
@@ -2634,12 +2967,13 @@ pub fn ci_binary_op(session: i64, cursor_idx: i32) -> i32:
     let rhs_start = clang_getRangeStart(rhs_range)
     var lhs_end_off: u32 = 0
     var rhs_start_off: u32 = 0
-    var file: *mut u8 = 0 as *mut u8
-    clang_getFileLocation(lhs_end, &mut file, 0 as *mut u32, 0 as *mut u32, &mut lhs_end_off)
-    clang_getFileLocation(rhs_start, 0 as *mut *mut u8, 0 as *mut u32, 0 as *mut u32, &mut rhs_start_off)
-    if file as i64 != 0 and rhs_start_off > lhs_end_off:
+    var lhs_file: *mut u8 = 0 as *mut u8
+    var rhs_file: *mut u8 = 0 as *mut u8
+    source_location_expansion_offset(lhs_end, &mut lhs_file, &mut lhs_end_off)
+    source_location_expansion_offset(rhs_start, &mut rhs_file, &mut rhs_start_off)
+    if lhs_file as i64 != 0 and rhs_file as i64 != 0 and clang_File_isEqual(lhs_file, rhs_file) != 0 and rhs_start_off > lhs_end_off:
         var buf_size: u64 = 0
-        let contents = clang_getFileContents((*s).tu, file, &mut buf_size)
+        let contents = clang_getFileContents((*s).tu, lhs_file, &mut buf_size)
         if contents as i64 != 0 and rhs_start_off as u64 <= buf_size:
             // Extract operator text between lhs end and rhs start, trimmed
             var op_s = lhs_end_off
@@ -2741,13 +3075,20 @@ pub fn ci_unary_op(session: i64, cursor_idx: i32) -> i32:
     var op_off: u32 = 0
     var child_start_off: u32 = 0
     var child_end_off: u32 = 0
-    var file: *mut u8 = 0 as *mut u8
-    clang_getFileLocation(op_loc, &mut file, 0 as *mut u32, 0 as *mut u32, &mut op_off)
-    clang_getFileLocation(child_start, 0 as *mut *mut u8, 0 as *mut u32, 0 as *mut u32, &mut child_start_off)
-    clang_getFileLocation(child_end, 0 as *mut *mut u8, 0 as *mut u32, 0 as *mut u32, &mut child_end_off)
-    if file as i64 == 0: return -1
+    var op_file: *mut u8 = 0 as *mut u8
+    var child_start_file: *mut u8 = 0 as *mut u8
+    var child_end_file: *mut u8 = 0 as *mut u8
+    source_location_expansion_offset(op_loc, &mut op_file, &mut op_off)
+    source_location_expansion_offset(child_start, &mut child_start_file, &mut child_start_off)
+    source_location_expansion_offset(child_end, &mut child_end_file, &mut child_end_off)
+    if op_file as i64 == 0:
+        return -1
+    if child_start_file as i64 == 0 or child_end_file as i64 == 0:
+        return -1
+    if clang_File_isEqual(op_file, child_start_file) == 0 or clang_File_isEqual(op_file, child_end_file) == 0:
+        return -1
     var buf_size: u64 = 0
-    let contents = clang_getFileContents((*s).tu, file, &mut buf_size)
+    let contents = clang_getFileContents((*s).tu, op_file, &mut buf_size)
     if contents as i64 == 0: return -1
     // Prefix operator
     if op_off < child_start_off:
@@ -2765,7 +3106,10 @@ pub fn ci_unary_op(session: i64, cursor_idx: i32) -> i32:
         if len == 2 and *op == 45 and *((op as i64 + 1) as *const u8) == 45: return 8 // -- = UO_PRE_DEC
     // Postfix operator
     var range_end_off: u32 = 0
-    clang_getFileLocation(clang_getRangeEnd(range), 0 as *mut *mut u8, 0 as *mut u32, 0 as *mut u32, &mut range_end_off)
+    var range_end_file: *mut u8 = 0 as *mut u8
+    source_location_expansion_offset(clang_getRangeEnd(range), &mut range_end_file, &mut range_end_off)
+    if range_end_file as i64 == 0 or clang_File_isEqual(op_file, range_end_file) == 0:
+        return -1
     if range_end_off > child_end_off:
         var op2 = (contents as i64 + child_end_off as i64) as *const u8
         var len2 = range_end_off - child_end_off

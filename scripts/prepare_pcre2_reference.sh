@@ -29,6 +29,7 @@ cat >"$src_dir/config.h" <<'EOF'
 #define WITH_PCRE2_CONFIG_H 1
 
 #define SUPPORT_PCRE2_8 1
+#define SUPPORT_UNICODE 1
 
 #ifdef __has_include
 #if __has_include(<unistd.h>)

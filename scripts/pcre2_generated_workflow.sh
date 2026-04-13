@@ -29,7 +29,7 @@ externize_shared_vars_except_owner() {
 
     for dst in "$generated_dir"/*.w; do
         [ "$(basename "$dst")" = "$owner_file" ] && continue
-        perl -pi -e 's/^var ('"$pattern"': )/extern var $1/' "$dst"
+        perl -pi -e 's/^var ('"$pattern"': [^=]+?) = .*$/extern var $1/; s/^var ('"$pattern"': )/extern var $1/' "$dst"
     done
 }
 
@@ -81,7 +81,7 @@ PY
 
 is_excluded() {
     case "$1" in
-        pcre2test.w|pcre2demo.w|pcre2grep.w|pcre2posix_test.w|\
+        pcre2test.w|pcre2demo.w|pcre2grep.w|pcre2posix.w|pcre2posix_test.w|\
         pcre2_jit_test.w|pcre2_jit_compile.w|pcre2_dftables.w|\
         pcre2_fuzzsupport.w)
             return 0
@@ -162,18 +162,9 @@ prepare_generated_tree() {
         fi
     done
 
-    # Strip broken initializers: C comments, unexpanded STR_* macros,
-    # STRING_* macros in var declarations → fall back to zero-init
+    # Keep migrated initializers intact. The raw migrate step must succeed
+    # semantically; prepare should not silently delete owners or data.
     for dst in "$generated_dir"/*.w; do
-        # var with C comment in initializer → strip to bare var
-        perl -pi -e 's/^(var \w+: [^=]+) = .*\/\*.*/$1/' "$dst"
-        # var with STR_ macro concatenation → strip initializer
-        perl -pi -e 's/^(var \w+: [^=]+) = .*STR_\w+.*/$1/' "$dst"
-        # var with STRING_ macro → strip initializer
-        perl -pi -e 's/^(var \w+: [^=]+) = .*STRING_\w+.*/$1/' "$dst"
-        # Remove orphan continuation lines from stripped multi-line initializers
-        perl -pi -e 's/^\s+STRING_\w+.*$//' "$dst"
-        perl -pi -e 's/^\s+STR_\w+.*$//' "$dst"
         # Array dimension assigned to array var in goto body
         # These are re-declarations of hoisted array vars where the migrator
         # emitted the dimension as an assignment value

@@ -153,6 +153,12 @@ pub fn cimport_var_storage_class(s: i64, i: i32) -> i32:
     let _ = i
     0
 
+@[weak] @[c_export("with_cimport_var_definition_kind")]
+pub fn cimport_var_definition_kind(s: i64, i: i32) -> i32:
+    let _ = s
+    let _ = i
+    0
+
 @[weak] @[c_export("with_ci_cursor_in_file")]
 pub fn ci_cursor_in_file(s: i64, c: i32, path: str) -> i32:
     let _ = s
@@ -160,10 +166,27 @@ pub fn ci_cursor_in_file(s: i64, c: i32, path: str) -> i32:
     let _ = path
     0
 
+@[weak] @[c_export("with_ci_cursor_token_text")]
+pub fn ci_cursor_token_text(s: i64, c: i32) -> str:
+    let _ = s
+    let _ = c
+    empty_str()
+
 @[weak] @[c_export("with_cimport_parse_macros")]
 pub fn cimport_parse_macros(h: str) -> i64:
     let _ = h
     0
+
+@[weak] @[c_export("with_cimport_collect_object_macro_types")]
+pub fn cimport_collect_object_macro_types(h: str, names: str) -> str:
+    let _ = h
+    let _ = names
+    empty_str()
+
+@[weak] @[c_export("with_cimport_preprocess_text")]
+pub fn cimport_preprocess_text(h: str) -> str:
+    let _ = h
+    empty_str()
 
 @[weak] @[c_export("with_cimport_macro_count")]
 pub fn cimport_macro_count(s: i64) -> i32:
