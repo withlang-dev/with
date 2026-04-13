@@ -4740,15 +4740,17 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     if expanded_src.len() > 0:
         return expanded_src
 
-    // Phase-B IR detour: route the kinds that ci_lower_expr_ir owns
-    // through CiIR + CiPrint. An empty result means the lowering
-    // didn't produce a node, so we fall through to the legacy code
-    // below. The set of detoured kinds grows commit by commit.
+    // Phase-B IR detour: every cursor kind flows through
+    // ci_lower_expr_ir. Kinds with specific lowering build a real
+    // CiExpr node; anything else falls through to the legacy-bypass
+    // fallback at the bottom of ci_lower_expr_ir, which wraps the
+    // legacy string in a CIE_RAW_STRING. An empty IR result still
+    // falls through to the legacy code below — that path handles
+    // `expanded_src`-like edge cases that bail before the detour.
     if ci_migrate_ir_enabled():
-        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP or kind == CXK_UNARY_OP or kind == CXK_IMPLICIT_CAST or kind == CXK_MEMBER_REF or kind == CXK_ARRAY_SUBSCRIPT or kind == CXK_CALL_EXPR or kind == CXK_COMPOUND_ASSIGN_OP or kind == CXK_COND_OP or kind == CXK_UNARY_EXPR or kind == CXK_CSTYLE_CAST:
-            let ir_result = ci_trans_expr_via_ir(session, cursor, scope)
-            if ir_result.len() > 0:
-                return ir_result
+        let ir_result = ci_trans_expr_via_ir(session, cursor, scope)
+        if ir_result.len() > 0:
+            return ir_result
 
     // Integer literal
     if kind == CXK_INT_LITERAL:
