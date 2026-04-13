@@ -4109,11 +4109,10 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
             if (inner_id as i32) != 0:
                 return exprs.add(CiExprKind.CIE_PAREN, inner_id as i32, 0, 0, 0 as CiTypeId)
 
-    // Binary operator — simple non-pointer non-array arithmetic /
-    // bitwise / assignment (B3b/B3e), plus comparison (B3l) and
-    // short-circuit logical ops (B3m). Pointer arith, shifts,
-    // and large-decimal coercion fall back to legacy below for
-    // now.
+    // Binary operator — simple arith/bitwise/assign (B3b/B3e),
+    // comparison (B3l), short-circuit logical (B3m), and pointer
+    // arithmetic (B3p). Shifts with small-int promotion and
+    // large-decimal coercion still fall back to legacy below.
     if kind == CXK_BINARY_OP:
         let bin_id = ci_lower_binary_simple(session, cursor, exprs, types, scope)
         if (bin_id as i32) != 0:
@@ -4124,6 +4123,9 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         let log_id = ci_lower_binary_logical(session, cursor, exprs, types, scope)
         if (log_id as i32) != 0:
             return log_id
+        let ptr_id = ci_lower_binary_pointer(session, cursor, exprs, types, scope)
+        if (ptr_id as i32) != 0:
+            return ptr_id
 
     // Unary operator — only the trivial cases for now (B3c).
     // UO_PLUS and UO_DEREF are byte-identical to the legacy without
@@ -4345,6 +4347,77 @@ fn ci_lower_binary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
         ci_op = CiBinOp.CIBO_ASSIGN
 
     exprs.binary(ci_op, lhs_id, rhs_id, 0 as CiTypeId)
+
+fn ci_lower_binary_pointer(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 2:
+        return 0 as CiExprId
+    let op = with_ci_binary_op(session, cursor)
+    if op != BO_ADD and op != BO_SUB:
+        return 0 as CiExprId
+
+    let lhs_cursor = with_ci_child(session, cursor, 0)
+    let rhs_cursor = with_ci_child(session, cursor, 1)
+    let lhs_is_ptr = with_ci_type_is_pointer(session, lhs_cursor) != 0
+    let rhs_is_ptr = with_ci_type_is_pointer(session, rhs_cursor) != 0
+    let lhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
+    let rhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_cursor))
+    let lhs_is_array = lhs_ty_str.len() > 0 and lhs_ty_str.byte_at(0) == 91
+    let rhs_is_array = rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91
+
+    // Bail if no operand is pointer/array — other helpers handle it.
+    if not (lhs_is_ptr or rhs_is_ptr or lhs_is_array or rhs_is_array):
+        return 0 as CiExprId
+
+    // Recursively lower both operands and print them.
+    let lhs_id = ci_lower_expr_ir(session, lhs_cursor, exprs, types, scope)
+    if (lhs_id as i32) == 0:
+        return 0 as CiExprId
+    let rhs_id = ci_lower_expr_ir(session, rhs_cursor, exprs, types, scope)
+    if (rhs_id as i32) == 0:
+        return 0 as CiExprId
+    let lhs_str = ci_print_expr(exprs, types, lhs_id, 0, 0)
+    let rhs_str = ci_print_expr(exprs, types, rhs_id, 0, 0)
+
+    // BO_ADD: `ptr + idx` (with optional array decay + signed
+    // index isize-cast).
+    if op == BO_ADD:
+        let ptr_is_lhs = lhs_is_ptr or lhs_is_array
+        var ptr_e = if ptr_is_lhs: lhs_str else: rhs_str
+        let ptr_cursor = if ptr_is_lhs: lhs_cursor else: rhs_cursor
+        let is_array = if ptr_is_lhs: lhs_is_array else: rhs_is_array
+        let idx_cursor = if ptr_is_lhs: rhs_cursor else: lhs_cursor
+        let idx_e = if ptr_is_lhs: rhs_str else: lhs_str
+        if is_array:
+            let arr_ty = with_ci_type_translated(session, with_ci_cursor_type(session, ptr_cursor))
+            let elem_start = ci_find_array_elem_start(arr_ty)
+            if elem_start > 0:
+                let elem_ty = arr_ty.slice(elem_start as i64, arr_ty.len())
+                ptr_e = "(&" ++ ptr_e ++ "[0] as *mut " ++ elem_ty ++ ")"
+        var result = ""
+        if with_ci_type_is_unsigned(session, idx_cursor) == 0:
+            result = "(" ++ ptr_e ++ " + (" ++ idx_e ++ " as isize as usize))"
+        else:
+            result = "(" ++ ptr_e ++ " + " ++ idx_e ++ ")"
+        return exprs.raw_string(result, 0 as CiTypeId)
+
+    // BO_SUB: three variants depending on operand types.
+    if op == BO_SUB:
+        // Pointer difference: (lhs - rhs) / sizeof[elem]
+        if lhs_is_ptr and rhs_is_ptr:
+            let elem_ty = with_ci_cursor_pointee_type(session, lhs_cursor)
+            let result = "((" ++ lhs_str ++ " as usize -% " ++ rhs_str ++ " as usize) / sizeof[" ++ elem_ty ++ "]())"
+            return exprs.raw_string(result, 0 as CiTypeId)
+        // Pointer minus integer index.
+        if lhs_is_ptr and not rhs_is_ptr:
+            var result = ""
+            if with_ci_type_is_unsigned(session, rhs_cursor) == 0:
+                result = "(" ++ lhs_str ++ " - (" ++ rhs_str ++ " as isize as usize))"
+            else:
+                result = "(" ++ lhs_str ++ " - " ++ rhs_str ++ ")"
+            return exprs.raw_string(result, 0 as CiTypeId)
+
+    0 as CiExprId
 
 fn ci_lower_binary_comparison(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
