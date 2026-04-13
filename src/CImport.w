@@ -5665,8 +5665,46 @@ fn ci_trans_bool_expr(session: i64, cursor: i32, scope: str) -> str:
 
 // ── Statement translator ────────────────────────────────────
 
+// Strip a single trailing '\n' from `s` if present. Used by the
+// ci_trans_stmt IR shim to match the legacy's no-trailing-newline
+// convention for single-line statements — the CiPrint layer always
+// emits a trailing newline for the sake of block composition, and
+// the legacy's compound-stmt loop adds its own newline via
+// ci_indent_block, so we strip the redundant one on the way out.
+fn ci_strip_trailing_newline(s: str) -> str:
+    if s.len() == 0:
+        return s
+    if s.byte_at(s.len() - 1) == 10:
+        return s.slice(0, s.len() - 1)
+    s
+
+fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, scope: str) -> str:
+    var types = CiTypePool.new()
+    var exprs = CiExprPool.new()
+    var stmts = CiStmtPool.new()
+
+    if kind == CXK_BREAK_STMT:
+        let id = stmts.break_()
+        return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
+
+    if kind == CXK_CONTINUE_STMT:
+        let id = stmts.continue_()
+        return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
+
+    ""
+
 fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     let kind = with_ci_cursor_kind(session, cursor)
+
+    // Phase-B IR detour for simple statement kinds. The detour
+    // grows commit by commit as lowering arms land. CXK_NULL_STMT
+    // stays in the legacy path — it returns "" which is trivially
+    // byte-identical.
+    if ci_migrate_ir_enabled():
+        if kind == CXK_BREAK_STMT or kind == CXK_CONTINUE_STMT:
+            let ir_result = ci_trans_stmt_via_ir(session, cursor, kind, scope)
+            if ir_result.len() > 0:
+                return ir_result
 
     // Compound statement (block) — new scope level
     if kind == CXK_COMPOUND_STMT:
