@@ -32,13 +32,18 @@ fn ci_make_indent(n: i32) -> str:
         i = i + 1
     out
 
-// Prepend `spaces` spaces to every non-empty line of `text`.
-// Empty lines (zero-length content between newlines) stay bare —
-// those are the "outer separator" blank lines the legacy
-// migrator's compound_stmt arm adds via `parts.push("\n")`. The
-// inner blanks that were already indented by an inner
-// ci_indent_block call have leading whitespace in their content,
-// so they're NOT empty and DO get re-indented.
+// Prepend `spaces` spaces to every line of `text`, matching
+// ci_indent_block's convention: empty lines get the prefix applied
+// too (so they become whitespace-only lines at the new indent
+// level).
+//
+// The bare `\n` separators that CIS_BLOCK inserts between children
+// get prefixed too when a container above the block re-indents —
+// each container level adds another prefix, matching the legacy
+// per-level ci_indent_block layering. The outermost result has no
+// outer container to re-indent, so its own CIS_BLOCK separators
+// stay bare (matching ci_try_translate_fn_body's top-level bare
+// blanks between statements).
 fn ci_reindent_spaces(text: str, spaces: i32) -> str:
     if text.len() == 0:
         return ""
@@ -56,9 +61,8 @@ fn ci_reindent_spaces(text: str, spaces: i32) -> str:
         var end = start
         while end < tlen and text.byte_at(end as i64) != 10:
             end = end + 1
-        if end > start:
-            parts.push(prefix)
-            parts.push(text.slice(start as i64, end as i64))
+        parts.push(prefix)
+        parts.push(text.slice(start as i64, end as i64))
         parts.push("\n")
         start = end + 1
     parts.join("")
@@ -377,21 +381,33 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         return out
 
     if kind == CiStmtKind.CIS_IF:
+        // The legacy if arm calls ci_trans_stmt(body, 0, scope)
+        // and then ci_indent_block(body, indent + 1). We match
+        // that by printing body at depth=0 (so the body produces
+        // level-0-relative text) and re-indenting by 4. The
+        // per-level re-indent is what lets inner CIS_BLOCK bare
+        // separators accumulate spaces correctly at each
+        // enclosing container.
         let cond = (stmts.get_d0(id)) as CiExprId
         let then_b = (stmts.get_d1(id)) as CiStmtId
         let else_b = (stmts.get_d2(id)) as CiStmtId
         var out = indent ++ "if " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
-        out = out ++ ci_print_stmt(stmts, exprs, types, then_b, depth + 4)
+        let then_text = ci_print_stmt(stmts, exprs, types, then_b, 0)
+        out = out ++ ci_reindent_spaces(then_text, 4)
         if (else_b as i32) != 0:
             out = out ++ indent ++ "else:\n"
-            out = out ++ ci_print_stmt(stmts, exprs, types, else_b, depth + 4)
+            let else_text = ci_print_stmt(stmts, exprs, types, else_b, 0)
+            out = out ++ ci_reindent_spaces(else_text, 4)
         return out
 
     if kind == CiStmtKind.CIS_WHILE:
+        // Same convention as CIS_IF: body printed at depth=0,
+        // then re-indented by 4 at the while's container level.
         let cond = (stmts.get_d0(id)) as CiExprId
         let body = (stmts.get_d1(id)) as CiStmtId
         var out = indent ++ "while " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
-        out = out ++ ci_print_stmt(stmts, exprs, types, body, depth + 4)
+        let body_text = ci_print_stmt(stmts, exprs, types, body, 0)
+        out = out ++ ci_reindent_spaces(body_text, 4)
         return out
 
     if kind == CiStmtKind.CIS_DO_WHILE:
