@@ -81,6 +81,7 @@ fn ci_bin_op_str(op: i32) -> str:
     if op == CiBinOp.CIBO_ADD_WRAP: return "+%"
     if op == CiBinOp.CIBO_SUB_WRAP: return "-%"
     if op == CiBinOp.CIBO_MUL_WRAP: return "*%"
+    if op == CiBinOp.CIBO_ASSIGN: return "="
     "?binop?"
 
 fn ci_unary_op_str(op: i32) -> str:

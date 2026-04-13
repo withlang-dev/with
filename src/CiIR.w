@@ -232,6 +232,9 @@ enum CiBinOp: i32:
     CIBO_ADD_WRAP = 18
     CIBO_SUB_WRAP = 19
     CIBO_MUL_WRAP = 20
+    // Plain assignment — maps C's `=` (as a binary op returning a
+    // value). Used for expressions like `(x = y)`.
+    CIBO_ASSIGN = 21
 
 enum CiUnaryOp: i32:
     CIUO_NEG = 0

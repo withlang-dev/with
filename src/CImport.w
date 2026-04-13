@@ -4177,10 +4177,10 @@ fn ci_lower_binary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
         return 0 as CiExprId
     let op = with_ci_binary_op(session, cursor)
 
-    // Only the arithmetic / bitwise non-shift ops. Shift, comparison,
-    // logical, and assignment all need bigger structural work and
+    // Arithmetic, bitwise non-shift, and plain assignment. Shift,
+    // comparison, and logical ops need bigger structural work and
     // belong to later sub-commits.
-    if op != BO_ADD and op != BO_SUB and op != BO_MUL and op != BO_DIV and op != BO_REM and op != BO_AND and op != BO_OR and op != BO_XOR:
+    if op != BO_ADD and op != BO_SUB and op != BO_MUL and op != BO_DIV and op != BO_REM and op != BO_AND and op != BO_OR and op != BO_XOR and op != BO_ASSIGN:
         return 0 as CiExprId
 
     let lhs_cursor = with_ci_child(session, cursor, 0)
@@ -4247,6 +4247,8 @@ fn ci_lower_binary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
         ci_op = CiBinOp.CIBO_BIT_OR
     if op == BO_XOR:
         ci_op = CiBinOp.CIBO_BIT_XOR
+    if op == BO_ASSIGN:
+        ci_op = CiBinOp.CIBO_ASSIGN
 
     exprs.binary(ci_op, lhs_id, rhs_id, 0 as CiTypeId)
 
