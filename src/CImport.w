@@ -4061,17 +4061,53 @@ fn ci_literal_token_text(session: i64, cursor: i32) -> str:
         return token_text
     with_ci_cursor_source_text(session, cursor)
 
-// ── Phase-B IR lowering for leaf expressions ─────────────────
+// ── Phase-B IR lowering ──────────────────────────────────────
 //
-// B2 covers literals + DeclRef. The lowering builds a CiExpr node
-// whose stored payload mirrors the legacy ci_trans_expr text byte
-// for byte, so output stays identical under the WITH_MIGRATE_IR
-// flag. Future B-phase commits add Binary/Unary/Cast/Call/etc.
-// arms in ci_lower_expr_ir; ci_trans_expr_via_ir grows alongside
-// them and the legacy literal arms get deleted in B11.
+// ci_lower_expr_ir is the recursive entry point. For supported
+// cursor kinds it produces a real CiExpr node; for unsupported
+// kinds it bypasses the IR detour cache, calls the legacy
+// ci_trans_expr to get a string, and wraps the result in a
+// CIE_RAW_STRING node. The cache bypass is the trick that lets
+// child sub-expressions re-enter ci_trans_expr without re-firing
+// the IR detour — the recursion bottoms out either at supported
+// leaves or at the legacy fallback.
 //
-// Returns 0 (the null sentinel) when the cursor kind is not yet
-// supported, signaling the caller to fall back to the legacy path.
+// B2 covered literals + DeclRef. B3a adds the recursive entry
+// point and CXK_PAREN_EXPR (trivial wrapper). Subsequent B3
+// sub-commits add binary, unary, and cast lowering.
+//
+// Returns 0 (the null sentinel) when even the legacy fallback
+// fails, which signals callers to fall through entirely.
+
+fn ci_trans_expr_legacy_for_ir(session: i64, cursor: i32, scope: str) -> str:
+    let prev = g_migrate_ir_enabled_cache
+    g_migrate_ir_enabled_cache = 0
+    let result = ci_trans_expr(session, cursor, scope)
+    g_migrate_ir_enabled_cache = prev
+    result
+
+fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    let kind = with_ci_cursor_kind(session, cursor)
+
+    // Literal + DeclRef leaves (B2).
+    if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF:
+        return ci_lower_literal_or_ref(session, cursor, kind, exprs, types, scope)
+
+    // Parenthesized expression — wraps a single inner expr (B3a).
+    if kind == CXK_PAREN_EXPR:
+        let nc = with_ci_num_children(session, cursor)
+        if nc == 1:
+            let inner_cursor = with_ci_child(session, cursor, 0)
+            let inner_id = ci_lower_expr_ir(session, inner_cursor, exprs, types, scope)
+            if (inner_id as i32) != 0:
+                return exprs.add(CiExprKind.CIE_PAREN, inner_id as i32, 0, 0, 0 as CiTypeId)
+
+    // Legacy fallback: bypass the cache, lower via the string path,
+    // and embed the result as a verbatim raw-string node.
+    let legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+    if legacy.len() == 0:
+        return 0 as CiExprId
+    exprs.raw_string(legacy, 0 as CiTypeId)
 
 fn ci_lower_literal_or_ref(session: i64, cursor: i32, kind: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     if kind == CXK_INT_LITERAL:
@@ -4128,10 +4164,10 @@ fn ci_lower_literal_or_ref(session: i64, cursor: i32, kind: i32, exprs: &mut CiE
 
     0 as CiExprId
 
-fn ci_trans_expr_via_ir(session: i64, cursor: i32, kind: i32, scope: str) -> str:
+fn ci_trans_expr_via_ir(session: i64, cursor: i32, scope: str) -> str:
     var types = CiTypePool.new()
     var exprs = CiExprPool.new()
-    let id = ci_lower_literal_or_ref(session, cursor, kind, &mut exprs, &mut types, scope)
+    let id = ci_lower_expr_ir(session, cursor, &mut exprs, &mut types, scope)
     if (id as i32) == 0:
         return ""
     ci_print_expr(&exprs, &types, id, 0, 0)
@@ -4143,13 +4179,13 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     if expanded_src.len() > 0:
         return expanded_src
 
-    // Phase-B IR detour: route the kinds that ci_lower_literal_or_ref
-    // owns through CiIR + CiPrint. An empty result means the lowering
-    // didn't produce a node (e.g. the kind isn't yet supported), so we
-    // fall through to the legacy code below.
+    // Phase-B IR detour: route the kinds that ci_lower_expr_ir owns
+    // through CiIR + CiPrint. An empty result means the lowering
+    // didn't produce a node, so we fall through to the legacy code
+    // below. The set of detoured kinds grows commit by commit.
     if ci_migrate_ir_enabled():
-        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF:
-            let ir_result = ci_trans_expr_via_ir(session, cursor, kind, scope)
+        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR:
+            let ir_result = ci_trans_expr_via_ir(session, cursor, scope)
             if ir_result.len() > 0:
                 return ir_result
 
