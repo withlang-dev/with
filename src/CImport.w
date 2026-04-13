@@ -4426,10 +4426,44 @@ fn ci_lower_implicit_cast(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
 
     // Remaining kinds (ARRAY_TO_PTR, INT_TO_PTR, PTR_TO_INT,
     // BITCAST/PTR_CAST, INT_WIDEN*, INT_TRUNC, FLOAT_WIDEN/TRUNC,
-    // FLOAT_TO_INT, INT_TO_FLOAT) all funnel through the legacy
-    // ci_render_cast_expr and need type-string resolution we
-    // don't yet have in the lowering pass. Bail and let legacy
-    // handle them.
+    // FLOAT_TO_INT, INT_TO_FLOAT) funnel through the legacy's
+    // ci_render_cast_expr / type-string formatting machinery.
+    // We recursively lower the inner operand and compose with the
+    // legacy helpers — the type-string path is too intricate to
+    // reproduce in IR right now but the sub-expression tree still
+    // goes through the IR pipeline.
+    let inner_id = ci_lower_expr_ir(session, inner_cursor, exprs, types, scope)
+    if (inner_id as i32) == 0:
+        return 0 as CiExprId
+    let inner_str = ci_print_expr(exprs, types, inner_id, 0, 0)
+    if inner_str.len() == 0:
+        return 0 as CiExprId
+    let inner_ty = with_ci_type_translated(session, with_ci_cursor_type(session, inner_cursor))
+
+    if cast_kind == CI_CAST_INT_TO_PTR:
+        return exprs.raw_string("(" ++ inner_str ++ " as usize as *mut c_void)", 0 as CiTypeId)
+    if cast_kind == CI_CAST_PTR_TO_INT:
+        let dest_ty = with_ci_cursor_type(session, cursor)
+        let dest_str = with_ci_type_translated(session, dest_ty)
+        return exprs.raw_string("(" ++ inner_str ++ " as usize as " ++ dest_str ++ ")", 0 as CiTypeId)
+    if cast_kind == CI_CAST_ARRAY_TO_PTR:
+        let pointee = with_ci_cursor_pointee_type(session, cursor)
+        if pointee.len() > 0:
+            return exprs.raw_string("(&" ++ inner_str ++ "[0] as *mut " ++ pointee ++ ")", 0 as CiTypeId)
+        return exprs.raw_string("&" ++ inner_str, 0 as CiTypeId)
+    if cast_kind == CI_CAST_BITCAST or cast_kind == CI_CAST_PTR_CAST:
+        let dest_ty = with_ci_cursor_type(session, cursor)
+        let dest_str = with_ci_type_translated(session, dest_ty)
+        let rendered = ci_render_cast_expr(inner_str, inner_ty, dest_str)
+        if rendered.len() > 0:
+            return exprs.raw_string(rendered, 0 as CiTypeId)
+    if cast_kind == CI_CAST_INT_WIDEN_SIGN or cast_kind == CI_CAST_INT_TRUNC or cast_kind == CI_CAST_FLOAT_WIDEN or cast_kind == CI_CAST_FLOAT_TRUNC or cast_kind == CI_CAST_FLOAT_TO_INT or cast_kind == CI_CAST_INT_TO_FLOAT:
+        let dest_ty = with_ci_cursor_type(session, cursor)
+        let dest_str = with_ci_type_translated(session, dest_ty)
+        let rendered = ci_render_cast_expr(inner_str, inner_ty, dest_str)
+        if rendered.len() > 0:
+            return exprs.raw_string(rendered, 0 as CiTypeId)
+
     0 as CiExprId
 
 fn ci_call_callee_name(session: i64, cursor: i32) -> str:
