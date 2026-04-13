@@ -268,7 +268,12 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
     if kind == CiExprKind.CIE_POST_DEC:
         return "<ci:unimpl:POST_DEC>"
     if kind == CiExprKind.CIE_COMPOUND_ASSIGN:
-        return "<ci:unimpl:COMPOUND_ASSIGN>"
+        let op = exprs.get_d0(id)
+        let lhs = (exprs.get_d1(id)) as CiExprId
+        let rhs = (exprs.get_d2(id)) as CiExprId
+        let lhs_str = ci_print_expr(exprs, types, lhs, 0, 0)
+        let rhs_str = ci_print_expr(exprs, types, rhs, 0, 0)
+        return lhs_str ++ " = " ++ lhs_str ++ " " ++ ci_bin_op_str(op) ++ " " ++ rhs_str
     if kind == CiExprKind.CIE_ASSIGN:
         let lhs = (exprs.get_d0(id)) as CiExprId
         let rhs = (exprs.get_d1(id)) as CiExprId
