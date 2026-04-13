@@ -4129,6 +4129,9 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         let shift_id = ci_lower_binary_shift(session, cursor, exprs, types, scope)
         if (shift_id as i32) != 0:
             return shift_id
+        let ptr_asgn_id = ci_lower_binary_ptr_assign(session, cursor, exprs, types, scope)
+        if (ptr_asgn_id as i32) != 0:
+            return ptr_asgn_id
 
     // Unary operator — only the trivial cases for now (B3c).
     // UO_PLUS and UO_DEREF are byte-identical to the legacy without
@@ -4426,6 +4429,37 @@ fn ci_lower_binary_pointer(session: i64, cursor: i32, exprs: &mut CiExprPool, ty
             return exprs.raw_string(result, 0 as CiTypeId)
 
     0 as CiExprId
+
+fn ci_lower_binary_ptr_assign(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    let op = with_ci_binary_op(session, cursor)
+    if op != BO_ASSIGN:
+        return 0 as CiExprId
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 2:
+        return 0 as CiExprId
+    let lhs_cursor = with_ci_child(session, cursor, 0)
+    let rhs_cursor = with_ci_child(session, cursor, 1)
+
+    // Pointer-type mismatch case only: both sides pointer, types
+    // differ → legacy inserts an `as LHS_TY` cast on the RHS.
+    if with_ci_type_is_pointer(session, lhs_cursor) == 0:
+        return 0 as CiExprId
+    if with_ci_type_is_pointer(session, rhs_cursor) == 0:
+        return 0 as CiExprId
+    let lhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
+    let rhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_cursor))
+    if lhs_ty_str == rhs_ty_str:
+        return 0 as CiExprId
+
+    let lhs_id = ci_lower_expr_ir(session, lhs_cursor, exprs, types, scope)
+    if (lhs_id as i32) == 0:
+        return 0 as CiExprId
+    let rhs_id = ci_lower_expr_ir(session, rhs_cursor, exprs, types, scope)
+    if (rhs_id as i32) == 0:
+        return 0 as CiExprId
+    let lhs_str = ci_print_expr(exprs, types, lhs_id, 0, 0)
+    let rhs_str = ci_print_expr(exprs, types, rhs_id, 0, 0)
+    exprs.raw_string("(" ++ lhs_str ++ " = (" ++ rhs_str ++ " as " ++ lhs_ty_str ++ "))", 0 as CiTypeId)
 
 fn ci_lower_binary_shift(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
