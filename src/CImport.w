@@ -5691,6 +5691,29 @@ fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, scope: str) -> str
         let id = stmts.continue_()
         return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
 
+    if kind == CXK_RETURN_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc == 0:
+            let id = stmts.return_(0 as CiExprId)
+            return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
+        let ret_child = with_ci_child(session, cursor, 0)
+
+        // Bail if the return expression needs setup-level lowering
+        // (side effects that need to be hoisted out of the rvalue
+        // position) or if the return type is an array (needs
+        // decay cast the printer doesn't yet produce).
+        if ci_rvalue_needs_lowering(session, ret_child):
+            return ""
+        let ret_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, ret_child))
+        if ret_ty_str.len() > 0 and ret_ty_str.byte_at(0) == 91:
+            return ""
+
+        let val_id = ci_lower_expr_ir(session, ret_child, &mut exprs, &mut types, scope)
+        if (val_id as i32) == 0:
+            return ""
+        let id = stmts.return_(val_id)
+        return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
+
     ""
 
 fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
@@ -5701,7 +5724,7 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     // stays in the legacy path — it returns "" which is trivially
     // byte-identical.
     if ci_migrate_ir_enabled():
-        if kind == CXK_BREAK_STMT or kind == CXK_CONTINUE_STMT:
+        if kind == CXK_BREAK_STMT or kind == CXK_CONTINUE_STMT or kind == CXK_RETURN_STMT:
             let ir_result = ci_trans_stmt_via_ir(session, cursor, kind, scope)
             if ir_result.len() > 0:
                 return ir_result
