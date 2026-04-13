@@ -4164,6 +4164,16 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         if (call_id as i32) != 0:
             return call_id
 
+    // Compound assignment (B3f). Lowers `x OP= y` to a CIE_
+    // COMPOUND_ASSIGN whose printer desugars to `x = x OP y`,
+    // matching the legacy arm's output byte-for-byte. The legacy
+    // unconditionally emits the non-wrap base op string, so the
+    // unsigned-wrap question doesn't come up here.
+    if kind == CXK_COMPOUND_ASSIGN_OP:
+        let compound_id = ci_lower_compound_assign(session, cursor, exprs, types, scope)
+        if (compound_id as i32) != 0:
+            return compound_id
+
     // Legacy fallback: bypass the cache, lower via the string path,
     // and embed the result as a verbatim raw-string node.
     let legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
@@ -4251,6 +4261,37 @@ fn ci_lower_binary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
         ci_op = CiBinOp.CIBO_ASSIGN
 
     exprs.binary(ci_op, lhs_id, rhs_id, 0 as CiTypeId)
+
+fn ci_compound_to_ci_binop(op: i32) -> i32:
+    if op == BO_ADD_ASSIGN: return CiBinOp.CIBO_ADD
+    if op == BO_SUB_ASSIGN: return CiBinOp.CIBO_SUB
+    if op == BO_MUL_ASSIGN: return CiBinOp.CIBO_MUL
+    if op == BO_DIV_ASSIGN: return CiBinOp.CIBO_DIV
+    if op == BO_REM_ASSIGN: return CiBinOp.CIBO_MOD
+    if op == BO_AND_ASSIGN: return CiBinOp.CIBO_BIT_AND
+    if op == BO_OR_ASSIGN: return CiBinOp.CIBO_BIT_OR
+    if op == BO_XOR_ASSIGN: return CiBinOp.CIBO_BIT_XOR
+    if op == BO_SHL_ASSIGN: return CiBinOp.CIBO_SHL
+    if op == BO_SHR_ASSIGN: return CiBinOp.CIBO_SHR
+    0 - 1
+
+fn ci_lower_compound_assign(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 2:
+        return 0 as CiExprId
+    let op = with_ci_binary_op(session, cursor)
+    let base_op = ci_compound_to_ci_binop(op)
+    if base_op < 0:
+        return 0 as CiExprId
+    let lhs_cursor = with_ci_child(session, cursor, 0)
+    let rhs_cursor = with_ci_child(session, cursor, 1)
+    let lhs_id = ci_lower_expr_ir(session, lhs_cursor, exprs, types, scope)
+    if (lhs_id as i32) == 0:
+        return 0 as CiExprId
+    let rhs_id = ci_lower_expr_ir(session, rhs_cursor, exprs, types, scope)
+    if (rhs_id as i32) == 0:
+        return 0 as CiExprId
+    exprs.add(CiExprKind.CIE_COMPOUND_ASSIGN, base_op, lhs_id as i32, rhs_id as i32, 0 as CiTypeId)
 
 fn ci_lower_unary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
@@ -4480,7 +4521,7 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     // didn't produce a node, so we fall through to the legacy code
     // below. The set of detoured kinds grows commit by commit.
     if ci_migrate_ir_enabled():
-        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP or kind == CXK_UNARY_OP or kind == CXK_IMPLICIT_CAST or kind == CXK_MEMBER_REF or kind == CXK_ARRAY_SUBSCRIPT or kind == CXK_CALL_EXPR:
+        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF or kind == CXK_PAREN_EXPR or kind == CXK_BINARY_OP or kind == CXK_UNARY_OP or kind == CXK_IMPLICIT_CAST or kind == CXK_MEMBER_REF or kind == CXK_ARRAY_SUBSCRIPT or kind == CXK_CALL_EXPR or kind == CXK_COMPOUND_ASSIGN_OP:
             let ir_result = ci_trans_expr_via_ir(session, cursor, scope)
             if ir_result.len() > 0:
                 return ir_result
