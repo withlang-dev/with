@@ -6169,11 +6169,12 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
                 return stmts.return_(val_id)
 
     // Legacy fallback: bypass the cache, call the legacy
-    // ci_trans_stmt at the provided indent, and wrap the result in
-    // a CIS_RAW_STRING. The caller's indent is preserved so the
-    // legacy's ci_indent_block output matches the surrounding
-    // context byte-for-byte.
-    let legacy = ci_trans_stmt_legacy_for_ir(session, cursor, indent, scope)
+    // ci_trans_stmt at indent=0, and wrap the result in a
+    // CIS_RAW_STRING. The printer re-indents at print time based
+    // on the enclosing container's depth — stashed text is always
+    // level-0-relative. This matches the convention established
+    // by the structural CIS_BLOCK printer.
+    let legacy = ci_trans_stmt_legacy_for_ir(session, cursor, 0, scope)
     if legacy.len() == 0:
         return 0 as CiStmtId
     stmts.raw_string(legacy)
@@ -6188,14 +6189,19 @@ fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope
         // CXK_NULL_STMT and empty-bypass map to empty string.
         return ""
 
-    // Simple single-line stmt kinds (break / continue / return)
-    // get their trailing newline stripped to match the legacy's
-    // bare-string convention. Multi-line and raw-string kinds
-    // keep their newlines intact.
+    // Target depth is the caller's indent level converted to
+    // spaces. For simple single-line stmt kinds (break / continue
+    // / return), we print at depth 0 and strip the trailing
+    // newline so the return matches the legacy's bare-string
+    // convention — callers apply their own ci_indent_block. For
+    // everything else (CIS_RAW_STRING from the fallback, or a
+    // structural multi-line node), we print at the target depth
+    // so the content lands at the caller's level.
     let sk = stmts.kind(id)
     if sk == CiStmtKind.CIS_BREAK or sk == CiStmtKind.CIS_CONTINUE or sk == CiStmtKind.CIS_RETURN:
         return ci_strip_trailing_newline(ci_print_stmt(&stmts, &exprs, &types, id, 0))
-    ci_print_stmt(&stmts, &exprs, &types, id, 0)
+    let target_depth = indent * 4
+    ci_print_stmt(&stmts, &exprs, &types, id, target_depth)
 
 fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     let kind = with_ci_cursor_kind(session, cursor)
