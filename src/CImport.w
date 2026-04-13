@@ -4126,6 +4126,9 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         let ptr_id = ci_lower_binary_pointer(session, cursor, exprs, types, scope)
         if (ptr_id as i32) != 0:
             return ptr_id
+        let shift_id = ci_lower_binary_shift(session, cursor, exprs, types, scope)
+        if (shift_id as i32) != 0:
+            return shift_id
 
     // Unary operator — only the trivial cases for now (B3c).
     // UO_PLUS and UO_DEREF are byte-identical to the legacy without
@@ -4418,6 +4421,61 @@ fn ci_lower_binary_pointer(session: i64, cursor: i32, exprs: &mut CiExprPool, ty
             return exprs.raw_string(result, 0 as CiTypeId)
 
     0 as CiExprId
+
+fn ci_lower_binary_shift(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 2:
+        return 0 as CiExprId
+    let op = with_ci_binary_op(session, cursor)
+    if op != BO_SHL and op != BO_SHR:
+        return 0 as CiExprId
+
+    let lhs_cursor = with_ci_child(session, cursor, 0)
+    let rhs_cursor = with_ci_child(session, cursor, 1)
+    let lhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
+    let rhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_cursor))
+
+    // Bail on pointer or array operands (not our arm).
+    if with_ci_type_is_pointer(session, lhs_cursor) != 0:
+        return 0 as CiExprId
+    if with_ci_type_is_pointer(session, rhs_cursor) != 0:
+        return 0 as CiExprId
+    if lhs_ty_str.len() > 0 and lhs_ty_str.byte_at(0) == 91:
+        return 0 as CiExprId
+    if rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91:
+        return 0 as CiExprId
+
+    let lhs_id = ci_lower_expr_ir(session, lhs_cursor, exprs, types, scope)
+    if (lhs_id as i32) == 0:
+        return 0 as CiExprId
+    let rhs_id = ci_lower_expr_ir(session, rhs_cursor, exprs, types, scope)
+    if (rhs_id as i32) == 0:
+        return 0 as CiExprId
+    let lhs_str = ci_print_expr(exprs, types, lhs_id, 0, 0)
+    let rhs_str = ci_print_expr(exprs, types, rhs_id, 0, 0)
+
+    // Bail on large-decimal operands — they go through the legacy
+    // `(... as c_uint)` coercion path which we don't duplicate.
+    if ci_is_large_decimal(lhs_str) or ci_is_large_decimal(rhs_str):
+        return 0 as CiExprId
+
+    let is_unsigned = with_ci_type_is_unsigned(session, cursor)
+    let op_str = ci_bo_to_str_typed(op, is_unsigned)
+    if op_str.len() == 0:
+        return 0 as CiExprId
+
+    // Integer-promotion: if the LHS is a small integer (u8/u16/
+    // i8/i16/c_uchar/c_schar/c_ushort/c_short/PCRE2_UCHAR8), cast
+    // to c_uint before the shift to avoid LLVM's `shl i8 %x, 8`
+    // poison. This is the bug fix the plan calls out explicitly.
+    if ci_type_is_small_int(lhs_ty_str):
+        let promoted = "((" ++ lhs_str ++ ") as c_uint)"
+        let result = "(" ++ promoted ++ " " ++ op_str ++ " " ++ rhs_str ++ ")"
+        return exprs.raw_string(result, 0 as CiTypeId)
+
+    // Non-small LHS: plain `(lhs << rhs)` form.
+    let result = "(" ++ lhs_str ++ " " ++ op_str ++ " " ++ rhs_str ++ ")"
+    exprs.raw_string(result, 0 as CiTypeId)
 
 fn ci_lower_binary_comparison(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
