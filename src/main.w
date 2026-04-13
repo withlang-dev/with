@@ -13,6 +13,7 @@ use Compilation
 use ConanClient
 use Fmt
 use Lsp
+use CiPrint
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
@@ -930,6 +931,11 @@ fn run_migrate_command(argc: i32) -> i32:
     if argc < 3:
         eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir]")
         return 1
+
+    // Hidden developer mode: run the CiIR/CiPrint roundtrip harness
+    // and exit. Used by the cli-selfhost-ir-roundtrip test.
+    if with_arg_at(2) == "--ir-roundtrip":
+        return ci_ir_roundtrip_test()
 
     // Parse arguments
     var source_path = ""

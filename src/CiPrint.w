@@ -19,6 +19,9 @@
 
 use CiIR
 
+extern fn with_write(s: str) -> void
+extern fn with_eprint(s: str) -> void
+
 // ── Helpers ────────────────────────────────────────────────────
 
 fn ci_make_indent(n: i32) -> str:
@@ -437,5 +440,105 @@ fn ci_print_decl(decls: &CiDeclPool, stmts: &CiStmtPool, exprs: &CiExprPool, typ
         return "extern fn " ++ name ++ "() -> " ++ ci_print_type(types, ret_ty) ++ "\n"
 
     "<ci:decl:unknown>\n"
+
+// ── Roundtrip harness ────────────────────────────────────────
+//
+// Hand-constructs known IR, calls ci_print_*, and asserts the
+// output matches a golden string. Invoked by `with migrate
+// --ir-roundtrip` for the cli-selfhost-ir-roundtrip test. Grows as
+// Phase-B lowering lands new kinds — each new kind picks up a
+// case here that exercises its printer arm in isolation.
+
+fn ci_expect_eq(label: str, actual: str, expected: str) -> i32:
+    if actual == expected:
+        return 0
+    with_eprint("ci-roundtrip FAIL: " ++ label ++ "\n")
+    with_eprint("  expected: " ++ expected ++ "\n")
+    with_eprint("  actual:   " ++ actual ++ "\n")
+    1
+
+fn ci_roundtrip_types -> i32:
+    var types = CiTypePool.new()
+    let i32_ty = types.ty_int(32, 0)
+    let u8_ty = types.ty_int(8, 1)
+    let bool_ty = types.ty_bool()
+    let ptr_i32 = types.ty_pointer(i32_ty, 0)
+    let arr_10_i32 = types.ty_array(i32_ty, 10)
+    let arr_open_u8 = types.ty_array(u8_ty, CI_SIZE_INCOMPLETE)
+    var fails: i32 = 0
+    fails = fails + ci_expect_eq("ty_int_32_signed", ci_print_type(&types, i32_ty), "i32")
+    fails = fails + ci_expect_eq("ty_int_8_unsigned", ci_print_type(&types, u8_ty), "u8")
+    fails = fails + ci_expect_eq("ty_bool", ci_print_type(&types, bool_ty), "bool")
+    fails = fails + ci_expect_eq("ty_ptr_mut_i32", ci_print_type(&types, ptr_i32), "*mut i32")
+    fails = fails + ci_expect_eq("ty_array_10_i32", ci_print_type(&types, arr_10_i32), "[10]i32")
+    fails = fails + ci_expect_eq("ty_array_open_u8", ci_print_type(&types, arr_open_u8), "[]u8")
+    fails
+
+fn ci_roundtrip_exprs -> i32:
+    var types = CiTypePool.new()
+    var exprs = CiExprPool.new()
+    let i32_ty = types.ty_int(32, 0)
+    let u8_ty = types.ty_int(8, 1)
+    let lit_idx = exprs.add_string("42")
+    let lit = exprs.int_lit(lit_idx, i32_ty)
+    let a_idx = exprs.add_string("a")
+    let b_idx = exprs.add_string("b")
+    let a = exprs.ident(a_idx, i32_ty)
+    let b = exprs.ident(b_idx, i32_ty)
+    let add = exprs.binary(CiBinOp.CIBO_ADD, a, b, i32_ty)
+    let neg = exprs.unary(CiUnaryOp.CIUO_NEG, lit, i32_ty)
+    let cast_u8 = exprs.cast(u8_ty, a)
+    var fails: i32 = 0
+    fails = fails + ci_expect_eq("expr_int_lit", ci_print_expr(&exprs, &types, lit, 0, 0), "42")
+    fails = fails + ci_expect_eq("expr_ident", ci_print_expr(&exprs, &types, a, 0, 0), "a")
+    fails = fails + ci_expect_eq("expr_binary_add", ci_print_expr(&exprs, &types, add, 0, 0), "(a + b)")
+    fails = fails + ci_expect_eq("expr_unary_neg", ci_print_expr(&exprs, &types, neg, 0, 0), "(-42)")
+    fails = fails + ci_expect_eq("expr_cast_u8", ci_print_expr(&exprs, &types, cast_u8, 0, 0), "(a as u8)")
+    fails
+
+fn ci_roundtrip_fn_decl -> i32:
+    // Construct:  fn foo() -> i32:
+    //                 return 42
+    var types = CiTypePool.new()
+    var exprs = CiExprPool.new()
+    var stmts = CiStmtPool.new()
+    var decls = CiDeclPool.new()
+    let i32_ty = types.ty_int(32, 0)
+    let lit_idx = exprs.add_string("42")
+    let lit = exprs.int_lit(lit_idx, i32_ty)
+    let ret = stmts.return_(lit)
+    let start = stmts.add_extra(ret as i32)
+    let body = stmts.block(start, 1)
+    let name_idx = decls.add_string("foo")
+    let fn_d = decls.fn_decl(name_idx, i32_ty, body, 0)
+    let actual = ci_print_decl(&decls, &stmts, &exprs, &types, fn_d)
+    let expected = "fn foo() -> i32:\n    return 42\n"
+    ci_expect_eq("fn_decl_return_literal", actual, expected)
+
+fn ci_roundtrip_raw_string -> i32:
+    // The Phase-B escape hatch: a raw-string expr prints its interned
+    // text verbatim, and a raw-string stmt does the same.
+    var types = CiTypePool.new()
+    var exprs = CiExprPool.new()
+    var stmts = CiStmtPool.new()
+    let i32_ty = types.ty_int(32, 0)
+    let raw_e = exprs.raw_string("legacy_expr()", i32_ty)
+    let raw_s = stmts.raw_string("    legacy_stmt()\n")
+    var fails: i32 = 0
+    fails = fails + ci_expect_eq("raw_expr", ci_print_expr(&exprs, &types, raw_e, 0, 0), "legacy_expr()")
+    fails = fails + ci_expect_eq("raw_stmt", ci_print_stmt(&stmts, &exprs, &types, raw_s, 0), "    legacy_stmt()\n")
+    fails
+
+pub fn ci_ir_roundtrip_test -> i32:
+    var fails: i32 = 0
+    fails = fails + ci_roundtrip_types()
+    fails = fails + ci_roundtrip_exprs()
+    fails = fails + ci_roundtrip_fn_decl()
+    fails = fails + ci_roundtrip_raw_string()
+    if fails == 0:
+        with_write("ci-roundtrip: PASS\n")
+        return 0
+    with_eprint("ci-roundtrip: FAIL (" ++ i32_to_string(fails) ++ " case(s))\n")
+    1
 
 let _ci_print_eof_guard = 0
