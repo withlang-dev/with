@@ -32,6 +32,37 @@ fn ci_make_indent(n: i32) -> str:
         i = i + 1
     out
 
+// Prepend `spaces` spaces to every non-empty line of `text`.
+// Empty lines (zero-length content between newlines) stay bare —
+// those are the "outer separator" blank lines the legacy
+// migrator's compound_stmt arm adds via `parts.push("\n")`. The
+// inner blanks that were already indented by an inner
+// ci_indent_block call have leading whitespace in their content,
+// so they're NOT empty and DO get re-indented.
+fn ci_reindent_spaces(text: str, spaces: i32) -> str:
+    if text.len() == 0:
+        return ""
+    if spaces <= 0:
+        return text
+    var prefix = ""
+    var k: i32 = 0
+    while k < spaces:
+        prefix = prefix ++ " "
+        k = k + 1
+    var parts: Vec[str] = Vec.new()
+    var start = 0
+    let tlen = text.len() as i32
+    while start < tlen:
+        var end = start
+        while end < tlen and text.byte_at(end as i64) != 10:
+            end = end + 1
+        if end > start:
+            parts.push(prefix)
+            parts.push(text.slice(start as i64, end as i64))
+        parts.push("\n")
+        start = end + 1
+    parts.join("")
+
 // Operator precedence table. Larger = binds tighter. Used by Phase-B
 // B3 to decide when to drop redundant parens; Phase A always wraps
 // binary / unary expressions in explicit parentheses.
@@ -326,13 +357,22 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         return indent ++ "return " ++ ci_print_expr(exprs, types, e, 0, 0) ++ "\n"
 
     if kind == CiStmtKind.CIS_BLOCK:
+        // Block composition convention matches the legacy
+        // compound_stmt arm: each child is rendered at depth 0
+        // (so the child produces level-0-relative text), then
+        // re-indented by this block's depth, then followed by a
+        // bare "\n" separator. Blank lines between children stay
+        // bare; blank lines *within* a child get re-indented by
+        // ci_reindent_spaces, matching ci_indent_block's behavior.
         let start = stmts.get_d0(id)
         let count = stmts.get_d1(id)
         var out = ""
         var i: i32 = 0
         while i < count:
             let child = (stmts.get_extra(start + i)) as CiStmtId
-            out = out ++ ci_print_stmt(stmts, exprs, types, child, depth)
+            let child_text = ci_print_stmt(stmts, exprs, types, child, 0)
+            out = out ++ ci_reindent_spaces(child_text, depth)
+            out = out ++ "\n"
             i = i + 1
         return out
 
@@ -397,7 +437,15 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         return indent ++ "__pc = " ++ i32_to_string(n) ++ "\n" ++ indent ++ "__goto_pending = 1\n"
 
     if kind == CiStmtKind.CIS_RAW_STRING:
-        return stmts.get_string(stmts.get_d0(id))
+        // The stashed text is always level-0-relative (the
+        // ci_lower_stmt_ir legacy fallback passes indent=0 to the
+        // bypass). Re-indent by depth at print time so the
+        // content lands at the right column for its enclosing
+        // container.
+        let text = stmts.get_string(stmts.get_d0(id))
+        if depth <= 0:
+            return text
+        return ci_reindent_spaces(text, depth)
 
     indent ++ "<ci:stmt:unknown>\n"
 
@@ -541,7 +589,10 @@ fn ci_roundtrip_fn_decl -> i32:
     let name_idx = decls.add_string("foo")
     let fn_d = decls.fn_decl(name_idx, i32_ty, body, 0)
     let actual = ci_print_decl(&decls, &stmts, &exprs, &types, fn_d)
-    let expected = "fn foo() -> i32:\n    return 42\n"
+    // CIS_BLOCK now appends a bare `\n` separator after each
+    // child to match the legacy compound_stmt's blank-line
+    // convention.
+    let expected = "fn foo() -> i32:\n    return 42\n\n"
     ci_expect_eq("fn_decl_return_literal", actual, expected)
 
 fn ci_roundtrip_raw_string -> i32:
