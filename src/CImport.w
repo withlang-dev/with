@@ -782,6 +782,8 @@ fn ci_field_type_is_demoted(ftype: str, demoted: str) -> bool:
 // ── Function translation ────────────────────────────────────
 
 fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
+    // B9: fresh per-function temp counter.
+    ci_temp_reset()
     let name = with_cimport_decl_name(session, idx)
     if name.len() == 0:
         return ""
@@ -3807,10 +3809,8 @@ fn ci_merge_stmt_text(prefix: str, stmt: str) -> str:
     prefix ++ "\n" ++ stmt
 
 fn ci_expr_temp_name(session: i64, cursor: i32, tag: str) -> str:
-    let off = with_ci_cursor_start_offset(session, cursor)
-    if off >= 0:
-        return "__ci_expr_" ++ tag ++ "_" ++ i64_to_string(off as i64)
-    "__ci_expr_" ++ tag ++ "_" ++ i64_to_string(cursor as i64)
+    let id = ci_temp_id_for_cursor(cursor)
+    "__ci_expr_" ++ tag ++ "_" ++ i64_to_string(id as i64)
 
 fn ci_lowering_to_stmt_text(lowered: CiExprLowering) -> str:
     if not ci_lowering_valid(lowered):
@@ -6011,10 +6011,8 @@ fn ci_condition_unwrap_cursor(session: i64, cursor: i32) -> i32:
     c
 
 fn ci_condition_temp_name(session: i64, cursor: i32, tag: str) -> str:
-    let off = with_ci_cursor_start_offset(session, cursor)
-    if off >= 0:
-        return "__ci_cond_" ++ tag ++ "_" ++ i64_to_string(off as i64)
-    "__ci_cond_" ++ tag ++ "_" ++ i64_to_string(cursor as i64)
+    let id = ci_temp_id_for_cursor(cursor)
+    "__ci_cond_" ++ tag ++ "_" ++ i64_to_string(id as i64)
 
 fn ci_condition_needs_stmt_eval(session: i64, cursor: i32) -> bool:
     ci_rvalue_needs_lowering(session, cursor)
@@ -7445,6 +7443,11 @@ fn ci_indent_str(level: i32) -> str:
 // Returns "" on failure (caller falls back to comptime_error stub).
 
 fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
+    // B9: fresh per-function temp counter. This path is called
+    // from ci_translate_function's static-inline branch — which
+    // already resets — but also from other call sites for header
+    // body translation, so reset here too.
+    ci_temp_reset()
     // Use the new cursor-based API to find the function body.
     // Match by NAME first (reliable), fall back to index matching.
     let root = with_ci_root_cursor(session)
@@ -8569,6 +8572,33 @@ extern fn with_getenv_str(name: str) -> str
 
 var g_migrate_ir_enabled_cache: i32 = 0 - 1
 
+// Per-function temp counter state (B9). The same cursor can be
+// visited multiple times during string-based lowering — the
+// memoization map keeps the assigned id stable per cursor so
+// re-entry returns the same name. Reset at the start of every
+// ci_migrate_translate_function call.
+var g_ci_temp_cursors: Vec[i32] = Vec.new()
+var g_ci_temp_ids: Vec[i32] = Vec.new()
+var g_ci_temp_next: i32 = 0
+
+fn ci_temp_reset():
+    g_ci_temp_cursors = Vec.new()
+    g_ci_temp_ids = Vec.new()
+    g_ci_temp_next = 0
+
+fn ci_temp_id_for_cursor(cursor: i32) -> i32:
+    var i: i32 = 0
+    let n = g_ci_temp_cursors.len() as i32
+    while i < n:
+        if g_ci_temp_cursors.get(i as i64) == cursor:
+            return g_ci_temp_ids.get(i as i64)
+        i = i + 1
+    let id = g_ci_temp_next
+    g_ci_temp_next = g_ci_temp_next + 1
+    g_ci_temp_cursors.push(cursor)
+    g_ci_temp_ids.push(id)
+    id
+
 fn ci_migrate_ir_enabled() -> bool:
     if g_migrate_ir_enabled_cache == 0 - 1:
         let v = with_getenv_str("WITH_MIGRATE_IR")
@@ -9059,6 +9089,11 @@ fn with_fs_read_file_cmd(cmd: str) -> str:
 // 3. Goto-containing functions use state-variable transform
 // 4. Never silently demotes to extern — emits comptime_error on failure
 fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> str:
+    // B9: every function gets a fresh per-function temp counter
+    // so temp names are `__ci_expr_TAG_0`, `__ci_expr_TAG_1`, ...
+    // rather than source-offset-keyed. The counter is cursor-
+    // memoized so re-entering the same cursor returns the same id.
+    ci_temp_reset()
     let name = with_cimport_decl_name(session, idx)
     if name.len() == 0:
         return ""
