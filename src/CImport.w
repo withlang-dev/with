@@ -5,6 +5,7 @@
 // Falls back gracefully when libclang is unavailable.
 
 use CiIR
+use CiPrint
 
 extern fn with_cimport_add_include_path(path: str) -> void
 extern fn with_cimport_clear_include_paths() -> void
