@@ -8548,20 +8548,22 @@ var g_migrate_no_c_export: i32 = 0
 pub fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val
 
-// Phase-B IR migration flag, latched from the WITH_MIGRATE_IR env var
-// the first time it is queried. Sentinel -1 = not yet checked.
+// IR re-entry guard. The WITH_MIGRATE_IR env flag was removed in
+// B11b — the IR detour is always on for `with migrate`. The
+// counter doubles as a re-entry prevention mechanism:
+// ci_trans_expr_legacy_for_ir / ci_trans_stmt_legacy_for_ir
+// temporarily set it to 0 before calling back into
+// ci_trans_expr / ci_trans_stmt, so the legacy fallback path at
+// the bottom of those functions runs without re-detouring through
+// IR. Outside those helpers the guard is always 1.
 //
-// B10 (this commit) flipped the default to ON — every expression
-// and statement cursor kind now flows through ci_lower_expr_ir /
-// ci_trans_stmt_via_ir unless WITH_MIGRATE_IR=0 is set explicitly.
-// The legacy path still exists behind the cache bypass helpers
-// (ci_trans_expr_legacy_for_ir / ci_trans_stmt_legacy_for_ir),
-// which CIE_RAW_STRING / CIS_RAW_STRING fallbacks invoke when a
-// structural lowering isn't available yet. Those bypass sites are
-// the remaining work for B11's legacy deletion.
-extern fn with_getenv_str(name: str) -> str
+// Legacy fallbacks still exist for expression and statement kinds
+// the IR pipeline has not yet lowered structurally — those kinds
+// fall through to a CIE_RAW_STRING / CIS_RAW_STRING wrapping the
+// legacy-translated text. Porting those kinds to structural IR is
+// the remaining Phase-B work.
 
-var g_migrate_ir_enabled_cache: i32 = 0 - 1
+var g_migrate_ir_enabled_cache: i32 = 1
 
 // Per-function temp counter state (B9). The same cursor can be
 // visited multiple times during string-based lowering — the
@@ -8591,12 +8593,6 @@ fn ci_temp_id_for_cursor(cursor: i32) -> i32:
     id
 
 fn ci_migrate_ir_enabled() -> bool:
-    if g_migrate_ir_enabled_cache == 0 - 1:
-        let v = with_getenv_str("WITH_MIGRATE_IR")
-        if v == "0":
-            g_migrate_ir_enabled_cache = 0
-        else:
-            g_migrate_ir_enabled_cache = 1
     g_migrate_ir_enabled_cache != 0
 
 // (ci_ir_shim_stmt was removed in B5e — B5d's statement-level
