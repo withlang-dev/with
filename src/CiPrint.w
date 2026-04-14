@@ -277,7 +277,11 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
     if kind == CiExprKind.CIE_FIELD:
         let base = (exprs.get_d0(id)) as CiExprId
         let field = exprs.get_string(exprs.get_d1(id))
-        return ci_print_expr(exprs, types, base, 0, 0) ++ "." ++ field
+        let is_arrow = exprs.get_d2(id)
+        let base_text = ci_print_expr(exprs, types, base, 0, 0)
+        if is_arrow != 0:
+            return ci_wrap_unsafe("*" ++ base_text) ++ "." ++ field
+        return base_text ++ "." ++ field
     if kind == CiExprKind.CIE_INDEX:
         let base = (exprs.get_d0(id)) as CiExprId
         let idx = (exprs.get_d1(id)) as CiExprId
