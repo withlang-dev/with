@@ -8643,8 +8643,22 @@ fn ci_var_init_translation_is_valid(vty_str: str, init_expr: str) -> bool:
 fn ci_var_init_expr(session: i64, var_cursor: i32, scope: str) -> str:
     let init_cursor = ci_find_var_init_cursor(session, var_cursor)
     if init_cursor >= 0:
-        let init_expr = ci_render_lowered_expr(session, init_cursor, ci_lower_rvalue_expr(session, init_cursor, scope))
+        var init_expr = ci_render_lowered_expr(session, init_cursor, ci_lower_rvalue_expr(session, init_cursor, scope))
         let vty_str = with_ci_type_translated(session, with_ci_cursor_type(session, var_cursor))
+        // Array-to-pointer decay in initializer context: when the
+        // var's type is a pointer and the init is an array-typed
+        // expression, insert the explicit `&init[0] as *T` decay.
+        // C performs this implicitly; With doesn't.
+        //
+        // String literals are exempt — With accepts `*const i8 =
+        // "literal"` directly without an explicit decay.
+        if vty_str.len() > 0 and vty_str.byte_at(0) == 42:
+            let init_peeled = ci_peel_transparent(session, init_cursor)
+            let init_kind = with_ci_cursor_kind(session, init_peeled)
+            if init_kind != CXK_STRING_LITERAL and ci_cursor_is_array_type(session, init_peeled):
+                let elem_ty = ci_array_elem_type_from_cursor(session, init_peeled)
+                if elem_ty.len() > 0:
+                    init_expr = "(&" ++ init_expr ++ "[0] as " ++ vty_str ++ ")"
         if ci_var_init_translation_is_valid(vty_str, init_expr):
             return init_expr
     if scope.len() == 0:
