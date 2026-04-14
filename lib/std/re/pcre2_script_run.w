@@ -107,38 +107,6 @@ type ucd_record { script: u8 = 0, chartype: u8 = 0, gbprop: u8 = 0, caseset: u8 
 type struct_ucd_record = ucd_record
 type pcre2_serialized_data { magic: c_uint = 0, version: c_uint = 0, config: c_uint = 0, number_of_codes: c_int = 0 }
 type struct_pcre2_serialized_data = pcre2_serialized_data
-extern var _pcre2_utf8_table1: *c_int
-extern let _pcre2_utf8_table1_size: c_uint
-extern var _pcre2_utf8_table2: *c_int
-extern var _pcre2_utf8_table3: *c_int
-extern var _pcre2_utf8_table4: *u8
-extern var _pcre2_OP_lengths_8: *u8
-extern var _pcre2_callout_end_delims_8: *c_uint
-extern var _pcre2_callout_start_delims_8: *c_uint
-extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
-extern var _pcre2_default_tables_8: *u8
-extern var _pcre2_hspace_list_8: *c_uint
-extern var _pcre2_vspace_list_8: *c_uint
-extern var _pcre2_ucd_boolprop_sets_8: *c_uint
-extern var _pcre2_ucd_caseless_sets_8: *c_uint
-extern let _pcre2_ucd_turkish_dotted_i_caseset_8: c_uint
-extern var _pcre2_ucd_nocase_ranges_8: *c_uint
-extern let _pcre2_ucd_nocase_ranges_size_8: c_uint
-extern var _pcre2_ucd_digit_sets_8: *c_uint
-extern var _pcre2_ucd_script_sets_8: *c_uint
-extern var _pcre2_ucd_records_8: *ucd_record
-extern var _pcre2_ucd_stage1_8: *c_ushort
-extern var _pcre2_ucd_stage2_8: *c_ushort
-extern var _pcre2_ucp_gbtable_8: *c_uint
-extern var _pcre2_ucp_gentype_8: *c_uint
-extern var _pcre2_unicode_version_8: *const i8
-extern var _pcre2_utt_8: *ucp_type_table
-extern var _pcre2_utt_names_8: *c_char
-extern let _pcre2_utt_size_8: c_ulong
-extern var _pcre2_ebcdic_1047_to_ascii_8: *u8
-extern var _pcre2_ascii_to_ebcdic_1047_8: *u8
 type pcre2_real_general_context_8 { memctl: pcre2_memctl }
 type struct_pcre2_real_general_context_8 = pcre2_real_general_context_8
 type pcre2_real_compile_context_8 { memctl: pcre2_memctl, stack_guard: *const fn(c_uint, *mut c_void) -> c_int = null, stack_guard_data: *mut c_void = null, tables: *const u8 = null, max_pattern_length: c_ulong = 0, max_pattern_compiled_length: c_ulong = 0, bsr_convention: c_ushort = 0, newline_convention: c_ushort = 0, parens_nest_limit: c_uint = 0, extra_options: c_uint = 0, max_varlookbehind: c_uint = 0, optimization_flags: c_uint = 0 }
@@ -170,7 +138,7 @@ type struct_recurse_arguments = recurse_arguments
 // union
 type class_bits_storage { classbits: [32]u8 = [0 as u8; 32], classwords: [8]c_uint = [0 as c_uint; 8] }
 type struct_class_bits_storage = class_bits_storage
-type compile_block_8 { cx: *mut pcre2_real_compile_context_8 = null, lcc: *const u8 = null, fcc: *const u8 = null, cbits: *const u8 = null, ctypes: *const u8 = null, start_workspace: *mut u8 = null, start_code: *mut u8 = null, start_pattern: *const u8 = null, end_pattern: *const u8 = null, name_table: *mut u8 = null, workspace_size: c_ulong = 0, small_ref_offset: [10]c_ulong = [0 as c_ulong; 10], erroroffset: c_ulong = 0, classbits: class_bits_storage, names_found: c_ushort = 0, name_entry_size: c_ushort = 0, parens_depth: c_ushort = 0, assert_depth: c_ushort = 0, named_groups: *mut named_group_8 = null, named_group_list_size: c_uint = 0, external_options: c_uint = 0, external_flags: c_uint = 0, bracount: c_uint = 0, lastcapture: c_uint = 0, parsed_pattern: *mut c_uint = null, parsed_pattern_end: *mut c_uint = null, groupinfo: *mut c_uint = null, top_backref: c_uint = 0, backref_map: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], class_op_used: [15]u8 = [0 as u8; 15], req_varyopt: c_uint = 0, max_varlookbehind: c_uint = 0, max_lookbehind: c_int = 0, had_accept: c_int = 0, had_pruneorskip: c_int = 0, had_recurse: c_int = 0, dupnames: c_int = 0, first_data: *mut compile_data = null, last_data: *mut compile_data = null }
+type compile_block_8 { cx: *mut pcre2_real_compile_context_8 = null, lcc: *const u8 = null, fcc: *const u8 = null, cbits: *const u8 = null, ctypes: *const u8 = null, start_workspace: *mut u8 = null, start_code: *mut u8 = null, start_pattern: *const u8 = null, end_pattern: *const u8 = null, name_table: *mut u8 = null, workspace_size: c_ulong = 0, small_ref_offset: [10]c_ulong = [0 as c_ulong; 10], erroroffset: c_ulong = 0, classbits: class_bits_storage, names_found: c_ushort = 0, name_entry_size: c_ushort = 0, parens_depth: c_ushort = 0, assert_depth: c_ushort = 0, named_groups: *mut named_group_8 = null, named_group_list_size: c_uint = 0, external_options: c_uint = 0, external_flags: c_uint = 0, bracount: c_uint = 0, lastcapture: c_uint = 0, parsed_pattern: *mut c_uint = null, parsed_pattern_end: *mut c_uint = null, groupinfo: *mut c_uint = null, top_backref: c_uint = 0, backref_map: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], class_op_used: [15]u8 = [0 as u8; 15], req_varyopt: c_uint = 0, max_varlookbehind: c_uint = 0, max_lookbehind: c_int = 0, had_accept: c_int = 0, had_pruneorskip: c_int = 0, had_recurse: c_int = 0, dupnames: c_int = 0, first_data: *mut compile_data = null, last_data: *mut compile_data = null, char_lists_size: c_ulong = 0 }
 type struct_compile_block_8 = compile_block_8
 type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
 type struct_pcre2_real_jit_stack_8 = pcre2_real_jit_stack_8
@@ -214,11 +182,234 @@ extern fn _pcre2_jit_get_size_8(p0: *mut c_void) -> c_ulong
 extern fn _pcre2_jit_get_target_8() -> *const i8
 extern fn _pcre2_memctl_malloc_8(p0: c_ulong, p1: *mut pcre2_memctl) -> *mut c_void
 extern fn _pcre2_ord2utf_8(p0: c_uint, p1: *mut u8) -> c_uint
-fn _pcre2_script_run_8(ptr: *const u8, endptr: *const u8, utf: c_int) -> c_int:
-    ptr
-    endptr
-    utf
-    return 1
+fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) -> c_int:
+    var ptr = __param_ptr
+    var require_state: c_uint = SCRIPT_UNSET
+
+    var require_map: [6]c_uint
+
+    var map: [6]c_uint
+
+    var require_digitset: c_uint = 0
+
+    var c: c_uint
+
+    if (ptr >= endptr):
+        return 1
+
+    var __ci_expr_old_0: *const u8 = ptr
+    (ptr = ptr + 1)
+    (c = (unsafe: *__ci_expr_old_0))
+
+    if ((utf != 0) and (c >= 192)):
+        if (((c & 32)) == 0):
+            var __ci_expr_old_1: *const u8 = ptr
+            (ptr = ptr + 1)
+            (c = (((((c & 31)) << 6)) | (((unsafe: *__ci_expr_old_1) & 63))))
+        else:
+            if (((c & 16)) == 0):
+                (c = ((((((c & 15)) << 12)) | (((((unsafe: *ptr) & 63)) << 6))) | ((ptr[1] & 63))))
+                
+                (ptr = ptr + 2)
+                
+            else:
+                if (((c & 8)) == 0):
+                    (c = (((((((c & 7)) << 18)) | (((((unsafe: *ptr) & 63)) << 12))) | ((((ptr[1] & 63)) << 6))) | ((ptr[2] & 63))))
+                    
+                    (ptr = ptr + 3)
+                    
+                else:
+                    if (((c & 4)) == 0):
+                        (c = ((((((((c & 3)) << 24)) | (((((unsafe: *ptr) & 63)) << 18))) | ((((ptr[1] & 63)) << 12))) | ((((ptr[2] & 63)) << 6))) | ((ptr[3] & 63))))
+                        
+                        (ptr = ptr + 4)
+                        
+                    else:
+                        (c = (((((((((c & 1)) << 30)) | (((((unsafe: *ptr) & 63)) << 24))) | ((((ptr[1] & 63)) << 18))) | ((((ptr[2] & 63)) << 12))) | ((((ptr[3] & 63)) << 6))) | ((ptr[4] & 63))))
+                        
+                        (ptr = ptr + 5)
+                        
+        
+
+    if (ptr >= endptr):
+        return 1
+
+    var i: c_int = 0
+    while (i < (((ucp_Script_Count / 32) + 1))):
+        ((&require_map[0] as *mut c_uint)[i] = 0)
+        var __ci_expr_old_2: c_int = i
+    (i = i + 1)
+
+    while true:
+        var ucd: *const ucd_record = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c) as c_int) / 128)] * 128) + (((c) as c_int) % 128))] as isize as usize)))
+        
+        var script: c_uint = ucd.script
+        
+        if (script == 99):
+            return 0
+        
+        if (((((ucd).scriptx_bidiclass & 1023)) != 0) or ((script != 107) and (script != 100))):
+            var OK: c_int
+            
+            if ((script != 100) and (script != 107)):
+                ((&(map)[0] as *mut c_uint)[((script) / 32)] = (&(map)[0] as *mut c_uint)[((script) / 32)] | ((1 << (((script) % 32)))))
+            
+            match require_state
+                0 =>
+                    match script
+                        30 =>
+                            (require_state = 2)
+                        27 =>
+                            (require_state = 3)
+                        28 =>
+                            (require_state = 3)
+                        29 =>
+                            (require_state = 4)
+                        22 =>
+                            (require_state = 5)
+                        _ =>
+                            (require_state = 1)
+                2 =>
+                    if (script != 30):
+                        var chspecial: c_uint = 0
+                        
+                        if ((((&(map)[0] as *mut c_uint)[((ucp_Bopomofo) / 32)] & ((1 << (((ucp_Bopomofo) % 32)))))) != 0):
+                            (chspecial = chspecial | 1)
+                        
+                        if ((((&(map)[0] as *mut c_uint)[((ucp_Hiragana) / 32)] & ((1 << (((ucp_Hiragana) % 32)))))) != 0):
+                            (chspecial = chspecial | 2)
+                        
+                        if ((((&(map)[0] as *mut c_uint)[((ucp_Katakana) / 32)] & ((1 << (((ucp_Katakana) % 32)))))) != 0):
+                            (chspecial = chspecial | 4)
+                        
+                        if ((((&(map)[0] as *mut c_uint)[((ucp_Hangul) / 32)] & ((1 << (((ucp_Hangul) % 32)))))) != 0):
+                            (chspecial = chspecial | 8)
+                        
+                        if (chspecial == 0):
+                            return 0
+                        
+                        if (chspecial == 1):
+                            (require_state = 4)
+                        else:
+                            if (chspecial == 6):
+                                (require_state = 3)
+                        
+                3 =>
+                    if ((((((&(map)[0] as *mut c_uint)[((ucp_Han) / 32)] & ((1 << (((ucp_Han) % 32)))))) +% (((&(map)[0] as *mut c_uint)[((ucp_Hiragana) / 32)] & ((1 << (((ucp_Hiragana) % 32))))))) +% (((&(map)[0] as *mut c_uint)[((ucp_Katakana) / 32)] & ((1 << (((ucp_Katakana) % 32))))))) == 0):
+                        return 0
+                4 =>
+                    if (((((&(map)[0] as *mut c_uint)[((ucp_Han) / 32)] & ((1 << (((ucp_Han) % 32)))))) +% (((&(map)[0] as *mut c_uint)[((ucp_Bopomofo) / 32)] & ((1 << (((ucp_Bopomofo) % 32))))))) == 0):
+                        return 0
+                5 =>
+                    if (((((&(map)[0] as *mut c_uint)[((ucp_Han) / 32)] & ((1 << (((ucp_Han) % 32)))))) +% (((&(map)[0] as *mut c_uint)[((ucp_Hangul) / 32)] & ((1 << (((ucp_Hangul) % 32))))))) == 0):
+                        return 0
+                1 =>
+                    (OK = 0)
+                    var i_1: c_int = 0
+                    while (i_1 < (((ucp_Script_Count / 32) + 1))):
+                        if ((((&require_map[0] as *mut c_uint)[i_1] & (&map[0] as *mut c_uint)[i_1])) != 0):
+                            (OK = 1)
+                            
+                            break
+                            
+                        
+                        var __ci_expr_old_3: c_int = i_1
+                    (i_1 = i_1 + 1)
+                    if (not ((OK != 0))):
+                        return 0
+                    match script
+                        30 =>
+                            (require_state = 2)
+                        27 =>
+                            (require_state = 3)
+                        28 =>
+                            (require_state = 3)
+                        29 =>
+                            (require_state = 4)
+                        22 =>
+                            (require_state = 5)
+                        _ =>
+                            var i_2: c_int = 0
+                            while (i_2 < (((ucp_Script_Count / 32) + 1))):
+                                ((&require_map[0] as *mut c_uint)[i_2] = (&require_map[0] as *mut c_uint)[i_2] & (&map[0] as *mut c_uint)[i_2])
+                                var __ci_expr_old_4: c_int = i_2
+                            (i_2 = i_2 + 1)
+                _ => 0
+            
+        
+        if (ucd.chartype == ucp_Nd):
+            var digitset: c_uint
+            
+            if (c <= _pcre2_ucd_digit_sets_8[1]):
+                (digitset = 1)
+            else:
+                var mid: c_int
+                
+                var bot: c_int = 1
+                
+                var top: c_int = _pcre2_ucd_digit_sets_8[0]
+                
+                while true:
+                    if (top <= (bot + 1)):
+                        (digitset = top)
+                        
+                        break
+                        
+                    
+                    (mid = (((top + bot)) / 2))
+                    
+                    if (c <= _pcre2_ucd_digit_sets_8[mid]):
+                        (top = mid)
+                    else:
+                        (bot = mid)
+                    
+                
+            
+            if (require_digitset == 0):
+                (require_digitset = digitset)
+            else:
+                if (digitset != require_digitset):
+                    return 0
+            
+        
+        if (ptr >= endptr):
+            return 1
+        
+        var __ci_expr_old_5: *const u8 = ptr
+        (ptr = ptr + 1)
+        (c = (unsafe: *__ci_expr_old_5))
+        
+        if ((utf != 0) and (c >= 192)):
+            if (((c & 32)) == 0):
+                var __ci_expr_old_6: *const u8 = ptr
+                (ptr = ptr + 1)
+                (c = (((((c & 31)) << 6)) | (((unsafe: *__ci_expr_old_6) & 63))))
+            else:
+                if (((c & 16)) == 0):
+                    (c = ((((((c & 15)) << 12)) | (((((unsafe: *ptr) & 63)) << 6))) | ((ptr[1] & 63))))
+                    
+                    (ptr = ptr + 2)
+                    
+                else:
+                    if (((c & 8)) == 0):
+                        (c = (((((((c & 7)) << 18)) | (((((unsafe: *ptr) & 63)) << 12))) | ((((ptr[1] & 63)) << 6))) | ((ptr[2] & 63))))
+                        
+                        (ptr = ptr + 3)
+                        
+                    else:
+                        if (((c & 4)) == 0):
+                            (c = ((((((((c & 3)) << 24)) | (((((unsafe: *ptr) & 63)) << 18))) | ((((ptr[1] & 63)) << 12))) | ((((ptr[2] & 63)) << 6))) | ((ptr[3] & 63))))
+                            
+                            (ptr = ptr + 4)
+                            
+                        else:
+                            (c = (((((((((c & 1)) << 30)) | (((((unsafe: *ptr) & 63)) << 24))) | ((((ptr[1] & 63)) << 18))) | ((((ptr[2] & 63)) << 12))) | ((((ptr[3] & 63)) << 6))) | ((ptr[4] & 63))))
+                            
+                            (ptr = ptr + 5)
+                            
+            
+        
+
 
 extern fn _pcre2_strcmp_8(p0: *const u8, p1: *const u8) -> c_int
 extern fn _pcre2_strcmp_c8_8(p0: *const u8, p1: *const i8) -> c_int
@@ -237,3 +428,371 @@ let SCRIPT_HANPENDING: c_uint = 2
 let SCRIPT_HANHIRAKATA: c_uint = 3
 let SCRIPT_HANBOPOMOFO: c_uint = 4
 let SCRIPT_HANHANGUL: c_uint = 5
+extern let _pcre2_utf8_table1: [6]c_int
+extern let _pcre2_utf8_table1_size: c_uint
+extern let _pcre2_utf8_table2: [6]c_int
+extern let _pcre2_utf8_table3: [6]c_int
+extern let _pcre2_utf8_table4: [64]u8
+extern let _pcre2_OP_lengths_8: [173]u8
+extern let _pcre2_callout_end_delims_8: [9]c_uint
+extern let _pcre2_callout_start_delims_8: [9]c_uint
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern let _pcre2_default_tables_8: [1088]u8
+extern let _pcre2_hspace_list_8: [20]c_uint
+extern let _pcre2_vspace_list_8: [8]c_uint
+extern let _pcre2_ucd_boolprop_sets_8: [382]c_uint
+extern let _pcre2_ucd_caseless_sets_8: [118]c_uint
+extern let _pcre2_ucd_turkish_dotted_i_caseset_8: c_uint
+extern let _pcre2_ucd_nocase_ranges_8: [84]c_uint
+extern let _pcre2_ucd_nocase_ranges_size_8: c_uint
+extern let _pcre2_ucd_digit_sets_8: [78]c_uint
+extern let _pcre2_ucd_script_sets_8: [476]c_uint
+extern let _pcre2_ucd_records_8: [1563]ucd_record
+extern let _pcre2_ucd_stage1_8: [8704]c_ushort
+extern let _pcre2_ucd_stage2_8: [40192]c_ushort
+extern let _pcre2_ucp_gbtable_8: [15]c_uint
+extern let _pcre2_ucp_gentype_8: [30]c_uint
+extern var _pcre2_unicode_version_8: *const i8
+extern let _pcre2_utt_8: *ucp_type_table
+extern let _pcre2_utt_names_8: *c_char
+extern let _pcre2_utt_size_8: c_ulong
+extern let _pcre2_ebcdic_1047_to_ascii_8: *u8
+extern let _pcre2_ascii_to_ebcdic_1047_8: *u8
+// untranslatable fn-like macro
+fn ACROSSCHAR() -> Never:
+    comptime_error("untranslatable C macro: ACROSSCHAR")
+// untranslatable fn-like macro
+fn BACKCHAR() -> Never:
+    comptime_error("untranslatable C macro: BACKCHAR")
+// untranslatable fn-like macro
+fn BYTES2CU() -> Never:
+    comptime_error("untranslatable C macro: BYTES2CU")
+// untranslatable fn-like macro
+fn CAST_USER_ADDR_T() -> Never:
+    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
+fn CHMAX_255[T](c: T) -> T:
+    (c <= 255)
+// untranslatable fn-like macro
+fn CU2BYTES() -> Never:
+    comptime_error("untranslatable C macro: CU2BYTES")
+// untranslatable fn-like macro
+fn FORWARDCHAR() -> Never:
+    comptime_error("untranslatable C macro: FORWARDCHAR")
+// untranslatable fn-like macro
+fn FORWARDCHARTEST() -> Never:
+    comptime_error("untranslatable C macro: FORWARDCHARTEST")
+let FOUND_BOPOMOFO: c_int = 1
+let FOUND_HANGUL: c_int = 8
+let FOUND_HIRAGANA: c_int = 2
+let FOUND_KATAKANA: c_int = 4
+let FULL_MAPSIZE: c_int = ((ucp_Script_Count / 32) + 1)
+// untranslatable fn-like macro
+fn GET() -> Never:
+    comptime_error("untranslatable C macro: GET")
+// untranslatable fn-like macro
+fn GET2() -> Never:
+    comptime_error("untranslatable C macro: GET2")
+// untranslatable fn-like macro
+fn GETCHAR() -> Never:
+    comptime_error("untranslatable C macro: GETCHAR")
+// untranslatable fn-like macro
+fn GETCHARINC() -> Never:
+    comptime_error("untranslatable C macro: GETCHARINC")
+// untranslatable fn-like macro
+fn GETCHARINCTEST() -> Never:
+    comptime_error("untranslatable C macro: GETCHARINCTEST")
+// untranslatable fn-like macro
+fn GETCHARLEN() -> Never:
+    comptime_error("untranslatable C macro: GETCHARLEN")
+// untranslatable fn-like macro
+fn GETCHARLENTEST() -> Never:
+    comptime_error("untranslatable C macro: GETCHARLENTEST")
+// untranslatable fn-like macro
+fn GETCHARTEST() -> Never:
+    comptime_error("untranslatable C macro: GETCHARTEST")
+// untranslatable fn-like macro
+fn GETUTF8() -> Never:
+    comptime_error("untranslatable C macro: GETUTF8")
+// untranslatable fn-like macro
+fn GETUTF8INC() -> Never:
+    comptime_error("untranslatable C macro: GETUTF8INC")
+// untranslatable fn-like macro
+fn GETUTF8LEN() -> Never:
+    comptime_error("untranslatable C macro: GETUTF8LEN")
+// untranslatable fn-like macro
+fn GET_EXTRALEN() -> Never:
+    comptime_error("untranslatable C macro: GET_EXTRALEN")
+// untranslatable fn-like macro
+fn GET_UCD() -> Never:
+    comptime_error("untranslatable C macro: GET_UCD")
+fn HASUTF8EXTRALEN[T](c: T) -> T:
+    (c >= 0xc0)
+fn HAS_EXTRALEN[T](c: T) -> T:
+    HASUTF8EXTRALEN(c)
+// untranslatable fn-like macro
+fn HTONL() -> Never:
+    comptime_error("untranslatable C macro: HTONL")
+// untranslatable fn-like macro
+fn HTONLL() -> Never:
+    comptime_error("untranslatable C macro: HTONLL")
+// untranslatable fn-like macro
+fn HTONS() -> Never:
+    comptime_error("untranslatable C macro: HTONS")
+fn INT16_C[T](v: T) -> T:
+    v
+fn INT32_C[T](v: T) -> T:
+    v
+fn INT64_C[T](v: T) -> i64:
+    (v as i64)
+fn INT8_C[T](v: T) -> T:
+    v
+fn INTMAX_C[T](v: T) -> i64:
+    (v as i64)
+// untranslatable fn-like macro
+fn IS_NEWLINE() -> Never:
+    comptime_error("untranslatable C macro: IS_NEWLINE")
+// untranslatable fn-like macro
+fn MAPBIT() -> Never:
+    comptime_error("untranslatable C macro: MAPBIT")
+// untranslatable fn-like macro
+fn MAPSET() -> Never:
+    comptime_error("untranslatable C macro: MAPSET")
+// untranslatable fn-like macro
+fn MAX_255() -> Never:
+    comptime_error("untranslatable C macro: MAX_255")
+// untranslatable fn-like macro
+fn NOT_FIRSTCU() -> Never:
+    comptime_error("untranslatable C macro: NOT_FIRSTCU")
+// untranslatable fn-like macro
+fn NTOHL() -> Never:
+    comptime_error("untranslatable C macro: NTOHL")
+// untranslatable fn-like macro
+fn NTOHLL() -> Never:
+    comptime_error("untranslatable C macro: NTOHLL")
+// untranslatable fn-like macro
+fn NTOHS() -> Never:
+    comptime_error("untranslatable C macro: NTOHS")
+// untranslatable fn-like macro
+fn PCRE2_ASSERT() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_ASSERT")
+// untranslatable fn-like macro
+fn PCRE2_DEBUG_UNREACHABLE() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
+// untranslatable fn-like macro
+fn PCRE2_GLUE() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_GLUE")
+// untranslatable fn-like macro
+fn PCRE2_JOIN() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_JOIN")
+fn PCRE2_SUFFIX[T](a: T) -> T:
+    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
+// untranslatable fn-like macro
+fn PCRE2_UNREACHABLE() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
+// untranslatable fn-like macro
+fn PRIV() -> Never:
+    comptime_error("untranslatable C macro: PRIV")
+// untranslatable fn-like macro
+fn PUT() -> Never:
+    comptime_error("untranslatable C macro: PUT")
+// untranslatable fn-like macro
+fn PUT2() -> Never:
+    comptime_error("untranslatable C macro: PUT2")
+// untranslatable fn-like macro
+fn PUT2INC() -> Never:
+    comptime_error("untranslatable C macro: PUT2INC")
+// untranslatable fn-like macro
+fn PUTCHAR() -> Never:
+    comptime_error("untranslatable C macro: PUTCHAR")
+// untranslatable fn-like macro
+fn PUTINC() -> Never:
+    comptime_error("untranslatable C macro: PUTINC")
+// untranslatable fn-like macro
+fn REAL_GET_UCD() -> Never:
+    comptime_error("untranslatable C macro: REAL_GET_UCD")
+// untranslatable fn-like macro
+fn STATIC_ASSERT() -> Never:
+    comptime_error("untranslatable C macro: STATIC_ASSERT")
+// untranslatable fn-like macro
+fn STATIC_ASSERT_JOIN() -> Never:
+    comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
+// untranslatable fn-like macro
+fn TABLE_GET() -> Never:
+    comptime_error("untranslatable C macro: TABLE_GET")
+// untranslatable fn-like macro
+fn UCD_ANY_I() -> Never:
+    comptime_error("untranslatable C macro: UCD_ANY_I")
+// untranslatable fn-like macro
+fn UCD_BIDICLASS() -> Never:
+    comptime_error("untranslatable C macro: UCD_BIDICLASS")
+// untranslatable fn-like macro
+fn UCD_BIDICLASS_PROP() -> Never:
+    comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
+// untranslatable fn-like macro
+fn UCD_BPROPS() -> Never:
+    comptime_error("untranslatable C macro: UCD_BPROPS")
+// untranslatable fn-like macro
+fn UCD_BPROPS_PROP() -> Never:
+    comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
+// untranslatable fn-like macro
+fn UCD_CASESET() -> Never:
+    comptime_error("untranslatable C macro: UCD_CASESET")
+// untranslatable fn-like macro
+fn UCD_CATEGORY() -> Never:
+    comptime_error("untranslatable C macro: UCD_CATEGORY")
+// untranslatable fn-like macro
+fn UCD_CHARTYPE() -> Never:
+    comptime_error("untranslatable C macro: UCD_CHARTYPE")
+fn UCD_DOTTED_I[T](ch: T) -> T:
+    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
+fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
+    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
+// untranslatable fn-like macro
+fn UCD_GRAPHBREAK() -> Never:
+    comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
+let UCD_MAPSIZE: c_int = ((ucp_Unknown / 32) + 1)
+// untranslatable fn-like macro
+fn UCD_OTHERCASE() -> Never:
+    comptime_error("untranslatable C macro: UCD_OTHERCASE")
+// untranslatable fn-like macro
+fn UCD_SCRIPT() -> Never:
+    comptime_error("untranslatable C macro: UCD_SCRIPT")
+// untranslatable fn-like macro
+fn UCD_SCRIPTX() -> Never:
+    comptime_error("untranslatable C macro: UCD_SCRIPTX")
+// untranslatable fn-like macro
+fn UCD_SCRIPTX_PROP() -> Never:
+    comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
+fn UINT16_C[T](v: T) -> T:
+    v
+fn UINT32_C[T](v: T) -> u32:
+    (v as u32)
+fn UINT64_C[T](v: T) -> u64:
+    (v as u64)
+fn UINT8_C[T](v: T) -> T:
+    v
+fn UINTMAX_C[T](v: T) -> u64:
+    (v as u64)
+// untranslatable fn-like macro
+fn WAS_NEWLINE() -> Never:
+    comptime_error("untranslatable C macro: WAS_NEWLINE")
+// untranslatable fn-like macro
+fn WCOREDUMP() -> Never:
+    comptime_error("untranslatable C macro: WCOREDUMP")
+// untranslatable fn-like macro
+fn WEXITSTATUS() -> Never:
+    comptime_error("untranslatable C macro: WEXITSTATUS")
+// untranslatable fn-like macro
+fn WIFCONTINUED() -> Never:
+    comptime_error("untranslatable C macro: WIFCONTINUED")
+// untranslatable fn-like macro
+fn WIFEXITED() -> Never:
+    comptime_error("untranslatable C macro: WIFEXITED")
+// untranslatable fn-like macro
+fn WIFSIGNALED() -> Never:
+    comptime_error("untranslatable C macro: WIFSIGNALED")
+// untranslatable fn-like macro
+fn WIFSTOPPED() -> Never:
+    comptime_error("untranslatable C macro: WIFSTOPPED")
+// untranslatable fn-like macro
+fn WSTOPSIG() -> Never:
+    comptime_error("untranslatable C macro: WSTOPSIG")
+// untranslatable fn-like macro
+fn WTERMSIG() -> Never:
+    comptime_error("untranslatable C macro: WTERMSIG")
+fn W_EXITCODE[T](ret: T, sig: T) -> T:
+    ((ret << 8) | sig)
+// untranslatable fn-like macro
+fn W_STOPCODE() -> Never:
+    comptime_error("untranslatable C macro: W_STOPCODE")
+// untranslatable fn-like macro
+fn alloca() -> Never:
+    comptime_error("untranslatable C macro: alloca")
+// untranslatable fn-like macro
+fn clearerr_unlocked() -> Never:
+    comptime_error("untranslatable C macro: clearerr_unlocked")
+// untranslatable fn-like macro
+fn feof_unlocked() -> Never:
+    comptime_error("untranslatable C macro: feof_unlocked")
+// untranslatable fn-like macro
+fn ferror_unlocked() -> Never:
+    comptime_error("untranslatable C macro: ferror_unlocked")
+// untranslatable fn-like macro
+fn fileno_unlocked() -> Never:
+    comptime_error("untranslatable C macro: fileno_unlocked")
+// untranslatable fn-like macro
+fn fropen() -> Never:
+    comptime_error("untranslatable C macro: fropen")
+// untranslatable fn-like macro
+fn fwopen() -> Never:
+    comptime_error("untranslatable C macro: fwopen")
+// untranslatable fn-like macro
+fn getc_unlocked() -> Never:
+    comptime_error("untranslatable C macro: getc_unlocked")
+// untranslatable fn-like macro
+fn getchar_unlocked() -> Never:
+    comptime_error("untranslatable C macro: getchar_unlocked")
+// untranslatable fn-like macro
+fn htonl() -> Never:
+    comptime_error("untranslatable C macro: htonl")
+// untranslatable fn-like macro
+fn htonll() -> Never:
+    comptime_error("untranslatable C macro: htonll")
+// untranslatable fn-like macro
+fn htons() -> Never:
+    comptime_error("untranslatable C macro: htons")
+fn memccpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn memcpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn memmove() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn memset() -> Never:
+    comptime_error("variadic macro — use direct call")
+// untranslatable fn-like macro
+fn ntohl() -> Never:
+    comptime_error("untranslatable C macro: ntohl")
+// untranslatable fn-like macro
+fn ntohll() -> Never:
+    comptime_error("untranslatable C macro: ntohll")
+// untranslatable fn-like macro
+fn ntohs() -> Never:
+    comptime_error("untranslatable C macro: ntohs")
+// untranslatable fn-like macro
+fn offsetof() -> Never:
+    comptime_error("untranslatable C macro: offsetof")
+// untranslatable fn-like macro
+fn putc_unlocked() -> Never:
+    comptime_error("untranslatable C macro: putc_unlocked")
+// untranslatable fn-like macro
+fn putchar_unlocked() -> Never:
+    comptime_error("untranslatable C macro: putchar_unlocked")
+// untranslatable fn-like macro
+fn sigmask() -> Never:
+    comptime_error("untranslatable C macro: sigmask")
+fn snprintf() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn sprintf() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn stpcpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn stpncpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strcat() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strcpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strlcat() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strlcpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strncat() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strncpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn vsnprintf() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn vsprintf() -> Never:
+    comptime_error("variadic macro — use direct call")

@@ -107,38 +107,6 @@ type ucd_record { script: u8 = 0, chartype: u8 = 0, gbprop: u8 = 0, caseset: u8 
 type struct_ucd_record = ucd_record
 type pcre2_serialized_data { magic: c_uint = 0, version: c_uint = 0, config: c_uint = 0, number_of_codes: c_int = 0 }
 type struct_pcre2_serialized_data = pcre2_serialized_data
-extern var _pcre2_utf8_table1: *c_int
-extern let _pcre2_utf8_table1_size: c_uint
-extern var _pcre2_utf8_table2: *c_int
-extern var _pcre2_utf8_table3: *c_int
-extern var _pcre2_utf8_table4: *u8
-extern var _pcre2_OP_lengths_8: *u8
-extern var _pcre2_callout_end_delims_8: *c_uint
-extern var _pcre2_callout_start_delims_8: *c_uint
-extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
-extern var _pcre2_default_tables_8: *u8
-extern var _pcre2_hspace_list_8: *c_uint
-extern var _pcre2_vspace_list_8: *c_uint
-extern var _pcre2_ucd_boolprop_sets_8: *c_uint
-extern var _pcre2_ucd_caseless_sets_8: *c_uint
-extern let _pcre2_ucd_turkish_dotted_i_caseset_8: c_uint
-extern var _pcre2_ucd_nocase_ranges_8: *c_uint
-extern let _pcre2_ucd_nocase_ranges_size_8: c_uint
-extern var _pcre2_ucd_digit_sets_8: *c_uint
-extern var _pcre2_ucd_script_sets_8: *c_uint
-extern var _pcre2_ucd_records_8: *ucd_record
-extern var _pcre2_ucd_stage1_8: *c_ushort
-extern var _pcre2_ucd_stage2_8: *c_ushort
-extern var _pcre2_ucp_gbtable_8: *c_uint
-extern var _pcre2_ucp_gentype_8: *c_uint
-extern var _pcre2_unicode_version_8: *const i8
-extern var _pcre2_utt_8: *ucp_type_table
-extern var _pcre2_utt_names_8: *c_char
-extern let _pcre2_utt_size_8: c_ulong
-extern var _pcre2_ebcdic_1047_to_ascii_8: *u8
-extern var _pcre2_ascii_to_ebcdic_1047_8: *u8
 type pcre2_real_general_context_8 { memctl: pcre2_memctl }
 type struct_pcre2_real_general_context_8 = pcre2_real_general_context_8
 type pcre2_real_compile_context_8 { memctl: pcre2_memctl, stack_guard: *const fn(c_uint, *mut c_void) -> c_int = null, stack_guard_data: *mut c_void = null, tables: *const u8 = null, max_pattern_length: c_ulong = 0, max_pattern_compiled_length: c_ulong = 0, bsr_convention: c_ushort = 0, newline_convention: c_ushort = 0, parens_nest_limit: c_uint = 0, extra_options: c_uint = 0, max_varlookbehind: c_uint = 0, optimization_flags: c_uint = 0 }
@@ -170,7 +138,7 @@ type struct_recurse_arguments = recurse_arguments
 // union
 type class_bits_storage { classbits: [32]u8 = [0 as u8; 32], classwords: [8]c_uint = [0 as c_uint; 8] }
 type struct_class_bits_storage = class_bits_storage
-type compile_block_8 { cx: *mut pcre2_real_compile_context_8 = null, lcc: *const u8 = null, fcc: *const u8 = null, cbits: *const u8 = null, ctypes: *const u8 = null, start_workspace: *mut u8 = null, start_code: *mut u8 = null, start_pattern: *const u8 = null, end_pattern: *const u8 = null, name_table: *mut u8 = null, workspace_size: c_ulong = 0, small_ref_offset: [10]c_ulong = [0 as c_ulong; 10], erroroffset: c_ulong = 0, classbits: class_bits_storage, names_found: c_ushort = 0, name_entry_size: c_ushort = 0, parens_depth: c_ushort = 0, assert_depth: c_ushort = 0, named_groups: *mut named_group_8 = null, named_group_list_size: c_uint = 0, external_options: c_uint = 0, external_flags: c_uint = 0, bracount: c_uint = 0, lastcapture: c_uint = 0, parsed_pattern: *mut c_uint = null, parsed_pattern_end: *mut c_uint = null, groupinfo: *mut c_uint = null, top_backref: c_uint = 0, backref_map: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], class_op_used: [15]u8 = [0 as u8; 15], req_varyopt: c_uint = 0, max_varlookbehind: c_uint = 0, max_lookbehind: c_int = 0, had_accept: c_int = 0, had_pruneorskip: c_int = 0, had_recurse: c_int = 0, dupnames: c_int = 0, first_data: *mut compile_data = null, last_data: *mut compile_data = null }
+type compile_block_8 { cx: *mut pcre2_real_compile_context_8 = null, lcc: *const u8 = null, fcc: *const u8 = null, cbits: *const u8 = null, ctypes: *const u8 = null, start_workspace: *mut u8 = null, start_code: *mut u8 = null, start_pattern: *const u8 = null, end_pattern: *const u8 = null, name_table: *mut u8 = null, workspace_size: c_ulong = 0, small_ref_offset: [10]c_ulong = [0 as c_ulong; 10], erroroffset: c_ulong = 0, classbits: class_bits_storage, names_found: c_ushort = 0, name_entry_size: c_ushort = 0, parens_depth: c_ushort = 0, assert_depth: c_ushort = 0, named_groups: *mut named_group_8 = null, named_group_list_size: c_uint = 0, external_options: c_uint = 0, external_flags: c_uint = 0, bracount: c_uint = 0, lastcapture: c_uint = 0, parsed_pattern: *mut c_uint = null, parsed_pattern_end: *mut c_uint = null, groupinfo: *mut c_uint = null, top_backref: c_uint = 0, backref_map: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], class_op_used: [15]u8 = [0 as u8; 15], req_varyopt: c_uint = 0, max_varlookbehind: c_uint = 0, max_lookbehind: c_int = 0, had_accept: c_int = 0, had_pruneorskip: c_int = 0, had_recurse: c_int = 0, dupnames: c_int = 0, first_data: *mut compile_data = null, last_data: *mut compile_data = null, char_lists_size: c_ulong = 0 }
 type struct_compile_block_8 = compile_block_8
 type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
 type struct_pcre2_real_jit_stack_8 = pcre2_real_jit_stack_8
@@ -222,12 +190,565 @@ extern fn _pcre2_strlen_8(p0: *const u8) -> c_ulong
 extern fn _pcre2_strncmp_8(p0: *const u8, p1: *const u8, p2: c_ulong) -> c_int
 extern fn _pcre2_strncmp_c8_8(p0: *const u8, p1: *const i8, p2: c_ulong) -> c_int
 extern fn _pcre2_study_8(p0: *mut pcre2_real_code_8) -> c_int
-fn _pcre2_valid_utf_8(string: *const u8, length: c_ulong, erroroffset: *mut c_ulong) -> c_int:
-    string
-    length
-    erroroffset
+fn _pcre2_valid_utf_8(string: *const u8, __param_length: c_ulong, erroroffset: *mut c_ulong) -> c_int:
+    var length = __param_length
+    var p: *const u8
+
+    var c: c_uint
+
+    (p = string)
+    while (length > 0):
+        var ab: c_uint
+        var d: c_uint
+        
+        (c = (unsafe: *p))
+        
+        var __ci_expr_old_1: c_ulong = length
+        (length = length - 1)
+        
+        if (c < 128):
+            continue
+        
+        if (c < 192):
+            ((unsafe: *erroroffset) = ((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong))
+            
+            return (-22)
+            
+        
+        if (c >= 254):
+            ((unsafe: *erroroffset) = ((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong))
+            
+            return (-23)
+            
+        
+        (ab = _pcre2_utf8_table4[(c & 63)])
+        
+        if (length < ab):
+            ((unsafe: *erroroffset) = ((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong))
+            
+            match (ab -% length)
+                1 =>
+                    return (-3)
+                2 =>
+                    return (-4)
+                3 =>
+                    return (-5)
+                4 =>
+                    return (-6)
+                5 =>
+                    return (-7)
+                _ => 0
+            
+        
+        (length = length - ab)
+        
+        var __ci_cond_if_2: bool = false
+        (p = p + 1)
+        (d = (unsafe: *(p)))
+        (__ci_cond_if_2 = ((if (((d) & 192)) != 128: 1 else: 0) != 0))
+        if __ci_cond_if_2:
+            ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 1))
+            
+            return (-8)
+            
+        
+        match ab
+            1 =>
+                if (((c & 62)) == 0):
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 1))
+                    
+                    return (-17)
+                    
+            2 =>
+                var __ci_cond_if_3: bool = false
+                (p = p + 1)
+                (__ci_cond_if_3 = ((if (((unsafe: *(p)) & 192)) != 128: 1 else: 0) != 0))
+                if __ci_cond_if_3:
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 2))
+                    
+                    return (-9)
+                    
+                if ((c == 224) and (((d & 32)) == 0)):
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 2))
+                    
+                    return (-18)
+                    
+                if ((c == 237) and (d >= 160)):
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 2))
+                    
+                    return (-16)
+                    
+            3 =>
+                var __ci_cond_if_4: bool = false
+                (p = p + 1)
+                (__ci_cond_if_4 = ((if (((unsafe: *(p)) & 192)) != 128: 1 else: 0) != 0))
+                if __ci_cond_if_4:
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 2))
+                    
+                    return (-9)
+                    
+                var __ci_cond_if_5: bool = false
+                (p = p + 1)
+                (__ci_cond_if_5 = ((if (((unsafe: *(p)) & 192)) != 128: 1 else: 0) != 0))
+                if __ci_cond_if_5:
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 3))
+                    
+                    return (-10)
+                    
+                if ((c == 240) and (((d & 48)) == 0)):
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 3))
+                    
+                    return (-19)
+                    
+                if ((c > 244) or ((c == 244) and (d > 143))):
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 3))
+                    
+                    return (-15)
+                    
+            4 =>
+                var __ci_cond_if_6: bool = false
+                (p = p + 1)
+                (__ci_cond_if_6 = ((if (((unsafe: *(p)) & 192)) != 128: 1 else: 0) != 0))
+                if __ci_cond_if_6:
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 2))
+                    
+                    return (-9)
+                    
+                var __ci_cond_if_7: bool = false
+                (p = p + 1)
+                (__ci_cond_if_7 = ((if (((unsafe: *(p)) & 192)) != 128: 1 else: 0) != 0))
+                if __ci_cond_if_7:
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 3))
+                    
+                    return (-10)
+                    
+                var __ci_cond_if_8: bool = false
+                (p = p + 1)
+                (__ci_cond_if_8 = ((if (((unsafe: *(p)) & 192)) != 128: 1 else: 0) != 0))
+                if __ci_cond_if_8:
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 4))
+                    
+                    return (-11)
+                    
+                if ((c == 248) and (((d & 56)) == 0)):
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 4))
+                    
+                    return (-20)
+                    
+            5 =>
+                var __ci_cond_if_9: bool = false
+                (p = p + 1)
+                (__ci_cond_if_9 = ((if (((unsafe: *(p)) & 192)) != 128: 1 else: 0) != 0))
+                if __ci_cond_if_9:
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 2))
+                    
+                    return (-9)
+                    
+                var __ci_cond_if_10: bool = false
+                (p = p + 1)
+                (__ci_cond_if_10 = ((if (((unsafe: *(p)) & 192)) != 128: 1 else: 0) != 0))
+                if __ci_cond_if_10:
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 3))
+                    
+                    return (-10)
+                    
+                var __ci_cond_if_11: bool = false
+                (p = p + 1)
+                (__ci_cond_if_11 = ((if (((unsafe: *(p)) & 192)) != 128: 1 else: 0) != 0))
+                if __ci_cond_if_11:
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 4))
+                    
+                    return (-11)
+                    
+                var __ci_cond_if_12: bool = false
+                (p = p + 1)
+                (__ci_cond_if_12 = ((if (((unsafe: *(p)) & 192)) != 128: 1 else: 0) != 0))
+                if __ci_cond_if_12:
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 5))
+                    
+                    return (-12)
+                    
+                if ((c == 252) and (((d & 60)) == 0)):
+                    ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 5))
+                    
+                    return (-21)
+                    
+            _ => 0
+        
+        if (ab > 3):
+            ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% ab))
+            
+            return (if (ab == 4): (-13) else: (-14))
+            
+        
+        var __ci_expr_old_0: *const u8 = p
+    (p = p + 1)
+
     return 0
+
 
 extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
 extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
 extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
+extern let _pcre2_utf8_table1: [6]c_int
+extern let _pcre2_utf8_table1_size: c_uint
+extern let _pcre2_utf8_table2: [6]c_int
+extern let _pcre2_utf8_table3: [6]c_int
+extern let _pcre2_utf8_table4: [64]u8
+extern let _pcre2_OP_lengths_8: [173]u8
+extern let _pcre2_callout_end_delims_8: [9]c_uint
+extern let _pcre2_callout_start_delims_8: [9]c_uint
+extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
+extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
+extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
+extern let _pcre2_default_tables_8: [1088]u8
+extern let _pcre2_hspace_list_8: [20]c_uint
+extern let _pcre2_vspace_list_8: [8]c_uint
+extern let _pcre2_ucd_boolprop_sets_8: [382]c_uint
+extern let _pcre2_ucd_caseless_sets_8: [118]c_uint
+extern let _pcre2_ucd_turkish_dotted_i_caseset_8: c_uint
+extern let _pcre2_ucd_nocase_ranges_8: [84]c_uint
+extern let _pcre2_ucd_nocase_ranges_size_8: c_uint
+extern let _pcre2_ucd_digit_sets_8: [78]c_uint
+extern let _pcre2_ucd_script_sets_8: [476]c_uint
+extern let _pcre2_ucd_records_8: [1563]ucd_record
+extern let _pcre2_ucd_stage1_8: [8704]c_ushort
+extern let _pcre2_ucd_stage2_8: [40192]c_ushort
+extern let _pcre2_ucp_gbtable_8: [15]c_uint
+extern let _pcre2_ucp_gentype_8: [30]c_uint
+extern var _pcre2_unicode_version_8: *const i8
+extern let _pcre2_utt_8: *ucp_type_table
+extern let _pcre2_utt_names_8: *c_char
+extern let _pcre2_utt_size_8: c_ulong
+extern let _pcre2_ebcdic_1047_to_ascii_8: *u8
+extern let _pcre2_ascii_to_ebcdic_1047_8: *u8
+// untranslatable fn-like macro
+fn ACROSSCHAR() -> Never:
+    comptime_error("untranslatable C macro: ACROSSCHAR")
+// untranslatable fn-like macro
+fn BACKCHAR() -> Never:
+    comptime_error("untranslatable C macro: BACKCHAR")
+// untranslatable fn-like macro
+fn BYTES2CU() -> Never:
+    comptime_error("untranslatable C macro: BYTES2CU")
+// untranslatable fn-like macro
+fn CAST_USER_ADDR_T() -> Never:
+    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
+fn CHMAX_255[T](c: T) -> T:
+    (c <= 255)
+// untranslatable fn-like macro
+fn CU2BYTES() -> Never:
+    comptime_error("untranslatable C macro: CU2BYTES")
+// untranslatable fn-like macro
+fn FORWARDCHAR() -> Never:
+    comptime_error("untranslatable C macro: FORWARDCHAR")
+// untranslatable fn-like macro
+fn FORWARDCHARTEST() -> Never:
+    comptime_error("untranslatable C macro: FORWARDCHARTEST")
+// untranslatable fn-like macro
+fn GET() -> Never:
+    comptime_error("untranslatable C macro: GET")
+// untranslatable fn-like macro
+fn GET2() -> Never:
+    comptime_error("untranslatable C macro: GET2")
+// untranslatable fn-like macro
+fn GETCHAR() -> Never:
+    comptime_error("untranslatable C macro: GETCHAR")
+// untranslatable fn-like macro
+fn GETCHARINC() -> Never:
+    comptime_error("untranslatable C macro: GETCHARINC")
+// untranslatable fn-like macro
+fn GETCHARINCTEST() -> Never:
+    comptime_error("untranslatable C macro: GETCHARINCTEST")
+// untranslatable fn-like macro
+fn GETCHARLEN() -> Never:
+    comptime_error("untranslatable C macro: GETCHARLEN")
+// untranslatable fn-like macro
+fn GETCHARLENTEST() -> Never:
+    comptime_error("untranslatable C macro: GETCHARLENTEST")
+// untranslatable fn-like macro
+fn GETCHARTEST() -> Never:
+    comptime_error("untranslatable C macro: GETCHARTEST")
+// untranslatable fn-like macro
+fn GETUTF8() -> Never:
+    comptime_error("untranslatable C macro: GETUTF8")
+// untranslatable fn-like macro
+fn GETUTF8INC() -> Never:
+    comptime_error("untranslatable C macro: GETUTF8INC")
+// untranslatable fn-like macro
+fn GETUTF8LEN() -> Never:
+    comptime_error("untranslatable C macro: GETUTF8LEN")
+// untranslatable fn-like macro
+fn GET_EXTRALEN() -> Never:
+    comptime_error("untranslatable C macro: GET_EXTRALEN")
+// untranslatable fn-like macro
+fn GET_UCD() -> Never:
+    comptime_error("untranslatable C macro: GET_UCD")
+fn HASUTF8EXTRALEN[T](c: T) -> T:
+    (c >= 0xc0)
+fn HAS_EXTRALEN[T](c: T) -> T:
+    HASUTF8EXTRALEN(c)
+// untranslatable fn-like macro
+fn HTONL() -> Never:
+    comptime_error("untranslatable C macro: HTONL")
+// untranslatable fn-like macro
+fn HTONLL() -> Never:
+    comptime_error("untranslatable C macro: HTONLL")
+// untranslatable fn-like macro
+fn HTONS() -> Never:
+    comptime_error("untranslatable C macro: HTONS")
+fn INT16_C[T](v: T) -> T:
+    v
+fn INT32_C[T](v: T) -> T:
+    v
+fn INT64_C[T](v: T) -> i64:
+    (v as i64)
+fn INT8_C[T](v: T) -> T:
+    v
+fn INTMAX_C[T](v: T) -> i64:
+    (v as i64)
+// untranslatable fn-like macro
+fn IS_NEWLINE() -> Never:
+    comptime_error("untranslatable C macro: IS_NEWLINE")
+// untranslatable fn-like macro
+fn MAPBIT() -> Never:
+    comptime_error("untranslatable C macro: MAPBIT")
+// untranslatable fn-like macro
+fn MAPSET() -> Never:
+    comptime_error("untranslatable C macro: MAPSET")
+// untranslatable fn-like macro
+fn MAX_255() -> Never:
+    comptime_error("untranslatable C macro: MAX_255")
+// untranslatable fn-like macro
+fn NOT_FIRSTCU() -> Never:
+    comptime_error("untranslatable C macro: NOT_FIRSTCU")
+// untranslatable fn-like macro
+fn NTOHL() -> Never:
+    comptime_error("untranslatable C macro: NTOHL")
+// untranslatable fn-like macro
+fn NTOHLL() -> Never:
+    comptime_error("untranslatable C macro: NTOHLL")
+// untranslatable fn-like macro
+fn NTOHS() -> Never:
+    comptime_error("untranslatable C macro: NTOHS")
+// untranslatable fn-like macro
+fn PCRE2_ASSERT() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_ASSERT")
+// untranslatable fn-like macro
+fn PCRE2_DEBUG_UNREACHABLE() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
+// untranslatable fn-like macro
+fn PCRE2_GLUE() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_GLUE")
+// untranslatable fn-like macro
+fn PCRE2_JOIN() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_JOIN")
+fn PCRE2_SUFFIX[T](a: T) -> T:
+    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
+// untranslatable fn-like macro
+fn PCRE2_UNREACHABLE() -> Never:
+    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
+// untranslatable fn-like macro
+fn PRIV() -> Never:
+    comptime_error("untranslatable C macro: PRIV")
+// untranslatable fn-like macro
+fn PUT() -> Never:
+    comptime_error("untranslatable C macro: PUT")
+// untranslatable fn-like macro
+fn PUT2() -> Never:
+    comptime_error("untranslatable C macro: PUT2")
+// untranslatable fn-like macro
+fn PUT2INC() -> Never:
+    comptime_error("untranslatable C macro: PUT2INC")
+// untranslatable fn-like macro
+fn PUTCHAR() -> Never:
+    comptime_error("untranslatable C macro: PUTCHAR")
+// untranslatable fn-like macro
+fn PUTINC() -> Never:
+    comptime_error("untranslatable C macro: PUTINC")
+// untranslatable fn-like macro
+fn REAL_GET_UCD() -> Never:
+    comptime_error("untranslatable C macro: REAL_GET_UCD")
+// untranslatable fn-like macro
+fn STATIC_ASSERT() -> Never:
+    comptime_error("untranslatable C macro: STATIC_ASSERT")
+// untranslatable fn-like macro
+fn STATIC_ASSERT_JOIN() -> Never:
+    comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
+// untranslatable fn-like macro
+fn TABLE_GET() -> Never:
+    comptime_error("untranslatable C macro: TABLE_GET")
+// untranslatable fn-like macro
+fn UCD_ANY_I() -> Never:
+    comptime_error("untranslatable C macro: UCD_ANY_I")
+// untranslatable fn-like macro
+fn UCD_BIDICLASS() -> Never:
+    comptime_error("untranslatable C macro: UCD_BIDICLASS")
+// untranslatable fn-like macro
+fn UCD_BIDICLASS_PROP() -> Never:
+    comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
+// untranslatable fn-like macro
+fn UCD_BPROPS() -> Never:
+    comptime_error("untranslatable C macro: UCD_BPROPS")
+// untranslatable fn-like macro
+fn UCD_BPROPS_PROP() -> Never:
+    comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
+// untranslatable fn-like macro
+fn UCD_CASESET() -> Never:
+    comptime_error("untranslatable C macro: UCD_CASESET")
+// untranslatable fn-like macro
+fn UCD_CATEGORY() -> Never:
+    comptime_error("untranslatable C macro: UCD_CATEGORY")
+// untranslatable fn-like macro
+fn UCD_CHARTYPE() -> Never:
+    comptime_error("untranslatable C macro: UCD_CHARTYPE")
+fn UCD_DOTTED_I[T](ch: T) -> T:
+    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
+fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
+    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
+// untranslatable fn-like macro
+fn UCD_GRAPHBREAK() -> Never:
+    comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
+// untranslatable fn-like macro
+fn UCD_OTHERCASE() -> Never:
+    comptime_error("untranslatable C macro: UCD_OTHERCASE")
+// untranslatable fn-like macro
+fn UCD_SCRIPT() -> Never:
+    comptime_error("untranslatable C macro: UCD_SCRIPT")
+// untranslatable fn-like macro
+fn UCD_SCRIPTX() -> Never:
+    comptime_error("untranslatable C macro: UCD_SCRIPTX")
+// untranslatable fn-like macro
+fn UCD_SCRIPTX_PROP() -> Never:
+    comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
+fn UINT16_C[T](v: T) -> T:
+    v
+fn UINT32_C[T](v: T) -> u32:
+    (v as u32)
+fn UINT64_C[T](v: T) -> u64:
+    (v as u64)
+fn UINT8_C[T](v: T) -> T:
+    v
+fn UINTMAX_C[T](v: T) -> u64:
+    (v as u64)
+// untranslatable fn-like macro
+fn WAS_NEWLINE() -> Never:
+    comptime_error("untranslatable C macro: WAS_NEWLINE")
+// untranslatable fn-like macro
+fn WCOREDUMP() -> Never:
+    comptime_error("untranslatable C macro: WCOREDUMP")
+// untranslatable fn-like macro
+fn WEXITSTATUS() -> Never:
+    comptime_error("untranslatable C macro: WEXITSTATUS")
+// untranslatable fn-like macro
+fn WIFCONTINUED() -> Never:
+    comptime_error("untranslatable C macro: WIFCONTINUED")
+// untranslatable fn-like macro
+fn WIFEXITED() -> Never:
+    comptime_error("untranslatable C macro: WIFEXITED")
+// untranslatable fn-like macro
+fn WIFSIGNALED() -> Never:
+    comptime_error("untranslatable C macro: WIFSIGNALED")
+// untranslatable fn-like macro
+fn WIFSTOPPED() -> Never:
+    comptime_error("untranslatable C macro: WIFSTOPPED")
+// untranslatable fn-like macro
+fn WSTOPSIG() -> Never:
+    comptime_error("untranslatable C macro: WSTOPSIG")
+// untranslatable fn-like macro
+fn WTERMSIG() -> Never:
+    comptime_error("untranslatable C macro: WTERMSIG")
+fn W_EXITCODE[T](ret: T, sig: T) -> T:
+    ((ret << 8) | sig)
+// untranslatable fn-like macro
+fn W_STOPCODE() -> Never:
+    comptime_error("untranslatable C macro: W_STOPCODE")
+// untranslatable fn-like macro
+fn alloca() -> Never:
+    comptime_error("untranslatable C macro: alloca")
+// untranslatable fn-like macro
+fn clearerr_unlocked() -> Never:
+    comptime_error("untranslatable C macro: clearerr_unlocked")
+// untranslatable fn-like macro
+fn feof_unlocked() -> Never:
+    comptime_error("untranslatable C macro: feof_unlocked")
+// untranslatable fn-like macro
+fn ferror_unlocked() -> Never:
+    comptime_error("untranslatable C macro: ferror_unlocked")
+// untranslatable fn-like macro
+fn fileno_unlocked() -> Never:
+    comptime_error("untranslatable C macro: fileno_unlocked")
+// untranslatable fn-like macro
+fn fropen() -> Never:
+    comptime_error("untranslatable C macro: fropen")
+// untranslatable fn-like macro
+fn fwopen() -> Never:
+    comptime_error("untranslatable C macro: fwopen")
+// untranslatable fn-like macro
+fn getc_unlocked() -> Never:
+    comptime_error("untranslatable C macro: getc_unlocked")
+// untranslatable fn-like macro
+fn getchar_unlocked() -> Never:
+    comptime_error("untranslatable C macro: getchar_unlocked")
+// untranslatable fn-like macro
+fn htonl() -> Never:
+    comptime_error("untranslatable C macro: htonl")
+// untranslatable fn-like macro
+fn htonll() -> Never:
+    comptime_error("untranslatable C macro: htonll")
+// untranslatable fn-like macro
+fn htons() -> Never:
+    comptime_error("untranslatable C macro: htons")
+fn memccpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn memcpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn memmove() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn memset() -> Never:
+    comptime_error("variadic macro — use direct call")
+// untranslatable fn-like macro
+fn ntohl() -> Never:
+    comptime_error("untranslatable C macro: ntohl")
+// untranslatable fn-like macro
+fn ntohll() -> Never:
+    comptime_error("untranslatable C macro: ntohll")
+// untranslatable fn-like macro
+fn ntohs() -> Never:
+    comptime_error("untranslatable C macro: ntohs")
+// untranslatable fn-like macro
+fn offsetof() -> Never:
+    comptime_error("untranslatable C macro: offsetof")
+// untranslatable fn-like macro
+fn putc_unlocked() -> Never:
+    comptime_error("untranslatable C macro: putc_unlocked")
+// untranslatable fn-like macro
+fn putchar_unlocked() -> Never:
+    comptime_error("untranslatable C macro: putchar_unlocked")
+// untranslatable fn-like macro
+fn sigmask() -> Never:
+    comptime_error("untranslatable C macro: sigmask")
+fn snprintf() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn sprintf() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn stpcpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn stpncpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strcat() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strcpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strlcat() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strlcpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strncat() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn strncpy() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn vsnprintf() -> Never:
+    comptime_error("variadic macro — use direct call")
+fn vsprintf() -> Never:
+    comptime_error("variadic macro — use direct call")
