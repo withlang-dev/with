@@ -117,7 +117,6 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
                 return 8
             19 =>
                 return 8
-            _ => 0
         
 
     if (re == null):

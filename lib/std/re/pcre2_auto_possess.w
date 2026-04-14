@@ -224,7 +224,6 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                         ((unsafe: *code) = (unsafe: *code) + (OP_POSUPTO - OP_UPTO))
                     OP_MINUPTO =>
                         ((unsafe: *code) = (unsafe: *code) + (OP_POSUPTO - OP_MINUPTO))
-                    _ => 0
                 
             
             (c = (unsafe: *code))
@@ -261,7 +260,6 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                                 ((unsafe: *repeat_opcode) = 109)
                             OP_CRMINRANGE =>
                                 ((unsafe: *repeat_opcode) = 109)
-                            _ => 0
                         
                     
                 
@@ -326,7 +324,6 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                 (code = code + code[1])
             OP_THEN_ARG =>
                 (code = code + code[1])
-            _ => 0
         
         code = code + _pcre2_OP_lengths_8[c]
         
@@ -500,7 +497,6 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                 OP_NOTPOSUPTOI =>
                     if ((code[-1]) >= 192):
                         (code = code + (_pcre2_utf8_table4[((code[-1]) & 63)]))
-                _ => 0
         
 
 
@@ -682,7 +678,6 @@ fn check_char_prop(c: c_uint, ptype: c_uint, pdata: c_uint, negated: c_int) -> c
             return 0
         12 =>
             return 0
-        _ => 0
 
     return 0
 
@@ -736,7 +731,6 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
                 (list[0] = (unsafe: *code))
                 var __ci_expr_old_0: *const u8 = code
                 (code = code + 1)
-            _ => 0
         
         (c = list[0])
         
@@ -1214,7 +1208,6 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             (list[2] = ((((end as usize -% code as usize) / sizeof[u8]())) as c_uint))
             (list[3] = ((((end as usize -% class_end as usize) / sizeof[u8]())) as c_uint))
             return end
-        _ => 0
 
     return null
 
@@ -1542,7 +1535,6 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                     return 0
                 (code = code + _pcre2_OP_lengths_8[c])
                 continue
-            _ => 0
         
         (code = get_chr_property_list(code, utf, ucp, cb.fcc, (&list[0] as *mut c_uint)))
         
@@ -1683,7 +1675,6 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                                 (n = propposstab[base_list[2]][list[2]])
                                 
                                 match n
-                                    0 => 0
                                     1 =>
                                         (accepted = bothprop)
                                     2 =>
@@ -1730,7 +1721,6 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                                     17 =>
                                         (p = (&(&posspropstab[0] as *mut [4]u8)[(n - 15)][0] as *mut u8))
                                         (accepted = (if (lisprop != 0) and (risprop == ((if (((&(&catposstab[0] as *mut [30]u8)[p[0]][0] as *mut u8)[base_list[3]] != 0) and ((&(&catposstab[0] as *mut [30]u8)[p[1]][0] as *mut u8)[base_list[3]] != 0)) and ((base_list[3] != p[3]) or (not ((risprop != 0)))): 1 else: 0))): 1 else: 0))
-                                    _ => 0
                                 
                         
                     else:
@@ -1934,7 +1924,6 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         8233 =>
                             return 0
                         _ => 0
-                24 => 0
                 16 =>
                     if (not ((check_char_prop(chr, list_ptr[2], list_ptr[3], (if list_ptr[0] == 15: 1 else: 0)) != 0))):
                         return 0

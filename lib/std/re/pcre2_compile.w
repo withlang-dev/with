@@ -2830,33 +2830,6 @@ fn check_lookbehinds(__param_pptr: *mut c_uint, retptr: *mut *mut c_uint, recurs
             2149974016 =>
                 var __ci_expr_old_1: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
-            2150498304 => 0
-            2147549184 => 0
-            2151153664 => 0
-            2151219200 => 0
-            2151284736 => 0
-            2147680256 => 0
-            2148073472 => 0
-            2148139008 => 0
-            2148204544 => 0
-            2148270080 => 0
-            2148335616 => 0
-            2148401152 => 0
-            2150629376 => 0
-            2149187584 => 0
-            2149253120 => 0
-            2150563840 => 0
-            2151350272 => 0
-            2151415808 => 0
-            2151481344 => 0
-            2150760448 => 0
-            2151546880 => 0
-            2151612416 => 0
-            2151677952 => 0
-            2149711872 => 0
-            2149777408 => 0
-            2150891520 => 0
-            2151022592 => 0
             2148925440 =>
                 (pptr = pptr + 2)
             2149842944 =>
@@ -4131,7 +4104,6 @@ fn handle_escdsw(escape: c_int, __param_parsed_pattern: *mut c_uint, options: c_
             (ascii_option = 1024)
         ESC_w =>
             (ascii_option = 1024)
-        _ => 0
 
     if ((((options & 131072)) == 0) or (((xoptions & ascii_option)) != 0)):
         var __ci_expr_old_0: *mut c_uint = parsed_pattern
@@ -4168,7 +4140,6 @@ fn handle_escdsw(escape: c_int, __param_parsed_pattern: *mut c_uint, options: c_
                 var __ci_expr_old_4: *mut c_uint = parsed_pattern
                 (parsed_pattern = parsed_pattern + 1)
                 ((unsafe: *__ci_expr_old_4) = 524288)
-            _ => 0
         
 
     return parsed_pattern
@@ -26039,7 +26010,6 @@ fn find_recurse(__param_code: *mut u8, utf: c_int) -> *mut u8:
                         (code = code + code[1])
                     OP_THEN_ARG =>
                         (code = code + code[1])
-                    _ => 0
                 
                 code = code + _pcre2_OP_lengths_8[c]
                 
@@ -26213,7 +26183,6 @@ fn find_recurse(__param_code: *mut u8, utf: c_int) -> *mut u8:
                         OP_NOTPOSQUERYI =>
                             if ((code[-1]) >= 192):
                                 (code = code + (_pcre2_utf8_table4[((code[-1]) & 63)]))
-                        _ => 0
                 
         
 

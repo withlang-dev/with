@@ -237,7 +237,6 @@ fn _pcre2_valid_utf_8(string: *const u8, __param_length: c_ulong, erroroffset: *
                     return (-6)
                 5 =>
                     return (-7)
-                _ => 0
             
         
         length = length - ab
@@ -375,7 +374,6 @@ fn _pcre2_valid_utf_8(string: *const u8, __param_length: c_ulong, erroroffset: *
                     
                     return (-21)
                     
-            _ => 0
         
         if (ab > 3):
             ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% ab))

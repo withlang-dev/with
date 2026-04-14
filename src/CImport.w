@@ -6442,6 +6442,190 @@ fn ci_lower_for_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs
         return stmts.block(wstart, 2)
     while_id
 
+// Structural lowering for CXK_SWITCH_STMT. Builds a CIS_MATCH
+// with raw-string subject + arm leaves. Mirrors the branching
+// structure of ci_trans_switch_body: simple per-case arms when
+// there's no fallthrough, prong-duplicated arms otherwise.
+//
+// Arm records in stmts.extra: [value_count, value_exprs...,
+// body_stmt_id]. Default arms have value_count == 0.
+//
+// Returns 0 to defer to legacy fallback when something in the
+// switch body doesn't map cleanly (empty cases, etc.).
+fn ci_lower_switch_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 2:
+        return 0 as CiStmtId
+    // Bypass the IR detour while building arm body text. The
+    // legacy ci_trans_switch_body runs with cache=0 (from the
+    // outer ci_trans_stmt_legacy_for_ir wrapper) and relies on
+    // the legacy text path's transparent stringify-macro
+    // expansion in ci_trans_expr — re-entering the IR pipeline
+    // here loses that expansion and emits unresolved macros
+    // like `XSTRING(...)` in var inits. Restore the cache before
+    // returning.
+    let saved_cache = g_migrate_ir_enabled_cache
+    g_migrate_ir_enabled_cache = 0
+    let result = ci_lower_switch_stmt_ir_inner(session, cursor, stmts, exprs, types, scope)
+    g_migrate_ir_enabled_cache = saved_cache
+    result
+
+fn ci_lower_switch_stmt_ir_inner(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 2:
+        return 0 as CiStmtId
+    let cond_cursor = with_ci_child(session, cursor, 0)
+    let cond_lowered = ci_prepare_stmt_subject(session, cond_cursor, scope, "switch")
+    if not ci_lowering_valid(cond_lowered):
+        return 0 as CiStmtId
+    let body_cursor = with_ci_child(session, cursor, 1)
+    let body_nc = with_ci_num_children(session, body_cursor)
+
+    // Detect fallthrough and count cases.
+    var has_fallthrough = false
+    var case_count = 0
+    var ii = 0
+    while ii < body_nc:
+        let child = with_ci_child(session, body_cursor, ii)
+        let ck = with_ci_cursor_kind(session, child)
+        if ck == CXK_CASE_STMT or ck == CXK_DEFAULT_STMT:
+            case_count = case_count + 1
+            let case_nc = with_ci_num_children(session, child)
+            if case_nc >= 2 and ck == CXK_CASE_STMT:
+                let body_child = with_ci_child(session, child, 1)
+                if not ci_stmt_ends_with_break(session, body_child):
+                    has_fallthrough = true
+            else if case_nc >= 1 and ck == CXK_DEFAULT_STMT:
+                let body_child = with_ci_child(session, child, 0)
+                if not ci_stmt_ends_with_break(session, body_child):
+                    has_fallthrough = true
+        ii = ii + 1
+
+    if case_count == 0:
+        return 0 as CiStmtId
+
+    // Arm records: [value_count, value_id_0, ..., body_id] flattened.
+    var arm_records: Vec[i32] = Vec.new()
+    var arm_count = 0
+    var default_values: Vec[i32] = Vec.new()  // placeholder, unused in no-fallthrough path
+    let _ = default_values  // suppress unused
+
+    if not has_fallthrough:
+        // Simple path: one arm per case, one default arm. Call
+        // ci_trans_stmt_strip_break with indent=2 to match the
+        // legacy ci_trans_switch_body convention — the legacy
+        // passes `indent + 2` where indent is the switch's own
+        // depth, so the case body text is indented consistently.
+        var default_body_id: CiStmtId = 0 as CiStmtId
+        var i = 0
+        while i < body_nc:
+            let child = with_ci_child(session, body_cursor, i)
+            let ck = with_ci_cursor_kind(session, child)
+            if ck == CXK_CASE_STMT:
+                let case_nc = with_ci_num_children(session, child)
+                if case_nc >= 2:
+                    let val_text = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
+                    let body_text = ci_trans_stmt_strip_break(session, with_ci_child(session, child, 1), 2, scope)
+                    if val_text.len() > 0 and body_text.len() > 0:
+                        let val_id = exprs.raw_string(val_text, 0 as CiTypeId)
+                        let body_id = stmts.raw_string(ci_strip_trailing_newline(body_text))
+                        arm_records.push(1)
+                        arm_records.push(val_id as i32)
+                        arm_records.push(body_id as i32)
+                        arm_count = arm_count + 1
+            else if ck == CXK_DEFAULT_STMT:
+                let case_nc = with_ci_num_children(session, child)
+                if case_nc >= 1:
+                    let body_text = ci_trans_stmt_strip_break(session, with_ci_child(session, child, 0), 2, scope)
+                    if body_text.len() > 0:
+                        default_body_id = stmts.raw_string(ci_strip_trailing_newline(body_text))
+            i = i + 1
+        // Append default arm at the end if present.
+        if (default_body_id as i32) != 0:
+            arm_records.push(0)
+            arm_records.push(default_body_id as i32)
+            arm_count = arm_count + 1
+    else:
+        // Fallthrough path: prong-duplicated arms. Walk cases in
+        // order, collect each case's value(s) via chain traversal,
+        // use ci_trans_switch_prong_forward to get the body text.
+        var default_arm_body: CiStmtId = 0 as CiStmtId
+        var i = 0
+        while i < body_nc:
+            let child = with_ci_child(session, body_cursor, i)
+            let ck = with_ci_cursor_kind(session, child)
+            if ck == CXK_CASE_STMT:
+                let prong_body = ci_trans_switch_prong_forward(session, body_cursor, i, body_nc, 0, scope)
+                if prong_body.len() > 0:
+                    let prong_body_id = stmts.raw_string(ci_strip_trailing_newline(prong_body))
+                    // Walk the case-chain, emitting one arm per nested case.
+                    var chain_cur = child
+                    var chain_done = false
+                    while not chain_done:
+                        let chain_kind = with_ci_cursor_kind(session, chain_cur)
+                        if chain_kind == CXK_CASE_STMT:
+                            let chain_nc = with_ci_num_children(session, chain_cur)
+                            if chain_nc >= 1:
+                                let val_text = ci_trans_expr(session, with_ci_child(session, chain_cur, 0), scope)
+                                if val_text.len() > 0:
+                                    let val_id = exprs.raw_string(val_text, 0 as CiTypeId)
+                                    arm_records.push(1)
+                                    arm_records.push(val_id as i32)
+                                    arm_records.push(prong_body_id as i32)
+                                    arm_count = arm_count + 1
+                            // Descend into nested CaseStmt if present.
+                            if chain_nc >= 2:
+                                let nested = with_ci_child(session, chain_cur, 1)
+                                let nk = with_ci_cursor_kind(session, nested)
+                                if nk == CXK_CASE_STMT or nk == CXK_DEFAULT_STMT:
+                                    chain_cur = nested
+                                else:
+                                    chain_done = true
+                            else:
+                                chain_done = true
+                        else if chain_kind == CXK_DEFAULT_STMT:
+                            // default nested in a case chain.
+                            arm_records.push(0)
+                            arm_records.push(prong_body_id as i32)
+                            arm_count = arm_count + 1
+                            chain_done = true
+                        else:
+                            chain_done = true
+            else if ck == CXK_DEFAULT_STMT:
+                let prong_body = ci_trans_switch_prong_forward(session, body_cursor, i, body_nc, 0, scope)
+                if prong_body.len() > 0:
+                    default_arm_body = stmts.raw_string(ci_strip_trailing_newline(prong_body))
+            i = i + 1
+        if (default_arm_body as i32) != 0:
+            arm_records.push(0)
+            arm_records.push(default_arm_body as i32)
+            arm_count = arm_count + 1
+
+    if arm_count == 0:
+        return 0 as CiStmtId
+
+    // Push arm records into stmts.extra contiguously.
+    let arms_start = stmts.extra.len() as i32
+    var ri: i64 = 0
+    while ri < arm_records.len():
+        let _ = stmts.add_extra(arm_records.get(ri))
+        ri = ri + 1
+
+    // Build CIS_MATCH with subject as raw-string expr.
+    let subject_id = exprs.raw_string(cond_lowered.value, 0 as CiTypeId)
+    let match_id = stmts.add(CiStmtKind.CIS_MATCH, subject_id as i32, arms_start, arm_count, 0)
+
+    // If the condition needed statement-level lowering, emit the
+    // setup as a leading raw-string stmt wrapped with the match
+    // in a CIS_BLOCK.
+    if cond_lowered.setup.len() > 0:
+        let setup_id = stmts.raw_string(ci_strip_trailing_newline(cond_lowered.setup))
+        let bstart = stmts.extra.len() as i32
+        let _ = stmts.add_extra(setup_id as i32)
+        let _ = stmts.add_extra(match_id as i32)
+        return stmts.block(bstart, 2)
+    match_id
+
 // Recursive statement lowering helper: produces a CiStmtId from a
 // cursor. Specific handlers build real CIS_* nodes for kinds we
 // own structurally; everything else bails to the legacy bypass
@@ -6564,6 +6748,14 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
         let for_id = ci_lower_for_stmt_ir(session, cursor, stmts, exprs, types, scope)
         if (for_id as i32) != 0:
             return for_id
+
+    // Structural switch statement. Builds a CIS_MATCH with
+    // raw-string arm leaves; handles both simple (non-fallthrough)
+    // and prong-duplicated fallthrough cases.
+    if kind == CXK_SWITCH_STMT:
+        let switch_id = ci_lower_switch_stmt_ir(session, cursor, stmts, exprs, types, scope)
+        if (switch_id as i32) != 0:
+            return switch_id
 
     // Structural do-while. Desugars to:
     //     while true:

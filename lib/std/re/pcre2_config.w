@@ -49,9 +49,6 @@ fn pcre2_config_8(what: c_uint, where_: *mut c_void) -> c_int:
                 return 4
             9 =>
                 return 4
-            2 => 0
-            10 => 0
-            11 => 0
             _ =>
                 return (-34)
         
@@ -97,7 +94,6 @@ fn pcre2_config_8(what: c_uint, where_: *mut c_void) -> c_int:
             var v_1: *const i8 = (((if (32 == 0): "10.48 2025-10-21" else: "10.48-DEV 2025-10-21") as *const i8) as *const i8)
             
             return (((1 +% ((if (where_ == null): string_len(v_1) else: _pcre2_strcpy_c8_8((where_ as *mut u8), v_1))))) as c_int)
-            
         _ =>
             return (-34)
 
