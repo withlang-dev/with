@@ -747,9 +747,20 @@ __install: $(STAGE2_BIN)
 install-user: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __install-user)
 
-__install-user: $(CANONICAL_BIN)
+# install-user is a pure copy: it installs whatever binary is
+# currently at $(CANONICAL_BIN). It intentionally does NOT declare
+# $(CANONICAL_BIN) as a prerequisite — a missing stage intermediate
+# would otherwise trigger a full rebuild chain (stage1 → stage2 →
+# canonical) that takes minutes. Run `make build` first if you
+# need a fresh binary, then `make install-user` to publish it.
+__install-user:
+	@if [ ! -x "$(CANONICAL_BIN)" ]; then \
+		echo "error: $(CANONICAL_BIN) does not exist — run 'make build' first" >&2; \
+		exit 1; \
+	fi
 	install -d "$(USER_BINDIR)"
 	install -m 0755 "$(CANONICAL_BIN)" "$(USER_BINDIR)/with"
+	@echo "installed: $(USER_BINDIR)/with"
 
 update-seed: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __update-seed)
