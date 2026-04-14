@@ -248,14 +248,16 @@ fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong:
     var c: c_ulong = 0
 
     while true:
-        var __ci_cond_while_1: bool = false
-        var __ci_expr_old_2: *const u8 = str
+        var __ci_cond_while_0: bool = false
+        var __ci_expr_old_1: *const u8 = str
         (str = str + 1)
-        (__ci_cond_while_1 = ((if (unsafe: *__ci_expr_old_2) != 0: 1 else: 0) != 0))
-        if not (__ci_cond_while_1):
+        (__ci_cond_while_0 = ((if (unsafe: *__ci_expr_old_1) != 0: 1 else: 0) != 0))
+        
+        if not (__ci_cond_while_0):
             break
-        var __ci_expr_old_0: c_ulong = c
+        
         (c = c + 1)
+        
 
     return c
 
@@ -268,19 +270,21 @@ fn _pcre2_strncmp_8(__param_str1: *const u8, __param_str2: *const u8, __param_le
     var c2: u8
 
     while (len > 0):
-        var __ci_expr_old_1: *const u8 = str1
+        var __ci_expr_old_0: *const u8 = str1
         (str1 = str1 + 1)
-        (c1 = (unsafe: *__ci_expr_old_1))
+        (c1 = (unsafe: *__ci_expr_old_0))
         
-        var __ci_expr_old_2: *const u8 = str2
+        var __ci_expr_old_1: *const u8 = str2
         (str2 = str2 + 1)
-        (c2 = (unsafe: *__ci_expr_old_2))
+        (c2 = (unsafe: *__ci_expr_old_1))
         
         if (c1 != c2):
             return (((((if c1 > c2: 1 else: 0)) << 1)) - 1)
         
-        var __ci_expr_old_0: c_ulong = len
-    (len = len - 1)
+        
+        var __ci_expr_old_2: c_ulong = len
+        (len = len - 1)
+        
 
     return 0
 
@@ -293,19 +297,21 @@ fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const i8, __param
     var c2: u8
 
     while (len > 0):
-        var __ci_expr_old_1: *const u8 = str1
+        var __ci_expr_old_0: *const u8 = str1
         (str1 = str1 + 1)
-        (c1 = (unsafe: *__ci_expr_old_1))
+        (c1 = (unsafe: *__ci_expr_old_0))
         
-        var __ci_expr_old_2: *const i8 = str2
+        var __ci_expr_old_1: *const i8 = str2
         (str2 = str2 + 1)
-        (c2 = (unsafe: *__ci_expr_old_2))
+        (c2 = (unsafe: *__ci_expr_old_1))
         
         if (c1 != c2):
             return (((((if c1 > c2: 1 else: 0)) << 1)) - 1)
         
-        var __ci_expr_old_0: c_ulong = len
-    (len = len - 1)
+        
+        var __ci_expr_old_2: c_ulong = len
+        (len = len - 1)
+        
 
     return 0
 

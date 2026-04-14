@@ -1300,8 +1300,7 @@ fn pcre2_code_free_8(code: *mut pcre2_real_code_8):
             (ref_count = (((code.tables + (((((512 + 320)) + 256)) as isize as usize))) as *mut c_ulong))
             
             if ((unsafe: *ref_count) > 0):
-                var __ci_expr_old_0: c_ulong = (unsafe: *ref_count)
-                ((unsafe: *ref_count) = (unsafe: *ref_count) - 1)
+                (((unsafe: *ref_count)) = ((unsafe: *ref_count)) - 1)
                 
                 if ((unsafe: *ref_count) == 0):
                     code.memctl.free((code.tables as *mut c_void), code.memctl.memory_data)
@@ -1332,8 +1331,7 @@ fn pcre2_code_copy_8(code: *const pcre2_real_code_8) -> *mut pcre2_real_code_8:
     if (((code.flags & 262144)) != 0):
         (ref_count = (((code.tables + (((((512 + 320)) + 256)) as isize as usize))) as *mut c_ulong))
         
-        var __ci_expr_old_0: c_ulong = (unsafe: *ref_count)
-        ((unsafe: *ref_count) = (unsafe: *ref_count) + 1)
+        (((unsafe: *ref_count)) = ((unsafe: *ref_count)) + 1)
         
 
     return newcode
@@ -1374,7 +1372,7 @@ fn pcre2_code_copy_with_tables_8(code: *const pcre2_real_code_8) -> *mut pcre2_r
 
     (newcode.tables = (newtables as *const u8))
 
-    (newcode.flags = newcode.flags | 262144)
+    newcode.flags = newcode.flags | 262144
 
     return newcode
 
@@ -1692,7 +1690,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
     (reqcuflags = 4294967295)
     (firstcuflags = reqcuflags)
 
-    (length = (6 +% skipunits))
+    (length = ((2 + (2 * 2)) +% skipunits))
 
     (lookbehind = (if (((unsafe: *code) == OP_ASSERTBACK) or ((unsafe: *code) == OP_ASSERTBACK_NOT)) or ((unsafe: *code) == OP_ASSERTBACK_NA): 1 else: 0))
 
@@ -1701,7 +1699,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
         
         (lookbehindminlength = (unsafe: *pptr))
         
-        (pptr = pptr + 2)
+        pptr = pptr + 2
         
     else:
         (lookbehindminlength = 0)
@@ -1722,7 +1720,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
     (code[1] = ((((0) >> 8)) as u8))
     (code[((1) + 1)] = ((((0) & 255)) as u8))
 
-    (code = code + (3 +% skipunits))
+    code = code + ((1 + 2) +% skipunits)
 
     while true:
         var branch_return: c_int
@@ -1734,7 +1732,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
         var branchreqcuflags: c_uint = 4294967295
         
         if ((lookbehind != 0) and (lookbehindlength > 0)):
-            if ((lookbehindminlength == 65535) or (lookbehindminlength == lookbehindlength)):
+            if ((lookbehindminlength == (65535)) or (lookbehindminlength == lookbehindlength)):
                 var __ci_expr_old_0: *mut u8 = code
                 (code = code + 1)
                 ((unsafe: *__ci_expr_old_0) = 126)
@@ -1743,7 +1741,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
                 (code[((0) + 1)] = ((lookbehindlength) & 255))
                 (code = code + 2)
                 
-                (length = length + 3)
+                length = length + (1 + 2)
                 
             else:
                 var __ci_expr_old_1: *mut u8 = code
@@ -1758,20 +1756,22 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
                 (code[((0) + 1)] = ((lookbehindlength) & 255))
                 (code = code + 2)
                 
-                (length = length + 5)
+                length = length + (1 + (2 * 2))
                 
             
         
         var __ci_cond_if_2: bool = false
-        (branch_return = compile_branch((&mut options as *mut c_uint), (&mut xoptions as *mut c_uint), (&mut code as *mut *mut u8), (&mut pptr as *mut *mut c_uint), errorcodeptr, (&mut branchfirstcu as *mut c_uint), (&mut branchfirstcuflags as *mut c_uint), (&mut branchreqcu as *mut c_uint), (&mut branchreqcuflags as *mut c_uint), (&mut bc as *mut branch_chain_8), open_caps, cb, (if (lengthptr == (null as *mut c_ulong)): (null as *mut c_ulong) else: (&mut length as *mut c_ulong))))
+        (branch_return = compile_branch((&mut options as *mut c_uint), (&mut xoptions as *mut c_uint), (&mut code as *mut *mut u8), (&mut pptr as *mut *mut c_uint), errorcodeptr, (&mut branchfirstcu as *mut c_uint), (&mut branchfirstcuflags as *mut c_uint), (&mut branchreqcu as *mut c_uint), (&mut branchreqcuflags as *mut c_uint), (&mut bc as *mut branch_chain_8), open_caps, cb, (if (lengthptr == null): null else: (&mut length as *mut c_ulong))))
         (__ci_cond_if_2 = ((if (branch_return) == 0: 1 else: 0) != 0))
+        
         if __ci_cond_if_2:
             return 0
+        
         
         if (branch_return < 0):
             (okreturn = -1)
         
-        if (lengthptr == (null as *mut c_ulong)):
+        if (lengthptr == null):
             if ((unsafe: *last_branch) != OP_ALT):
                 (firstcu = branchfirstcu)
                 
@@ -1805,13 +1805,13 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
                 else:
                     (reqcu = branchreqcu)
                     
-                    (reqcuflags = reqcuflags | branchreqcuflags)
+                    reqcuflags = reqcuflags | branchreqcuflags
                     
                 
             
         
         if ((((unsafe: *pptr) & (4294901760 as c_uint))) != 2147549184):
-            if (lengthptr == (null as *mut c_ulong)):
+            if (lengthptr == null):
                 var branch_length: c_uint = ((((code as usize -% last_branch as usize) / sizeof[u8]())) as c_uint)
                 
                 while true:
@@ -1822,18 +1822,20 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
                     
                     (branch_length = prev_length)
                     
-                    (last_branch = last_branch - branch_length)
+                    last_branch = last_branch - branch_length
+                    
                     
                     if not ((branch_length > 0)):
                         break
+                    
                 
             
-            ((unsafe: *code) = 122)
+            ((unsafe: *code) = OP_KET)
             
             (code[1] = ((((((((code as usize -% start_bracket as usize) / sizeof[u8]())) as c_uint)) >> 8)) as u8))
             (code[((1) + 1)] = ((((((((code as usize -% start_bracket as usize) / sizeof[u8]())) as c_uint)) & 255)) as u8))
             
-            (code = code + (1 + 2))
+            code = code + (1 + 2)
             
             ((unsafe: *codeptr) = code)
             
@@ -1847,26 +1849,26 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
             
             ((unsafe: *reqcuflagsptr) = reqcuflags)
             
-            if (lengthptr != (null as *mut c_ulong)):
-                if ((2147483627 -% (unsafe: *lengthptr)) < length):
+            if (lengthptr != null):
+                if ((((2147483647 - 20)) -% (unsafe: *lengthptr)) < length):
                     ((unsafe: *errorcodeptr) = ERR20)
                     
                     return 0
                     
                 
-                ((unsafe: *lengthptr) = (unsafe: *lengthptr) + length)
+                (unsafe: *lengthptr) = (unsafe: *lengthptr) + length
                 
             
             return okreturn
             
         
-        if (lengthptr != (null as *mut c_ulong)):
+        if (lengthptr != null):
             (code = ((((unsafe: *codeptr) + (1 as isize as usize)) + (2 as isize as usize)) + skipunits))
             
-            (length = length + 3)
+            length = length + (1 + 2)
             
         else:
-            ((unsafe: *code) = 121)
+            ((unsafe: *code) = OP_ALT)
             
             (code[1] = ((((((((code as usize -% last_branch as usize) / sizeof[u8]())) as c_int)) >> 8)) as u8))
             (code[((1) + 1)] = ((((((((code as usize -% last_branch as usize) / sizeof[u8]())) as c_int)) & 255)) as u8))
@@ -1874,13 +1876,18 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
             (last_branch = code)
             (bc.current_branch = last_branch)
             
-            (code = code + (1 + 2))
+            code = code + (1 + 2)
             
         
         (lookbehindlength = (((unsafe: *pptr) & 65535)))
         
-        var __ci_expr_old_3: *mut c_uint = pptr
         (pptr = pptr + 1)
+        
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
         
 
     return 0
@@ -2712,13 +2719,13 @@ fn set_lookbehind_lengths(pptrptr: *mut *mut c_uint, errcodeptr: *mut c_int, lcp
     (offset = ((((bptr[1] as c_ulong) << 32)) | (bptr[2] as c_ulong)))
     
 
-    ((unsafe: *pptrptr) = (unsafe: *pptrptr) + 2)
+    (unsafe: *pptrptr) = (unsafe: *pptrptr) + 2
 
     while true:
         var branchlength: c_int
         var branchminlength: c_int
         
-        ((unsafe: *pptrptr) = (unsafe: *pptrptr) + 1)
+        (unsafe: *pptrptr) = (unsafe: *pptrptr) + 1
         
         (branchlength = get_branchlength(pptrptr, (&mut branchminlength as *mut c_int), errcodeptr, lcptr, recurses, cb))
         
@@ -2744,12 +2751,14 @@ fn set_lookbehind_lengths(pptrptr: *mut *mut c_uint, errcodeptr: *mut c_int, lcp
         if (branchlength > cb.max_lookbehind):
             (cb.max_lookbehind = branchlength)
         
-        ((unsafe: *bptr) = (unsafe: *bptr) | branchlength)
+        (unsafe: *bptr) = (unsafe: *bptr) | branchlength
         
         (bptr = (unsafe: *pptrptr))
         
+        
         if not (((((unsafe: *bptr) & (4294901760 as c_uint))) == 2147549184)):
             break
+        
 
     if (variable != 0):
         (gbptr[1] = minlength)
@@ -2763,7 +2772,7 @@ fn set_lookbehind_lengths(pptrptr: *mut *mut c_uint, errcodeptr: *mut c_int, lcp
             
         
     else:
-        (gbptr[1] = 65535)
+        (gbptr[1] = (65535))
 
     return 1
 
@@ -2785,41 +2794,41 @@ fn check_lookbehinds(__param_pptr: *mut c_uint, retptr: *mut *mut c_uint, recurs
                 if ((((unsafe: *pptr) -% (2149318656 as c_uint)) == 15) or (((unsafe: *pptr) -% (2149318656 as c_uint)) == 16)):
                     (pptr = pptr + 1)
             2149384192 =>
-                var __ci_cond_if_1: bool = false
+                var __ci_cond_if_0: bool = false
                 (nestlevel = nestlevel - 1)
-                (__ci_cond_if_1 = ((if nestlevel < 0: 1 else: 0) != 0))
-                if __ci_cond_if_1:
+                (__ci_cond_if_0 = ((if nestlevel < 0: 1 else: 0) != 0))
+                if __ci_cond_if_0:
                     if (retptr != (null as *mut *mut c_uint)):
                         ((unsafe: *retptr) = pptr)
                     
                     return 0
                     
             2147614720 =>
-                var __ci_expr_old_2: c_int = nestlevel
+                var __ci_expr_old_1: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2148007936 =>
-                var __ci_expr_old_2: c_int = nestlevel
+                var __ci_expr_old_1: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2148466688 =>
-                var __ci_expr_old_2: c_int = nestlevel
+                var __ci_expr_old_1: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2148990976 =>
-                var __ci_expr_old_2: c_int = nestlevel
+                var __ci_expr_old_1: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2150039552 =>
-                var __ci_expr_old_2: c_int = nestlevel
+                var __ci_expr_old_1: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2150105088 =>
-                var __ci_expr_old_2: c_int = nestlevel
+                var __ci_expr_old_1: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2150301696 =>
-                var __ci_expr_old_2: c_int = nestlevel
+                var __ci_expr_old_1: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2149449728 =>
-                var __ci_expr_old_2: c_int = nestlevel
+                var __ci_expr_old_1: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2149974016 =>
-                var __ci_expr_old_2: c_int = nestlevel
+                var __ci_expr_old_1: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2150498304 => 0
             2147549184 => 0
@@ -2858,27 +2867,27 @@ fn check_lookbehinds(__param_pptr: *mut c_uint, retptr: *mut *mut c_uint, recurs
                 (pptr = pptr + (1 + 2))
             2148532224 =>
                 (pptr = pptr + 2)
-                var __ci_expr_old_3: c_int = nestlevel
+                var __ci_expr_old_2: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2148597760 =>
                 (pptr = pptr + (1 + 2))
-                var __ci_expr_old_4: c_int = nestlevel
+                var __ci_expr_old_3: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2148663296 =>
                 (pptr = pptr + (1 + 2))
-                var __ci_expr_old_4: c_int = nestlevel
+                var __ci_expr_old_3: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2148728832 =>
                 (pptr = pptr + (1 + 2))
-                var __ci_expr_old_4: c_int = nestlevel
+                var __ci_expr_old_3: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2148794368 =>
                 (pptr = pptr + (1 + 2))
-                var __ci_expr_old_4: c_int = nestlevel
+                var __ci_expr_old_3: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2148859904 =>
                 (pptr = pptr + 3)
-                var __ci_expr_old_5: c_int = nestlevel
+                var __ci_expr_old_4: c_int = nestlevel
                 (nestlevel = nestlevel + 1)
             2147942400 =>
                 (pptr = pptr + (3 + 2))
@@ -2925,8 +2934,10 @@ fn check_lookbehinds(__param_pptr: *mut c_uint, retptr: *mut *mut c_uint, recurs
                 (cb.erroroffset = 0)
                 return ERR70
         
-        var __ci_expr_old_0: *mut c_uint = pptr
-    (pptr = pptr + 1)
+        
+        var __ci_expr_old_5: *mut c_uint = pptr
+        (pptr = pptr + 1)
+        
 
     return 0
 
@@ -3590,7 +3601,6 @@ fn check_posix_syntax(__param_ptr: *const u8, ptrend: *const u8, endptr: *mut *c
 
     while (((ptrend as usize -% ptr as usize) / sizeof[u8]()) >= 2):
         if (((unsafe: *ptr) == 92) and ((ptr[1] == 93) or (ptr[1] == 92))):
-            var __ci_expr_old_2: *const u8 = ptr
             (ptr = ptr + 1)
         else:
             if ((((unsafe: *ptr) == 91) and (ptr[1] == terminator)) or ((unsafe: *ptr) == 93)):
@@ -3602,8 +3612,10 @@ fn check_posix_syntax(__param_ptr: *const u8, ptrend: *const u8, endptr: *mut *c
                     return 1
                     
         
+        
         var __ci_expr_old_1: *const u8 = ptr
-    (ptr = ptr + 1)
+        (ptr = ptr + 1)
+        
 
     return 0
 
@@ -3617,9 +3629,8 @@ fn check_posix_name(ptr: *const u8, len: c_int) -> c_int:
         if ((len == posix_name_lengths[yield_]) and (_pcre2_strncmp_c8_8(ptr, pn, (len as c_uint)) == 0)):
             return yield_
         
-        (pn = pn + ((&posix_name_lengths[0] as *mut u8)[yield_] + 1))
+        pn = pn + (posix_name_lengths[yield_] + 1)
         
-        var __ci_expr_old_0: c_int = yield_
         (yield_ = yield_ + 1)
         
 
@@ -4081,7 +4092,7 @@ fn manage_callouts(ptr: *const u8, pcalloutptr: *mut *mut c_uint, auto_callout: 
         if (((previous_callout == null) or (previous_callout != (parsed_pattern - (4 as isize as usize)))) or (previous_callout[3] != 255)):
             (previous_callout = parsed_pattern)
             
-            (parsed_pattern = parsed_pattern + 4)
+            parsed_pattern = parsed_pattern + 4
             
             (previous_callout[0] = 2147876864)
             
@@ -4173,7 +4184,7 @@ fn max_parsed_pattern(ptr: *const u8, ptrend: *const u8, utf: c_int, options: c_
     (parsed_size_needed = ((((ptrend as usize -% ptr as usize) / sizeof[u8]())) +% big32count))
 
     if (((options & 4)) != 0):
-        (parsed_size_needed = parsed_size_needed + ((((ptrend as usize -% ptr as usize) / sizeof[u8]())) * 4))
+        parsed_size_needed = parsed_size_needed + ((((ptrend as usize -% ptr as usize) / sizeof[u8]())) * 4)
 
     return parsed_size_needed
 
@@ -8283,6 +8294,12 @@ fn first_significant_code(__param_code: *const u8, skipassert: c_int) -> *const 
                 (code = code + (code[1] + _pcre2_OP_lengths_8[(unsafe: *code)]))
             _ =>
                 return code
+        
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
         
 
 
@@ -25858,10 +25875,12 @@ fn is_anchored(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_bl
                                 if (((op != OP_SOD) and (op != OP_SOM)) and (op != OP_CIRC)):
                                     return 0
         
-        (code = code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint))
+        code = code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint)
+        
         
         if not (((unsafe: *code) == OP_ALT)):
             break
+        
 
     return 1
 
@@ -25874,13 +25893,13 @@ fn is_startline(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_b
         var op: c_int = (unsafe: *scode)
         
         if (op == OP_COND):
-            (scode = scode + (1 + 2))
+            scode = scode + (1 + 2)
             
             if ((unsafe: *scode) == OP_CALLOUT):
-                (scode = scode + _pcre2_OP_lengths_8[OP_CALLOUT])
+                scode = scode + _pcre2_OP_lengths_8[OP_CALLOUT]
             else:
                 if ((unsafe: *scode) == OP_CALLOUT_STR):
-                    (scode = scode + ((((((scode)[(1 + (2 * 2))] << 8)) | (scode)[(((1 + (2 * 2))) + 1)])) as c_uint))
+                    scode = scode + ((((((scode)[(1 + (2 * 2))] << 8)) | (scode)[(((1 + (2 * 2))) + 1)])) as c_uint)
             
             match (unsafe: *scode)
                 OP_CREF =>
@@ -25943,10 +25962,12 @@ fn is_startline(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_b
                             if ((op != OP_CIRC) and (op != OP_CIRCM)):
                                 return 0
         
-        (code = code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint))
+        code = code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint)
+        
         
         if not (((unsafe: *code) == OP_ALT)):
             break
+        
 
     return 1
 
@@ -25957,16 +25978,16 @@ fn find_recurse(__param_code: *mut u8, utf: c_int) -> *mut u8:
         var c: u8 = (unsafe: *code)
         
         if (c == OP_END):
-            return (null as *mut u8)
+            return null
         
         if (c == OP_RECURSE):
             return code
         
         if ((c == OP_XCLASS) or (c == OP_ECLASS)):
-            (code = code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint))
+            code = code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint)
         else:
             if (c == OP_CALLOUT_STR):
-                (code = code + ((((((code)[(1 + (2 * 2))] << 8)) | (code)[(((1 + (2 * 2))) + 1)])) as c_uint))
+                code = code + ((((((code)[(1 + (2 * 2))] << 8)) | (code)[(((1 + (2 * 2))) + 1)])) as c_uint)
             else:
                 match c
                     OP_TYPESTAR =>
@@ -26020,7 +26041,7 @@ fn find_recurse(__param_code: *mut u8, utf: c_int) -> *mut u8:
                         (code = code + code[1])
                     _ => 0
                 
-                (code = code + _pcre2_OP_lengths_8[c])
+                code = code + _pcre2_OP_lengths_8[c]
                 
                 if (utf != 0):
                     match c
@@ -26462,10 +26483,12 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
             _ =>
                 return 0
         
-        (code = code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint))
+        code = code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint)
+        
         
         if not (((unsafe: *code) == OP_ALT)):
             break
+        
 
     ((unsafe: *flags) = cflags)
 
@@ -26502,58 +26525,58 @@ fn parsed_skip(__param_pptr: *mut c_uint, skiptype: c_uint) -> *mut c_uint:
                 if (skiptype == 1):
                     return pptr
             2147614720 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2148007936 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2148466688 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2148532224 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2148597760 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2148663296 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2148728832 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2148794368 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2148859904 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2148990976 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2150039552 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2150105088 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2150301696 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2150170624 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2150236160 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2150367232 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2149449728 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2149974016 =>
-                var __ci_expr_old_1: c_uint = nestlevel
+                var __ci_expr_old_0: c_uint = nestlevel
                 (nestlevel = nestlevel + 1)
             2147549184 =>
                 if ((nestlevel == 0) and (skiptype == 0)):
@@ -26561,7 +26584,7 @@ fn parsed_skip(__param_pptr: *mut c_uint, skiptype: c_uint) -> *mut c_uint:
             2149384192 =>
                 if (nestlevel == 0):
                     return pptr
-                var __ci_expr_old_2: c_uint = nestlevel
+                var __ci_expr_old_1: c_uint = nestlevel
                 (nestlevel = nestlevel - 1)
             _ =>
                 if (meta < 2147483648):
@@ -26570,12 +26593,20 @@ fn parsed_skip(__param_pptr: *mut c_uint, skiptype: c_uint) -> *mut c_uint:
         (meta = (((meta >> 16)) & 32767))
         
         if (meta >= (73 * sizeof[u8]())):
-            return (null as *mut c_uint)
+            return null
         
-        (pptr = pptr + (&meta_extra_lengths[0] as *mut u8)[meta])
+        pptr = pptr + meta_extra_lengths[meta]
         
-        var __ci_expr_old_0: *mut c_uint = pptr
-    (pptr = pptr + 1)
+        
+        var __ci_expr_old_2: *mut c_uint = pptr
+        (pptr = pptr + 1)
+        
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
 
 fn get_grouplength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, isinline: c_int, errcodeptr: *mut c_int, lcptr: *mut c_int, group: c_int, recurses: *mut parsed_recurse_check, cb: *mut compile_block_8) -> c_int:

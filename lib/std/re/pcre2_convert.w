@@ -99,10 +99,11 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
         
 
     var i: c_int = 0
+    
     while (i < 2):
         var allocated: *mut u8
         
-        var dummyrun: c_int = (if (buffptr == (null as *mut *mut u8)) or ((unsafe: *buffptr) == (null as *mut u8)): 1 else: 0)
+        var dummyrun: c_int = (if (buffptr == null) or ((unsafe: *buffptr) == null): 1 else: 0)
         
         match pattype
             16 =>
@@ -115,12 +116,12 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
                 ((unsafe: *bufflenptr) = 0)
                 return (-44)
         
-        if (((rc != 0) or (buffptr == (null as *mut *mut u8))) or ((unsafe: *buffptr) != (null as *mut u8))):
+        if (((rc != 0) or (buffptr == null)) or ((unsafe: *buffptr) != null)):
             return rc
         
         (allocated = (_pcre2_memctl_malloc_8((sizeof[pcre2_memctl]() +% ((((unsafe: *bufflenptr) +% 1)) *% 8)), (ccontext as *mut pcre2_memctl)) as *mut u8))
         
-        if (allocated == (null as *mut u8)):
+        if (allocated == null):
             ((unsafe: *bufflenptr) = 0)
             
             return (-48)
@@ -132,8 +133,17 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
         
         (use_length = ((unsafe: *bufflenptr) +% 1))
         
+        
         var __ci_expr_old_0: c_int = i
-    (i = i + 1)
+        (i = i + 1)
+        
+    
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     ((unsafe: *bufflenptr) = 0)
 
@@ -867,13 +877,12 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
 type pcre2_output_context { output: *mut u8 = null, output_end: *const u8 = null, output_size: c_ulong = 0, out_str: [8]u8 = [0 as u8; 8] }
 type struct_pcre2_output_context = pcre2_output_context
 fn convert_glob_write(out: *mut pcre2_output_context, chr: u8):
-    var __ci_expr_old_0: c_ulong = out.output_size
     (out.output_size = out.output_size + 1)
 
     if (out.output < out.output_end):
-        var __ci_expr_old_1: *mut u8 = out.output
+        var __ci_expr_old_0: *mut u8 = out.output
         (out.output = out.output + 1)
-        ((unsafe: *__ci_expr_old_1) = chr)
+        ((unsafe: *__ci_expr_old_0) = chr)
 
 
 fn convert_glob_write_str(out: *mut pcre2_output_context, __param_length: c_ulong):
@@ -916,9 +925,9 @@ fn convert_glob_print_separator(out: *mut pcre2_output_context, separator: u8, w
 
 
 fn convert_glob_print_wildcard(out: *mut pcre2_output_context, separator: u8, with_escape: c_int):
-    ((&out.out_str[0] as *mut u8)[0] = 91)
+    (out.out_str[0] = 91)
 
-    ((&out.out_str[0] as *mut u8)[1] = 94)
+    (out.out_str[1] = 94)
 
     convert_glob_write_str(out, 2)
 
@@ -965,36 +974,33 @@ fn convert_glob_parse_class(from: *mut *const u8, pattern_end: *const u8, out: *
         
         while ((unsafe: *pattern) == ((unsafe: *class_ptr) as u8)):
             if ((unsafe: *pattern) == 58):
-                (pattern = pattern + 2)
+                pattern = pattern + 2
                 
-                (start = start - 2)
+                start = start - 2
                 
                 while true:
                     var __ci_expr_old_1: *const u8 = start
                     (start = start + 1)
+                    
                     if not ((start < pattern)):
                         break
+                    
                 
                 ((unsafe: *from) = pattern)
                 
                 return class_index
                 
             
-            var __ci_expr_old_2: *const u8 = pattern
             (pattern = pattern + 1)
             
-            var __ci_expr_old_3: *const i8 = class_ptr
             (class_ptr = class_ptr + 1)
             
         
         while ((unsafe: *class_ptr) != 58):
-            var __ci_expr_old_4: *const i8 = class_ptr
             (class_ptr = class_ptr + 1)
         
-        var __ci_expr_old_5: *const i8 = class_ptr
         (class_ptr = class_ptr + 1)
         
-        var __ci_expr_old_6: c_int = class_index
         (class_index = class_index + 1)
         
 
@@ -1075,7 +1081,6 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
         
 
     if (((unsafe: *pattern) == 33) or ((unsafe: *pattern) == 94)):
-        var __ci_expr_old_0: *const u8 = pattern
         (pattern = pattern + 1)
         
         if (pattern >= pattern_end):
@@ -1086,21 +1091,20 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
         
         (is_negative = 1)
         
-        ((&out.out_str[0] as *mut u8)[0] = 91)
+        (out.out_str[0] = 91)
         
-        ((&out.out_str[0] as *mut u8)[1] = 94)
+        (out.out_str[1] = 94)
         
         (len = 2)
         
         if (not ((no_wildsep != 0))):
             if (with_escape != 0):
-                ((&out.out_str[0] as *mut u8)[len] = 92)
+                (out.out_str[len] = 92)
                 
-                var __ci_expr_old_1: c_int = len
                 (len = len + 1)
                 
             
-            ((&out.out_str[0] as *mut u8)[len] = separator)
+            (out.out_str[len] = separator)
             
         
         convert_glob_write_str(out, (len + 1))
@@ -1113,9 +1117,9 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
     (prev_c = 0)
 
     if ((unsafe: *pattern) == 93):
-        ((&out.out_str[0] as *mut u8)[0] = 92)
+        (out.out_str[0] = 92)
         
-        ((&out.out_str[0] as *mut u8)[1] = 93)
+        (out.out_str[1] = 93)
         
         convert_glob_write_str(out, 2)
         
@@ -1123,44 +1127,43 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
         
         (prev_c = 93)
         
-        var __ci_expr_old_2: *const u8 = pattern
         (pattern = pattern + 1)
         
 
     while (pattern < pattern_end):
         (char_start = pattern)
         
-        var __ci_expr_old_3: *const u8 = pattern
+        var __ci_expr_old_0: *const u8 = pattern
         (pattern = pattern + 1)
-        (c = (unsafe: *__ci_expr_old_3))
+        (c = (unsafe: *__ci_expr_old_0))
         
         if ((utf != 0) and (c >= 192)):
             if (((c & 32)) == 0):
-                var __ci_expr_old_4: *const u8 = pattern
+                var __ci_expr_old_1: *const u8 = pattern
                 (pattern = pattern + 1)
-                (c = (((((c & 31)) << 6)) | (((unsafe: *__ci_expr_old_4) & 63))))
+                (c = (((((c & 31)) << 6)) | (((unsafe: *__ci_expr_old_1) & 63))))
             else:
                 if (((c & 16)) == 0):
                     (c = ((((((c & 15)) << 12)) | (((((unsafe: *pattern) & 63)) << 6))) | ((pattern[1] & 63))))
                     
-                    (pattern = pattern + 2)
+                    pattern = pattern + 2
                     
                 else:
                     if (((c & 8)) == 0):
                         (c = (((((((c & 7)) << 18)) | (((((unsafe: *pattern) & 63)) << 12))) | ((((pattern[1] & 63)) << 6))) | ((pattern[2] & 63))))
                         
-                        (pattern = pattern + 3)
+                        pattern = pattern + 3
                         
                     else:
                         if (((c & 4)) == 0):
                             (c = ((((((((c & 3)) << 24)) | (((((unsafe: *pattern) & 63)) << 18))) | ((((pattern[1] & 63)) << 12))) | ((((pattern[2] & 63)) << 6))) | ((pattern[3] & 63))))
                             
-                            (pattern = pattern + 4)
+                            pattern = pattern + 4
                             
                         else:
                             (c = (((((((((c & 1)) << 30)) | (((((unsafe: *pattern) & 63)) << 24))) | ((((pattern[1] & 63)) << 18))) | ((((pattern[2] & 63)) << 12))) | ((((pattern[3] & 63)) << 6))) | ((pattern[4] & 63))))
                             
-                            (pattern = pattern + 5)
+                            pattern = pattern + 5
                             
             
         
@@ -1168,13 +1171,13 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
             convert_glob_write(out, c)
             
             if (((not ((is_negative != 0))) and (not ((no_wildsep != 0)))) and (separator_seen != 0)):
-                ((&out.out_str[0] as *mut u8)[0] = 40)
+                (out.out_str[0] = 40)
                 
-                ((&out.out_str[0] as *mut u8)[1] = 63)
+                (out.out_str[1] = 63)
                 
-                ((&out.out_str[0] as *mut u8)[2] = 60)
+                (out.out_str[2] = 60)
                 
-                ((&out.out_str[0] as *mut u8)[3] = 33)
+                (out.out_str[3] = 33)
                 
                 convert_glob_write_str(out, 4)
                 
@@ -1215,37 +1218,37 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
                 
                 (char_start = pattern)
                 
-                var __ci_expr_old_5: *const u8 = pattern
+                var __ci_expr_old_2: *const u8 = pattern
                 (pattern = pattern + 1)
-                (c = (unsafe: *__ci_expr_old_5))
+                (c = (unsafe: *__ci_expr_old_2))
                 
                 if ((utf != 0) and (c >= 192)):
                     if (((c & 32)) == 0):
-                        var __ci_expr_old_6: *const u8 = pattern
+                        var __ci_expr_old_3: *const u8 = pattern
                         (pattern = pattern + 1)
-                        (c = (((((c & 31)) << 6)) | (((unsafe: *__ci_expr_old_6) & 63))))
+                        (c = (((((c & 31)) << 6)) | (((unsafe: *__ci_expr_old_3) & 63))))
                     else:
                         if (((c & 16)) == 0):
                             (c = ((((((c & 15)) << 12)) | (((((unsafe: *pattern) & 63)) << 6))) | ((pattern[1] & 63))))
                             
-                            (pattern = pattern + 2)
+                            pattern = pattern + 2
                             
                         else:
                             if (((c & 8)) == 0):
                                 (c = (((((((c & 7)) << 18)) | (((((unsafe: *pattern) & 63)) << 12))) | ((((pattern[1] & 63)) << 6))) | ((pattern[2] & 63))))
                                 
-                                (pattern = pattern + 3)
+                                pattern = pattern + 3
                                 
                             else:
                                 if (((c & 4)) == 0):
                                     (c = ((((((((c & 3)) << 24)) | (((((unsafe: *pattern) & 63)) << 18))) | ((((pattern[1] & 63)) << 12))) | ((((pattern[2] & 63)) << 6))) | ((pattern[3] & 63))))
                                     
-                                    (pattern = pattern + 4)
+                                    pattern = pattern + 4
                                     
                                 else:
                                     (c = (((((((((c & 1)) << 30)) | (((((unsafe: *pattern) & 63)) << 24))) | ((((pattern[1] & 63)) << 18))) | ((((pattern[2] & 63)) << 12))) | ((((pattern[3] & 63)) << 6))) | ((pattern[4] & 63))))
                                     
-                                    (pattern = pattern + 5)
+                                    pattern = pattern + 5
                                     
                     
                 
@@ -1255,37 +1258,37 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
                 if ((escape != 0) and (c == escape)):
                     (char_start = pattern)
                     
-                    var __ci_expr_old_7: *const u8 = pattern
+                    var __ci_expr_old_4: *const u8 = pattern
                     (pattern = pattern + 1)
-                    (c = (unsafe: *__ci_expr_old_7))
+                    (c = (unsafe: *__ci_expr_old_4))
                     
                     if ((utf != 0) and (c >= 192)):
                         if (((c & 32)) == 0):
-                            var __ci_expr_old_8: *const u8 = pattern
+                            var __ci_expr_old_5: *const u8 = pattern
                             (pattern = pattern + 1)
-                            (c = (((((c & 31)) << 6)) | (((unsafe: *__ci_expr_old_8) & 63))))
+                            (c = (((((c & 31)) << 6)) | (((unsafe: *__ci_expr_old_5) & 63))))
                         else:
                             if (((c & 16)) == 0):
                                 (c = ((((((c & 15)) << 12)) | (((((unsafe: *pattern) & 63)) << 6))) | ((pattern[1] & 63))))
                                 
-                                (pattern = pattern + 2)
+                                pattern = pattern + 2
                                 
                             else:
                                 if (((c & 8)) == 0):
                                     (c = (((((((c & 7)) << 18)) | (((((unsafe: *pattern) & 63)) << 12))) | ((((pattern[1] & 63)) << 6))) | ((pattern[2] & 63))))
                                     
-                                    (pattern = pattern + 3)
+                                    pattern = pattern + 3
                                     
                                 else:
                                     if (((c & 4)) == 0):
                                         (c = ((((((((c & 3)) << 24)) | (((((unsafe: *pattern) & 63)) << 18))) | ((((pattern[1] & 63)) << 12))) | ((((pattern[2] & 63)) << 6))) | ((pattern[3] & 63))))
                                         
-                                        (pattern = pattern + 4)
+                                        pattern = pattern + 4
                                         
                                     else:
                                         (c = (((((((((c & 1)) << 30)) | (((((unsafe: *pattern) & 63)) << 24))) | ((((pattern[1] & 63)) << 18))) | ((((pattern[2] & 63)) << 12))) | ((((pattern[3] & 63)) << 6))) | ((pattern[4] & 63))))
                                         
-                                        (pattern = pattern + 5)
+                                        pattern = pattern + 5
                                         
                         
                     
@@ -1313,37 +1316,37 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
                 if ((escape != 0) and (c == escape)):
                     (char_start = pattern)
                     
-                    var __ci_expr_old_9: *const u8 = pattern
+                    var __ci_expr_old_6: *const u8 = pattern
                     (pattern = pattern + 1)
-                    (c = (unsafe: *__ci_expr_old_9))
+                    (c = (unsafe: *__ci_expr_old_6))
                     
                     if ((utf != 0) and (c >= 192)):
                         if (((c & 32)) == 0):
-                            var __ci_expr_old_10: *const u8 = pattern
+                            var __ci_expr_old_7: *const u8 = pattern
                             (pattern = pattern + 1)
-                            (c = (((((c & 31)) << 6)) | (((unsafe: *__ci_expr_old_10) & 63))))
+                            (c = (((((c & 31)) << 6)) | (((unsafe: *__ci_expr_old_7) & 63))))
                         else:
                             if (((c & 16)) == 0):
                                 (c = ((((((c & 15)) << 12)) | (((((unsafe: *pattern) & 63)) << 6))) | ((pattern[1] & 63))))
                                 
-                                (pattern = pattern + 2)
+                                pattern = pattern + 2
                                 
                             else:
                                 if (((c & 8)) == 0):
                                     (c = (((((((c & 7)) << 18)) | (((((unsafe: *pattern) & 63)) << 12))) | ((((pattern[1] & 63)) << 6))) | ((pattern[2] & 63))))
                                     
-                                    (pattern = pattern + 3)
+                                    pattern = pattern + 3
                                     
                                 else:
                                     if (((c & 4)) == 0):
                                         (c = ((((((((c & 3)) << 24)) | (((((unsafe: *pattern) & 63)) << 18))) | ((((pattern[1] & 63)) << 12))) | ((((pattern[2] & 63)) << 6))) | ((pattern[3] & 63))))
                                         
-                                        (pattern = pattern + 4)
+                                        pattern = pattern + 4
                                         
                                     else:
                                         (c = (((((((((c & 1)) << 30)) | (((((unsafe: *pattern) & 63)) << 24))) | ((((pattern[1] & 63)) << 18))) | ((((pattern[2] & 63)) << 12))) | ((((pattern[3] & 63)) << 6))) | ((pattern[4] & 63))))
                                         
-                                        (pattern = pattern + 5)
+                                        pattern = pattern + 5
                                         
                         
                     
@@ -1363,10 +1366,12 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
             (separator_seen = 1)
         
         while true:
-            var __ci_expr_old_11: *const u8 = char_start
+            var __ci_expr_old_8: *const u8 = char_start
             (char_start = char_start + 1)
+            
             if not ((char_start < pattern)):
                 break
+            
         
 
     ((unsafe: *from) = pattern)
@@ -1375,21 +1380,21 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
 
 
 fn convert_glob_print_commit(out: *mut pcre2_output_context):
-    ((&out.out_str[0] as *mut u8)[0] = 40)
+    (out.out_str[0] = 40)
 
-    ((&out.out_str[0] as *mut u8)[1] = 42)
+    (out.out_str[1] = 42)
 
-    ((&out.out_str[0] as *mut u8)[2] = 67)
+    (out.out_str[2] = 67)
 
-    ((&out.out_str[0] as *mut u8)[3] = 79)
+    (out.out_str[3] = 79)
 
-    ((&out.out_str[0] as *mut u8)[4] = 77)
+    (out.out_str[4] = 77)
 
-    ((&out.out_str[0] as *mut u8)[5] = 77)
+    (out.out_str[5] = 77)
 
-    ((&out.out_str[0] as *mut u8)[6] = 73)
+    (out.out_str[6] = 73)
 
-    ((&out.out_str[0] as *mut u8)[7] = 84)
+    (out.out_str[7] = 84)
 
     convert_glob_write_str(out, 8)
 
@@ -1434,7 +1439,7 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
         return (-64)
         
 
-    (with_escape = (if string_find_char(pcre2_escaped_literals, separator) != (null as *mut i8): 1 else: 0))
+    (with_escape = (if string_find_char(pcre2_escaped_literals, separator) != null: 1 else: 0))
 
     (out.output = use_buffer)
 
@@ -1442,13 +1447,13 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
 
     (out.output_size = 0)
 
-    ((&out.out_str[0] as *mut u8)[0] = 40)
+    (out.out_str[0] = 40)
 
-    ((&out.out_str[0] as *mut u8)[1] = 63)
+    (out.out_str[1] = 63)
 
-    ((&out.out_str[0] as *mut u8)[2] = 115)
+    (out.out_str[2] = 115)
 
-    ((&out.out_str[0] as *mut u8)[3] = 41)
+    (out.out_str[3] = 41)
 
     convert_glob_write_str((&mut out as *mut pcre2_output_context), 4)
 
@@ -1463,9 +1468,9 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
         
 
     if (is_start != 0):
-        ((&out.out_str[0] as *mut u8)[0] = 92)
+        (out.out_str[0] = 92)
         
-        ((&out.out_str[0] as *mut u8)[1] = 65)
+        (out.out_str[1] = 65)
         
         convert_glob_write_str((&mut out as *mut pcre2_output_context), 2)
         
@@ -1488,10 +1493,11 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
                 (after_separator = (if (is_start != 0) or (pattern[-2] == separator): 1 else: 0))
                 
                 while true:
-                    var __ci_expr_old_1: *const u8 = pattern
                     (pattern = pattern + 1)
+                    
                     if not (((pattern < pattern_end) and ((unsafe: *pattern) == 42))):
                         break
+                    
                 
                 if (pattern >= pattern_end):
                     (no_slash_z = 1)
@@ -1502,24 +1508,23 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
                 (after_starstar = 1)
                 
                 if (((((after_separator != 0) and (escape != 0)) and ((unsafe: *pattern) == escape)) and ((pattern + (1 as isize as usize)) < pattern_end)) and (pattern[1] == separator)):
-                    var __ci_expr_old_2: *const u8 = pattern
                     (pattern = pattern + 1)
                 
                 if (is_start != 0):
                     if ((unsafe: *pattern) != separator):
                         continue
                     
-                    ((&out.out_str[0] as *mut u8)[0] = 40)
+                    (out.out_str[0] = 40)
                     
-                    ((&out.out_str[0] as *mut u8)[1] = 63)
+                    (out.out_str[1] = 63)
                     
-                    ((&out.out_str[0] as *mut u8)[2] = 58)
+                    (out.out_str[2] = 58)
                     
-                    ((&out.out_str[0] as *mut u8)[3] = 92)
+                    (out.out_str[3] = 92)
                     
-                    ((&out.out_str[0] as *mut u8)[4] = 65)
+                    (out.out_str[4] = 65)
                     
-                    ((&out.out_str[0] as *mut u8)[5] = 124)
+                    (out.out_str[5] = 124)
                     
                     convert_glob_write_str((&mut out as *mut pcre2_output_context), 6)
                     
@@ -1527,7 +1532,6 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
                     
                     convert_glob_write((&mut out as *mut pcre2_output_context), 41)
                     
-                    var __ci_expr_old_3: *const u8 = pattern
                     (pattern = pattern + 1)
                     
                     continue
@@ -1536,42 +1540,41 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
                 convert_glob_print_commit((&mut out as *mut pcre2_output_context))
                 
                 if ((not ((after_separator != 0))) or ((unsafe: *pattern) != separator)):
-                    ((&out.out_str[0] as *mut u8)[0] = 46)
+                    (out.out_str[0] = 46)
                     
-                    ((&out.out_str[0] as *mut u8)[1] = 42)
+                    (out.out_str[1] = 42)
                     
-                    ((&out.out_str[0] as *mut u8)[2] = 63)
+                    (out.out_str[2] = 63)
                     
                     convert_glob_write_str((&mut out as *mut pcre2_output_context), 3)
                     
                     continue
                     
                 
-                ((&out.out_str[0] as *mut u8)[0] = 40)
+                (out.out_str[0] = 40)
                 
-                ((&out.out_str[0] as *mut u8)[1] = 63)
+                (out.out_str[1] = 63)
                 
-                ((&out.out_str[0] as *mut u8)[2] = 58)
+                (out.out_str[2] = 58)
                 
-                ((&out.out_str[0] as *mut u8)[3] = 46)
+                (out.out_str[3] = 46)
                 
-                ((&out.out_str[0] as *mut u8)[4] = 42)
+                (out.out_str[4] = 42)
                 
-                ((&out.out_str[0] as *mut u8)[5] = 63)
+                (out.out_str[5] = 63)
                 
                 convert_glob_write_str((&mut out as *mut pcre2_output_context), 6)
                 
                 convert_glob_print_separator((&mut out as *mut pcre2_output_context), separator, with_escape)
                 
-                ((&out.out_str[0] as *mut u8)[0] = 41)
+                (out.out_str[0] = 41)
                 
-                ((&out.out_str[0] as *mut u8)[1] = 63)
+                (out.out_str[1] = 63)
                 
-                ((&out.out_str[0] as *mut u8)[2] = 63)
+                (out.out_str[2] = 63)
                 
                 convert_glob_write_str((&mut out as *mut pcre2_output_context), 3)
                 
-                var __ci_expr_old_4: *const u8 = pattern
                 (pattern = pattern + 1)
                 
                 continue
@@ -1579,10 +1582,11 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
             
             if ((pattern < pattern_end) and ((unsafe: *pattern) == 42)):
                 while true:
-                    var __ci_expr_old_5: *const u8 = pattern
                     (pattern = pattern + 1)
+                    
                     if not (((pattern < pattern_end) and ((unsafe: *pattern) == 42))):
                         break
+                    
                 
             
             if (no_wildsep != 0):
@@ -1598,11 +1602,11 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
             
             if (not ((is_start != 0))):
                 if (after_starstar != 0):
-                    ((&out.out_str[0] as *mut u8)[0] = 40)
+                    (out.out_str[0] = 40)
                     
-                    ((&out.out_str[0] as *mut u8)[1] = 63)
+                    (out.out_str[1] = 63)
                     
-                    ((&out.out_str[0] as *mut u8)[2] = 62)
+                    (out.out_str[2] = 62)
                     
                     convert_glob_write_str((&mut out as *mut pcre2_output_context), 3)
                     
@@ -1617,12 +1621,12 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
             else:
                 convert_glob_print_wildcard((&mut out as *mut pcre2_output_context), separator, with_escape)
             
-            ((&out.out_str[0] as *mut u8)[0] = 42)
+            (out.out_str[0] = 42)
             
-            ((&out.out_str[0] as *mut u8)[1] = 63)
+            (out.out_str[1] = 63)
             
             if (pattern >= pattern_end):
-                ((&out.out_str[0] as *mut u8)[1] = 43)
+                (out.out_str[1] = 43)
             
             convert_glob_write_str((&mut out as *mut pcre2_output_context), 2)
             
@@ -1654,9 +1658,9 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
                 break
                 
             
-            var __ci_expr_old_6: *const u8 = pattern
+            var __ci_expr_old_1: *const u8 = pattern
             (pattern = pattern + 1)
-            (c = (unsafe: *__ci_expr_old_6))
+            (c = (unsafe: *__ci_expr_old_1))
             
         
         if ((c < 255) and (string_find_char(pcre2_escaped_literals, c) != null)):
@@ -1667,9 +1671,9 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
 
     if (result == 0):
         if (not ((no_slash_z != 0))):
-            ((&out.out_str[0] as *mut u8)[0] = 92)
+            (out.out_str[0] = 92)
             
-            ((&out.out_str[0] as *mut u8)[1] = 122)
+            (out.out_str[1] = 122)
             
             convert_glob_write_str((&mut out as *mut pcre2_output_context), 2)
             

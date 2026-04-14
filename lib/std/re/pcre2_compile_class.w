@@ -215,6 +215,7 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
         
 
     (c = 0)
+    
     while (c < 256):
         (prop = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((c) / 128)] * 128) + ((c) % 128))] as isize as usize))))
         
@@ -304,14 +305,16 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
             (set_bit = (if set_bit != 0: 0 else: 1))
         
         if (set_bit != 0):
-            ((unsafe: *classbits) = (unsafe: *classbits) | (((1 << ((c & 7)))) as u8))
+            (unsafe: *classbits) = (unsafe: *classbits) | (((1 << ((c & 7)))) as u8)
         
         if (((c & 7)) == 7):
-            var __ci_expr_old_1: *mut u8 = classbits
             (classbits = classbits + 1)
         
+        
         var __ci_expr_old_0: c_int = c
-    (c = c + 1)
+        (c = c + 1)
+        
+    
 
 
 fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_ptr: *mut c_uint, pcode: *mut *mut u8, negate_class: c_int, has_bitmap: *mut c_int, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint:
@@ -1344,7 +1347,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
     (code = code + 1)
     ((unsafe: *__ci_expr_old_0) = 113)
 
-    (code = code + 2)
+    code = code + 2
 
     var __ci_expr_old_1: *mut u8 = code
     (code = code + 1)
@@ -1354,27 +1357,31 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
         return 0
 
     if (lengthptr != null):
-        ((unsafe: *lengthptr) = (unsafe: *lengthptr) + ((code as usize -% previous as usize) / sizeof[u8]()))
+        (unsafe: *lengthptr) = (unsafe: *lengthptr) + ((code as usize -% previous as usize) / sizeof[u8]())
         
         (code = previous)
         
 
     var i: c_int = 0
+    
     while (i < 8):
-        if ((&op_info.bits.classwords[0] as *mut c_uint)[i] != 4294967295):
+        if (op_info.bits.classwords[i] != 4294967295):
             (allbitsone = 0)
             
             break
             
+        
         var __ci_expr_old_2: c_int = i
-    (i = i + 1)
+        (i = i + 1)
+        
+    
 
     if (op_info.op_single_type != 0):
         (code = previous)
         
         if ((op_info.op_single_type == 6) and (allbitsone != 0)):
             if (lengthptr != null):
-                ((unsafe: *lengthptr) = (unsafe: *lengthptr) - 1)
+                (unsafe: *lengthptr) = (unsafe: *lengthptr) - 1
             
             var __ci_expr_old_3: *mut u8 = code
             (code = code + 1)
@@ -1390,7 +1397,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                     
                 
                 if (lengthptr != null):
-                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) - required_len)
+                    (unsafe: *lengthptr) = (unsafe: *lengthptr) - required_len
                 
                 var __ci_expr_old_4: *mut u8 = code
                 (code = code + 1)
@@ -1398,12 +1405,18 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                 
                 with_memcpy((code as *mut c_void) as *i8, ((&op_info.bits.classbits[0] as *mut u8) as *const c_void) as *i8, 32 as i64)
                 
-                (code = code + (32 / sizeof[u8]()))
+                code = code + (32 / sizeof[u8]())
                 
             else:
                 var need_map: c_int = context.needs_bitmap
                 
                 var required_len_1: c_ulong
+                
+                while true:
+                    
+                    if not ((0 != 0)):
+                        break
+                    
                 
                 (required_len_1 = (op_info.length +% ((if (need_map != 0): (32 / sizeof[u8]()) else: 0))))
                 
@@ -1411,7 +1424,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                     if (required_len_1 > (((unsafe: *lengthptr) -% previous_length))):
                         ((unsafe: *lengthptr) = (previous_length +% required_len_1))
                     
-                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) - 4)
+                    (unsafe: *lengthptr) = (unsafe: *lengthptr) - ((1 + 2) + 1)
                     
                     var __ci_expr_old_5: *mut u8 = code
                     (code = code + 1)
@@ -1420,7 +1433,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                     (code[0] = ((((((1 + 2) + 1)) >> 8)) as u8))
                     (code[((0) + 1)] = ((((((1 + 2) + 1)) & 255)) as u8))
                     
-                    (code = code + 2)
+                    code = code + 2
                     
                     var __ci_expr_old_6: *mut u8 = code
                     (code = code + 1)
@@ -1433,11 +1446,23 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                     
                     var flags: u8
                     
+                    while true:
+                        
+                        if not ((0 != 0)):
+                            break
+                        
+                    
                     (rest = (((op_info.code_start + (1 as isize as usize)) + (2 as isize as usize)) + (1 as isize as usize)))
                     
                     (rest_len = ((((op_info.code_start + op_info.length)) as usize -% rest as usize) / sizeof[u8]()))
                     
                     (flags = op_info.code_start[(1 + 2)])
+                    
+                    while true:
+                        
+                        if not ((0 != 0)):
+                            break
+                        
                     
                     var __ci_expr_old_7: *mut u8 = code
                     (code = code + 1)
@@ -1446,7 +1471,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                     (code[0] = (((((required_len_1 as c_int)) >> 8)) as u8))
                     (code[((0) + 1)] = (((((required_len_1 as c_int)) & 255)) as u8))
                     
-                    (code = code + 2)
+                    code = code + 2
                     
                     var __ci_expr_old_8: *mut u8 = code
                     (code = code + 1)
@@ -1455,10 +1480,10 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                     if (need_map != 0):
                         with_memcpy((code as *mut c_void) as *i8, ((&op_info.bits.classbits[0] as *mut u8) as *const c_void) as *i8, 32 as i64)
                         
-                        (code = code + (32 / sizeof[u8]()))
+                        code = code + (32 / sizeof[u8]())
                         
                     
-                    (code = code + rest_len)
+                    code = code + rest_len
                     
                 
         
@@ -1471,7 +1496,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
             if (required_len_2 > (((unsafe: *lengthptr) -% previous_length))):
                 ((unsafe: *lengthptr) = (previous_length +% required_len_2))
             
-            ((unsafe: *lengthptr) = (unsafe: *lengthptr) - 4)
+            (unsafe: *lengthptr) = (unsafe: *lengthptr) - ((1 + 2) + 1)
             
             var __ci_expr_old_9: *mut u8 = code
             (code = code + 1)
@@ -1480,7 +1505,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
             (code[0] = ((((((1 + 2) + 1)) >> 8)) as u8))
             (code[((0) + 1)] = ((((((1 + 2) + 1)) & 255)) as u8))
             
-            (code = code + 2)
+            code = code + 2
             
             var __ci_expr_old_10: *mut u8 = code
             (code = code + 1)
@@ -1490,11 +1515,11 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
             if (need_map_1 != 0):
                 var map_start: *mut u8 = (((previous + (1 as isize as usize)) + (2 as isize as usize)) + (1 as isize as usize))
                 
-                (previous[(1 + 2)] = previous[(1 + 2)] | 1)
+                previous[(1 + 2)] = previous[(1 + 2)] | 1
                 
                 with_memcpy((map_start as *mut c_void) as *i8, ((&op_info.bits.classbits[0] as *mut u8) as *const c_void) as *i8, 32 as i64)
                 
-                (code = code + (32 / sizeof[u8]()))
+                code = code + (32 / sizeof[u8]())
                 
             
             (previous[1] = ((((((((code as usize -% previous as usize) / sizeof[u8]())) as c_int)) >> 8)) as u8))
@@ -1599,13 +1624,19 @@ fn utf_caseless_extend(start: c_uint, end: c_uint, options: c_uint, __param_buff
 
     var skip_start: c_uint = skip_range[0]
 
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
+
     while (c <= end):
         var co: c_uint
         
         if (c > skip_start):
             (c = skip_range[1])
             
-            (skip_range = skip_range + 2)
+            skip_range = skip_range + 2
             
             (skip_start = skip_range[0])
             
@@ -1627,9 +1658,11 @@ fn utf_caseless_extend(start: c_uint, end: c_uint, options: c_uint, __param_buff
                 (__ci_expr_logic_0 = (if ((if _pcre2_ucd_caseless_sets_8[co] < 128: 1 else: 0) != 0): 1 else: 0))
             
             (__ci_cond_if_0 = (__ci_expr_logic_0 != 0))
+            
             if __ci_cond_if_0:
                 (co = 0)
                 
+            
         
         if (co != 0):
             (list = ((&_pcre2_ucd_caseless_sets_8[0] as *mut c_uint) + co))
@@ -1638,24 +1671,23 @@ fn utf_caseless_extend(start: c_uint, end: c_uint, options: c_uint, __param_buff
             
             (list = ((&tmp[0] as *mut c_uint) as *const c_uint))
             
-            ((&tmp[0] as *mut c_uint)[0] = c)
+            (tmp[0] = c)
             
-            ((&tmp[0] as *mut c_uint)[1] = 4294967295)
+            (tmp[1] = 4294967295)
             
             if (co != c):
-                ((&tmp[0] as *mut c_uint)[1] = co)
+                (tmp[1] = co)
                 
-                ((&tmp[0] as *mut c_uint)[2] = 4294967295)
+                (tmp[2] = 4294967295)
                 
             
         
-        var __ci_expr_old_2: c_uint = c
         (c = c + 1)
         
         while true:
             if ((unsafe: *list) < new_start):
                 if (((unsafe: *list) +% 1) == new_start):
-                    var __ci_expr_old_3: c_uint = new_start
+                    var __ci_expr_old_2: c_uint = new_start
                     (new_start = new_start - 1)
                     
                     continue
@@ -1664,7 +1696,7 @@ fn utf_caseless_extend(start: c_uint, end: c_uint, options: c_uint, __param_buff
             else:
                 if ((unsafe: *list) > new_end):
                     if (((unsafe: *list) -% 1) == new_end):
-                        var __ci_expr_old_4: c_uint = new_end
+                        var __ci_expr_old_3: c_uint = new_end
                         (new_end = new_end + 1)
                         
                         continue
@@ -1683,10 +1715,10 @@ fn utf_caseless_extend(start: c_uint, end: c_uint, options: c_uint, __param_buff
                 (buffer = buffer + 2)
                 
             
-            var __ci_cond_do_5: bool = false
+            var __ci_cond_do_4: bool = false
             (list = list + 1)
-            (__ci_cond_do_5 = ((if (unsafe: *(list)) != 4294967295: 1 else: 0) != 0))
-            if not (__ci_cond_do_5):
+            (__ci_cond_do_4 = ((if (unsafe: *(list)) != 4294967295: 1 else: 0) != 0))
+            if not (__ci_cond_do_4):
                 break
         
 
@@ -1695,7 +1727,7 @@ fn utf_caseless_extend(start: c_uint, end: c_uint, options: c_uint, __param_buff
         
         (buffer[1] = new_end)
         
-        (buffer = buffer + 2)
+        buffer = buffer + 2
         
         buffer
         
@@ -1714,18 +1746,23 @@ fn append_char_list(__param_p: *const c_uint, __param_buffer: *mut c_uint) -> c_
         (n = p)
         
         while (n[0] == (n[1] -% 1)):
-            var __ci_expr_old_0: *const c_uint = n
             (n = n + 1)
+        
+        while true:
+            
+            if not ((0 != 0)):
+                break
+            
         
         if (buffer != null):
             (buffer[0] = (unsafe: *p))
             
             (buffer[1] = (unsafe: *n))
             
-            (buffer = buffer + 2)
+            buffer = buffer + 2
             
         
-        (result = result + 2)
+        result = result + 2
         
         (p = (n + (1 as isize as usize)))
         
@@ -1748,22 +1785,33 @@ fn append_negated_char_list(__param_p: *const c_uint, options: c_uint, __param_b
 
     var result: c_ulong = 2
 
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
+
     while ((unsafe: *p) != 4294967295):
         (n = p)
         
         while (n[0] == (n[1] -% 1)):
-            var __ci_expr_old_0: *const c_uint = n
             (n = n + 1)
+        
+        while true:
+            
+            if not ((0 != 0)):
+                break
+            
         
         if (buffer != null):
             (buffer[0] = start)
             
             (buffer[1] = ((unsafe: *p) -% 1))
             
-            (buffer = buffer + 2)
+            buffer = buffer + 2
             
         
-        (result = result + 2)
+        result = result + 2
         
         (start = ((unsafe: *n) +% 1))
         
@@ -1775,7 +1823,7 @@ fn append_negated_char_list(__param_p: *const c_uint, options: c_uint, __param_b
         
         (buffer[1] = get_highest_char(options))
         
-        (buffer = buffer + 2)
+        buffer = buffer + 2
         
         buffer
         
@@ -1903,22 +1951,27 @@ fn parse_class(__param_ptr: *mut c_uint, options: c_uint, __param_buffer: *mut c
         (start_char = (unsafe: *ptr))
         
         if ((ptr[1] == 2149777408) or (ptr[1] == 2149711872)):
-            (ptr = ptr + 2)
+            ptr = ptr + 2
+            
+            while true:
+                
+                if not ((0 != 0)):
+                    break
+                
             
             if ((unsafe: *ptr) == 2147811328):
-                var __ci_expr_old_3: *mut c_uint = ptr
                 (ptr = ptr + 1)
             
         
         if ((options & 2) != 0):
-            var __ci_expr_old_4: *mut c_uint = ptr
+            var __ci_expr_old_3: *mut c_uint = ptr
             (ptr = ptr + 1)
-            (size = utf_caseless_extend(start_char, (unsafe: *__ci_expr_old_4), options, buffer))
+            (size = utf_caseless_extend(start_char, (unsafe: *__ci_expr_old_3), options, buffer))
             
             if (buffer != null):
-                (buffer = buffer + size)
+                buffer = buffer + size
             
-            (total_size = total_size + size)
+            total_size = total_size + size
             
             continue
             
@@ -1928,13 +1981,12 @@ fn parse_class(__param_ptr: *mut c_uint, options: c_uint, __param_buffer: *mut c
             
             (buffer[1] = (unsafe: *ptr))
             
-            (buffer = buffer + 2)
+            buffer = buffer + 2
             
         
-        var __ci_expr_old_5: *mut c_uint = ptr
         (ptr = ptr + 1)
         
-        (total_size = total_size + 2)
+        total_size = total_size + 2
         
 
     return total_size
@@ -1969,18 +2021,24 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
     var range_end: c_uint
 
     if ((options & 524288) != 0):
-        (class_options = class_options | 1)
+        class_options = class_options | 1
 
     if (((options & 8) != 0) and ((options & ((524288 | 131072))) != 0)):
-        (class_options = class_options | 2)
+        class_options = class_options | 2
 
     if ((xoptions & 128) != 0):
-        (class_options = class_options | 4)
+        class_options = class_options | 4
 
     if ((xoptions & 65536) != 0):
-        (class_options = class_options | 8)
+        class_options = class_options | 8
 
-    (range_list_size = parse_class(start_ptr, class_options, (null as *mut c_uint)))
+    (range_list_size = parse_class(start_ptr, class_options, null))
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     (total_size = (range_list_size +% ((if (range_list_size >= 2): 3 else: 0))))
 
@@ -2017,7 +2075,7 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
         if (i == 0):
             break
         
-        (i = i - 2)
+        i = i - 2
         
 
     (i = (range_list_size -% 2))
@@ -2040,18 +2098,18 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
         if (i == 0):
             break
         
-        (i = i - 2)
+        i = i - 2
         
 
     (dst = buffer)
 
     (ptr = (buffer + (2 as isize as usize)))
 
-    (range_list_size = range_list_size - 2)
+    range_list_size = range_list_size - 2
 
     while ((range_list_size > 0) and (dst[1] != (0 - (0 as c_uint) - 1))):
         if ((dst[1] +% 1) < ptr[0]):
-            (dst = dst + 2)
+            dst = dst + 2
             
             (dst[0] = ptr[0])
             
@@ -2061,15 +2119,21 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
             if (dst[1] < ptr[1]):
                 (dst[1] = ptr[1])
         
-        (ptr = ptr + 2)
+        ptr = ptr + 2
         
-        (range_list_size = range_list_size - 2)
+        range_list_size = range_list_size - 2
+        
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
         
 
     (ptr = buffer)
 
     while ((ptr < dst) and (ptr[1] < 256)):
-        (ptr = ptr + 2)
+        ptr = ptr + 2
 
     if (((dst as usize -% ptr as usize) / sizeof[c_uint]()) < ((2 * ((6 - 1))))):
         (cranges.range_list_size = (((((dst + (2 as isize as usize)) as usize -% buffer as usize) / sizeof[c_uint]())) as c_ushort))
@@ -2089,7 +2153,13 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
 
     (tmp1 = 0)
 
-    (tmp2 = 6)
+    (tmp2 = ((((((3 * sizeof[c_uint]()) / sizeof[c_uint]())) -% 1)) *% 3))
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     (range_start = dst[0])
 
@@ -2098,10 +2168,8 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
     while (1 != 0):
         if (range_start >= char_list_start):
             if ((range_start == range_end) or (range_end < char_list_end)):
-                var __ci_expr_old_1: c_uint = tmp1
                 (tmp1 = tmp1 + 1)
                 
-                var __ci_expr_old_2: *mut c_ushort = next_char
                 (next_char = next_char - 1)
                 
                 if (char_list_start < 65536):
@@ -2113,10 +2181,8 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
             
             if (range_start < range_end):
                 if (range_start > char_list_start):
-                    var __ci_expr_old_3: c_uint = tmp1
                     (tmp1 = tmp1 + 1)
                     
-                    var __ci_expr_old_4: *mut c_ushort = next_char
                     (next_char = next_char - 1)
                     
                     if (char_list_start < 65536):
@@ -2126,11 +2192,17 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
                         ((unsafe: *((next_char) as *mut c_uint)) = ((range_start << 1)))
                     
                 else:
-                    (cranges.char_lists_types = cranges.char_lists_types | (4 << tmp2))
+                    cranges.char_lists_types = cranges.char_lists_types | (4 << tmp2)
+                
+            
+            while true:
+                
+                if not ((0 != 0)):
+                    break
                 
             
             if (dst > buffer):
-                (dst = dst - 2)
+                dst = dst - 2
                 
                 (range_start = dst[0])
                 
@@ -2145,11 +2217,15 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
             
         
         if (range_end >= char_list_start):
+            while true:
+                
+                if not ((0 != 0)):
+                    break
+                
+            
             if (range_end < char_list_end):
-                var __ci_expr_old_5: c_uint = tmp1
                 (tmp1 = tmp1 + 1)
                 
-                var __ci_expr_old_6: *mut c_ushort = next_char
                 (next_char = next_char - 1)
                 
                 if (char_list_start < 65536):
@@ -2158,14 +2234,19 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
                     (next_char = next_char - 1)
                     ((unsafe: *((next_char) as *mut c_uint)) = (((range_end << 1)) | 1))
                 
+                while true:
+                    
+                    if not ((0 != 0)):
+                        break
+                    
+                
             
-            (cranges.char_lists_types = cranges.char_lists_types | (4 << tmp2))
+            cranges.char_lists_types = cranges.char_lists_types | (4 << tmp2)
             
         
         if (tmp1 >= 3):
-            (cranges.char_lists_types = cranges.char_lists_types | (3 << tmp2))
+            cranges.char_lists_types = cranges.char_lists_types | (3 << tmp2)
             
-            var __ci_expr_old_7: *mut c_ushort = next_char
             (next_char = next_char - 1)
             
             if (char_list_start < 65536):
@@ -2175,25 +2256,43 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
                 ((unsafe: *((next_char) as *mut c_uint)) = tmp1)
             
         else:
-            (cranges.char_lists_types = cranges.char_lists_types | (tmp1 << tmp2))
+            cranges.char_lists_types = cranges.char_lists_types | (tmp1 << tmp2)
         
         if ((range_end < 256) or (tmp2 == 0)):
+            while true:
+                
+                if not ((0 != 0)):
+                    break
+                
+            
             break
+            
+        
+        while true:
+            
+            if not ((0 != 0)):
+                break
             
         
         (char_list_end = (char_list_start -% 1))
         
-        var __ci_expr_old_8: *const c_uint = char_list_next
+        var __ci_expr_old_1: *const c_uint = char_list_next
         (char_list_next = char_list_next + 1)
-        (char_list_start = (unsafe: *__ci_expr_old_8))
+        (char_list_start = (unsafe: *__ci_expr_old_1))
         
         (tmp1 = 0)
         
-        (tmp2 = tmp2 - 3)
+        tmp2 = tmp2 - 3
         
 
     if (dst[0] < 256):
-        (dst = dst + 2)
+        dst = dst + 2
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     (cranges.char_lists_size = (((((((buffer + total_size)) as *mut u8) as usize -% (next_char as *mut u8) as usize) / sizeof[u8]())) as c_ulong))
 
@@ -2221,36 +2320,48 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
                 var lo_end: c_uint = ((if (classbits_end < 127): classbits_end else: 127))
                 
                 (c = start)
+                
                 while (c <= lo_end):
                     if ((turkish_i != 0) and (((((c) | 32)) == 105) or ((((c) | 1)) == 305))):
                         continue
                     
-                    (classbits[((cb.fcc[c]) >> 3)] = classbits[((cb.fcc[c]) >> 3)] | (((1 << (((cb.fcc[c]) & 7)))) as u8))
+                    classbits[((cb.fcc[c]) >> 3)] = classbits[((cb.fcc[c]) >> 3)] | (((1 << (((cb.fcc[c]) & 7)))) as u8)
+                    
                     
                     var __ci_expr_old_0: c_uint = c
-                (c = c + 1)
+                    (c = c + 1)
+                    
+                
                 
             
             if (classbits_end >= 128):
                 var hi_start: c_uint = ((if (start > 128): start else: 128))
                 
                 (c = hi_start)
+                
                 while (c <= classbits_end):
                     var co: c_uint = (((((c as c_int) + ((((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c) as c_int) / 128)] * 128) + (((c) as c_int) % 128))] as isize as usize))).other_case))) as c_uint))
                     
                     if (co <= 255):
-                        (classbits[((co) >> 3)] = classbits[((co) >> 3)] | (((1 << (((co) & 7)))) as u8))
+                        classbits[((co) >> 3)] = classbits[((co) >> 3)] | (((1 << (((co) & 7)))) as u8)
+                    
                     
                     var __ci_expr_old_1: c_uint = c
-                (c = c + 1)
+                    (c = c + 1)
+                    
+                
                 
             
         else:
             (c = start)
+            
             while (c <= classbits_end):
-                (classbits[((cb.fcc[c]) >> 3)] = classbits[((cb.fcc[c]) >> 3)] | (((1 << (((cb.fcc[c]) & 7)))) as u8))
+                classbits[((cb.fcc[c]) >> 3)] = classbits[((cb.fcc[c]) >> 3)] | (((1 << (((cb.fcc[c]) & 7)))) as u8)
+                
                 var __ci_expr_old_2: c_uint = c
-            (c = c + 1)
+                (c = c + 1)
+                
+            
             
         
 
@@ -2260,35 +2371,51 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
 
     if (byte_start >= byte_end):
         (c = start)
+        
         while (c <= classbits_end):
-            (classbits[((c) >> 3)] = classbits[((c) >> 3)] | (((1 << (((c) & 7)))) as u8))
+            classbits[((c) >> 3)] = classbits[((c) >> 3)] | (((1 << (((c) & 7)))) as u8)
+            
             var __ci_expr_old_3: c_uint = c
-        (c = c + 1)
+            (c = c + 1)
+            
+        
         
         return
         
 
     (c = byte_start)
+    
     while (c < byte_end):
         (classbits[c] = 255)
+        
         var __ci_expr_old_4: c_uint = c
-    (c = c + 1)
+        (c = c + 1)
+        
+    
 
-    (byte_start = byte_start << 3)
+    byte_start = byte_start << 3
 
-    (byte_end = byte_end << 3)
+    byte_end = byte_end << 3
 
     (c = start)
+    
     while (c < byte_start):
-        (classbits[((c) >> 3)] = classbits[((c) >> 3)] | (((1 << (((c) & 7)))) as u8))
+        classbits[((c) >> 3)] = classbits[((c) >> 3)] | (((1 << (((c) & 7)))) as u8)
+        
         var __ci_expr_old_5: c_uint = c
-    (c = c + 1)
+        (c = c + 1)
+        
+    
 
     (c = byte_end)
+    
     while (c <= classbits_end):
-        (classbits[((c) >> 3)] = classbits[((c) >> 3)] | (((1 << (((c) & 7)))) as u8))
+        classbits[((c) >> 3)] = classbits[((c) >> 3)] | (((1 << (((c) & 7)))) as u8)
+        
         var __ci_expr_old_6: c_uint = c
-    (c = c + 1)
+        (c = c + 1)
+        
+    
 
 
 fn add_list_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, __param_p: *const c_uint):
@@ -2297,12 +2424,11 @@ fn add_list_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8
         var n: c_uint = 0
         
         while (p[(n +% 1)] == ((p[0] +% n) +% 1)):
-            var __ci_expr_old_0: c_uint = n
             (n = n + 1)
         
         add_to_class(options, xoptions, cb, p[0], p[n])
         
-        (p = p + (n +% 1))
+        p = p + (n +% 1)
         
 
 
@@ -2313,12 +2439,10 @@ fn add_not_list_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_blo
 
     while (p[0] < 256):
         while (p[1] == (p[0] +% 1)):
-            var __ci_expr_old_0: *const c_uint = p
             (p = p + 1)
         
         add_to_class(options, xoptions, cb, (p[0] +% 1), (if (p[1] > 255): 255 else: (p[1] -% 1)))
         
-        var __ci_expr_old_1: *const c_uint = p
         (p = p + 1)
         
 
@@ -2326,11 +2450,11 @@ fn add_not_list_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_blo
 fn fold_negation(pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong, preserve_classbits: c_int):
     if (pop_info.op_single_type == 0):
         if (lengthptr != null):
-            ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 1)
+            (unsafe: *lengthptr) = (unsafe: *lengthptr) + 1
         else:
             (pop_info.code_start[pop_info.length] = 4)
         
-        (pop_info.length = pop_info.length + 1)
+        pop_info.length = pop_info.length + 1
         
     else:
         if ((pop_info.op_single_type == 6) or (pop_info.op_single_type == 7)):
@@ -2340,16 +2464,26 @@ fn fold_negation(pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong, preserv
                 ((unsafe: *(pop_info.code_start)) = pop_info.op_single_type)
             
         else:
+            while true:
+                
+                if not ((0 != 0)):
+                    break
+                
+            
             if (lengthptr == null):
-                (pop_info.code_start[(1 + 2)] = pop_info.code_start[(1 + 2)] ^ 1)
+                pop_info.code_start[(1 + 2)] = pop_info.code_start[(1 + 2)] ^ 1
             
 
     if (not ((preserve_classbits != 0))):
         var i: c_int = 0
+        
         while (i < 8):
-            ((&pop_info.bits.classwords[0] as *mut c_uint)[i] = (0 - (&pop_info.bits.classwords[0] as *mut c_uint)[i] - 1))
+            (pop_info.bits.classwords[i] = (0 - pop_info.bits.classwords[i] - 1))
+            
             var __ci_expr_old_0: c_int = i
-        (i = i + 1)
+            (i = i + 1)
+            
+        
         
 
 
@@ -2380,18 +2514,37 @@ fn compile_eclass_nested(context: *mut eclass_context, __param_negated: c_int, p
     var negated = __param_negated
     var ptr: *mut c_uint = (unsafe: *pptr)
 
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
+
     var __ci_cond_if_0: bool = false
     var __ci_expr_old_1: *mut c_uint = ptr
     (ptr = ptr + 1)
     (__ci_cond_if_0 = ((if (unsafe: *__ci_expr_old_1) == (((2148401152 as c_uint) | 1)): 1 else: 0) != 0))
+    
     if __ci_cond_if_0:
         (negated = (if negated != 0: 0 else: 1))
+    
 
-    var __ci_expr_old_2: *mut c_uint = (unsafe: *pptr)
-    ((unsafe: *pptr) = (unsafe: *pptr) + 1)
+    (((unsafe: *pptr)) = ((unsafe: *pptr)) + 1)
 
     if (not ((compile_class_binary_loose(context, negated, pptr, pcode, pop_info, lengthptr) != 0))):
         return 0
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     return 1
 
@@ -2795,6 +2948,12 @@ fn compile_class_juxtaposition(context: *mut eclass_context, negated: c_int, ppt
             (code = (pop_info.code_start + pop_info.length))
         
 
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
+
     ((unsafe: *pptr) = ptr)
 
     ((unsafe: *pcode) = code)
@@ -2816,6 +2975,12 @@ fn compile_class_unary(context: *mut eclass_context, __param_negated: c_int, ppt
 
     if (not ((compile_class_juxtaposition(context, negated, pptr, pcode, pop_info, lengthptr) != 0))):
         return 0
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     return 1
 
@@ -2855,6 +3020,12 @@ fn compile_class_binary_tight(context: *mut eclass_context, negated: c_int, pptr
         
         if (lengthptr == null):
             (code = (pop_info.code_start + pop_info.length))
+        
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
         
 
     ((unsafe: *pptr) = ptr)
@@ -2908,6 +3079,12 @@ fn compile_class_binary_loose(context: *mut eclass_context, negated: c_int, pptr
         
         if (lengthptr == null):
             (code = (pop_info.code_start + pop_info.length))
+        
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
         
 
     ((unsafe: *pptr) = ptr)

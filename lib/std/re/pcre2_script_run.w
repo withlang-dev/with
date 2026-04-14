@@ -210,24 +210,24 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
             if (((c & 16)) == 0):
                 (c = ((((((c & 15)) << 12)) | (((((unsafe: *ptr) & 63)) << 6))) | ((ptr[1] & 63))))
                 
-                (ptr = ptr + 2)
+                ptr = ptr + 2
                 
             else:
                 if (((c & 8)) == 0):
                     (c = (((((((c & 7)) << 18)) | (((((unsafe: *ptr) & 63)) << 12))) | ((((ptr[1] & 63)) << 6))) | ((ptr[2] & 63))))
                     
-                    (ptr = ptr + 3)
+                    ptr = ptr + 3
                     
                 else:
                     if (((c & 4)) == 0):
                         (c = ((((((((c & 3)) << 24)) | (((((unsafe: *ptr) & 63)) << 18))) | ((((ptr[1] & 63)) << 12))) | ((((ptr[2] & 63)) << 6))) | ((ptr[3] & 63))))
                         
-                        (ptr = ptr + 4)
+                        ptr = ptr + 4
                         
                     else:
                         (c = (((((((((c & 1)) << 30)) | (((((unsafe: *ptr) & 63)) << 24))) | ((((ptr[1] & 63)) << 18))) | ((((ptr[2] & 63)) << 12))) | ((((ptr[3] & 63)) << 6))) | ((ptr[4] & 63))))
                         
-                        (ptr = ptr + 5)
+                        ptr = ptr + 5
                         
         
 
@@ -235,23 +235,27 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
         return 1
 
     var i: c_int = 0
+    
     while (i < (((ucp_Script_Count / 32) + 1))):
-        ((&require_map[0] as *mut c_uint)[i] = 0)
+        (require_map[i] = 0)
+        
         var __ci_expr_old_2: c_int = i
-    (i = i + 1)
+        (i = i + 1)
+        
+    
 
     while true:
         var ucd: *const ucd_record = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c) as c_int) / 128)] * 128) + (((c) as c_int) % 128))] as isize as usize)))
         
         var script: c_uint = ucd.script
         
-        if (script == 99):
+        if (script == ucp_Unknown):
             return 0
         
-        if (((((ucd).scriptx_bidiclass & 1023)) != 0) or ((script != 107) and (script != 100))):
+        if (((((ucd).scriptx_bidiclass & 1023)) != 0) or ((script != ucp_Inherited) and (script != ucp_Common))):
             var OK: c_int
             
-            if ((script != 100) and (script != 107)):
+            if ((script != ucp_Common) and (script != ucp_Inherited)):
                 ((&(map)[0] as *mut c_uint)[((script) / 32)] = (&(map)[0] as *mut c_uint)[((script) / 32)] | ((1 << (((script) % 32)))))
             
             match require_state
@@ -388,24 +392,24 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
                 if (((c & 16)) == 0):
                     (c = ((((((c & 15)) << 12)) | (((((unsafe: *ptr) & 63)) << 6))) | ((ptr[1] & 63))))
                     
-                    (ptr = ptr + 2)
+                    ptr = ptr + 2
                     
                 else:
                     if (((c & 8)) == 0):
                         (c = (((((((c & 7)) << 18)) | (((((unsafe: *ptr) & 63)) << 12))) | ((((ptr[1] & 63)) << 6))) | ((ptr[2] & 63))))
                         
-                        (ptr = ptr + 3)
+                        ptr = ptr + 3
                         
                     else:
                         if (((c & 4)) == 0):
                             (c = ((((((((c & 3)) << 24)) | (((((unsafe: *ptr) & 63)) << 18))) | ((((ptr[1] & 63)) << 12))) | ((((ptr[2] & 63)) << 6))) | ((ptr[3] & 63))))
                             
-                            (ptr = ptr + 4)
+                            ptr = ptr + 4
                             
                         else:
                             (c = (((((((((c & 1)) << 30)) | (((((unsafe: *ptr) & 63)) << 24))) | ((((ptr[1] & 63)) << 18))) | ((((ptr[2] & 63)) << 12))) | ((((ptr[3] & 63)) << 6))) | ((ptr[4] & 63))))
                             
-                            (ptr = ptr + 5)
+                            ptr = ptr + 5
                             
             
         

@@ -190,17 +190,23 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
         (c = (unsafe: *code))
         
         if (c >= OP_TABLE_LENGTH):
+            while true:
+                
+                if not ((0 != 0)):
+                    break
+                
+            
             return -1
             
         
         if ((c >= OP_STAR) and (c <= OP_TYPEPOSUPTO)):
-            (c = c - (get_repeat_base(c) - OP_STAR))
+            c = c - (get_repeat_base(c) - OP_STAR)
             
             (end = (if (c <= OP_MINUPTO): get_chr_property_list((code as *const u8), utf, ucp, cb.fcc, (&list[0] as *mut c_uint)) else: (null as *const u8)))
             
-            ((&list[0] as *mut c_uint)[1] = (if (((c == OP_STAR) or (c == OP_PLUS)) or (c == OP_QUERY)) or (c == OP_UPTO): 1 else: 0))
+            (list[1] = (if (((c == OP_STAR) or (c == OP_PLUS)) or (c == OP_QUERY)) or (c == OP_UPTO): 1 else: 0))
             
-            if ((end != (null as *const u8)) and (compare_opcodes(end, utf, ucp, cb, ((&list[0] as *mut c_uint) as *const c_uint), end, (&mut rec_limit as *mut c_int)) != 0)):
+            if ((end != null) and (compare_opcodes(end, utf, ucp, cb, ((&list[0] as *mut c_uint) as *const c_uint), end, (&mut rec_limit as *mut c_int)) != 0)):
                 match c
                     OP_STAR =>
                         ((unsafe: *code) = (unsafe: *code) + (OP_POSSTAR - OP_STAR))
@@ -235,9 +241,9 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                 if ((c >= OP_CRSTAR) and (c <= OP_CRMINRANGE)):
                     (end = get_chr_property_list((code as *const u8), utf, ucp, cb.fcc, (&list[0] as *mut c_uint)))
                     
-                    ((&list[0] as *mut c_uint)[1] = (if ((c & 1)) == 0: 1 else: 0))
+                    (list[1] = (if ((c & 1)) == 0: 1 else: 0))
                     
-                    if ((end != (null as *const u8)) and (compare_opcodes(end, utf, ucp, cb, ((&list[0] as *mut c_uint) as *const c_uint), end, (&mut rec_limit as *mut c_int)) != 0)):
+                    if ((end != null) and (compare_opcodes(end, utf, ucp, cb, ((&list[0] as *mut c_uint) as *const c_uint), end, (&mut rec_limit as *mut c_int)) != 0)):
                         match c
                             OP_CRSTAR =>
                                 ((unsafe: *repeat_opcode) = 106)
@@ -322,7 +328,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                 (code = code + code[1])
             _ => 0
         
-        (code = code + _pcre2_OP_lengths_8[c])
+        code = code + _pcre2_OP_lengths_8[c]
         
         if (utf != 0):
             match c
@@ -705,16 +711,15 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
 
     (list[1] = 0)
 
-    var __ci_expr_old_0: *const u8 = code
     (code = code + 1)
 
     if ((c >= OP_STAR) and (c <= OP_TYPEPOSUPTO)):
         (base = get_repeat_base(c))
         
-        (c = c - ((base - OP_STAR)))
+        c = c - ((base - OP_STAR))
         
         if ((((c == OP_UPTO) or (c == OP_MINUPTO)) or (c == OP_EXACT)) or (c == OP_POSUPTO)):
-            (code = code + 2)
+            code = code + 2
         
         (list[1] = ((if (((c != OP_PLUS) and (c != OP_MINPLUS)) and (c != OP_EXACT)) and (c != OP_POSPLUS): 1 else: 0)))
         
@@ -729,7 +734,7 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
                 (list[0] = 32)
             OP_TYPESTAR =>
                 (list[0] = (unsafe: *code))
-                var __ci_expr_old_1: *const u8 = code
+                var __ci_expr_old_0: *const u8 = code
                 (code = code + 1)
             _ => 0
         
@@ -774,14 +779,14 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
         OP_DOLLM =>
             return code
         OP_CHAR =>
-            var __ci_expr_old_2: *const u8 = code
+            var __ci_expr_old_1: *const u8 = code
             (code = code + 1)
-            (chr = (unsafe: *__ci_expr_old_2))
+            (chr = (unsafe: *__ci_expr_old_1))
             if ((utf != 0) and (chr >= 192)):
                 if (((chr & 32)) == 0):
-                    var __ci_expr_old_3: *const u8 = code
+                    var __ci_expr_old_2: *const u8 = code
                     (code = code + 1)
-                    (chr = (((((chr & 31)) << 6)) | (((unsafe: *__ci_expr_old_3) & 63))))
+                    (chr = (((((chr & 31)) << 6)) | (((unsafe: *__ci_expr_old_2) & 63))))
                 else:
                     if (((chr & 16)) == 0):
                         (chr = ((((((chr & 15)) << 12)) | (((((unsafe: *code) & 63)) << 6))) | ((code[1] & 63))))
@@ -810,14 +815,14 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             (list[3] = 4294967295)
             return code
         OP_NOT =>
-            var __ci_expr_old_2: *const u8 = code
+            var __ci_expr_old_1: *const u8 = code
             (code = code + 1)
-            (chr = (unsafe: *__ci_expr_old_2))
+            (chr = (unsafe: *__ci_expr_old_1))
             if ((utf != 0) and (chr >= 192)):
                 if (((chr & 32)) == 0):
-                    var __ci_expr_old_3: *const u8 = code
+                    var __ci_expr_old_2: *const u8 = code
                     (code = code + 1)
-                    (chr = (((((chr & 31)) << 6)) | (((unsafe: *__ci_expr_old_3) & 63))))
+                    (chr = (((((chr & 31)) << 6)) | (((unsafe: *__ci_expr_old_2) & 63))))
                 else:
                     if (((chr & 16)) == 0):
                         (chr = ((((((chr & 15)) << 12)) | (((((unsafe: *code) & 63)) << 6))) | ((code[1] & 63))))
@@ -847,14 +852,14 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             return code
         OP_CHARI =>
             (list[0] = (if (c == OP_CHARI): OP_CHAR else: OP_NOT))
-            var __ci_expr_old_4: *const u8 = code
+            var __ci_expr_old_3: *const u8 = code
             (code = code + 1)
-            (chr = (unsafe: *__ci_expr_old_4))
+            (chr = (unsafe: *__ci_expr_old_3))
             if ((utf != 0) and (chr >= 192)):
                 if (((chr & 32)) == 0):
-                    var __ci_expr_old_5: *const u8 = code
+                    var __ci_expr_old_4: *const u8 = code
                     (code = code + 1)
-                    (chr = (((((chr & 31)) << 6)) | (((unsafe: *__ci_expr_old_5) & 63))))
+                    (chr = (((((chr & 31)) << 6)) | (((unsafe: *__ci_expr_old_4) & 63))))
                 else:
                     if (((chr & 16)) == 0):
                         (chr = ((((((chr & 15)) << 12)) | (((((unsafe: *code) & 63)) << 6))) | ((code[1] & 63))))
@@ -891,14 +896,14 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             return code
         OP_NOTI =>
             (list[0] = (if (c == OP_CHARI): OP_CHAR else: OP_NOT))
-            var __ci_expr_old_4: *const u8 = code
+            var __ci_expr_old_3: *const u8 = code
             (code = code + 1)
-            (chr = (unsafe: *__ci_expr_old_4))
+            (chr = (unsafe: *__ci_expr_old_3))
             if ((utf != 0) and (chr >= 192)):
                 if (((chr & 32)) == 0):
-                    var __ci_expr_old_5: *const u8 = code
+                    var __ci_expr_old_4: *const u8 = code
                     (code = code + 1)
-                    (chr = (((((chr & 31)) << 6)) | (((unsafe: *__ci_expr_old_5) & 63))))
+                    (chr = (((((chr & 31)) << 6)) | (((unsafe: *__ci_expr_old_4) & 63))))
                 else:
                     if (((chr & 16)) == 0):
                         (chr = ((((((chr & 15)) << 12)) | (((((unsafe: *code) & 63)) << 6))) | ((code[1] & 63))))
@@ -953,15 +958,15 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
                     return code
                     
                 
-                var __ci_expr_old_6: *mut c_uint = clist_dest
+                var __ci_expr_old_5: *mut c_uint = clist_dest
                 (clist_dest = clist_dest + 1)
-                ((unsafe: *__ci_expr_old_6) = (unsafe: *clist_src))
+                ((unsafe: *__ci_expr_old_5) = (unsafe: *clist_src))
                 
-                var __ci_cond_do_7: bool = false
-                var __ci_expr_old_8: *const c_uint = clist_src
+                var __ci_cond_do_6: bool = false
+                var __ci_expr_old_7: *const c_uint = clist_src
                 (clist_src = clist_src + 1)
-                (__ci_cond_do_7 = ((if (unsafe: *__ci_expr_old_8) != 4294967295: 1 else: 0) != 0))
-                if not (__ci_cond_do_7):
+                (__ci_cond_do_6 = ((if (unsafe: *__ci_expr_old_7) != 4294967295: 1 else: 0) != 0))
+                if not (__ci_cond_do_6):
                     break
             (list[0] = (if (c == OP_PROP): OP_CHAR else: OP_NOT))
             return code
@@ -985,15 +990,15 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
                     return code
                     
                 
-                var __ci_expr_old_6: *mut c_uint = clist_dest
+                var __ci_expr_old_5: *mut c_uint = clist_dest
                 (clist_dest = clist_dest + 1)
-                ((unsafe: *__ci_expr_old_6) = (unsafe: *clist_src))
+                ((unsafe: *__ci_expr_old_5) = (unsafe: *clist_src))
                 
-                var __ci_cond_do_7: bool = false
-                var __ci_expr_old_8: *const c_uint = clist_src
+                var __ci_cond_do_6: bool = false
+                var __ci_expr_old_7: *const c_uint = clist_src
                 (clist_src = clist_src + 1)
-                (__ci_cond_do_7 = ((if (unsafe: *__ci_expr_old_8) != 4294967295: 1 else: 0) != 0))
-                if not (__ci_cond_do_7):
+                (__ci_cond_do_6 = ((if (unsafe: *__ci_expr_old_7) != 4294967295: 1 else: 0) != 0))
+                if not (__ci_cond_do_6):
                     break
             (list[0] = (if (c == OP_PROP): OP_CHAR else: OP_NOT))
             return code
@@ -1006,36 +1011,36 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             match (unsafe: *end)
                 OP_CRSTAR =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRMINSTAR =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRQUERY =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRMINQUERY =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRPOSSTAR =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRPOSQUERY =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRPLUS =>
-                    var __ci_expr_old_10: *const u8 = end
+                    var __ci_expr_old_9: *const u8 = end
                     (end = end + 1)
                 OP_CRMINPLUS =>
-                    var __ci_expr_old_10: *const u8 = end
+                    var __ci_expr_old_9: *const u8 = end
                     (end = end + 1)
                 OP_CRPOSPLUS =>
-                    var __ci_expr_old_10: *const u8 = end
+                    var __ci_expr_old_9: *const u8 = end
                     (end = end + 1)
                 OP_CRRANGE =>
                     (list[1] = ((if ((((((end)[1] << 8)) | (end)[((1) + 1)])) as c_uint) == 0: 1 else: 0)))
@@ -1059,36 +1064,36 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             match (unsafe: *end)
                 OP_CRSTAR =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRMINSTAR =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRQUERY =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRMINQUERY =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRPOSSTAR =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRPOSQUERY =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRPLUS =>
-                    var __ci_expr_old_10: *const u8 = end
+                    var __ci_expr_old_9: *const u8 = end
                     (end = end + 1)
                 OP_CRMINPLUS =>
-                    var __ci_expr_old_10: *const u8 = end
+                    var __ci_expr_old_9: *const u8 = end
                     (end = end + 1)
                 OP_CRPOSPLUS =>
-                    var __ci_expr_old_10: *const u8 = end
+                    var __ci_expr_old_9: *const u8 = end
                     (end = end + 1)
                 OP_CRRANGE =>
                     (list[1] = ((if ((((((end)[1] << 8)) | (end)[((1) + 1)])) as c_uint) == 0: 1 else: 0)))
@@ -1112,36 +1117,36 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             match (unsafe: *end)
                 OP_CRSTAR =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRMINSTAR =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRQUERY =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRMINQUERY =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRPOSSTAR =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRPOSQUERY =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRPLUS =>
-                    var __ci_expr_old_10: *const u8 = end
+                    var __ci_expr_old_9: *const u8 = end
                     (end = end + 1)
                 OP_CRMINPLUS =>
-                    var __ci_expr_old_10: *const u8 = end
+                    var __ci_expr_old_9: *const u8 = end
                     (end = end + 1)
                 OP_CRPOSPLUS =>
-                    var __ci_expr_old_10: *const u8 = end
+                    var __ci_expr_old_9: *const u8 = end
                     (end = end + 1)
                 OP_CRRANGE =>
                     (list[1] = ((if ((((((end)[1] << 8)) | (end)[((1) + 1)])) as c_uint) == 0: 1 else: 0)))
@@ -1165,36 +1170,36 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             match (unsafe: *end)
                 OP_CRSTAR =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRMINSTAR =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRQUERY =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRMINQUERY =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRPOSSTAR =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRPOSQUERY =>
                     (list[1] = 1)
-                    var __ci_expr_old_9: *const u8 = end
+                    var __ci_expr_old_8: *const u8 = end
                     (end = end + 1)
                 OP_CRPLUS =>
-                    var __ci_expr_old_10: *const u8 = end
+                    var __ci_expr_old_9: *const u8 = end
                     (end = end + 1)
                 OP_CRMINPLUS =>
-                    var __ci_expr_old_10: *const u8 = end
+                    var __ci_expr_old_9: *const u8 = end
                     (end = end + 1)
                 OP_CRPOSPLUS =>
-                    var __ci_expr_old_10: *const u8 = end
+                    var __ci_expr_old_9: *const u8 = end
                     (end = end + 1)
                 OP_CRRANGE =>
                     (list[1] = ((if ((((((end)[1] << 8)) | (end)[((1) + 1)])) as c_uint) == 0: 1 else: 0)))
@@ -1246,8 +1251,10 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
     var __ci_cond_if_0: bool = false
     ((unsafe: *rec_limit) = (unsafe: *rec_limit) - 1)
     (__ci_cond_if_0 = ((if (unsafe: *rec_limit) <= 0: 1 else: 0) != 0))
+    
     if __ci_cond_if_0:
         return 0
+    
 
     while true:
         var bracode: *const u8
@@ -1255,22 +1262,24 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
         (c = (unsafe: *code))
         
         if (c == OP_CALLOUT):
-            (code = code + _pcre2_OP_lengths_8[c])
+            code = code + _pcre2_OP_lengths_8[c]
             
             continue
             
         
         if (c == OP_CALLOUT_STR):
-            (code = code + ((((((code)[(1 + (2 * 2))] << 8)) | (code)[(((1 + (2 * 2))) + 1)])) as c_uint))
+            code = code + ((((((code)[(1 + (2 * 2))] << 8)) | (code)[(((1 + (2 * 2))) + 1)])) as c_uint)
             
             continue
             
         
         if (c == OP_ALT):
             while true:
-                (code = code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint))
+                code = code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint)
+                
                 if not (((unsafe: *code) == OP_ALT)):
                     break
+                
             
             (c = (unsafe: *code))
             
@@ -1537,23 +1546,23 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
         
         (code = get_chr_property_list(code, utf, ucp, cb.fcc, (&list[0] as *mut c_uint)))
         
-        if (code == (null as *const u8)):
+        if (code == null):
             return 0
         
-        if (base_list[0] == 29):
+        if (base_list[0] == OP_CHAR):
             (chr_ptr = (base_list + (2 as isize as usize)))
             
             (list_ptr = ((&list[0] as *mut c_uint) as *const c_uint))
             
         else:
-            if ((&list[0] as *mut c_uint)[0] == 29):
+            if (list[0] == OP_CHAR):
                 (chr_ptr = (((&(&list[0] as *mut c_uint)[0] as *mut c_uint) + (2 as isize as usize)) as *const c_uint))
                 
                 (list_ptr = base_list)
                 
             else:
-                if (((base_list[0] == 110) or ((&list[0] as *mut c_uint)[0] == 110)) or ((not ((utf != 0))) and ((base_list[0] == 111) or ((&list[0] as *mut c_uint)[0] == 111)))):
-                    if ((base_list[0] == 110) or ((not ((utf != 0))) and (base_list[0] == 111))):
+                if (((base_list[0] == OP_CLASS) or (list[0] == OP_CLASS)) or ((not ((utf != 0))) and ((base_list[0] == OP_NCLASS) or (list[0] == OP_NCLASS)))):
+                    if ((base_list[0] == OP_CLASS) or ((not ((utf != 0))) and (base_list[0] == OP_NCLASS))):
                         (set1 = ((base_end - base_list[2])))
                         
                         (list_ptr = ((&list[0] as *mut c_uint) as *const c_uint))
@@ -1610,11 +1619,15 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                             var __ci_expr_old_3: *const u8 = set2
                             (set2 = set2 + 1)
                             (__ci_cond_if_1 = ((if (((unsafe: *__ci_expr_old_2) & (0 - ((unsafe: *__ci_expr_old_3)) - 1))) != 0: 1 else: 0) != 0))
+                            
                             if __ci_cond_if_1:
                                 return 0
                             
+                            
+                            
                             if not ((set1 < set_end)):
                                 break
+                            
                         
                     else:
                         while true:
@@ -1624,14 +1637,18 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                             var __ci_expr_old_6: *const u8 = set2
                             (set2 = set2 + 1)
                             (__ci_cond_if_4 = ((if (((unsafe: *__ci_expr_old_5) & (unsafe: *__ci_expr_old_6))) != 0: 1 else: 0) != 0))
+                            
                             if __ci_cond_if_4:
                                 return 0
                             
+                            
+                            
                             if not ((set1 < set_end)):
                                 break
+                            
                         
                     
-                    if ((&list[0] as *mut c_uint)[1] == 0):
+                    if (list[1] == 0):
                         return 1
                     
                     continue
@@ -1642,28 +1659,28 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                     
                     (leftop = base_list[0])
                     
-                    (rightop = (&list[0] as *mut c_uint)[0])
+                    (rightop = list[0])
                     
                     (accepted = 0)
                     
-                    if ((leftop == 16) or (leftop == 15)):
-                        if (rightop == 24):
+                    if ((leftop == OP_PROP) or (leftop == OP_NOTPROP)):
+                        if (rightop == OP_EOD):
                             (accepted = 1)
                         else:
-                            if ((rightop == 16) or (rightop == 15)):
+                            if ((rightop == OP_PROP) or (rightop == OP_NOTPROP)):
                                 var n: c_int
                                 
                                 var p: *const u8
                                 
                                 var same: c_int = (if leftop == rightop: 1 else: 0)
                                 
-                                var lisprop: c_int = (if leftop == 16: 1 else: 0)
+                                var lisprop: c_int = (if leftop == OP_PROP: 1 else: 0)
                                 
-                                var risprop: c_int = (if rightop == 16: 1 else: 0)
+                                var risprop: c_int = (if rightop == OP_PROP: 1 else: 0)
                                 
                                 var bothprop: c_int = (if (lisprop != 0) and (risprop != 0): 1 else: 0)
                                 
-                                (n = (&(&propposstab[0] as *mut [13]u8)[base_list[2]][0] as *mut u8)[(&list[0] as *mut c_uint)[2]])
+                                (n = propposstab[base_list[2]][list[2]])
                                 
                                 match n
                                     0 => 0
@@ -1717,12 +1734,12 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                                 
                         
                     else:
-                        (accepted = (if ((((leftop >= 6) and (leftop <= 22)) and (rightop >= 6)) and (rightop <= 26)) and ((&(&autoposstab[0] as *mut [21]u8)[(leftop -% 6)][0] as *mut u8)[(rightop -% 6)] != 0): 1 else: 0))
+                        (accepted = (if ((((leftop >= OP_NOT_DIGIT) and (leftop <= OP_EXTUNI)) and (rightop >= OP_NOT_DIGIT)) and (rightop <= OP_DOLLM)) and (autoposstab[(leftop -% OP_NOT_DIGIT)][(rightop -% OP_NOT_DIGIT)] != 0): 1 else: 0))
                     
                     if (not ((accepted != 0))):
                         return 0
                     
-                    if ((&list[0] as *mut c_uint)[1] == 0):
+                    if (list[1] == 0):
                         return 1
                     
                     continue
@@ -1947,14 +1964,21 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                 _ =>
                     return 0
             
-            var __ci_expr_old_9: *const c_uint = chr_ptr
             (chr_ptr = chr_ptr + 1)
+            
             
             if not (((unsafe: *chr_ptr) != 4294967295)):
                 break
+            
         
-        if ((&list[0] as *mut c_uint)[1] == 0):
+        if (list[1] == 0):
             return 1
+        
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
         
 
     return 0

@@ -256,12 +256,10 @@ fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const 
     var ptr = __param_ptr
     var c: c_uint
 
-    var __ci_expr_old_0: *const u8 = ptr
     (ptr = ptr - 1)
 
     if (utf != 0):
         while ((((unsafe: *ptr) & 192)) == 128):
-            var __ci_expr_old_1: *const u8 = ptr
             (ptr = ptr - 1)
         
         (c = (unsafe: *ptr))

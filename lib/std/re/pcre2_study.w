@@ -2074,7 +2074,7 @@ fn set_table_bit(re: *mut pcre2_real_code_8, __param_p: *const u8, caseless: c_i
 
     ucp
 
-    ((&re.start_bitmap[0] as *mut u8)[((c) / 8)] = (&re.start_bitmap[0] as *mut u8)[((c) / 8)] | ((1 << (((c) & 7)))))
+    re.start_bitmap[((c) / 8)] = re.start_bitmap[((c) / 8)] | ((1 << (((c) & 7))))
 
     if (utf != 0):
         if (c >= 192):
@@ -2086,24 +2086,24 @@ fn set_table_bit(re: *mut pcre2_real_code_8, __param_p: *const u8, caseless: c_i
                 if (((c & 16)) == 0):
                     (c = ((((((c & 15)) << 12)) | (((((unsafe: *p) & 63)) << 6))) | ((p[1] & 63))))
                     
-                    (p = p + 2)
+                    p = p + 2
                     
                 else:
                     if (((c & 8)) == 0):
                         (c = (((((((c & 7)) << 18)) | (((((unsafe: *p) & 63)) << 12))) | ((((p[1] & 63)) << 6))) | ((p[2] & 63))))
                         
-                        (p = p + 3)
+                        p = p + 3
                         
                     else:
                         if (((c & 4)) == 0):
                             (c = ((((((((c & 3)) << 24)) | (((((unsafe: *p) & 63)) << 18))) | ((((p[1] & 63)) << 12))) | ((((p[2] & 63)) << 6))) | ((p[3] & 63))))
                             
-                            (p = p + 4)
+                            p = p + 4
                             
                         else:
                             (c = (((((((((c & 1)) << 30)) | (((((unsafe: *p) & 63)) << 24))) | ((((p[1] & 63)) << 18))) | ((((p[2] & 63)) << 12))) | ((((p[3] & 63)) << 6))) | ((p[4] & 63))))
                             
-                            (p = p + 5)
+                            p = p + 5
                             
             
         
@@ -2117,15 +2117,15 @@ fn set_table_bit(re: *mut pcre2_real_code_8, __param_p: *const u8, caseless: c_i
                 
                 _pcre2_ord2utf_8(c, (&buff[0] as *mut u8))
                 
-                ((&re.start_bitmap[0] as *mut u8)[(((&buff[0] as *mut u8)[0]) / 8)] = (&re.start_bitmap[0] as *mut u8)[(((&buff[0] as *mut u8)[0]) / 8)] | ((1 << ((((&buff[0] as *mut u8)[0]) & 7)))))
+                re.start_bitmap[((buff[0]) / 8)] = re.start_bitmap[((buff[0]) / 8)] | ((1 << (((buff[0]) & 7))))
                 
             else:
                 if (c < 256):
-                    ((&re.start_bitmap[0] as *mut u8)[((c) / 8)] = (&re.start_bitmap[0] as *mut u8)[((c) / 8)] | ((1 << (((c) & 7)))))
+                    re.start_bitmap[((c) / 8)] = re.start_bitmap[((c) / 8)] | ((1 << (((c) & 7))))
             
         else:
             if (1 != 0):
-                ((&re.start_bitmap[0] as *mut u8)[((re.tables[(256 +% c)]) / 8)] = (&re.start_bitmap[0] as *mut u8)[((re.tables[(256 +% c)]) / 8)] | ((1 << (((re.tables[(256 +% c)]) & 7)))))
+                re.start_bitmap[((re.tables[(256 +% c)]) / 8)] = re.start_bitmap[((re.tables[(256 +% c)]) / 8)] | ((1 << (((re.tables[(256 +% c)]) & 7))))
         
 
     return p
@@ -2135,43 +2135,59 @@ fn set_type_bits(re: *mut pcre2_real_code_8, cbit_type: c_int, table_limit: c_ui
     var c: c_uint
 
     (c = 0)
+    
     while (c < table_limit):
-        ((&re.start_bitmap[0] as *mut u8)[c] = (&re.start_bitmap[0] as *mut u8)[c] | re.tables[((c +% 512) +% cbit_type)])
+        re.start_bitmap[c] = re.start_bitmap[c] | re.tables[((c +% 512) +% cbit_type)]
+        
         var __ci_expr_old_0: c_uint = c
-    (c = c + 1)
+        (c = c + 1)
+        
+    
 
     if (table_limit == 32):
         return
 
     (c = 128)
+    
     while (c < 256):
         if (((re.tables[(512 +% (c / 8))] & ((1 << ((c & 7)))))) != 0):
             var buff: [6]u8
             
             _pcre2_ord2utf_8(c, (&buff[0] as *mut u8))
             
-            ((&re.start_bitmap[0] as *mut u8)[(((&buff[0] as *mut u8)[0]) / 8)] = (&re.start_bitmap[0] as *mut u8)[(((&buff[0] as *mut u8)[0]) / 8)] | ((1 << ((((&buff[0] as *mut u8)[0]) & 7)))))
+            re.start_bitmap[((buff[0]) / 8)] = re.start_bitmap[((buff[0]) / 8)] | ((1 << (((buff[0]) & 7))))
             
         
+        
         var __ci_expr_old_1: c_uint = c
-    (c = c + 1)
+        (c = c + 1)
+        
+    
 
 
 fn set_nottype_bits(re: *mut pcre2_real_code_8, cbit_type: c_int, table_limit: c_uint):
     var c: c_uint
 
     (c = 0)
+    
     while (c < table_limit):
-        ((&re.start_bitmap[0] as *mut u8)[c] = (&re.start_bitmap[0] as *mut u8)[c] | (((0 - (re.tables[((c +% 512) +% cbit_type)]) - 1)) as u8))
+        re.start_bitmap[c] = re.start_bitmap[c] | (((0 - (re.tables[((c +% 512) +% cbit_type)]) - 1)) as u8)
+        
         var __ci_expr_old_0: c_uint = c
-    (c = c + 1)
+        (c = c + 1)
+        
+    
 
     if (table_limit != 32):
         (c = 24)
+        
         while (c < 32):
-            ((&re.start_bitmap[0] as *mut u8)[c] = 255)
+            (re.start_bitmap[c] = 255)
+            
             var __ci_expr_old_1: c_uint = c
-        (c = c + 1)
+            (c = c + 1)
+            
+        
 
 
 fn study_char_list(__param_code: *const u8, start_bitmap: *mut u8, char_lists_end: *const u8):
@@ -2194,11 +2210,11 @@ fn study_char_list(__param_code: *const u8, start_bitmap: *mut u8, char_lists_en
 
     (type_ = ((((code[0] << 8)) as c_uint) | code[1]))
 
-    (code = code + 2)
+    code = code + 2
 
     (next_char = (char_lists_end - ((((((((code)[0] << 8)) | (code)[((0) + 1)])) as c_uint) << 1))))
 
-    (type_ = type_ & 4095)
+    type_ = type_ & 4095
 
     (list_ind = 0)
 
@@ -2212,12 +2228,12 @@ fn study_char_list(__param_code: *const u8, start_bitmap: *mut u8, char_lists_en
             if (list_ind <= 1):
                 (item_count = (unsafe: *(next_char as *const c_ushort)))
                 
-                (next_char = next_char + 2)
+                next_char = next_char + 2
                 
             else:
                 (item_count = (unsafe: *(next_char as *const c_uint)))
                 
-                (next_char = next_char + 4)
+                next_char = next_char + 4
                 
             
         
@@ -2225,12 +2241,12 @@ fn study_char_list(__param_code: *const u8, start_bitmap: *mut u8, char_lists_en
             if (list_ind <= 1):
                 (range_end = (unsafe: *(next_char as *const c_ushort)))
                 
-                (next_char = next_char + 2)
+                next_char = next_char + 2
                 
             else:
                 (range_end = (unsafe: *(next_char as *const c_uint)))
                 
-                (next_char = next_char + 4)
+                next_char = next_char + 4
                 
             
             if (((range_end & 1)) != 0):
@@ -2238,33 +2254,35 @@ fn study_char_list(__param_code: *const u8, start_bitmap: *mut u8, char_lists_en
                 
                 _pcre2_ord2utf_8(range_end, (&end_buffer[0] as *mut u8))
                 
-                (end = (&end_buffer[0] as *mut u8)[0])
+                (end = end_buffer[0])
                 
                 if (range_start < range_end):
                     _pcre2_ord2utf_8(range_start, (&start_buffer[0] as *mut u8))
                     
-                    (start = (&start_buffer[0] as *mut u8)[0])
+                    (start = start_buffer[0])
+                    
                     while (start <= end):
-                        (start_bitmap[(start / 8)] = start_bitmap[(start / 8)] | ((1 << ((start & 7)))))
+                        start_bitmap[(start / 8)] = start_bitmap[(start / 8)] | ((1 << ((start & 7))))
+                        
                         var __ci_expr_old_0: u8 = start
-                    (start = start + 1)
+                        (start = start + 1)
+                        
+                    
                     
                 else:
-                    (start_bitmap[(end / 8)] = start_bitmap[(end / 8)] | ((1 << ((end & 7)))))
+                    start_bitmap[(end / 8)] = start_bitmap[(end / 8)] | ((1 << ((end & 7))))
                 
                 (range_start = (0 - (0 as c_uint) - 1))
                 
             else:
                 (range_start = (char_list_add +% ((range_end >> 1))))
             
-            var __ci_expr_old_1: c_uint = item_count
             (item_count = item_count - 1)
             
         
-        var __ci_expr_old_2: c_uint = list_ind
         (list_ind = list_ind + 1)
         
-        (type_ = type_ >> 3)
+        type_ = type_ >> 3
         
         if (range_start == (0 - (0 as c_uint) - 1)):
             if (((type_ & 4)) != 0):
@@ -2285,13 +2303,17 @@ fn study_char_list(__param_code: *const u8, start_bitmap: *mut u8, char_lists_en
                 
                 _pcre2_ord2utf_8(range_end, (&end_buffer[0] as *mut u8))
                 
-                (end = (&end_buffer[0] as *mut u8)[0])
+                (end = end_buffer[0])
                 
-                (start = (&start_buffer[0] as *mut u8)[0])
+                (start = start_buffer[0])
+                
                 while (start <= end):
-                    (start_bitmap[(start / 8)] = start_bitmap[(start / 8)] | ((1 << ((start & 7)))))
-                    var __ci_expr_old_3: u8 = start
-                (start = start + 1)
+                    start_bitmap[(start / 8)] = start_bitmap[(start / 8)] | ((1 << ((start & 7))))
+                    
+                    var __ci_expr_old_1: u8 = start
+                    (start = start + 1)
+                    
+                
                 
                 (range_start = (0 - (0 as c_uint) - 1))
                 

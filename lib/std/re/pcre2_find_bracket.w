@@ -180,19 +180,19 @@ fn _pcre2_find_bracket_8(__param_code: *const u8, utf: c_int, number: c_int) -> 
         var c: u8 = (unsafe: *code)
         
         if (c == OP_END):
-            return (null as *const u8)
+            return null
         
         if ((c == OP_XCLASS) or (c == OP_ECLASS)):
-            (code = code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint))
+            code = code + ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint)
         else:
             if (c == OP_CALLOUT_STR):
-                (code = code + ((((((code)[(1 + (2 * 2))] << 8)) | (code)[(((1 + (2 * 2))) + 1)])) as c_uint))
+                code = code + ((((((code)[(1 + (2 * 2))] << 8)) | (code)[(((1 + (2 * 2))) + 1)])) as c_uint)
             else:
                 if ((c == OP_REVERSE) or (c == OP_VREVERSE)):
                     if (number < 0):
                         return code
                     
-                    (code = code + _pcre2_OP_lengths_8[c])
+                    code = code + _pcre2_OP_lengths_8[c]
                     
                 else:
                     if ((((c == OP_CBRA) or (c == OP_SCBRA)) or (c == OP_CBRAPOS)) or (c == OP_SCBRAPOS)):
@@ -201,7 +201,7 @@ fn _pcre2_find_bracket_8(__param_code: *const u8, utf: c_int, number: c_int) -> 
                         if (n == number):
                             return code
                         
-                        (code = code + _pcre2_OP_lengths_8[c])
+                        code = code + _pcre2_OP_lengths_8[c]
                         
                     else:
                         match c
@@ -256,7 +256,7 @@ fn _pcre2_find_bracket_8(__param_code: *const u8, utf: c_int, number: c_int) -> 
                                 (code = code + code[1])
                             _ => 0
                         
-                        (code = code + _pcre2_OP_lengths_8[c])
+                        code = code + _pcre2_OP_lengths_8[c]
                         
                         if (utf != 0):
                             match c

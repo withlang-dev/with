@@ -123,13 +123,27 @@ fn pcre2_get_error_message_8(enumber: c_int, buffer: *mut u8, size: c_ulong) -> 
             
 
     while (n > 0):
+        while true:
+            var __ci_cond_while_0: bool = false
+            var __ci_expr_old_1: *const u8 = message
+            (message = message + 1)
+            (__ci_cond_while_0 = ((if (unsafe: *__ci_expr_old_1) != 0: 1 else: 0) != 0))
+            
+            if not (__ci_cond_while_0):
+                break
+            
+            
+        
         if ((unsafe: *message) == 0):
             return (-29)
         
-        var __ci_expr_old_0: c_int = n
-    (n = n - 1)
+        
+        var __ci_expr_old_2: c_int = n
+        (n = n - 1)
+        
 
     (i = 0)
+    
     while ((unsafe: *message) != 0):
         if (i >= (size -% 1)):
             (rc = (-48))
@@ -137,12 +151,15 @@ fn pcre2_get_error_message_8(enumber: c_int, buffer: *mut u8, size: c_ulong) -> 
             break
             
         
-        var __ci_expr_old_2: *const u8 = message
+        var __ci_expr_old_3: *const u8 = message
         (message = message + 1)
-        (buffer[i] = (unsafe: *__ci_expr_old_2))
+        (buffer[i] = (unsafe: *__ci_expr_old_3))
         
-        var __ci_expr_old_1: c_ulong = i
-    (i = i + 1)
+        
+        var __ci_expr_old_4: c_ulong = i
+        (i = i + 1)
+        
+    
 
     (buffer[i] = 0)
 
