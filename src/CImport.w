@@ -85,6 +85,7 @@ extern fn with_ci_cursor_kind(session: i64, cursor: i32) -> i32
 extern fn with_ci_cursor_spelling(session: i64, cursor: i32) -> str
 extern fn with_ci_cursor_type(session: i64, cursor: i32) -> i32
 extern fn with_ci_type_kind(session: i64, ty: i32) -> i32
+extern fn with_ci_type_array_element(session: i64, ty: i32) -> i32
 extern fn with_ci_type_declaration(session: i64, ty: i32) -> i32
 extern fn with_ci_type_translated(session: i64, ty: i32) -> str
 extern fn with_ci_cursor_is_definition(session: i64, cursor: i32) -> i32
@@ -3966,20 +3967,25 @@ fn ci_trans_binary_expr_from_parts(session: i64, cursor: i32, lhs_cursor: i32, l
     let rhs_is_ptr = with_ci_type_is_pointer(session, rhs_cursor) != 0
     let lhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
     let rhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_cursor))
-    let lhs_is_array = lhs_ty_str.len() > 0 and lhs_ty_str.byte_at(0) == 91
-    let rhs_is_array = rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91
+    // Peel through transparent wrappers (ImplicitCast, ParenExpr,
+    // UnexposedExpr) so array-to-pointer decay wrappers don't
+    // hide the underlying array type from the decay logic.
+    let lhs_peeled = ci_peel_transparent(session, lhs_cursor)
+    let rhs_peeled = ci_peel_transparent(session, rhs_cursor)
+    let lhs_peeled_ty = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_peeled))
+    let rhs_peeled_ty = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_peeled))
+    let lhs_is_array = (lhs_ty_str.len() > 0 and lhs_ty_str.byte_at(0) == 91) or (lhs_peeled_ty.len() > 0 and lhs_peeled_ty.byte_at(0) == 91) or ci_cursor_is_array_type(session, lhs_peeled)
+    let rhs_is_array = (rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91) or (rhs_peeled_ty.len() > 0 and rhs_peeled_ty.byte_at(0) == 91) or ci_cursor_is_array_type(session, rhs_peeled)
 
     if op == BO_ADD and (lhs_is_ptr or rhs_is_ptr or lhs_is_array or rhs_is_array):
         var ptr_e = if lhs_is_ptr or lhs_is_array: lhs else: rhs
-        let ptr_cursor = if lhs_is_ptr or lhs_is_array: lhs_cursor else: rhs_cursor
+        let ptr_cursor = if lhs_is_ptr or lhs_is_array: lhs_peeled else: rhs_peeled
         let is_array = if lhs_is_ptr or lhs_is_array: lhs_is_array else: rhs_is_array
         let idx_cursor = if lhs_is_ptr or lhs_is_array: rhs_cursor else: lhs_cursor
         let idx_e = if lhs_is_ptr or lhs_is_array: rhs else: lhs
         if is_array:
-            let arr_ty = with_ci_type_translated(session, with_ci_cursor_type(session, ptr_cursor))
-            let elem_start = ci_find_array_elem_start(arr_ty)
-            if elem_start > 0:
-                let elem_ty = arr_ty.slice(elem_start as i64, arr_ty.len())
+            let elem_ty = ci_array_elem_type_from_cursor(session, ptr_cursor)
+            if elem_ty.len() > 0:
                 ptr_e = "(&" ++ ptr_e ++ "[0] as *mut " ++ elem_ty ++ ")"
         if with_ci_type_is_unsigned(session, idx_cursor) == 0:
             return "(" ++ ptr_e ++ " + (" ++ idx_e ++ " as isize as usize))"
@@ -4379,6 +4385,64 @@ fn ci_lower_binary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
 
     exprs.binary(ci_op, lhs_id, rhs_id, 0 as CiTypeId)
 
+// Check if a cursor's canonical type is any form of C array —
+// constant-size `[N]T`, incomplete `[]T`, or variable-length
+// array. Used to detect decayed-array operands whose translated
+// type may not render with a leading `[` (e.g. extern incomplete
+// arrays whose size is unknown in the current TU).
+let CXT_ConstantArray: i32 = 112
+let CXT_IncompleteArray: i32 = 114
+let CXT_VariableArray: i32 = 115
+let CXT_DependentSizedArray: i32 = 116
+
+fn ci_cursor_is_array_type(session: i64, cursor: i32) -> bool:
+    let ty = with_ci_cursor_type(session, cursor)
+    if ty < 0:
+        return false
+    let k = with_ci_type_kind(session, ty)
+    k == CXT_ConstantArray or k == CXT_IncompleteArray or k == CXT_VariableArray or k == CXT_DependentSizedArray
+
+// Return the array element type as a With type string, or ""
+// if the cursor isn't an array. Handles extern incomplete arrays
+// whose translated string doesn't have a leading `[N]` prefix
+// (e.g. `*const ucd_record` from a decayed `extern ... []` ref).
+fn ci_array_elem_type_from_cursor(session: i64, cursor: i32) -> str:
+    let ty = with_ci_cursor_type(session, cursor)
+    if ty < 0:
+        return ""
+    let k = with_ci_type_kind(session, ty)
+    if k == CXT_ConstantArray or k == CXT_IncompleteArray or k == CXT_VariableArray or k == CXT_DependentSizedArray:
+        let elem_ty = with_ci_type_array_element(session, ty)
+        if elem_ty >= 0:
+            let translated = with_ci_type_translated(session, elem_ty)
+            if translated.len() > 0:
+                return translated
+    // Fallback: parse the translated string form `[N]T` or `[]T`
+    // to recover `T`.
+    let arr_ty = with_ci_type_translated(session, ty)
+    let elem_start = ci_find_array_elem_start(arr_ty)
+    if elem_start > 0:
+        return arr_ty.slice(elem_start as i64, arr_ty.len())
+    ""
+
+// Peel through transparent wrappers (ImplicitCast, ParenExpr,
+// UnexposedExpr) to reach the semantically meaningful operand.
+// Used to detect array-to-pointer decay casts so the arithmetic
+// handler can re-apply the decay in the output.
+fn ci_peel_transparent(session: i64, cursor: i32) -> i32:
+    var c = cursor
+    var depth = 0
+    while depth < 16:
+        let k = with_ci_cursor_kind(session, c)
+        if k != CXK_IMPLICIT_CAST and k != CXK_PAREN_EXPR and k != 100:
+            return c
+        let nc = with_ci_num_children(session, c)
+        if nc != 1:
+            return c
+        c = with_ci_child(session, c, 0)
+        depth = depth + 1
+    c
+
 fn ci_lower_binary_pointer(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
@@ -4391,10 +4455,21 @@ fn ci_lower_binary_pointer(session: i64, cursor: i32, exprs: &mut CiExprPool, ty
     let rhs_cursor = with_ci_child(session, cursor, 1)
     let lhs_is_ptr = with_ci_type_is_pointer(session, lhs_cursor) != 0
     let rhs_is_ptr = with_ci_type_is_pointer(session, rhs_cursor) != 0
+
+    // Array-to-pointer decay detection: libclang wraps a DeclRef
+    // to an array-typed symbol in an ImplicitCast whose result
+    // type is a pointer. The outer cursor type reports pointer;
+    // the inner (peeled) cursor type reports array. If the peeled
+    // side is an array, treat it as an array in the decay logic
+    // so we emit `(&arr[0] as *mut elem)` explicitly.
+    let lhs_peeled = ci_peel_transparent(session, lhs_cursor)
+    let rhs_peeled = ci_peel_transparent(session, rhs_cursor)
+    let lhs_peeled_ty = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_peeled))
+    let rhs_peeled_ty = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_peeled))
     let lhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
     let rhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_cursor))
-    let lhs_is_array = lhs_ty_str.len() > 0 and lhs_ty_str.byte_at(0) == 91
-    let rhs_is_array = rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91
+    let lhs_is_array = (lhs_ty_str.len() > 0 and lhs_ty_str.byte_at(0) == 91) or (lhs_peeled_ty.len() > 0 and lhs_peeled_ty.byte_at(0) == 91) or ci_cursor_is_array_type(session, lhs_peeled)
+    let rhs_is_array = (rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91) or (rhs_peeled_ty.len() > 0 and rhs_peeled_ty.byte_at(0) == 91) or ci_cursor_is_array_type(session, rhs_peeled)
 
     // Bail if no operand is pointer/array — other helpers handle it.
     if not (lhs_is_ptr or rhs_is_ptr or lhs_is_array or rhs_is_array):
@@ -4411,19 +4486,18 @@ fn ci_lower_binary_pointer(session: i64, cursor: i32, exprs: &mut CiExprPool, ty
     let rhs_str = ci_print_expr(exprs, types, rhs_id, 0, 0)
 
     // BO_ADD: `ptr + idx` (with optional array decay + signed
-    // index isize-cast).
+    // index isize-cast). Decayed-array operands are detected via
+    // the peeled cursor's canonical type kind.
     if op == BO_ADD:
         let ptr_is_lhs = lhs_is_ptr or lhs_is_array
         var ptr_e = if ptr_is_lhs: lhs_str else: rhs_str
-        let ptr_cursor = if ptr_is_lhs: lhs_cursor else: rhs_cursor
+        let ptr_cursor = if ptr_is_lhs: lhs_peeled else: rhs_peeled
         let is_array = if ptr_is_lhs: lhs_is_array else: rhs_is_array
         let idx_cursor = if ptr_is_lhs: rhs_cursor else: lhs_cursor
         let idx_e = if ptr_is_lhs: rhs_str else: lhs_str
         if is_array:
-            let arr_ty = with_ci_type_translated(session, with_ci_cursor_type(session, ptr_cursor))
-            let elem_start = ci_find_array_elem_start(arr_ty)
-            if elem_start > 0:
-                let elem_ty = arr_ty.slice(elem_start as i64, arr_ty.len())
+            let elem_ty = ci_array_elem_type_from_cursor(session, ptr_cursor)
+            if elem_ty.len() > 0:
                 ptr_e = "(&" ++ ptr_e ++ "[0] as *mut " ++ elem_ty ++ ")"
         var result = ""
         if with_ci_type_is_unsigned(session, idx_cursor) == 0:
@@ -5106,23 +5180,28 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                 let rhs_is_ptr = with_ci_type_is_pointer(session, rhs_cursor) != 0
 
                 // Pointer arithmetic: ptr + idx, idx + ptr
-                // Also handle array + idx (array decays to pointer)
+                // Also handle array + idx (array decays to pointer).
+                // Peel through ImplicitCast / ParenExpr / UnexposedExpr
+                // so ArrayToPointer decay casts don't hide the
+                // underlying array type from the decay logic.
                 let lhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
                 let rhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_cursor))
-                let lhs_is_array = lhs_ty_str.len() > 0 and lhs_ty_str.byte_at(0) == 91
-                let rhs_is_array = rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91
+                let lhs_peeled = ci_peel_transparent(session, lhs_cursor)
+                let rhs_peeled = ci_peel_transparent(session, rhs_cursor)
+                let lhs_peeled_ty = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_peeled))
+                let rhs_peeled_ty = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_peeled))
+                let lhs_is_array = (lhs_ty_str.len() > 0 and lhs_ty_str.byte_at(0) == 91) or (lhs_peeled_ty.len() > 0 and lhs_peeled_ty.byte_at(0) == 91) or ci_cursor_is_array_type(session, lhs_peeled)
+                let rhs_is_array = (rhs_ty_str.len() > 0 and rhs_ty_str.byte_at(0) == 91) or (rhs_peeled_ty.len() > 0 and rhs_peeled_ty.byte_at(0) == 91) or ci_cursor_is_array_type(session, rhs_peeled)
                 if op == BO_ADD and (lhs_is_ptr or rhs_is_ptr or lhs_is_array or rhs_is_array):
                     var ptr_e = if lhs_is_ptr or lhs_is_array: lhs else: rhs
-                    let ptr_cursor = if lhs_is_ptr or lhs_is_array: lhs_cursor else: rhs_cursor
+                    let ptr_cursor = if lhs_is_ptr or lhs_is_array: lhs_peeled else: rhs_peeled
                     let is_array = if lhs_is_ptr or lhs_is_array: lhs_is_array else: rhs_is_array
                     let idx_cursor = if lhs_is_ptr or lhs_is_array: rhs_cursor else: lhs_cursor
                     let idx_e = if lhs_is_ptr or lhs_is_array: rhs else: lhs
                     // Array decay: &arr[0]
                     if is_array:
-                        let arr_ty = with_ci_type_translated(session, with_ci_cursor_type(session, ptr_cursor))
-                        let elem_start = ci_find_array_elem_start(arr_ty)
-                        if elem_start > 0:
-                            let elem_ty = arr_ty.slice(elem_start as i64, arr_ty.len())
+                        let elem_ty = ci_array_elem_type_from_cursor(session, ptr_cursor)
+                        if elem_ty.len() > 0:
                             ptr_e = "(&" ++ ptr_e ++ "[0] as *mut " ++ elem_ty ++ ")"
                     if with_ci_type_is_unsigned(session, idx_cursor) == 0:
                         return "(" ++ ptr_e ++ " + (" ++ idx_e ++ " as isize as usize))"
