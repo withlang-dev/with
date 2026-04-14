@@ -99,7 +99,7 @@ extern fn with_ci_unary_op(session: i64, cursor: i32) -> i32
 extern fn with_ci_eval_int_value(session: i64, cursor: i32) -> i64
 extern fn with_ci_eval_int_valid(session: i64, cursor: i32) -> i32
 extern fn with_ci_member_field_name(session: i64, cursor: i32) -> str
-extern fn with_ci_member_is_arrow(session: i64, cursor: i32) -> i32
+extern fn with_getenv_str(name: str) -> str
 extern fn with_ci_implicit_cast_kind(session: i64, cursor: i32) -> i32
 extern fn with_ci_type_is_unsigned(session: i64, cursor: i32) -> i32
 extern fn with_ci_type_is_pointer(session: i64, cursor: i32) -> i32
@@ -8860,17 +8860,32 @@ fn ci_migrate_ir_enabled() -> bool:
     g_migrate_ir_enabled_cache != 0
 
 // Debug trace for CXK_ kinds that still reach the raw-string
-// fallback in ci_lower_expr_ir / ci_lower_stmt_ir. Every call
-// appends; ci_dump_raw_fallback_stats aggregates at end of
-// migration.
+// fallback in ci_lower_expr_ir / ci_lower_stmt_ir. Gated behind
+// `WITH_MIGRATE_RAW_STATS=1` — recording unconditionally on every
+// fallback hit adds measurable overhead during large migrations
+// (pcre2_match can trigger thousands of fallbacks per function).
+// When the flag is off, ci_record_raw_{expr,stmt}_kind is a no-op
+// and the aggregators at end of migration never fire.
+var g_ci_raw_stats_enabled_cache: i32 = 0 - 1
 var g_ci_raw_expr_kinds: Vec[i32] = Vec.new()
 var g_ci_raw_stmt_kinds: Vec[i32] = Vec.new()
 
+fn ci_raw_stats_enabled() -> bool:
+    if g_ci_raw_stats_enabled_cache == 0 - 1:
+        let v = with_getenv_str("WITH_MIGRATE_RAW_STATS")
+        if v == "1":
+            g_ci_raw_stats_enabled_cache = 1
+        else:
+            g_ci_raw_stats_enabled_cache = 0
+    g_ci_raw_stats_enabled_cache != 0
+
 fn ci_record_raw_expr_kind(kind: i32):
-    g_ci_raw_expr_kinds.push(kind)
+    if ci_raw_stats_enabled():
+        g_ci_raw_expr_kinds.push(kind)
 
 fn ci_record_raw_stmt_kind(kind: i32):
-    g_ci_raw_stmt_kinds.push(kind)
+    if ci_raw_stats_enabled():
+        g_ci_raw_stmt_kinds.push(kind)
 
 fn ci_aggregate_kind_vec(v: &Vec[i32], label: str):
     // Collect unique kinds into parallel vectors and count.
@@ -8913,6 +8928,8 @@ fn ci_aggregate_kind_vec(v: &Vec[i32], label: str):
         u = u + 1
 
 pub fn ci_dump_raw_fallback_stats():
+    if not ci_raw_stats_enabled():
+        return
     ci_aggregate_kind_vec(&g_ci_raw_expr_kinds, "migrate: raw-expr fallback by cursor kind:")
     ci_aggregate_kind_vec(&g_ci_raw_stmt_kinds, "migrate: raw-stmt fallback by cursor kind:")
 
