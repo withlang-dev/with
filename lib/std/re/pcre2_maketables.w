@@ -96,7 +96,7 @@ extern fn pcre2_jit_stack_assign_8(p0: *mut pcre2_real_match_context_8, p1: *con
 extern fn pcre2_jit_stack_free_8(p0: *mut pcre2_real_jit_stack_8) -> void
 extern fn pcre2_get_error_message_8(p0: c_int, p1: *mut u8, p2: c_ulong) -> c_int
 fn pcre2_maketables_8(gcontext: *mut pcre2_real_general_context_8) -> *const u8:
-    var yield_: *mut u8 = (((if (gcontext != null): gcontext.memctl.malloc(1088, gcontext.memctl.memory_data) else: (with_alloc(1088 as i64) as *mut c_void))) as *mut u8)
+    var yield_: *mut u8 = (((if (gcontext != null): gcontext.memctl.malloc(((((512 + 320)) + 256)), gcontext.memctl.memory_data) else: (with_alloc(((((512 + 320)) + 256)) as i64) as *mut c_void))) as *mut u8)
 
     var i: c_int
 
@@ -137,7 +137,7 @@ fn pcre2_maketables_8(gcontext: *mut pcre2_real_general_context_8) -> *const u8:
         
     
 
-    with_memset((p as *mut c_void) as *i8, 0, 320 as i64)
+    with_memset(p as *i8, 0, 320 as i64)
 
     (i = 0)
     

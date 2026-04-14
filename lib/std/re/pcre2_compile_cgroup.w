@@ -279,13 +279,13 @@ fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut 
     (i = 0)
     
     while (i < tablecount):
-        var crc: c_int = with_memcmp((name as *const c_void) as *i8, ((slot + (2 as isize as usize)) as *const c_void) as *i8, (((length) * (((8 / 8))))) as i64)
+        var crc: c_int = with_memcmp(name as *i8, (slot + (2 as isize as usize)) as *i8, (((length) * (((8 / 8))))) as i64)
         
         if ((crc == 0) and (slot[(2 + length)] != 0)):
             (crc = -1)
         
         if (crc < 0):
-            with_memmove(((slot + (cb.name_entry_size *% duplicate_count)) as *mut c_void) as *i8, (slot as *const c_void) as *i8, ((((((tablecount -% i)) *% cb.name_entry_size)) *% 1)) as i64)
+            with_memmove((slot + (cb.name_entry_size *% duplicate_count)) as *i8, slot as *i8, ((((((tablecount -% i)) *% cb.name_entry_size)) *% (((8 / 8))))) as i64)
             
             break
             
@@ -304,9 +304,9 @@ fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut 
         (slot[0] = ((ng.number) >> 8))
         (slot[((0) + 1)] = ((ng.number) & 255))
         
-        with_memcpy(((slot + (2 as isize as usize)) as *mut c_void) as *i8, (name as *const c_void) as *i8, (((length) * (((8 / 8))))) as i64)
+        with_memcpy((slot + (2 as isize as usize)) as *i8, name as *i8, (((length) * (((8 / 8))))) as i64)
         
-        with_memset((((slot + (2 as isize as usize)) + (length as isize as usize)) as *mut c_void) as *i8, 0, (((((cb.name_entry_size - length) - 2)) * (((8 / 8))))) as i64)
+        with_memset(((slot + (2 as isize as usize)) + (length as isize as usize)) as *i8, 0, (((((cb.name_entry_size - length) - 2)) * (((8 / 8))))) as i64)
         
         var __ci_cond_if_2: bool = false
         (duplicate_count = duplicate_count - 1)
@@ -438,7 +438,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
         return null
         
 
-    with_memset((captures as *mut c_void) as *i8, 0, size as i64)
+    with_memset(captures as *i8, 0, size as i64)
 
     while (1 != 0):
         match (((unsafe: *pptr) & (4294901760 as c_uint)))
@@ -548,7 +548,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
         break
         
 
-    cb.cx.memctl.free((captures as *mut c_void), cb.cx.memctl.memory_data)
+    cb.cx.memctl.free(captures, cb.cx.memctl.memory_data)
 
     return (pptr - (1 as isize as usize))
 

@@ -154,7 +154,7 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
 
     (dst_bytes = (bytes + sizeof[pcre2_serialized_data]()))
 
-    with_memcpy((dst_bytes as *mut c_void) as *i8, (tables as *const c_void) as *i8, 1088 as i64)
+    with_memcpy(dst_bytes as *i8, tables as *i8, ((((512 + 320)) + 256)) as i64)
 
     dst_bytes = dst_bytes + ((((512 + 320)) + 256))
 
@@ -163,7 +163,7 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
     while (i < number_of_codes):
         (re = (codes[i]))
         
-        with_memcpy((dst_bytes as *mut c_void) as *i8, ((re as *const i8) as *const c_void) as *i8, re.blocksize as i64)
+        with_memcpy(dst_bytes as *i8, (re as *const i8) as *i8, re.blocksize as i64)
         
         dst_bytes = dst_bytes + re.blocksize
         
@@ -354,7 +354,7 @@ fn pcre2_serialize_free_8(bytes: *mut u8):
     if (bytes != null):
         var memctl: *mut pcre2_memctl = (((bytes - sizeof[pcre2_memctl]())) as *mut pcre2_memctl)
         
-        memctl.free((memctl as *mut c_void), memctl.memory_data)
+        memctl.free(memctl, memctl.memory_data)
         
 
 

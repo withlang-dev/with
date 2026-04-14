@@ -124,7 +124,7 @@ fn pcre2_substring_copy_bynumber_8(match_data: *mut pcre2_real_match_data_8, str
         return (-48)
 
     if (size != 0):
-        with_memcpy((buffer as *mut c_void) as *i8, ((match_data.subject + (&match_data.ovector[0] as *mut c_ulong)[(stringnumber *% 2)]) as *const c_void) as *i8, (((size) *% 1)) as i64)
+        with_memcpy(buffer as *i8, (match_data.subject + match_data.ovector[(stringnumber *% 2)]) as *i8, (((size) *% (((8 / 8))))) as i64)
 
     (buffer[size] = 0)
 
@@ -137,7 +137,7 @@ fn pcre2_substring_free_8(string: *mut u8):
     if (string != null):
         var memctl: *mut pcre2_memctl = ((((string as *mut i8) - sizeof[pcre2_memctl]())) as *mut pcre2_memctl)
         
-        memctl.free((memctl as *mut c_void), memctl.memory_data)
+        memctl.free(memctl, memctl.memory_data)
         
 
 
@@ -199,7 +199,7 @@ fn pcre2_substring_get_bynumber_8(match_data: *mut pcre2_real_match_data_8, stri
     (yield_ = (((((yield_ as *mut i8)) + sizeof[pcre2_memctl]())) as *mut u8))
 
     if (size != 0):
-        with_memcpy((yield_ as *mut c_void) as *i8, ((match_data.subject + (&match_data.ovector[0] as *mut c_ulong)[(stringnumber *% 2)]) as *const c_void) as *i8, (((size) *% 1)) as i64)
+        with_memcpy(yield_ as *i8, (match_data.subject + match_data.ovector[(stringnumber *% 2)]) as *i8, (((size) *% (((8 / 8))))) as i64)
 
     (yield_[size] = 0)
 
@@ -371,7 +371,7 @@ fn pcre2_substring_list_free_8(list: *mut *mut u8):
     if (list != null):
         var memctl: *mut pcre2_memctl = ((((list as *mut i8) - sizeof[pcre2_memctl]())) as *mut pcre2_memctl)
         
-        memctl.free((memctl as *mut c_void), memctl.memory_data)
+        memctl.free(memctl, memctl.memory_data)
         
 
 
@@ -452,7 +452,7 @@ fn pcre2_substring_list_get_8(match_data: *mut pcre2_real_match_data_8, listptr:
         (size = (if (ovector[(i + 1)] > ovector[i]): ((ovector[(i + 1)] -% ovector[i])) else: 0))
         
         if (size != 0):
-            with_memcpy((sp as *mut c_void) as *i8, ((match_data.subject + ovector[i]) as *const c_void) as *i8, (((size) *% 1)) as i64)
+            with_memcpy(sp as *i8, (match_data.subject + ovector[i]) as *i8, (((size) *% (((8 / 8))))) as i64)
         
         var __ci_expr_old_1: *mut *mut u8 = listp
         (listp = listp + 1)

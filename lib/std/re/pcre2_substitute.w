@@ -3223,7 +3223,7 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
             
         
         if ((not ((overflow != 0))) and (chlen <= output_cap)):
-            with_memcpy((output as *mut c_void) as *i8, ((&temp[0] as *mut u8) as *const c_void) as *i8, (((chlen) *% 1)) as i64)
+            with_memcpy(output as *i8, temp as *i8, (((chlen) *% (((8 / 8))))) as i64)
             
             output = output + chlen
             
@@ -3244,7 +3244,7 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
             var rest_len: c_ulong = ((input_end as usize -% input as usize) / sizeof[u8]())
             
             if ((not ((overflow != 0))) and (rest_len <= output_cap)):
-                with_memcpy((output as *mut c_void) as *i8, (input as *const c_void) as *i8, (((rest_len) *% 1)) as i64)
+                with_memcpy(output as *i8, input as *i8, (((rest_len) *% (((8 / 8))))) as i64)
             
             if (rest_len > ((0 - (0 as c_ulong) - 1) -% written)):
                 return (0 - (0 as c_ulong) - 1)
@@ -3377,7 +3377,7 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
     
     (ch1_len = ((ch_end as usize -% input as usize) / sizeof[u8]()))
     
-    with_memcpy(((&ch1[0] as *mut u8) as *mut c_void) as *i8, (input as *const c_void) as *i8, (((ch1_len) *% 1)) as i64)
+    with_memcpy(ch1 as *i8, input as *i8, (((ch1_len) *% (((8 / 8))))) as i64)
     
 
     (rest = (input + ch1_len))
@@ -3413,7 +3413,7 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
             break
             
         
-        with_memmove(((input_output + rc) as *mut c_void) as *i8, (rest as *const c_void) as *i8, (((rest_len) *% 1)) as i64)
+        with_memmove((input_output + rc) as *i8, rest as *i8, (((rest_len) *% (((8 / 8))))) as i64)
         
         (rest = (input + rc))
         
@@ -3429,7 +3429,7 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
                     break
                 
             
-            with_memmove(((output + rc) as *mut c_void) as *i8, (rest as *const c_void) as *i8, (((rest_len) *% 1)) as i64)
+            with_memmove((output + rc) as *i8, rest as *i8, (((rest_len) *% (((8 / 8))))) as i64)
             
         
         (rc2 = rest_len)

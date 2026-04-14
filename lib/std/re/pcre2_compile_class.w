@@ -209,7 +209,7 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
 
     if (ptype == 13):
         if (not ((negated != 0))):
-            with_memset((classbits as *mut c_void) as *i8, 255, 32 as i64)
+            with_memset(classbits as *i8, 255, 32 as i64)
         
         return
         
@@ -1403,7 +1403,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                 (code = code + 1)
                 ((unsafe: *__ci_expr_old_4) = (if (op_info.op_single_type == 6): OP_NCLASS else: OP_CLASS))
                 
-                with_memcpy((code as *mut c_void) as *i8, ((&op_info.bits.classbits[0] as *mut u8) as *const c_void) as *i8, 32 as i64)
+                with_memcpy(code as *i8, op_info.bits.classbits as *i8, 32 as i64)
                 
                 code = code + (32 / sizeof[u8]())
                 
@@ -1478,7 +1478,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                     ((unsafe: *__ci_expr_old_8) = (flags | ((if (need_map != 0): 2 else: 0))))
                     
                     if (need_map != 0):
-                        with_memcpy((code as *mut c_void) as *i8, ((&op_info.bits.classbits[0] as *mut u8) as *const c_void) as *i8, 32 as i64)
+                        with_memcpy(code as *i8, op_info.bits.classbits as *i8, 32 as i64)
                         
                         code = code + (32 / sizeof[u8]())
                         
@@ -1517,7 +1517,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                 
                 previous[(1 + 2)] = previous[(1 + 2)] | 1
                 
-                with_memcpy((map_start as *mut c_void) as *i8, ((&op_info.bits.classbits[0] as *mut u8) as *const c_void) as *i8, 32 as i64)
+                with_memcpy(map_start as *i8, op_info.bits.classbits as *i8, 32 as i64)
                 
                 code = code + (32 / sizeof[u8]())
                 

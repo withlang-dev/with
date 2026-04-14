@@ -55,7 +55,7 @@ fn pcre2_general_context_create_8(__param_private_malloc: *const fn(c_ulong, *mu
 
 fn pcre2_general_context_free_8(gcontext: *mut pcre2_real_general_context_8):
     if (gcontext != null):
-        gcontext.memctl.free((gcontext as *mut c_void), gcontext.memctl.memory_data)
+        gcontext.memctl.free(gcontext, gcontext.memctl.memory_data)
 
 
 fn pcre2_compile_context_copy_8(ccontext: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_compile_context_8:
@@ -83,7 +83,7 @@ fn pcre2_compile_context_create_8(gcontext: *mut pcre2_real_general_context_8) -
 
 fn pcre2_compile_context_free_8(ccontext: *mut pcre2_real_compile_context_8):
     if (ccontext != null):
-        ccontext.memctl.free((ccontext as *mut c_void), ccontext.memctl.memory_data)
+        ccontext.memctl.free(ccontext, ccontext.memctl.memory_data)
 
 
 fn pcre2_set_bsr_8(ccontext: *mut pcre2_real_compile_context_8, value: c_uint) -> c_int:
@@ -214,7 +214,7 @@ fn pcre2_convert_context_create_8(gcontext: *mut pcre2_real_general_context_8) -
 
 fn pcre2_convert_context_free_8(ccontext: *mut pcre2_real_convert_context_8):
     if (ccontext != null):
-        ccontext.memctl.free((ccontext as *mut c_void), ccontext.memctl.memory_data)
+        ccontext.memctl.free(ccontext, ccontext.memctl.memory_data)
 
 
 fn pcre2_set_glob_escape_8(ccontext: *mut pcre2_real_convert_context_8, escape: c_uint) -> c_int:
@@ -262,7 +262,7 @@ fn pcre2_match_context_create_8(gcontext: *mut pcre2_real_general_context_8) -> 
 
 fn pcre2_match_context_free_8(mcontext: *mut pcre2_real_match_context_8):
     if (mcontext != null):
-        mcontext.memctl.free((mcontext as *mut c_void), mcontext.memctl.memory_data)
+        mcontext.memctl.free(mcontext, mcontext.memctl.memory_data)
 
 
 fn pcre2_set_callout_8(mcontext: *mut pcre2_real_match_context_8, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int, callout_data: *mut c_void) -> c_int:

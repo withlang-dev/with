@@ -100,12 +100,12 @@ fn pcre2_match_data_create_from_pattern_8(code: *const pcre2_real_code_8, __para
 fn pcre2_match_data_free_8(match_data: *mut pcre2_real_match_data_8):
     if (match_data != null):
         if (match_data.heapframes != null):
-            match_data.memctl.free((match_data.heapframes as *mut c_void), match_data.memctl.memory_data)
+            match_data.memctl.free(match_data.heapframes, match_data.memctl.memory_data)
         
         if (((match_data.flags & 1)) != 0):
             match_data.memctl.free((match_data.subject as *mut c_void), match_data.memctl.memory_data)
         
-        match_data.memctl.free((match_data as *mut c_void), match_data.memctl.memory_data)
+        match_data.memctl.free(match_data, match_data.memctl.memory_data)
         
 
 

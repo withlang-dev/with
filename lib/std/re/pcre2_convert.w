@@ -154,7 +154,7 @@ fn pcre2_converted_pattern_free_8(converted: *mut u8):
     if (converted != null):
         var memctl: *mut pcre2_memctl = ((((converted as *mut i8) - sizeof[pcre2_memctl]())) as *mut pcre2_memctl)
         
-        memctl.free((memctl as *mut c_void), memctl.memory_data)
+        memctl.free(memctl, memctl.memory_data)
         
 
 
