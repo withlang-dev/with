@@ -6296,6 +6296,152 @@ fn ci_strip_trailing_newline(s: str) -> str:
         return s.slice(0, s.len() - 1)
     s
 
+// Extract (init, cond, inc, body) cursors from a CXK_FOR_STMT
+// cursor by finding the two `;` characters in the for header via
+// source-text scan. libclang ForStmt skips NULL children so the
+// child index doesn't identify roles directly. Returns the cursors
+// as (init, cond, inc, body); any missing component is -1.
+type CiForParts {
+    init_cursor: i32 = -1
+    cond_cursor: i32 = -1
+    inc_cursor: i32 = -1
+    body_cursor: i32 = -1
+}
+
+fn ci_extract_for_parts(session: i64, cursor: i32) -> CiForParts:
+    var parts = CiForParts {}
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 1:
+        return parts
+    let body_idx = nc - 1
+    parts.body_cursor = with_ci_child(session, cursor, body_idx)
+    if nc < 2:
+        return parts
+    let for_start = with_ci_cursor_start_offset(session, cursor)
+    let body_start = with_ci_cursor_start_offset(session, parts.body_cursor)
+    let for_src = with_ci_cursor_source_text(session, cursor)
+    var sc1_off: i32 = -1
+    var sc2_off: i32 = -1
+    if for_start >= 0 and body_start > for_start and for_src.len() > 0:
+        let header_len = body_start - for_start
+        let limit = if header_len < for_src.len() as i32: header_len else: for_src.len() as i32
+        var paren_depth = 0
+        var i = 0
+        while i < limit:
+            let c = for_src.byte_at(i as i64)
+            if c == 40:
+                paren_depth = paren_depth + 1
+            else if c == 41:
+                paren_depth = paren_depth - 1
+            else if c == 59 and paren_depth == 1:
+                if sc1_off < 0:
+                    sc1_off = for_start + i
+                else if sc2_off < 0:
+                    sc2_off = for_start + i
+            i = i + 1
+    if sc1_off >= 0 and sc2_off >= 0:
+        var ci_idx = 0
+        while ci_idx < body_idx:
+            let child = with_ci_child(session, cursor, ci_idx)
+            let off = with_ci_cursor_start_offset(session, child)
+            if off >= 0:
+                if off < sc1_off:
+                    parts.init_cursor = child
+                else if off < sc2_off:
+                    parts.cond_cursor = child
+                else:
+                    parts.inc_cursor = child
+            ci_idx = ci_idx + 1
+    else:
+        // Source text unavailable — fall back to positional heuristic.
+        let child0 = with_ci_child(session, cursor, 0)
+        let child0_kind = with_ci_cursor_kind(session, child0)
+        if body_idx == 1:
+            parts.cond_cursor = child0
+        else if body_idx == 2:
+            let child1 = with_ci_child(session, cursor, 1)
+            if child0_kind == CXK_DECL_STMT:
+                parts.init_cursor = child0
+                parts.cond_cursor = child1
+            else:
+                parts.cond_cursor = child0
+                parts.inc_cursor = child1
+        else if body_idx == 3:
+            parts.init_cursor = child0
+            parts.cond_cursor = with_ci_child(session, cursor, 1)
+            parts.inc_cursor = with_ci_child(session, cursor, 2)
+    parts
+
+// Structural lowering for CXK_FOR_STMT. Desugars to:
+//     <init_stmt>
+//     while <cond>:
+//         <body>
+//         <inc>
+// where init becomes a leading statement in an enclosing CIS_BLOCK,
+// cond becomes a CIE_RAW_STRING boolean expression (via
+// ci_trans_bool_expr), and inc becomes the last stmt of the while
+// body wrapped in CIS_EXPR or CIS_RAW_STRING.
+//
+// Bails (returns 0) when the for-loop's condition needs statement-
+// level evaluation (`ci_condition_needs_stmt_eval`) — that path
+// stays with the legacy fallback for now.
+fn ci_lower_for_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+    let parts = ci_extract_for_parts(session, cursor)
+    if parts.body_cursor < 0:
+        return 0 as CiStmtId
+    // Complex condition: defer to legacy.
+    if parts.cond_cursor >= 0 and ci_condition_needs_stmt_eval(session, parts.cond_cursor):
+        return 0 as CiStmtId
+
+    var inner_scope = scope
+    var init_id: CiStmtId = 0 as CiStmtId
+    if parts.init_cursor >= 0:
+        if with_ci_cursor_kind(session, parts.init_cursor) == CXK_DECL_STMT:
+            let decl_lowered = ci_lower_decl_stmt(session, parts.init_cursor, inner_scope, false)
+            inner_scope = decl_lowered.updated_scope
+            if decl_lowered.local_stmt.len() > 0:
+                init_id = stmts.raw_string(ci_strip_trailing_newline(decl_lowered.local_stmt))
+        else:
+            init_id = ci_lower_stmt_ir(session, parts.init_cursor, stmts, exprs, types, 0, inner_scope)
+
+    var cond_id: CiExprId = 0 as CiExprId
+    if parts.cond_cursor >= 0:
+        let cond_text = ci_trans_bool_expr(session, parts.cond_cursor, inner_scope)
+        if cond_text.len() > 0:
+            cond_id = exprs.raw_string(cond_text, 0 as CiTypeId)
+        else:
+            cond_id = exprs.raw_string("true", 0 as CiTypeId)
+    else:
+        cond_id = exprs.raw_string("true", 0 as CiTypeId)
+
+    let body_id = ci_lower_stmt_ir(session, parts.body_cursor, stmts, exprs, types, 0, inner_scope)
+    if (body_id as i32) == 0:
+        return 0 as CiStmtId
+
+    var inc_stmt_id: CiStmtId = 0 as CiStmtId
+    if parts.inc_cursor >= 0:
+        let inc_text = ci_lowering_to_effect_stmt_text(ci_lower_rvalue_expr(session, parts.inc_cursor, inner_scope))
+        if inc_text.len() > 0:
+            inc_stmt_id = stmts.raw_string(inc_text)
+
+    // Body + inc wrapped in a block (if we have an inc).
+    var while_body_id: CiStmtId = body_id
+    if (inc_stmt_id as i32) != 0:
+        let bstart = stmts.extra.len() as i32
+        let _ = stmts.add_extra(body_id as i32)
+        let _ = stmts.add_extra(inc_stmt_id as i32)
+        while_body_id = stmts.block(bstart, 2)
+
+    let while_id = stmts.while_stmt(cond_id, while_body_id)
+
+    // Final: wrap init + while in a block if init is non-empty.
+    if (init_id as i32) != 0:
+        let wstart = stmts.extra.len() as i32
+        let _ = stmts.add_extra(init_id as i32)
+        let _ = stmts.add_extra(while_id as i32)
+        return stmts.block(wstart, 2)
+    while_id
+
 // Recursive statement lowering helper: produces a CiStmtId from a
 // cursor. Specific handlers build real CIS_* nodes for kinds we
 // own structurally; everything else bails to the legacy bypass
@@ -6377,6 +6523,16 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
                     if (body_id as i32) != 0:
                         let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
                         return stmts.while_stmt(cond_id, body_id)
+
+    // Structural for statement. Desugars `for (init; cond; inc) body`
+    // to a block containing the init statement plus a while loop
+    // whose body ends with the inc statement. Only the simple-
+    // condition form is lowered here; complex-condition for-loops
+    // (setup-stmt conditions) still fall through to legacy.
+    if kind == CXK_FOR_STMT:
+        let for_id = ci_lower_for_stmt_ir(session, cursor, stmts, exprs, types, scope)
+        if (for_id as i32) != 0:
+            return for_id
 
     // Compound statement with gotos (B8a). The legacy transforms
     // the whole body into a `while true: match __pc: ...` state
