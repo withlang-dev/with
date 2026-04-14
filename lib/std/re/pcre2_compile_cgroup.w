@@ -544,7 +544,6 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
                 ((unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit)
                 ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 3)
                 continue
-            _ => 0
         
         break
         
@@ -662,7 +661,6 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
                 (pptr = pptr + 1)
                 ((unsafe: *__ci_expr_old_3) = (unsafe: *(pptr)))
                 continue
-            _ => 0
         
         break
         
@@ -878,7 +876,6 @@ fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset
                 var __ci_expr_old_4: c_ulong = size
                 (size = size + 1)
                 continue
-            _ => 0
         
         while true:
             

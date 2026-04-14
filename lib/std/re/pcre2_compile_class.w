@@ -2507,7 +2507,6 @@ fn fold_binary(op: c_int, lhs_op_info: *mut eclass_op_info, rhs_op_info: *mut ec
                 ((&lhs_op_info.bits.classwords[0] as *mut c_uint)[i_2] = (&lhs_op_info.bits.classwords[0] as *mut c_uint)[i_2] ^ (&rhs_op_info.bits.classwords[0] as *mut c_uint)[i_2])
                 var __ci_expr_old_2: c_int = i_2
             (i_2 = i_2 + 1)
-        _ => 0
 
 
 fn compile_eclass_nested(context: *mut eclass_context, __param_negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int:

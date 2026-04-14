@@ -253,7 +253,6 @@ fn do_bumpalong(match_data: *mut pcre2_real_match_data_8, offset: c_ulong) -> c_
                 return (offset +% 2)
             5 =>
                 return (offset +% 2)
-            _ => 0
         
 
     if (utf != 0):

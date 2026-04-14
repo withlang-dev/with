@@ -254,7 +254,6 @@ fn _pcre2_find_bracket_8(__param_code: *const u8, utf: c_int, number: c_int) -> 
                                 (code = code + code[1])
                             OP_THEN_ARG =>
                                 (code = code + code[1])
-                            _ => 0
                         
                         code = code + _pcre2_OP_lengths_8[c]
                         
@@ -428,7 +427,6 @@ fn _pcre2_find_bracket_8(__param_code: *const u8, utf: c_int, number: c_int) -> 
                                 OP_NOTPOSQUERYI =>
                                     if ((code[-1]) >= 192):
                                         (code = code + (_pcre2_utf8_table4[((code[-1]) & 63)]))
-                                _ => 0
                         
         
 

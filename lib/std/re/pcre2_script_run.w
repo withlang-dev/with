@@ -338,7 +338,6 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
                                 ((&require_map[0] as *mut c_uint)[i_2] = (&require_map[0] as *mut c_uint)[i_2] & (&map[0] as *mut c_uint)[i_2])
                                 var __ci_expr_old_4: c_int = i_2
                             (i_2 = i_2 + 1)
-                _ => 0
             
         
         if (ucd.chartype == ucp_Nd):
