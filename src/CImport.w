@@ -6605,10 +6605,6 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
             // compile_branch — leading to ERR89 on every PCRE2 compile.
             let body_idx = nc - 1
             let body_cursor = with_ci_child(session, cursor, body_idx)
-            let body_raw = ci_trans_stmt(session, body_cursor, 0, scope)
-            if body_raw.len() == 0:
-                return ""
-            let body = ci_indent_block(body_raw, indent + 1)
 
             var init_cursor: i32 = -1
             var cond_cursor: i32 = -1
@@ -6683,20 +6679,46 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
             var cond_setup = ""
             var cond_name = ""
             var inc_str = ""
+            // Translate init first so its scope update is visible
+            // to the body and cond translations. If init is a
+            // DeclStmt (`for (int i = 0; ...)`) we call the decl
+            // lowerer directly and thread updated_scope into
+            // subsequent translations.
+            var inner_scope = scope
             if init_cursor >= 0:
-                init_str = ci_trans_stmt(session, init_cursor, indent, scope)
+                if with_ci_cursor_kind(session, init_cursor) == CXK_DECL_STMT:
+                    let decl_lowered = ci_lower_decl_stmt(session, init_cursor, inner_scope, false)
+                    inner_scope = decl_lowered.updated_scope
+                    init_str = decl_lowered.local_stmt
+                    if init_str.len() > 0:
+                        init_str = ci_indent_block(init_str, indent)
+                        // Strip trailing newline — we re-add it below.
+                        let il = init_str.len() as i32
+                        if il > 0 and init_str.byte_at((il - 1) as i64) == 10:
+                            init_str = init_str.slice(0, (il - 1) as i64)
+                else:
+                    init_str = ci_trans_stmt(session, init_cursor, indent, inner_scope)
             if cond_cursor >= 0:
                 if ci_condition_needs_stmt_eval(session, cond_cursor):
                     cond_name = ci_condition_temp_name(session, cond_cursor, "for")
-                    cond_setup = ci_trans_condition_prepare(session, cond_cursor, cond_name, scope)
+                    cond_setup = ci_trans_condition_prepare(session, cond_cursor, cond_name, inner_scope)
                     if cond_setup.len() == 0:
                         return ""
                 else:
-                    let cond_e = ci_trans_bool_expr(session, cond_cursor, scope)
+                    let cond_e = ci_trans_bool_expr(session, cond_cursor, inner_scope)
                     if cond_e.len() > 0:
                         cond_str = cond_e
             if inc_cursor >= 0:
-                inc_str = ci_lowering_to_effect_stmt_text(ci_lower_rvalue_expr(session, inc_cursor, scope))
+                inc_str = ci_lowering_to_effect_stmt_text(ci_lower_rvalue_expr(session, inc_cursor, inner_scope))
+
+            // Translate the body AFTER init has updated the scope
+            // so `var i` references resolve to the right storage
+            // name when ci_lower_decl_stmt renames to avoid
+            // function-wide shadowing.
+            let body_raw = ci_trans_stmt(session, body_cursor, 0, inner_scope)
+            if body_raw.len() == 0:
+                return ""
+            let body = ci_indent_block(body_raw, indent + 1)
 
             var result = ""
             if init_str.len() > 0:
@@ -7571,13 +7593,22 @@ fn ci_lower_decl_stmt(session: i64, cursor: i32, scope: str, hoisted: bool) -> C
             if hoisted:
                 storage_name = ci_goto_hoisted_var_name(session, child)
                 new_scope = ci_scope_add_mangled(new_scope, escaped, storage_name)
+                ci_fn_var_names_register(storage_name)
             else:
-                let mangled = ci_scope_mangle(new_scope, escaped)
+                // First check the per-block scope (which the legacy
+                // ci_scope_mangle handles), then fall back to the
+                // function-wide registry so nested switch arms that
+                // share a name (`for (int i = ...)` repeated in
+                // multiple cases) get unique storage names.
+                var mangled = ci_scope_mangle(new_scope, escaped)
+                if mangled == escaped and ci_fn_var_names_contains(escaped):
+                    mangled = ci_fn_var_names_unique(escaped)
                 storage_name = mangled
                 if mangled != escaped:
                     new_scope = ci_scope_add_mangled(new_scope, escaped, mangled)
                 else:
                     new_scope = ci_scope_add(new_scope, escaped)
+                ci_fn_var_names_register(storage_name)
             let init = ci_var_init_expr(session, child, new_scope)
             if hoisted:
                 if init.len() > 0:
@@ -8782,10 +8813,39 @@ var g_ci_temp_cursors: Vec[i32] = Vec.new()
 var g_ci_temp_ids: Vec[i32] = Vec.new()
 var g_ci_temp_next: i32 = 0
 
+// Per-function var-name registry. The string holds `|name|`
+// segments for every var declaration emitted in the current
+// function. Used by ci_lower_decl_stmt to detect when a nested-
+// scope decl would shadow an outer one (e.g. `for (int i = 0; ;)`
+// in three different switch cases) and rename it. The legacy
+// scope plumbing tracks per-block scope but loses the trail when
+// switch arms reset to the function-entry scope; this registry
+// is function-wide and survives those resets.
+var g_ci_fn_var_names: str = ""
+
+fn ci_fn_var_names_contains(name: str) -> bool:
+    let needle = "|" ++ name ++ "|"
+    ci_str_contains(g_ci_fn_var_names, needle)
+
+fn ci_fn_var_names_register(name: str):
+    g_ci_fn_var_names = g_ci_fn_var_names ++ "|" ++ name ++ "|"
+
+fn ci_fn_var_names_unique(base: str) -> str:
+    if not ci_fn_var_names_contains(base):
+        return base
+    var suffix = 1
+    while suffix < 100:
+        let candidate = f"{base}_{suffix}"
+        if not ci_fn_var_names_contains(candidate):
+            return candidate
+        suffix = suffix + 1
+    base ++ "_99"
+
 fn ci_temp_reset():
     g_ci_temp_cursors = Vec.new()
     g_ci_temp_ids = Vec.new()
     g_ci_temp_next = 0
+    g_ci_fn_var_names = ""
 
 fn ci_temp_id_for_cursor(cursor: i32) -> i32:
     var i: i32 = 0
