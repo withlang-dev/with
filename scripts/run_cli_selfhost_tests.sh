@@ -1509,10 +1509,10 @@ expect_pcre2_match_heapframe_is_concrete() {
   echo "PASS(cli-selfhost-build) pcre2_match_heapframe"
 }
 
-expect_build_reports_pcre2_link_failure() {
-  local case_dir="$tmpdir/pcre2_link_failure_case"
-  local src="$case_dir/pcre2_link_failure.w"
-  local bin="$case_dir/pcre2_link_failure"
+expect_pcre2_compile_builds_cleanly() {
+  local case_dir="$tmpdir/pcre2_compile_builds_case"
+  local src="$case_dir/pcre2_compile_builds.w"
+  local bin="$case_dir/pcre2_compile_builds"
   mkdir -p "$case_dir"
 
   cat >"$src" <<'EOF'
@@ -1524,37 +1524,37 @@ fn main:
     print("ok")
 EOF
 
-  if run_cli "$tmpdir/out" "$tmpdir/err" build "$src" -o "$bin"; then
-    echo "FAIL(cli-selfhost-build) pcre2_link_failure"
-    if [[ -f "$bin" ]]; then
-      ls -lh "$bin" || true
-    fi
-    failures=$((failures + 1))
-    return
-  fi
-
-  if [[ -e "$bin" ]]; then
-    echo "FAIL(cli-selfhost-build-artifact) pcre2_link_failure"
-    ls -lh "$bin" || true
-    failures=$((failures + 1))
-    return
-  fi
-
-  if ! file_has_literal "$tmpdir/err" "Undefined symbols for architecture arm64:" \
-    || ! file_has_literal "$tmpdir/err" "__pcre2_OP_lengths_8" \
-    || ! file_has_literal "$tmpdir/err" "__pcre2_default_compile_context_8" \
-    || ! file_has_literal "$tmpdir/err" "__pcre2_strlen_8" \
-    || ! file_has_literal "$tmpdir/err" "ld: symbol(s) not found for architecture arm64" \
-    || ! file_has_literal "$tmpdir/err" "error: build failed" \
-    || ! file_forbid_literal "$tmpdir/err" "error: MIR lowering failed for function 'pcre2_compile_8'" \
-    || ! file_forbid_literal "$tmpdir/err" "AST codegen was removed"; then
-    echo "FAIL(cli-selfhost-build-diagnostic) pcre2_link_failure"
+  # Previously named expect_build_reports_pcre2_link_failure: the
+  # migrated pcre2_compile used to fail to link because the shared
+  # tables (_pcre2_OP_lengths_8, _pcre2_default_compile_context_8,
+  # _pcre2_strlen_8) weren't being included. After B11's migrator
+  # fixes the tables/utils modules carry the actual definitions,
+  # so pcre2_compile now builds AND links AND runs end-to-end. Keep
+  # the test to guard against a MIR-lowering regression: any error
+  # mentioning `MIR lowering failed` or `AST codegen was removed`
+  # is the original class of failure this test watches for.
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$src" -o "$bin"; then
+    echo "FAIL(cli-selfhost-build) pcre2_compile_builds"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
     return
   fi
 
-  echo "PASS(cli-selfhost-build) pcre2_link_failure"
+  if ! file_forbid_literal "$tmpdir/err" "MIR lowering failed" \
+    || ! file_forbid_literal "$tmpdir/err" "AST codegen was removed"; then
+    echo "FAIL(cli-selfhost-build-diagnostic) pcre2_compile_builds"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ ! -x "$bin" ]]; then
+    echo "FAIL(cli-selfhost-build-artifact) pcre2_compile_builds"
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) pcre2_compile_builds"
 }
 
 expect_init_in_cwd() {
@@ -1724,7 +1724,7 @@ expect_migrate_recursive_anonymous_records
 expect_migrate_ir_roundtrip
 expect_opaque_field_access_is_rejected
 expect_pcre2_match_heapframe_is_concrete
-expect_build_reports_pcre2_link_failure
+expect_pcre2_compile_builds_cleanly
 
 if [[ "$failures" -ne 0 ]]; then
   echo "cli selfhost tests: $failures failure(s)"

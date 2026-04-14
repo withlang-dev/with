@@ -3941,6 +3941,11 @@ fn ci_trans_implicit_cast_expr(session: i64, cursor: i32, inner: str, inner_ty: 
     if cast_kind == CI_CAST_TO_VOID:
         return inner
     if cast_kind == CI_CAST_ARRAY_TO_PTR:
+        // Preserve const qualifiers from the destination type.
+        let dest_ty = with_ci_cursor_type(session, cursor)
+        let dest_str = with_ci_type_translated(session, dest_ty)
+        if dest_str.len() > 0:
+            return "(&" ++ inner ++ "[0] as " ++ dest_str ++ ")"
         let pointee = with_ci_cursor_pointee_type(session, cursor)
         if pointee.len() > 0:
             return "(&" ++ inner ++ "[0] as *mut " ++ pointee ++ ")"
@@ -4198,12 +4203,10 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         if (cast_id as i32) != 0:
             return cast_id
 
-    // Member access — `base.field` with With-reserved keyword
-    // escaping on the field name (B4a). C's `->` must be detected
-    // by the base *type* (pointer → arrow). Source-text scanning
-    // for `->` via with_ci_member_is_arrow misses macro expansions
-    // where the cursor range points into the macro body instead
-    // of the call site.
+    // Member access — `base.field`. With supports auto-deref
+    // `.field` on pointer-typed bases (mirroring C's `->`), so
+    // we never need to insert an explicit dereference. Keep the
+    // is_arrow slot at zero; the printer just emits `base.field`.
     if kind == CXK_MEMBER_REF:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
@@ -4213,10 +4216,7 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
             if (base_id as i32) != 0 and field.len() > 0:
                 let escaped = ci_escape_reserved(field)
                 let field_idx = exprs.add_string(escaped)
-                var is_arrow = with_ci_member_is_arrow(session, cursor)
-                if is_arrow == 0 and with_ci_type_is_pointer(session, base_cursor) != 0:
-                    is_arrow = 1
-                return exprs.add(CiExprKind.CIE_FIELD, base_id as i32, field_idx, is_arrow, 0 as CiTypeId)
+                return exprs.add(CiExprKind.CIE_FIELD, base_id as i32, field_idx, 0, 0 as CiTypeId)
 
     // Array subscript — `base[idx]` (B4a).
     if kind == CXK_ARRAY_SUBSCRIPT:
@@ -4884,6 +4884,13 @@ fn ci_lower_implicit_cast(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
         let dest_str = with_ci_type_translated(session, dest_ty)
         return exprs.raw_string("(" ++ inner_str ++ " as usize as " ++ dest_str ++ ")", 0 as CiTypeId)
     if cast_kind == CI_CAST_ARRAY_TO_PTR:
+        // Use the cast's full destination type so const qualifiers
+        // on the pointee are preserved. A `const T[]` decays to
+        // `*const T`, not `*mut T`.
+        let dest_ty = with_ci_cursor_type(session, cursor)
+        let dest_str = with_ci_type_translated(session, dest_ty)
+        if dest_str.len() > 0:
+            return exprs.raw_string("(&" ++ inner_str ++ "[0] as " ++ dest_str ++ ")", 0 as CiTypeId)
         let pointee = with_ci_cursor_pointee_type(session, cursor)
         if pointee.len() > 0:
             return exprs.raw_string("(&" ++ inner_str ++ "[0] as *mut " ++ pointee ++ ")", 0 as CiTypeId)
@@ -4948,8 +4955,9 @@ fn ci_lower_call_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, types
         let arg_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, arg_cursor))
         if arg_ty_str.len() > 0 and arg_ty_str.byte_at(0) == 91:
             return 0 as CiExprId
-        // Bail on extern incomplete array args (e.g. _pcre2_xxx_8)
-        // so legacy emits the explicit decay.
+        // Bail on any array arg (including extern-resolved arrays
+        // whose ImplicitCast wrapper hides the array-ness) so
+        // legacy emits the explicit decay.
         if ci_cursor_is_array_type(session, ci_peel_transparent(session, arg_cursor)):
             return 0 as CiExprId
         let arg_src = with_ci_cursor_source_text(session, arg_cursor)
@@ -5151,6 +5159,13 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
             if cast_kind == CI_CAST_TO_VOID:
                 return inner
             if cast_kind == CI_CAST_ARRAY_TO_PTR:
+                // Use the cast's full destination type so const
+                // qualifiers on the pointee are preserved. A
+                // `const T[]` decays to `*const T`, not `*mut T`.
+                let dest_ty = with_ci_cursor_type(session, cursor)
+                let dest_str = with_ci_type_translated(session, dest_ty)
+                if dest_str.len() > 0:
+                    return "(&" ++ inner ++ "[0] as " ++ dest_str ++ ")"
                 let pointee = with_ci_cursor_pointee_type(session, cursor)
                 if pointee.len() > 0:
                     return "(&" ++ inner ++ "[0] as *mut " ++ pointee ++ ")"
@@ -5396,12 +5411,16 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                             arg = expanded_arg
                     if arg.len() == 0:
                         return ""
-                    // Array-to-pointer decay: if arg is array
-                    // type (including extern incomplete arrays
-                    // whose translated string doesn't start with
-                    // `[`), cast to pointer.
+                    // Array-to-pointer decay. Peel through
+                    // transparent wrappers (ImplicitCast etc.)
+                    // to detect the underlying array — needed
+                    // for extern arrays where libclang doesn't
+                    // emit a CAST_ARRAY_TO_PTR cursor we can
+                    // hook — and guard against double-decay by
+                    // checking the rendered text for a prior
+                    // `[0] as *` decay wrapper.
                     let arg_peeled = ci_peel_transparent(session, arg_cursor)
-                    if ci_cursor_is_array_type(session, arg_peeled):
+                    if ci_cursor_is_array_type(session, arg_peeled) and not ci_str_contains(arg, "[0] as *"):
                         let elem_ty = ci_array_elem_type_from_cursor(session, arg_peeled)
                         if elem_ty.len() > 0:
                             arg = "(&" ++ arg ++ "[0] as *mut " ++ elem_ty ++ ")"
@@ -5414,22 +5433,15 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                 return callee ++ "(" ++ args ++ ")"
         return ""
 
-    // Member reference (. or ->). Detected by the base cursor's
-    // type (pointer → arrow) so macro-expanded member accesses
-    // whose source range falls inside the macro body still get
-    // the right dereference.
+    // Member reference (. or ->). With supports auto-deref for
+    // pointer-typed bases (C's `->` is transparent), so emit
+    // `base.field` in both cases.
     if kind == CXK_MEMBER_REF:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
-            let base_cursor = with_ci_child(session, cursor, 0)
-            let base = ci_trans_expr(session, base_cursor, scope)
+            let base = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
             let field = with_ci_member_field_name(session, cursor)
             if base.len() > 0 and field.len() > 0:
-                var is_arrow = with_ci_member_is_arrow(session, cursor) != 0
-                if not is_arrow and with_ci_type_is_pointer(session, base_cursor) != 0:
-                    is_arrow = true
-                if is_arrow:
-                    return "(unsafe: *" ++ base ++ ")." ++ ci_escape_reserved(field)
                 return base ++ "." ++ ci_escape_reserved(field)
         return ""
 
@@ -5656,20 +5668,12 @@ fn ci_lower_lvalue_expr(session: i64, cursor: i32, scope: str) -> CiExprLowering
         return ci_lowering_invalid()
 
     if kind == CXK_MEMBER_REF and nc > 0:
-        let base_cursor = with_ci_child(session, cursor, 0)
-        let base = ci_lower_rvalue_expr(session, base_cursor, scope)
+        let base = ci_lower_rvalue_expr(session, with_ci_child(session, cursor, 0), scope)
         let field = with_ci_member_field_name(session, cursor)
         if ci_lowering_valid(base) and field.len() > 0:
-            var is_arrow = with_ci_member_is_arrow(session, cursor) != 0
-            if not is_arrow and with_ci_type_is_pointer(session, base_cursor) != 0:
-                is_arrow = true
-            let dotted = if is_arrow:
-                "(unsafe: *" ++ base.value ++ ")." ++ ci_escape_reserved(field)
-            else:
-                base.value ++ "." ++ ci_escape_reserved(field)
             return CiExprLowering {
                 setup: base.setup,
-                value: dotted,
+                value: base.value ++ "." ++ ci_escape_reserved(field),
                 ty,
             }
         return ci_lowering_invalid()
@@ -5934,7 +5938,7 @@ fn ci_lower_rvalue_expr(session: i64, cursor: i32, scope: str) -> CiExprLowering
                 if expanded_arg.len() > 0:
                     arg = expanded_arg
             let arg_peeled = ci_peel_transparent(session, arg_cursor)
-            if ci_cursor_is_array_type(session, arg_peeled):
+            if ci_cursor_is_array_type(session, arg_peeled) and not ci_str_contains(arg, "[0] as *"):
                 let elem_ty = ci_array_elem_type_from_cursor(session, arg_peeled)
                 if elem_ty.len() > 0:
                     arg = "(&" ++ arg ++ "[0] as *mut " ++ elem_ty ++ ")"
@@ -5949,20 +5953,12 @@ fn ci_lower_rvalue_expr(session: i64, cursor: i32, scope: str) -> CiExprLowering
         }
 
     if kind == CXK_MEMBER_REF and nc > 0:
-        let base_cursor = with_ci_child(session, cursor, 0)
-        let base = ci_lower_rvalue_expr(session, base_cursor, scope)
+        let base = ci_lower_rvalue_expr(session, with_ci_child(session, cursor, 0), scope)
         let field = with_ci_member_field_name(session, cursor)
         if ci_lowering_valid(base) and field.len() > 0:
-            var is_arrow = with_ci_member_is_arrow(session, cursor) != 0
-            if not is_arrow and with_ci_type_is_pointer(session, base_cursor) != 0:
-                is_arrow = true
-            let dotted = if is_arrow:
-                "(unsafe: *" ++ base.value ++ ")." ++ ci_escape_reserved(field)
-            else:
-                base.value ++ "." ++ ci_escape_reserved(field)
             return CiExprLowering {
                 setup: base.setup,
-                value: dotted,
+                value: base.value ++ "." ++ ci_escape_reserved(field),
                 ty,
             }
         return ci_lowering_invalid()
