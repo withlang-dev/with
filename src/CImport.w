@@ -6429,6 +6429,22 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
             cj = cj + 1
         return stmts.block(extra_start, count)
 
+    // Expression-as-statement: when a statement cursor is actually
+    // an expression kind (bare binary op, call, compound assign,
+    // cast, paren, unary, etc.), lower it through the IR expression
+    // pipeline and wrap the result in CIS_EXPR.
+    //
+    // A top-level assignment / compound-assignment / inc-dec is
+    // fine at statement level — it's the rvalue-position variants
+    // (nested within larger expressions) that need legacy decomposition.
+    // ci_stmt_level_needs_legacy recurses into children, skipping
+    // the top-level wrapper, to make this distinction.
+    if ci_cursor_kind_is_expression(kind):
+        if not ci_stmt_level_needs_legacy(session, cursor):
+            let expr_id = ci_lower_expr_ir(session, cursor, exprs, types, scope)
+            if (expr_id as i32) != 0:
+                return stmts.expr_stmt(expr_id)
+
     // Legacy fallback: bypass the cache, call the legacy
     // ci_trans_stmt at indent=0, and wrap the result in a
     // CIS_RAW_STRING. The printer re-indents at print time based
@@ -6440,6 +6456,49 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
     if legacy.len() == 0:
         return 0 as CiStmtId
     stmts.raw_string(legacy)
+
+// Does the cursor, treated as a statement, need legacy
+// decomposition? A top-level assignment / inc-dec / compound
+// assign is fine at statement level — those only need
+// decomposition in rvalue position. So we check the cursor's
+// CHILDREN recursively (via ci_rvalue_needs_lowering), skipping
+// the top-level expression shape.
+fn ci_stmt_level_needs_legacy(session: i64, cursor: i32) -> bool:
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+    // Top-level assignment / compound assign / inc-dec: check children only.
+    if kind == CXK_BINARY_OP or kind == CXK_COMPOUND_ASSIGN_OP or kind == CXK_UNARY_OP:
+        var i = 0
+        while i < nc:
+            if ci_rvalue_needs_lowering(session, with_ci_child(session, cursor, i)):
+                return true
+            i = i + 1
+        return false
+    // Non-effectful expressions at statement level are handled by
+    // rvalue_needs_lowering directly.
+    ci_rvalue_needs_lowering(session, cursor)
+
+fn ci_cursor_kind_is_expression(kind: i32) -> bool:
+    if kind == CXK_INT_LITERAL: return true
+    if kind == CXK_FLOAT_LITERAL: return true
+    if kind == CXK_STRING_LITERAL: return true
+    if kind == CXK_CHAR_LITERAL: return true
+    if kind == CXK_DECL_REF: return true
+    if kind == CXK_MEMBER_REF: return true
+    if kind == CXK_CALL_EXPR: return true
+    if kind == CXK_ARRAY_SUBSCRIPT: return true
+    if kind == CXK_PAREN_EXPR: return true
+    if kind == CXK_UNARY_OP: return true
+    if kind == CXK_BINARY_OP: return true
+    if kind == CXK_COMPOUND_ASSIGN_OP: return true
+    if kind == CXK_COND_OP: return true
+    if kind == CXK_CSTYLE_CAST: return true
+    if kind == CXK_IMPLICIT_CAST: return true
+    if kind == CXK_INIT_LIST: return true
+    if kind == CXK_COMPOUND_LITERAL: return true
+    if kind == CXK_UNARY_EXPR: return true
+    if kind == 100: return true
+    false
 
 fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope: str) -> str:
     var types = CiTypePool.new()
