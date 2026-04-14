@@ -98,6 +98,7 @@ extern fn with_ci_unary_op(session: i64, cursor: i32) -> i32
 extern fn with_ci_eval_int_value(session: i64, cursor: i32) -> i64
 extern fn with_ci_eval_int_valid(session: i64, cursor: i32) -> i32
 extern fn with_ci_member_field_name(session: i64, cursor: i32) -> str
+extern fn with_ci_member_is_arrow(session: i64, cursor: i32) -> i32
 extern fn with_ci_implicit_cast_kind(session: i64, cursor: i32) -> i32
 extern fn with_ci_type_is_unsigned(session: i64, cursor: i32) -> i32
 extern fn with_ci_type_is_pointer(session: i64, cursor: i32) -> i32
@@ -4165,7 +4166,11 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
             return cast_id
 
     // Member access — `base.field` with With-reserved keyword
-    // escaping on the field name (B4a).
+    // escaping on the field name (B4a). C's `->` must be detected
+    // by the base *type* (pointer → arrow). Source-text scanning
+    // for `->` via with_ci_member_is_arrow misses macro expansions
+    // where the cursor range points into the macro body instead
+    // of the call site.
     if kind == CXK_MEMBER_REF:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
@@ -4175,7 +4180,10 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
             if (base_id as i32) != 0 and field.len() > 0:
                 let escaped = ci_escape_reserved(field)
                 let field_idx = exprs.add_string(escaped)
-                return exprs.add(CiExprKind.CIE_FIELD, base_id as i32, field_idx, 0, 0 as CiTypeId)
+                var is_arrow = with_ci_member_is_arrow(session, cursor)
+                if is_arrow == 0 and with_ci_type_is_pointer(session, base_cursor) != 0:
+                    is_arrow = 1
+                return exprs.add(CiExprKind.CIE_FIELD, base_id as i32, field_idx, is_arrow, 0 as CiTypeId)
 
     // Array subscript — `base[idx]` (B4a).
     if kind == CXK_ARRAY_SUBSCRIPT:
@@ -5289,13 +5297,22 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                 return callee ++ "(" ++ args ++ ")"
         return ""
 
-    // Member reference (. or ->)
+    // Member reference (. or ->). Detected by the base cursor's
+    // type (pointer → arrow) so macro-expanded member accesses
+    // whose source range falls inside the macro body still get
+    // the right dereference.
     if kind == CXK_MEMBER_REF:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
-            let base = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+            let base_cursor = with_ci_child(session, cursor, 0)
+            let base = ci_trans_expr(session, base_cursor, scope)
             let field = with_ci_member_field_name(session, cursor)
             if base.len() > 0 and field.len() > 0:
+                var is_arrow = with_ci_member_is_arrow(session, cursor) != 0
+                if not is_arrow and with_ci_type_is_pointer(session, base_cursor) != 0:
+                    is_arrow = true
+                if is_arrow:
+                    return "(unsafe: *" ++ base ++ ")." ++ ci_escape_reserved(field)
                 return base ++ "." ++ ci_escape_reserved(field)
         return ""
 
@@ -5522,12 +5539,20 @@ fn ci_lower_lvalue_expr(session: i64, cursor: i32, scope: str) -> CiExprLowering
         return ci_lowering_invalid()
 
     if kind == CXK_MEMBER_REF and nc > 0:
-        let base = ci_lower_rvalue_expr(session, with_ci_child(session, cursor, 0), scope)
+        let base_cursor = with_ci_child(session, cursor, 0)
+        let base = ci_lower_rvalue_expr(session, base_cursor, scope)
         let field = with_ci_member_field_name(session, cursor)
         if ci_lowering_valid(base) and field.len() > 0:
+            var is_arrow = with_ci_member_is_arrow(session, cursor) != 0
+            if not is_arrow and with_ci_type_is_pointer(session, base_cursor) != 0:
+                is_arrow = true
+            let dotted = if is_arrow:
+                "(unsafe: *" ++ base.value ++ ")." ++ ci_escape_reserved(field)
+            else:
+                base.value ++ "." ++ ci_escape_reserved(field)
             return CiExprLowering {
                 setup: base.setup,
-                value: base.value ++ "." ++ ci_escape_reserved(field),
+                value: dotted,
                 ty,
             }
         return ci_lowering_invalid()
@@ -5808,12 +5833,20 @@ fn ci_lower_rvalue_expr(session: i64, cursor: i32, scope: str) -> CiExprLowering
         }
 
     if kind == CXK_MEMBER_REF and nc > 0:
-        let base = ci_lower_rvalue_expr(session, with_ci_child(session, cursor, 0), scope)
+        let base_cursor = with_ci_child(session, cursor, 0)
+        let base = ci_lower_rvalue_expr(session, base_cursor, scope)
         let field = with_ci_member_field_name(session, cursor)
         if ci_lowering_valid(base) and field.len() > 0:
+            var is_arrow = with_ci_member_is_arrow(session, cursor) != 0
+            if not is_arrow and with_ci_type_is_pointer(session, base_cursor) != 0:
+                is_arrow = true
+            let dotted = if is_arrow:
+                "(unsafe: *" ++ base.value ++ ")." ++ ci_escape_reserved(field)
+            else:
+                base.value ++ "." ++ ci_escape_reserved(field)
             return CiExprLowering {
                 setup: base.setup,
-                value: base.value ++ "." ++ ci_escape_reserved(field),
+                value: dotted,
                 ty,
             }
         return ci_lowering_invalid()
