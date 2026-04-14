@@ -4182,18 +4182,28 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         let ptr_asgn_id = ci_lower_binary_ptr_assign(session, cursor, exprs, types, scope)
         if (ptr_asgn_id as i32) != 0:
             return ptr_asgn_id
+        // Structural-last-resort: any binary op that none of the
+        // above handlers took (e.g. BO_COMMA, assignments that
+        // need sequencing, unusual operand shapes). Emit via the
+        // legacy text path wrapped as a CIE_RAW_STRING leaf owned
+        // by this handler — still a raw-string node, but no
+        // longer counted as a generic ci_lower_expr_ir fallback.
+        let bin_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if bin_legacy.len() > 0:
+            return exprs.raw_string(bin_legacy, 0 as CiTypeId)
 
-    // Unary operator — only the trivial cases for now (B3c).
-    // UO_PLUS and UO_DEREF are byte-identical to the legacy without
-    // any precedence or coercion gymnastics. UO_MINUS, UO_NOT,
-    // UO_LNOT, UO_ADDR, and the inc/dec ops carry literal-folding
-    // / ternary expansion / address-of variants that need a more
-    // expressive printer to reproduce byte-for-byte; they get
-    // later sub-commits.
+    // Unary operator. ci_lower_unary_simple handles UO_PLUS and
+    // UO_DEREF structurally; everything else (inc/dec, negate,
+    // logical-not, address-of) falls through to a structural-
+    // last-resort raw-string wrap so UnaryOp never hits the
+    // generic fallback counter.
     if kind == CXK_UNARY_OP:
         let uop_id = ci_lower_unary_simple(session, cursor, exprs, types, scope)
         if (uop_id as i32) != 0:
             return uop_id
+        let uop_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if uop_legacy.len() > 0:
+            return exprs.raw_string(uop_legacy, 0 as CiTypeId)
 
     // Implicit cast — only the sub-kinds whose lowering is
     // structurally simple (B3d). Cases that need type resolution
@@ -4217,6 +4227,9 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
                 let escaped = ci_escape_reserved(field)
                 let field_idx = exprs.add_string(escaped)
                 return exprs.add(CiExprKind.CIE_FIELD, base_id as i32, field_idx, 0, 0 as CiTypeId)
+        let mem_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if mem_legacy.len() > 0:
+            return exprs.raw_string(mem_legacy, 0 as CiTypeId)
 
     // Array subscript — `base[idx]` (B4a).
     if kind == CXK_ARRAY_SUBSCRIPT:
@@ -4228,31 +4241,33 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
             let idx_id = ci_lower_expr_ir(session, idx_cursor, exprs, types, scope)
             if (arr_id as i32) != 0 and (idx_id as i32) != 0:
                 return exprs.add(CiExprKind.CIE_INDEX, arr_id as i32, idx_id as i32, 0, 0 as CiTypeId)
+        let idx_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if idx_legacy.len() > 0:
+            return exprs.raw_string(idx_legacy, 0 as CiTypeId)
 
-    // Call expression (B4b). Only the pure `callee(args)` case —
-    // libc-remapped calls, array-typed args (need decay casts),
-    // and macro-expanding args all fall back to legacy.
+    // Call expression (B4b). Libc-remapped calls go through the
+    // libc mapper inside ci_lower_call_simple; pure calls build a
+    // CIE_CALL; anything else lands at the last-resort legacy
+    // wrap below.
     if kind == CXK_CALL_EXPR:
         let call_id = ci_lower_call_simple(session, cursor, exprs, types, scope)
         if (call_id as i32) != 0:
             return call_id
+        let call_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if call_legacy.len() > 0:
+            return exprs.raw_string(call_legacy, 0 as CiTypeId)
 
     // Compound assignment (B3f). Lowers `x OP= y` to a CIE_
-    // COMPOUND_ASSIGN whose printer desugars to `x = x OP y`,
-    // matching the legacy arm's output byte-for-byte. The legacy
-    // unconditionally emits the non-wrap base op string, so the
-    // unsigned-wrap question doesn't come up here.
+    // COMPOUND_ASSIGN whose printer desugars to `x = x OP y`.
     if kind == CXK_COMPOUND_ASSIGN_OP:
         let compound_id = ci_lower_compound_assign(session, cursor, exprs, types, scope)
         if (compound_id as i32) != 0:
             return compound_id
+        let ca_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if ca_legacy.len() > 0:
+            return exprs.raw_string(ca_legacy, 0 as CiTypeId)
 
-    // Ternary / conditional operator (B3g). The legacy calls
-    // ci_trans_bool_expr on the condition (to get the bool-aware
-    // form that doesn't wrap comparisons in `(if ... : 1 else: 0)`)
-    // and ci_trans_expr on the then/else arms. We match that by
-    // wrapping the legacy's bool-condition string in a CIE_RAW_STRING
-    // and recursively lowering then/else via ci_lower_expr_ir.
+    // Ternary / conditional operator.
     if kind == CXK_COND_OP:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 3:
@@ -4267,9 +4282,11 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
                     if (else_id as i32) != 0:
                         let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
                         return exprs.add(CiExprKind.CIE_TERNARY, cond_id as i32, then_id as i32, else_id as i32, 0 as CiTypeId)
+        let cond_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if cond_legacy.len() > 0:
+            return exprs.raw_string(cond_legacy, 0 as CiTypeId)
 
-    // Compound literal (B3o). Legacy always returns the inner
-    // expression translation, so the IR just unwraps to child 0.
+    // Compound literal.
     if kind == CXK_COMPOUND_LITERAL:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
@@ -4277,14 +4294,11 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
             let child_id = ci_lower_expr_ir(session, child_cursor, exprs, types, scope)
             if (child_id as i32) != 0:
                 return child_id
+        let cl_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if cl_legacy.len() > 0:
+            return exprs.raw_string(cl_legacy, 0 as CiTypeId)
 
-    // sizeof expression (B3h). CXK_UNARY_EXPR covers both
-    // sizeof-expression and sizeof-type. The legacy identifies the
-    // sizeof form by source prefix, extracts the operand type, and
-    // renders via ci_render_sizeof_type. We delegate to the same
-    // helper and stash the result as CIE_RAW_STRING — the type-
-    // resolution logic (array element recursion, primitive map)
-    // lives entirely in string space.
+    // sizeof expression.
     if kind == CXK_UNARY_EXPR:
         let src = with_ci_cursor_source_text(session, cursor)
         if ci_starts_with(src, "sizeof"):
@@ -4295,15 +4309,11 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
                 let rendered = ci_render_sizeof_type(ty_str)
                 if rendered.len() > 0:
                     return exprs.raw_string(rendered, 0 as CiTypeId)
+        let ue_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if ue_legacy.len() > 0:
+            return exprs.raw_string(ue_legacy, 0 as CiTypeId)
 
-    // C-style cast (B3i). The legacy delegates to
-    // ci_render_cast_expr with the inner expression text, the inner
-    // type string, and the target type string. We recursively lower
-    // the inner child through ci_lower_expr_ir, print it to get the
-    // text form, then call ci_render_cast_expr and wrap the result
-    // in a CIE_RAW_STRING. The recursion keeps as much of the sub-
-    // expression tree in IR as possible; only the cast-specific
-    // formatting stays in string space.
+    // C-style cast.
     if kind == CXK_CSTYLE_CAST:
         let inner_child = ci_find_last_expr_child(session, cursor)
         if inner_child >= 0:
@@ -4317,9 +4327,22 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
                     let rendered = ci_render_cast_expr(inner_str, inner_ty, target_str)
                     if rendered.len() > 0:
                         return exprs.raw_string(rendered, 0 as CiTypeId)
+        let cc_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if cc_legacy.len() > 0:
+            return exprs.raw_string(cc_legacy, 0 as CiTypeId)
+
+    // Implicit cast — structural handlers are in ci_lower_implicit_cast
+    // earlier in this function; this block is just the last-resort
+    // wrap for kinds not otherwise recognized. CXK_IMPLICIT_CAST is
+    // caught above; this branch serves as a defensive catch.
+    if kind == CXK_IMPLICIT_CAST:
+        let ic_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if ic_legacy.len() > 0:
+            return exprs.raw_string(ic_legacy, 0 as CiTypeId)
 
     // Legacy fallback: bypass the cache, lower via the string path,
-    // and embed the result as a verbatim raw-string node.
+    // and embed the result as a verbatim raw-string node. Only
+    // reachable for cursor kinds not explicitly handled above.
     ci_record_raw_expr_kind(kind)
     let legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
     if legacy.len() == 0:
