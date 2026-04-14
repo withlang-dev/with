@@ -1307,7 +1307,7 @@ fn pcre2_code_free_8(code: *mut pcre2_real_code_8):
                 
             
         
-        code.memctl.free((code as *mut c_void), code.memctl.memory_data)
+        code.memctl.free(code, code.memctl.memory_data)
         
 
 
@@ -1324,7 +1324,7 @@ fn pcre2_code_copy_8(code: *const pcre2_real_code_8) -> *mut pcre2_real_code_8:
     if (newcode == null):
         return null
 
-    with_memcpy((newcode as *mut c_void) as *i8, (code as *const c_void) as *i8, code.blocksize as i64)
+    with_memcpy(newcode as *i8, code as *i8, code.blocksize as i64)
 
     (newcode.executable_jit = null)
 
@@ -1352,7 +1352,7 @@ fn pcre2_code_copy_with_tables_8(code: *const pcre2_real_code_8) -> *mut pcre2_r
     if (newcode == null):
         return null
 
-    with_memcpy((newcode as *mut c_void) as *i8, (code as *const c_void) as *i8, code.blocksize as i64)
+    with_memcpy(newcode as *i8, code as *i8, code.blocksize as i64)
 
     (newcode.executable_jit = null)
 
@@ -1364,7 +1364,7 @@ fn pcre2_code_copy_with_tables_8(code: *const pcre2_real_code_8) -> *mut pcre2_r
         return null
         
 
-    with_memcpy((newtables as *mut c_void) as *i8, (code.tables as *const c_void) as *i8, 1088 as i64)
+    with_memcpy(newtables as *i8, code.tables as *i8, ((((512 + 320)) + 256)) as i64)
 
     (ref_count = (((newtables + (((((512 + 320)) + 256)) as isize as usize))) as *mut c_ulong))
 

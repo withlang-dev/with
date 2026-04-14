@@ -4937,27 +4937,46 @@ fn ci_lower_call_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, types
 
     let callee_cursor = with_ci_child(session, cursor, 0)
 
-    // Bail when the callee matches a libc function the legacy
-    // rewrites via ci_map_libc_call — those need name-specific
-    // argument shapes the structural lowering doesn't know about.
-    let callee_name = ci_call_callee_name(session, callee_cursor)
-    if callee_name.len() > 0:
-        let escaped = ci_escape_reserved(callee_name)
-        if ci_map_libc_call(escaped, "").len() > 0:
-            return 0 as CiExprId
+    // Lower the callee once and reuse for both libc-mapping probe
+    // and structural CIE_CALL construction below.
+    let callee_id = ci_lower_expr_ir(session, callee_cursor, exprs, types, scope)
+    if (callee_id as i32) == 0:
+        return 0 as CiExprId
 
-    // Bail on any arg that:
-    //   - has array type (needs pointer-decay cast)
-    //   - has source text the preprocessor still wants to expand
+    // Libc-mapped calls (malloc, memcpy, strlen, isalpha, ...).
+    // Probe ci_map_libc_call with the FULL translated callee text
+    // so `gcontext->memctl.malloc` doesn't match libc `malloc`.
+    // On a match, lower args through the IR, join the printed
+    // arg texts comma-separated, and delegate to the mapper;
+    // wrap the remapped call as a raw-string CiExpr leaf.
+    let callee_text = ci_print_expr(exprs, types, callee_id, 0, 0)
+    if callee_text.len() > 0 and ci_map_libc_call(callee_text, "").len() > 0:
+        var parts_buf: str = ""
+        var la: i32 = 1
+        while la < nc:
+            let arg_cursor = with_ci_child(session, cursor, la)
+            let arg_id = ci_lower_expr_ir(session, arg_cursor, exprs, types, scope)
+            if (arg_id as i32) == 0:
+                return 0 as CiExprId
+            let arg_text = ci_print_expr(exprs, types, arg_id, 0, 0)
+            if la > 1:
+                parts_buf = parts_buf ++ ", "
+            parts_buf = parts_buf ++ arg_text
+            la = la + 1
+        let mapped = ci_map_libc_call(callee_text, parts_buf)
+        if mapped.len() > 0:
+            return exprs.raw_string(mapped, 0 as CiTypeId)
+        return 0 as CiExprId
+
+    // Bail on array-typed args (need pointer-decay cast via
+    // legacy text) or args that still have source-text macro
+    // expansions pending.
     var ai: i32 = 1
     while ai < nc:
         let arg_cursor = with_ci_child(session, cursor, ai)
         let arg_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, arg_cursor))
         if arg_ty_str.len() > 0 and arg_ty_str.byte_at(0) == 91:
             return 0 as CiExprId
-        // Bail on any array arg (including extern-resolved arrays
-        // whose ImplicitCast wrapper hides the array-ness) so
-        // legacy emits the explicit decay.
         if ci_cursor_is_array_type(session, ci_peel_transparent(session, arg_cursor)):
             return 0 as CiExprId
         let arg_src = with_ci_cursor_source_text(session, arg_cursor)
@@ -4965,18 +4984,6 @@ fn ci_lower_call_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, types
         if expanded.len() > 0:
             return 0 as CiExprId
         ai = ai + 1
-
-    // All clear — recursively lower callee and args, then emit
-    // CIE_CALL. The printer formats as `callee(arg0, arg1, ...)`.
-    //
-    // Important: inner recursive lowering may itself push values
-    // into `exprs.extra` (e.g. a nested call arg list). To keep
-    // this call's arg block contiguous we buffer the arg ids in
-    // a local Vec first and only push them into `extra` once all
-    // inner lowering has completed.
-    let callee_id = ci_lower_expr_ir(session, callee_cursor, exprs, types, scope)
-    if (callee_id as i32) == 0:
-        return 0 as CiExprId
 
     var arg_ids: Vec[i32] = Vec.new()
     ai = 1
@@ -10962,9 +10969,13 @@ fn ci_is_mapped_libc_fn(name: str) -> bool:
 // Map C standard library function calls to With equivalents.
 // This enables migrated code to be pure With (no c_import needed).
 fn ci_map_libc_call(callee: str, args: str) -> str:
-    // Memory allocation — use runtime externs with pointer casts
+    // Memory allocation — use runtime externs with pointer casts.
+    // with_alloc returns *i8 but C malloc callers usually assign
+    // to a void*-typed variable, so wrap the cast inline instead
+    // of doing it as a post-process text rewrite (which can't
+    // handle nested parens in the arg text).
     if callee == "malloc":
-        return "with_alloc(" ++ args ++ " as i64)"
+        return "(with_alloc(" ++ args ++ " as i64) as *mut c_void)"
     if callee == "free":
         return "with_free(" ++ args ++ " as *i8)"
     if callee == "calloc":

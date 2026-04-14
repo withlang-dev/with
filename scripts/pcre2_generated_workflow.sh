@@ -267,10 +267,12 @@ prepare_generated_tree() {
         '_pcre2_posix_class_maps8'
 
     # Concatenate adjacent string literals: "foo" "bar" → "foobar"
-    # Cast with_alloc to *mut c_void (returns *i8 but often assigned to void*)
+    # The `with_alloc(X) → (with_alloc(X) as *mut c_void)` rewrite
+    # used to live here but is now emitted inline by
+    # ci_map_libc_call — the perl regex was paren-unaware and
+    # corrupted arg texts with nested parens.
     for dst in "$generated_dir"/*.w; do
         perl -pi -e 's/"([^"]*)" "([^"]*)"/"$1$2"/g' "$dst"
-        perl -pi -e 's/(?<!fn )with_alloc\(([^)]+)\)/(with_alloc($1) as *mut c_void)/g' "$dst"
     done
 
     # -1 in unsigned assignment context (PCRE2_UNSET = ~(size_t)0 = ULONG_MAX)
