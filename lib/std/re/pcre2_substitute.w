@@ -3127,6 +3127,12 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
 
     var written: c_ulong = 0
 
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
+
     (utf = (if ((code.overall_options & 524288)) != 0: 1 else: 0))
 
     (ucp = (if ((code.overall_options & 131072)) != 0: 1 else: 0))
@@ -3175,24 +3181,24 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
                 if (((ch & 16)) == 0):
                     (ch = ((((((ch & 15)) << 12)) | (((((unsafe: *input) & 63)) << 6))) | ((input[1] & 63))))
                     
-                    (input = input + 2)
+                    input = input + 2
                     
                 else:
                     if (((ch & 8)) == 0):
                         (ch = (((((((ch & 7)) << 18)) | (((((unsafe: *input) & 63)) << 12))) | ((((input[1] & 63)) << 6))) | ((input[2] & 63))))
                         
-                        (input = input + 3)
+                        input = input + 3
                         
                     else:
                         if (((ch & 4)) == 0):
                             (ch = ((((((((ch & 3)) << 24)) | (((((unsafe: *input) & 63)) << 18))) | ((((input[1] & 63)) << 12))) | ((((input[2] & 63)) << 6))) | ((input[3] & 63))))
                             
-                            (input = input + 4)
+                            input = input + 4
                             
                         else:
                             (ch = (((((((((ch & 1)) << 30)) | (((((unsafe: *input) & 63)) << 24))) | ((((input[1] & 63)) << 18))) | ((((input[2] & 63)) << 12))) | ((((input[3] & 63)) << 6))) | ((input[4] & 63))))
                             
-                            (input = input + 5)
+                            input = input + 5
                             
             
         
@@ -3211,7 +3217,7 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
         if (utf != 0):
             (chlen = _pcre2_ord2utf_8(ch, (&temp[0] as *mut u8)))
         else:
-            ((&temp[0] as *mut u8)[0] = ch)
+            (temp[0] = ch)
             
             (chlen = 1)
             
@@ -3219,9 +3225,9 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
         if ((not ((overflow != 0))) and (chlen <= output_cap)):
             with_memcpy((output as *mut c_void) as *i8, ((&temp[0] as *mut u8) as *const c_void) as *i8, (((chlen) *% 1)) as i64)
             
-            (output = output + chlen)
+            output = output + chlen
             
-            (output_cap = output_cap - chlen)
+            output_cap = output_cap - chlen
             
         else:
             (overflow = 1)
@@ -3230,7 +3236,7 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
         if (chlen > ((0 - (0 as c_ulong) - 1) -% written)):
             return (0 - (0 as c_ulong) - 1)
         
-        (written = written + chlen)
+        written = written + chlen
         
         (next_to_upper = rest_to_upper)
         
@@ -3243,7 +3249,7 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
             if (rest_len > ((0 - (0 as c_ulong) - 1) -% written)):
                 return (0 - (0 as c_ulong) - 1)
             
-            (written = written + rest_len)
+            written = written + rest_len
             
             return written
             
@@ -3276,6 +3282,12 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
     var ch1_overflow: c_int = 0
 
     var rest_overflow: c_int = 0
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     match state.to_case
         1 =>
@@ -3334,28 +3346,34 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
             if (((ch & 16)) == 0):
                 (ch = ((((((ch & 15)) << 12)) | (((((unsafe: *ch_end) & 63)) << 6))) | ((ch_end[1] & 63))))
                 
-                (ch_end = ch_end + 2)
+                ch_end = ch_end + 2
                 
             else:
                 if (((ch & 8)) == 0):
                     (ch = (((((((ch & 7)) << 18)) | (((((unsafe: *ch_end) & 63)) << 12))) | ((((ch_end[1] & 63)) << 6))) | ((ch_end[2] & 63))))
                     
-                    (ch_end = ch_end + 3)
+                    ch_end = ch_end + 3
                     
                 else:
                     if (((ch & 4)) == 0):
                         (ch = ((((((((ch & 3)) << 24)) | (((((unsafe: *ch_end) & 63)) << 18))) | ((((ch_end[1] & 63)) << 12))) | ((((ch_end[2] & 63)) << 6))) | ((ch_end[3] & 63))))
                         
-                        (ch_end = ch_end + 4)
+                        ch_end = ch_end + 4
                         
                     else:
                         (ch = (((((((((ch & 1)) << 30)) | (((((unsafe: *ch_end) & 63)) << 24))) | ((((ch_end[1] & 63)) << 18))) | ((((ch_end[2] & 63)) << 12))) | ((((ch_end[3] & 63)) << 6))) | ((ch_end[4] & 63))))
                         
-                        (ch_end = ch_end + 5)
+                        ch_end = ch_end + 5
                         
         
     
     ch
+    
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
     
     (ch1_len = ((ch_end as usize -% input as usize) / sizeof[u8]()))
     
@@ -3371,6 +3389,12 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
     var max_ch1_cap: c_ulong
     
     (ch1_cap = ch1_len)
+    
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
     
     (max_ch1_cap = (output_cap -% rest_len))
     
@@ -3399,6 +3423,12 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
 
     if (rest_to_case == 0):
         if (not ((ch1_overflow != 0))):
+            while true:
+                
+                if not ((0 != 0)):
+                    break
+                
+            
             with_memmove(((output + rc) as *mut c_void) as *i8, (rest as *const c_void) as *i8, (((rest_len) *% 1)) as i64)
             
         
@@ -3409,7 +3439,7 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
     else:
         var dummy: [1]u8
         
-        (rc2 = substitute_case_callout(rest, rest_len, (if (ch1_overflow != 0): (&dummy[0] as *mut u8) else: (output + rc)), (if (ch1_overflow != 0): 0 else: (output_cap -% rc)), rest_to_case, substitute_case_callout_data))
+        (rc2 = substitute_case_callout(rest, rest_len, (if (ch1_overflow != 0): dummy else: (output + rc)), (if (ch1_overflow != 0): 0 else: (output_cap -% rc)), rest_to_case, substitute_case_callout_data))
         
         if (rc2 == (0 - (0 as c_ulong) - 1)):
             return rc2
@@ -3425,6 +3455,12 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
 
     if (rc2 > ((0 - (0 as c_ulong) - 1) -% rc)):
         return (0 - (0 as c_ulong) - 1)
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     rest_overflow
 

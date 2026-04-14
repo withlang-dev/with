@@ -175,6 +175,12 @@ extern fn _pcre2_check_escape_8(p0: *mut *const u8, p1: *const u8, p2: *mut c_ui
 fn _pcre2_ckd_smul_8(r: *mut c_ulong, a: c_int, b: c_int) -> c_int:
     var m: c_longlong
 
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
+
     (m = ((a as c_longlong) * (b as c_longlong)))
 
     if ((sizeof[c_longlong]() > sizeof[c_ulong]()) and (m > (-1 as c_longlong))):

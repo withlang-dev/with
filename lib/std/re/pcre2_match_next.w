@@ -81,6 +81,12 @@ fn pcre2_next_match_8(match_data: *mut pcre2_real_match_data_8, pstart_offset: *
     if (rc < 0):
         return 0
 
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
+
     if ((ovector[0] != start_offset) and (ovector[1] == start_offset)):
         if (start_offset >= match_data.subject_length):
             return 0
@@ -258,7 +264,6 @@ fn do_bumpalong(match_data: *mut pcre2_real_match_data_8, offset: c_ulong) -> c_
         subject_end
         
         while ((next < subject_end) and ((((unsafe: *next) & 192)) == 128)):
-            var __ci_expr_old_0: *const u8 = next
             (next = next + 1)
         
         return ((next as usize -% subject as usize) / sizeof[u8]())

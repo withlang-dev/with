@@ -106,13 +106,14 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
     if (number_of_codes <= 0):
         return (-29)
 
-    (total_size = (sizeof[pcre2_serialized_data]() +% 1088))
+    (total_size = (sizeof[pcre2_serialized_data]() +% ((((512 + 320)) + 256))))
 
     (tables = (null as *const u8))
 
     (i = 0)
+    
     while (i < number_of_codes):
-        if (codes[i] == (null as *const pcre2_real_code_8)):
+        if (codes[i] == null):
             return (-51)
         
         (re = (codes[i]))
@@ -120,29 +121,32 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
         if (re.magic_number != 1346589253):
             return (-31)
         
-        if (tables == (null as *const u8)):
+        if (tables == null):
             (tables = re.tables)
         else:
             if (tables != re.tables):
                 return (-30)
         
-        (total_size = total_size + re.blocksize)
+        total_size = total_size + re.blocksize
+        
         
         var __ci_expr_old_0: c_int = i
-    (i = i + 1)
+        (i = i + 1)
+        
+    
 
     (bytes = (memctl.malloc((total_size +% sizeof[pcre2_memctl]()), memctl.memory_data) as *mut u8))
 
     if (bytes == null):
         return (-48)
 
-    (bytes = bytes + sizeof[pcre2_memctl]())
+    bytes = bytes + sizeof[pcre2_memctl]()
 
     (data = (bytes as *mut pcre2_serialized_data))
 
     (data.magic = 1347564115)
 
-    (data.version = 3145738)
+    (data.version = (((10) | (((48) << 16)))))
 
     (data.config = 526337)
 
@@ -152,18 +156,22 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
 
     with_memcpy((dst_bytes as *mut c_void) as *i8, (tables as *const c_void) as *i8, 1088 as i64)
 
-    (dst_bytes = dst_bytes + ((((512 + 320)) + 256)))
+    dst_bytes = dst_bytes + ((((512 + 320)) + 256))
 
     (i = 0)
+    
     while (i < number_of_codes):
         (re = (codes[i]))
         
         with_memcpy((dst_bytes as *mut c_void) as *i8, ((re as *const i8) as *const c_void) as *i8, re.blocksize as i64)
         
-        (dst_bytes = dst_bytes + re.blocksize)
+        dst_bytes = dst_bytes + re.blocksize
+        
         
         var __ci_expr_old_1: c_int = i
-    (i = i + 1)
+        (i = i + 1)
+        
+    
 
     ((unsafe: *serialized_bytes) = bytes)
 

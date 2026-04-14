@@ -91,17 +91,21 @@ fn pcre2_substring_copy_byname_8(match_data: *mut pcre2_real_match_data_8, strin
     (failrc = (-54))
 
     (entry = first)
+    
     while (entry <= last):
         var n: c_uint = ((((((entry)[0] << 8)) | (entry)[((0) + 1)])) as c_uint)
         
         if (n < match_data.oveccount):
-            if ((&match_data.ovector[0] as *mut c_ulong)[(n *% 2)] != ((0 - (0 as c_ulong) - 1))):
+            if (match_data.ovector[(n *% 2)] != ((0 - (0 as c_ulong) - 1))):
                 return pcre2_substring_copy_bynumber_8(match_data, n, buffer, sizeptr)
             
             (failrc = (-55))
             
         
+        
         (entry = entry + entrysize)
+        
+    
 
     return failrc
 
@@ -156,17 +160,21 @@ fn pcre2_substring_get_byname_8(match_data: *mut pcre2_real_match_data_8, string
     (failrc = (-54))
 
     (entry = first)
+    
     while (entry <= last):
         var n: c_uint = ((((((entry)[0] << 8)) | (entry)[((0) + 1)])) as c_uint)
         
         if (n < match_data.oveccount):
-            if ((&match_data.ovector[0] as *mut c_ulong)[(n *% 2)] != ((0 - (0 as c_ulong) - 1))):
+            if (match_data.ovector[(n *% 2)] != ((0 - (0 as c_ulong) - 1))):
                 return pcre2_substring_get_bynumber_8(match_data, n, stringptr, sizeptr)
             
             (failrc = (-55))
             
         
+        
         (entry = entry + entrysize)
+        
+    
 
     return failrc
 
@@ -221,17 +229,21 @@ fn pcre2_substring_length_byname_8(match_data: *mut pcre2_real_match_data_8, str
     (failrc = (-54))
 
     (entry = first)
+    
     while (entry <= last):
         var n: c_uint = ((((((entry)[0] << 8)) | (entry)[((0) + 1)])) as c_uint)
         
         if (n < match_data.oveccount):
-            if ((&match_data.ovector[0] as *mut c_ulong)[(n *% 2)] != ((0 - (0 as c_ulong) - 1))):
+            if (match_data.ovector[(n *% 2)] != ((0 - (0 as c_ulong) - 1))):
                 return pcre2_substring_length_bynumber_8(match_data, n, sizeptr)
             
             (failrc = (-55))
             
         
+        
         (entry = entry + entrysize)
+        
+    
 
     return failrc
 
@@ -270,11 +282,17 @@ fn pcre2_substring_length_bynumber_8(match_data: *mut pcre2_real_match_data_8, s
             return (-55)
         
 
-    (left = (&match_data.ovector[0] as *mut c_ulong)[(stringnumber *% 2)])
+    (left = match_data.ovector[(stringnumber *% 2)])
 
-    (right = (&match_data.ovector[0] as *mut c_ulong)[((stringnumber *% 2) +% 1)])
+    (right = match_data.ovector[((stringnumber *% 2) +% 1)])
 
     if ((left > match_data.subject_length) or (right > match_data.subject_length)):
+        while true:
+            
+            if not ((0 != 0)):
+                break
+            
+        
         return (-67)
         
 
@@ -316,14 +334,14 @@ fn pcre2_substring_nametable_scan_8(code: *const pcre2_real_code_8, stringname: 
                 if (_pcre2_strcmp_8(stringname, (((first - (entrysize as isize as usize)) + (2 as isize as usize)))) != 0):
                     break
                 
-                (first = first - entrysize)
+                first = first - entrysize
                 
             
             while (last < lastentry):
                 if (_pcre2_strcmp_8(stringname, (((last + (entrysize as isize as usize)) + (2 as isize as usize)))) != 0):
                     break
                 
-                (last = last + entrysize)
+                last = last + entrysize
                 
             
             if (firstptr == null):
@@ -377,8 +395,10 @@ fn pcre2_substring_list_get_8(match_data: *mut pcre2_real_match_data_8, listptr:
     var __ci_cond_if_0: bool = false
     (count = match_data.rc)
     (__ci_cond_if_0 = ((if (count) < 0: 1 else: 0) != 0))
+    
     if __ci_cond_if_0:
         return count
+    
 
     if (count == 0):
         (count = match_data.oveccount)
@@ -390,16 +410,20 @@ fn pcre2_substring_list_get_8(match_data: *mut pcre2_real_match_data_8, listptr:
     (size = (sizeof[pcre2_memctl]() +% sizeof[u8]()))
 
     if (lengthsptr != null):
-        (size = size + (sizeof[c_ulong]() *% count))
+        size = size + (sizeof[c_ulong]() *% count)
 
     (i = 0)
+    
     while (i < count2):
-        (size = size + (sizeof[u8]() +% 1))
+        size = size + (sizeof[u8]() +% (((1) * (((8 / 8))))))
         
         if (ovector[(i + 1)] > ovector[i]):
-            (size = size + ((((ovector[(i + 1)] -% ovector[i])) *% 1)))
+            size = size + ((((ovector[(i + 1)] -% ovector[i])) *% (((8 / 8)))))
+        
         
         (i = i + 2)
+        
+    
 
     (memp = (_pcre2_memctl_malloc_8(size, (match_data as *mut pcre2_memctl)) as *mut pcre2_memctl))
 
@@ -423,6 +447,7 @@ fn pcre2_substring_list_get_8(match_data: *mut pcre2_real_match_data_8, listptr:
         
 
     (i = 0)
+    
     while (i < count2):
         (size = (if (ovector[(i + 1)] > ovector[i]): ((ovector[(i + 1)] -% ovector[i])) else: 0))
         
@@ -433,18 +458,21 @@ fn pcre2_substring_list_get_8(match_data: *mut pcre2_real_match_data_8, listptr:
         (listp = listp + 1)
         ((unsafe: *__ci_expr_old_1) = sp)
         
-        if (lensp != (null as *mut c_ulong)):
+        if (lensp != null):
             var __ci_expr_old_2: *mut c_ulong = lensp
             (lensp = lensp + 1)
             ((unsafe: *__ci_expr_old_2) = size)
         
-        (sp = sp + size)
+        sp = sp + size
         
         var __ci_expr_old_3: *mut u8 = sp
         (sp = sp + 1)
         ((unsafe: *__ci_expr_old_3) = 0)
         
+        
         (i = i + 2)
+        
+    
 
     ((unsafe: *listp) = (null as *mut u8))
 

@@ -213,12 +213,14 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
     var __ci_expr_old_1: *const u8 = data
     (data = data + 1)
     (__ci_cond_if_0 = ((if (((unsafe: *__ci_expr_old_1) & 2)) != 0: 1 else: 0) != 0))
+    
     if __ci_cond_if_0:
         if (c < 256):
             return (if (((data)[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0)
         
-        (data = data + (32 / sizeof[u8]()))
+        data = data + (32 / sizeof[u8]())
         
+    
 
     if (((unsafe: *data) == 3) or ((unsafe: *data) == 4)):
         var prop: *const ucd_record = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c) as c_int) / 128)] * 128) + (((c) as c_int) % 128))] as isize as usize)))
@@ -459,19 +461,27 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
                 _ =>
                     return 0
             
-            (data = data + 2)
+            data = data + 2
+            
             
             if not ((((unsafe: *data) == 3) or ((unsafe: *data) == 4))):
                 break
+            
         
 
     (type_ = ((((data[0] << 8)) as c_uint) | data[1]))
 
-    (data = data + 2)
+    data = data + 2
 
     (next_char = (char_lists_end - ((((((((data)[0] << 8)) | (data)[((0) + 1)])) as c_uint) << 1))))
 
-    (type_ = type_ & 4095)
+    type_ = type_ & 4095
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     if (c >= 32768):
         (max_index = (type_ & 3))
@@ -479,12 +489,18 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
         if (max_index == 3):
             (max_index = (unsafe: *(next_char as *const c_ushort)))
             
-            (next_char = next_char + 2)
+            while true:
+                
+                if not ((0 != 0)):
+                    break
+                
+            
+            next_char = next_char + 2
             
         
-        (next_char = next_char + (max_index << 1))
+        next_char = next_char + (max_index << 1)
         
-        (type_ = type_ >> 3)
+        type_ = type_ >> 3
         
 
     if (c < 65536):
@@ -495,7 +511,13 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
         if (max_index == 3):
             (max_index = (unsafe: *(next_char as *const c_ushort)))
             
-            (next_char = next_char + 2)
+            while true:
+                
+                if not ((0 != 0)):
+                    break
+                
+            
+            next_char = next_char + 2
             
         
         if ((max_index == 0) or (c < (unsafe: *(next_char as *const c_ushort)))):
@@ -509,7 +531,6 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
         if (c >= value):
             return (if ((if (value == c) or (((value & 1)) == 0): 1 else: 0)) == not_negated: 1 else: 0)
         
-        var __ci_expr_old_12: c_uint = max_index
         (max_index = max_index - 1)
         
         while (1 != 0):
@@ -532,12 +553,24 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
     if (max_index == 3):
         (max_index = (unsafe: *(next_char as *const c_ushort)))
         
-        (next_char = next_char + 2)
+        while true:
+            
+            if not ((0 != 0)):
+                break
+            
+        
+        next_char = next_char + 2
         
 
-    (next_char = next_char + ((max_index << 1)))
+    next_char = next_char + ((max_index << 1))
 
-    (type_ = type_ >> 3)
+    type_ = type_ >> 3
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     (max_index = (type_ & 3))
 
@@ -546,7 +579,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
     if (max_index == 3):
         (max_index = (unsafe: *(next_char as *const c_uint)))
         
-        (next_char = next_char + 4)
+        next_char = next_char + 4
         
 
     if ((max_index == 0) or (c < (unsafe: *(next_char as *const c_uint)))):
@@ -560,7 +593,6 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
     if (c >= value):
         return (if ((if (value == c) or (((value & 1)) == 0): 1 else: 0)) == not_negated: 1 else: 0)
 
-    var __ci_expr_old_13: c_uint = max_index
     (max_index = max_index - 1)
 
     while (1 != 0):
@@ -587,15 +619,27 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
 
     var stack_depth: c_int = 0
 
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
+
     var __ci_expr_old_0: *const u8 = ptr
     (ptr = ptr + 1)
     (flags = (unsafe: *__ci_expr_old_0))
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     if (((flags & 1)) != 0):
         if (c < 256):
             return (if (((ptr)[(c / 8)] & ((1 << ((c & 7)))))) != 0: 1 else: 0)
         
-        (ptr = ptr + (32 / sizeof[u8]()))
+        ptr = ptr + (32 / sizeof[u8]())
         
 
     while (ptr < data_end):
@@ -629,6 +673,12 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
                 return 0
             _ =>
                 return 0
+        
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
         
 
     stack_depth

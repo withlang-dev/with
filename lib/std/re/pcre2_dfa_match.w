@@ -1073,7 +1073,7 @@ type struct_RWS_anchor = RWS_anchor
 fn do_callout_dfa(code: *const u8, offsets: *mut c_ulong, current_subject: *const u8, ptr: *const u8, mb: *mut dfa_match_block_8, extracode: c_ulong, lengthptr: *mut c_ulong) -> c_int:
     var cb: *mut pcre2_callout_block_8 = mb.cb
 
-    ((unsafe: *lengthptr) = (if (code[extracode] == OP_CALLOUT): (_pcre2_OP_lengths_8[OP_CALLOUT] as c_ulong) else: (((((((code)[(5 +% extracode)] << 8)) | (code)[(((5 +% extracode)) +% 1)])) as c_uint) as c_ulong)))
+    ((unsafe: *lengthptr) = (if (code[extracode] == OP_CALLOUT): (_pcre2_OP_lengths_8[OP_CALLOUT] as c_ulong) else: (((((((code)[((1 + (2 * 2)) +% extracode)] << 8)) | (code)[((((1 + (2 * 2)) +% extracode)) +% 1)])) as c_uint) as c_ulong)))
 
     if (mb.callout == null):
         return 0
@@ -1086,10 +1086,10 @@ fn do_callout_dfa(code: *const u8, offsets: *mut c_ulong, current_subject: *cons
 
     (cb.pattern_position = ((((((code)[(1 +% extracode)] << 8)) | (code)[(((1 +% extracode)) +% 1)])) as c_uint))
 
-    (cb.next_item_length = ((((((code)[(3 +% extracode)] << 8)) | (code)[(((3 +% extracode)) +% 1)])) as c_uint))
+    (cb.next_item_length = ((((((code)[((1 + 2) +% extracode)] << 8)) | (code)[((((1 + 2) +% extracode)) +% 1)])) as c_uint))
 
     if (code[extracode] == OP_CALLOUT):
-        (cb.callout_number = code[(5 +% extracode)])
+        (cb.callout_number = code[((1 + (2 * 2)) +% extracode)])
         
         (cb.callout_string_offset = 0)
         
@@ -1100,11 +1100,11 @@ fn do_callout_dfa(code: *const u8, offsets: *mut c_ulong, current_subject: *cons
     else:
         (cb.callout_number = 0)
         
-        (cb.callout_string_offset = ((((((code)[(7 +% extracode)] << 8)) | (code)[(((7 +% extracode)) +% 1)])) as c_uint))
+        (cb.callout_string_offset = ((((((code)[((1 + (3 * 2)) +% extracode)] << 8)) | (code)[((((1 + (3 * 2)) +% extracode)) +% 1)])) as c_uint))
         
         (cb.callout_string = ((code + ((9 +% extracode))) + (1 as isize as usize)))
         
-        (cb.callout_string_length = (((unsafe: *lengthptr) -% 9) -% 2))
+        (cb.callout_string_length = (((unsafe: *lengthptr) -% ((1 + (4 * 2)))) -% 2))
         
 
     return (mb.callout)(cb, mb.callout_data)
@@ -1129,7 +1129,7 @@ fn more_workspace(rwsptr: *mut *mut RWS_anchor, ovecsize: c_uint, mb: *mut dfa_m
         if (new == null):
             return (-48)
         
-        (mb.heap_used = mb.heap_used + newsizeK)
+        mb.heap_used = mb.heap_used + newsizeK
         
         (new.next = (null as *mut RWS_anchor))
         

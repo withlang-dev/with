@@ -202,7 +202,19 @@ extern fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr:
 fn _pcre2_compile_get_hash_from_name8(name: *const u8, length: c_uint) -> c_ushort:
     var hash: c_ushort
 
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
+
     (hash = (((((name[0] & 127)) | ((((name[(length -% 1)] & 255)) << 7)))) as c_ushort))
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     return hash
 
@@ -215,11 +227,15 @@ fn _pcre2_compile_find_named_group8(name: *const u8, length: c_uint, cb: *mut co
     var end: *mut named_group_8 = (cb.named_groups + (cb.names_found as isize as usize))
 
     (ng = cb.named_groups)
+    
     while (ng < end):
-        if (((length == ng.length) and (hash == (((ng).hash_dup & 32767)))) and (_pcre2_strncmp_8(name, ng.name, length) == 0)):
+        if (((length == ng.length) and (hash == (((ng).hash_dup & ((32767 as c_ushort)))))) and (_pcre2_strncmp_8(name, ng.name, length) == 0)):
             return ng
+        
         var __ci_expr_old_0: *mut named_group_8 = ng
-    (ng = ng + 1)
+        (ng = ng + 1)
+        
+    
 
     return null
 
@@ -237,21 +253,31 @@ fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut 
 
     var slot: *mut u8 = cb.name_table
 
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
+
     if (((ng.hash_dup & ((32768 as c_ushort)))) != 0):
         var ng_it: *mut named_group_8
         
         var end: *mut named_group_8 = (cb.named_groups + (cb.names_found as isize as usize))
         
         (ng_it = (ng + (1 as isize as usize)))
+        
         while (ng_it < end):
             if (ng_it.name == name):
-                var __ci_expr_old_1: c_uint = duplicate_count
                 (duplicate_count = duplicate_count + 1)
+            
             var __ci_expr_old_0: *mut named_group_8 = ng_it
-        (ng_it = ng_it + 1)
+            (ng_it = ng_it + 1)
+            
+        
         
 
     (i = 0)
+    
     while (i < tablecount):
         var crc: c_int = with_memcmp((name as *const c_void) as *i8, ((slot + (2 as isize as usize)) as *const c_void) as *i8, (((length) * (((8 / 8))))) as i64)
         
@@ -264,12 +290,15 @@ fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut 
             break
             
         
-        (slot = slot + cb.name_entry_size)
+        slot = slot + cb.name_entry_size
         
-        var __ci_expr_old_2: c_uint = i
-    (i = i + 1)
+        
+        var __ci_expr_old_1: c_uint = i
+        (i = i + 1)
+        
+    
 
-    (tablecount = tablecount + duplicate_count)
+    tablecount = tablecount + duplicate_count
 
     while (1 != 0):
         (slot[0] = ((ng.number) >> 8))
@@ -279,11 +308,13 @@ fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut 
         
         with_memset((((slot + (2 as isize as usize)) + (length as isize as usize)) as *mut c_void) as *i8, 0, (((((cb.name_entry_size - length) - 2)) * (((8 / 8))))) as i64)
         
-        var __ci_cond_if_3: bool = false
+        var __ci_cond_if_2: bool = false
         (duplicate_count = duplicate_count - 1)
-        (__ci_cond_if_3 = ((if duplicate_count == 0: 1 else: 0) != 0))
-        if __ci_cond_if_3:
+        (__ci_cond_if_2 = ((if duplicate_count == 0: 1 else: 0) != 0))
+        
+        if __ci_cond_if_2:
             break
+        
         
         while (1 != 0):
             (ng = ng + 1)
@@ -292,7 +323,7 @@ fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut 
                 break
             
         
-        (slot = slot + cb.name_entry_size)
+        slot = slot + cb.name_entry_size
         
 
     return tablecount
@@ -307,16 +338,26 @@ fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexpt
     var slot: *mut u8 = cb.name_table
 
     (i = 0)
+    
     while (i < cb.names_found):
-        if ((_pcre2_strncmp_8(name, ((slot + (2 as isize as usize)) as *const u8), length) == 0) and (slot[(2 +% length)] == 0)):
+        if ((_pcre2_strncmp_8(name, (slot + (2 as isize as usize)), length) == 0) and (slot[(2 +% length)] == 0)):
             break
         
-        (slot = slot + cb.name_entry_size)
+        slot = slot + cb.name_entry_size
+        
         
         var __ci_expr_old_0: c_uint = i
-    (i = i + 1)
+        (i = i + 1)
+        
+    
 
     if (i >= cb.names_found):
+        while true:
+            
+            if not ((0 != 0)):
+                break
+            
+        
         ((unsafe: *errorcodeptr) = ERR53)
         
         (cb.erroroffset = ((name as usize -% cb.start_pattern as usize) / sizeof[u8]()))
@@ -329,25 +370,26 @@ fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexpt
     (count = 0)
 
     while true:
-        var __ci_expr_old_1: c_int = count
         (count = count + 1)
         
         (groupnumber = ((((((slot)[0] << 8)) | (slot)[((0) + 1)])) as c_uint))
         
-        (cb.backref_map = cb.backref_map | (if (groupnumber < 32): ((1 << groupnumber)) else: 1))
+        cb.backref_map = cb.backref_map | (if (groupnumber < 32): ((1 << groupnumber)) else: 1)
         
         if (groupnumber > cb.top_backref):
             (cb.top_backref = groupnumber)
         
-        var __ci_cond_if_2: bool = false
+        var __ci_cond_if_1: bool = false
         (i = i + 1)
-        (__ci_cond_if_2 = ((if i >= cb.names_found: 1 else: 0) != 0))
-        if __ci_cond_if_2:
+        (__ci_cond_if_1 = ((if i >= cb.names_found: 1 else: 0) != 0))
+        
+        if __ci_cond_if_1:
             break
         
-        (slot = slot + cb.name_entry_size)
         
-        if ((_pcre2_strncmp_8(name, ((slot + (2 as isize as usize)) as *const u8), length) != 0) or (((slot + (2 as isize as usize)))[length] != 0)):
+        slot = slot + cb.name_entry_size
+        
+        if ((_pcre2_strncmp_8(name, (slot + (2 as isize as usize)), length) != 0) or (((slot + (2 as isize as usize)))[length] != 0)):
             break
         
 
@@ -373,6 +415,12 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
     var all_found: c_int
 
     var size: c_ulong
+
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
 
     if (_pcre2_compile_process_capture_list((pptr - (1 as isize as usize)), 0, errorcodeptr, cb) == 0):
         return null
@@ -619,6 +667,12 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
         break
         
 
+    while true:
+        
+        if not ((0 != 0)):
+            break
+        
+
     (args.skip_size = (((((pptr as usize -% pptr_start as usize) / sizeof[c_uint]())) as c_ulong) -% 1))
 
     if (size == 1):
@@ -634,11 +688,11 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
         if (i == 0):
             break
         
-        var __ci_expr_old_4: c_ulong = i
         (i = i - 1)
         
 
     (i = (size -% 1))
+    
     while (i > 0):
         (tmp = captures[0])
         
@@ -648,14 +702,17 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
         
         do_heapify_u16(captures, i, 0)
         
-        var __ci_expr_old_5: c_ulong = i
-    (i = i - 1)
+        
+        var __ci_expr_old_4: c_ulong = i
+        (i = i - 1)
+        
+    
 
     (captures_end = (captures + size))
 
-    var __ci_expr_old_6: *mut c_ushort = captures
+    var __ci_expr_old_5: *mut c_ushort = captures
     (captures = captures + 1)
-    (tmp = (unsafe: *__ci_expr_old_6))
+    (tmp = (unsafe: *__ci_expr_old_5))
 
     (current = captures)
 
@@ -663,12 +720,11 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
         if ((unsafe: *current) != tmp):
             (tmp = (unsafe: *current))
             
-            var __ci_expr_old_7: *mut c_ushort = captures
+            var __ci_expr_old_6: *mut c_ushort = captures
             (captures = captures + 1)
-            ((unsafe: *__ci_expr_old_7) = tmp)
+            ((unsafe: *__ci_expr_old_6) = tmp)
             
         
-        var __ci_expr_old_8: *mut c_ushort = current
         (current = current + 1)
         
 
@@ -823,6 +879,12 @@ fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset
                 (size = size + 1)
                 continue
             _ => 0
+        
+        while true:
+            
+            if not ((0 != 0)):
+                break
+            
         
         return size
         

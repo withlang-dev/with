@@ -187,24 +187,32 @@ fn _pcre2_ord2utf_8(__param_cvalue: c_uint, __param_buffer: *mut u8) -> c_uint:
     var i: c_uint
 
     (i = 0)
+    
     while (i < _pcre2_utf8_table1_size):
         if ((cvalue as c_int) <= _pcre2_utf8_table1[i]):
             break
+        
         var __ci_expr_old_0: c_uint = i
-    (i = i + 1)
+        (i = i + 1)
+        
+    
 
-    (buffer = buffer + i)
+    buffer = buffer + i
 
     var j: c_uint = i
+    
     while (j != 0):
-        var __ci_expr_old_2: *mut u8 = buffer
+        var __ci_expr_old_1: *mut u8 = buffer
         (buffer = buffer - 1)
-        ((unsafe: *__ci_expr_old_2) = (128 | ((cvalue & 63))))
+        ((unsafe: *__ci_expr_old_1) = (128 | ((cvalue & 63))))
         
-        (cvalue = cvalue >> 6)
+        cvalue = cvalue >> 6
         
-        var __ci_expr_old_1: c_uint = j
-    (j = j - 1)
+        
+        var __ci_expr_old_2: c_uint = j
+        (j = j - 1)
+        
+    
 
     ((unsafe: *buffer) = (((_pcre2_utf8_table2[i] | (cvalue as c_int))) as u8))
 

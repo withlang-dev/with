@@ -108,94 +108,110 @@ fn pcre2_maketables_8(gcontext: *mut pcre2_real_general_context_8) -> *const u8:
     (p = yield_)
 
     (i = 0)
+    
     while (i < 256):
         var c: c_int = (to_lower((i)))
         
-        var __ci_expr_old_1: *mut u8 = p
+        var __ci_expr_old_0: *mut u8 = p
         (p = p + 1)
-        ((unsafe: *__ci_expr_old_1) = (if (c < 256): c else: i))
+        ((unsafe: *__ci_expr_old_0) = (if (c < 256): c else: i))
         
-        var __ci_expr_old_0: c_int = i
-    (i = i + 1)
+        
+        var __ci_expr_old_1: c_int = i
+        (i = i + 1)
+        
+    
 
     (i = 0)
+    
     while (i < 256):
         var c_1: c_int = ((if (is_lower((i)) != 0): to_upper((i)) else: to_lower((i))))
         
-        var __ci_expr_old_3: *mut u8 = p
+        var __ci_expr_old_2: *mut u8 = p
         (p = p + 1)
-        ((unsafe: *__ci_expr_old_3) = (if (c_1 < 256): c_1 else: i))
+        ((unsafe: *__ci_expr_old_2) = (if (c_1 < 256): c_1 else: i))
         
-        var __ci_expr_old_2: c_int = i
-    (i = i + 1)
+        
+        var __ci_expr_old_3: c_int = i
+        (i = i + 1)
+        
+    
 
     with_memset((p as *mut c_void) as *i8, 0, 320 as i64)
 
     (i = 0)
+    
     while (i < 256):
         if (is_digit((i)) != 0):
-            (p[(64 + (i / 8))] = p[(64 + (i / 8))] | (1 << ((i & 7))))
+            p[(64 + (i / 8))] = p[(64 + (i / 8))] | (1 << ((i & 7)))
         
         if (is_upper((i)) != 0):
-            (p[(96 + (i / 8))] = p[(96 + (i / 8))] | (1 << ((i & 7))))
+            p[(96 + (i / 8))] = p[(96 + (i / 8))] | (1 << ((i & 7)))
         
         if (is_lower((i)) != 0):
-            (p[(128 + (i / 8))] = p[(128 + (i / 8))] | (1 << ((i & 7))))
+            p[(128 + (i / 8))] = p[(128 + (i / 8))] | (1 << ((i & 7)))
         
         if (is_alnum((i)) != 0):
-            (p[(160 + (i / 8))] = p[(160 + (i / 8))] | (1 << ((i & 7))))
+            p[(160 + (i / 8))] = p[(160 + (i / 8))] | (1 << ((i & 7)))
         
         if (i == 95):
-            (p[(160 + (i / 8))] = p[(160 + (i / 8))] | (1 << ((i & 7))))
+            p[(160 + (i / 8))] = p[(160 + (i / 8))] | (1 << ((i & 7)))
         
         if (is_space((i)) != 0):
-            (p[(0 + (i / 8))] = p[(0 + (i / 8))] | (1 << ((i & 7))))
+            p[(0 + (i / 8))] = p[(0 + (i / 8))] | (1 << ((i & 7)))
         
         if (is_xdigit((i)) != 0):
-            (p[(32 + (i / 8))] = p[(32 + (i / 8))] | (1 << ((i & 7))))
+            p[(32 + (i / 8))] = p[(32 + (i / 8))] | (1 << ((i & 7)))
         
         if ((if is_print((i)) and not is_space((i)): 1 else: 0) != 0):
-            (p[(192 + (i / 8))] = p[(192 + (i / 8))] | (1 << ((i & 7))))
+            p[(192 + (i / 8))] = p[(192 + (i / 8))] | (1 << ((i & 7)))
         
         if (is_print((i)) != 0):
-            (p[(224 + (i / 8))] = p[(224 + (i / 8))] | (1 << ((i & 7))))
+            p[(224 + (i / 8))] = p[(224 + (i / 8))] | (1 << ((i & 7)))
         
         if ((if is_print((i)) and not is_alnum((i)) and not is_space((i)): 1 else: 0) != 0):
-            (p[(256 + (i / 8))] = p[(256 + (i / 8))] | (1 << ((i & 7))))
+            p[(256 + (i / 8))] = p[(256 + (i / 8))] | (1 << ((i & 7)))
         
         if ((if ((i)) < 32 or ((i)) == 127: 1 else: 0) != 0):
-            (p[(288 + (i / 8))] = p[(288 + (i / 8))] | (1 << ((i & 7))))
+            p[(288 + (i / 8))] = p[(288 + (i / 8))] | (1 << ((i & 7)))
+        
         
         var __ci_expr_old_4: c_int = i
-    (i = i + 1)
+        (i = i + 1)
+        
+    
 
-    (p = p + 320)
+    p = p + 320
 
     (i = 0)
+    
     while (i < 256):
         var x: c_int = 0
         
         if (is_space((i)) != 0):
-            (x = x + 1)
+            x = x + 1
         
         if (is_alpha((i)) != 0):
-            (x = x + 2)
+            x = x + 2
         
         if (is_lower((i)) != 0):
-            (x = x + 4)
+            x = x + 4
         
         if (is_digit((i)) != 0):
-            (x = x + 8)
+            x = x + 8
         
         if ((is_alnum((i)) != 0) or (i == 95)):
-            (x = x + 16)
+            x = x + 16
         
-        var __ci_expr_old_6: *mut u8 = p
+        var __ci_expr_old_5: *mut u8 = p
         (p = p + 1)
-        ((unsafe: *__ci_expr_old_6) = x)
+        ((unsafe: *__ci_expr_old_5) = x)
         
-        var __ci_expr_old_5: c_int = i
-    (i = i + 1)
+        
+        var __ci_expr_old_6: c_int = i
+        (i = i + 1)
+        
+    
 
     return yield_
 
