@@ -2779,6 +2779,22 @@ fn ci_is_large_decimal(s: str) -> bool:
         i = i + 1
     false  // equal = not large
 
+// Pure decimal literal (no operators, no idents). Used by the
+// unsigned-arithmetic emit logic to decide whether to wrap an
+// operand in `(... as c_uint)` — With's literal type inference
+// defaults to signed, so an unsigned wrap op like `+%` rejects a
+// bare decimal literal that doesn't fit i32 silently and a
+// fitting-but-untagged literal as type-mismatched against the
+// other unsigned operand.
+fn ci_is_decimal_literal(s: str) -> bool:
+    if s.len() == 0: return false
+    var i = 0
+    while i as i64 < s.len():
+        let c = s.byte_at(i as i64)
+        if c < 48 or c > 57: return false
+        i = i + 1
+    true
+
 fn ci_find_array_elem_start(ty: str) -> i32:
     if ty.len() == 0 or ty.byte_at(0) != 91: return 0
     var i = 1
@@ -4024,6 +4040,17 @@ fn ci_trans_binary_expr_from_parts(session: i64, cursor: i32, lhs_cursor: i32, l
         return "((" ++ lhs ++ " as c_uint) " ++ op_str ++ " " ++ rhs ++ ")"
     if ci_is_large_decimal(rhs):
         return "(" ++ lhs ++ " " ++ op_str ++ " (" ++ rhs ++ " as c_uint))"
+    // Unsigned wrap arithmetic where BOTH operands are bare
+    // decimal literals: With's literal inference defaults to
+    // signed (i32), and `+%`/`-%`/`*%` require unsigned operands
+    // that unify with the surrounding context. When at least one
+    // operand is a typed variable, the variable drives inference
+    // and a bare literal adopts the right type; when both sides
+    // are literals there's no anchor, so wrap the LHS in
+    // `(L as c_uint)`.
+    if is_unsigned != 0 and (op == BO_ADD or op == BO_SUB or op == BO_MUL):
+        if ci_is_decimal_literal(lhs) and ci_is_decimal_literal(rhs):
+            return "((" ++ lhs ++ " as c_uint) " ++ op_str ++ " " ++ rhs ++ ")"
     "(" ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ")"
 
 fn ci_trans_unary_expr_from_part(session: i64, cursor: i32, operand_cursor: i32, operand: str) -> str:
@@ -5251,6 +5278,12 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                         return "((" ++ lhs ++ " as c_uint) " ++ op_str ++ " " ++ rhs ++ ")"
                     if ci_is_large_decimal(rhs):
                         return "(" ++ lhs ++ " " ++ op_str ++ " (" ++ rhs ++ " as c_uint))"
+                    // Unsigned wrap arithmetic on bare decimal
+                    // literals — see ci_trans_binary_expr_from_parts
+                    // for the rationale.
+                    if is_unsigned != 0 and (op == BO_ADD or op == BO_SUB or op == BO_MUL):
+                        if ci_is_decimal_literal(lhs) and ci_is_decimal_literal(rhs):
+                            return "((" ++ lhs ++ " as c_uint) " ++ op_str ++ " " ++ rhs ++ ")"
                     return "(" ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ")"
         return ""
 

@@ -71,6 +71,19 @@ fn ci_reindent_spaces(text: str, spaces: i32) -> str:
         start = end + 1
     parts.join("")
 
+// Pure decimal literal predicate. Used by the unsigned-wrap
+// binary printer to decide whether to wrap an operand in
+// `(L as c_uint)` so With's literal type inference picks the
+// unsigned type that matches `+%`/`-%`/`*%`.
+fn ci_is_decimal_literal_str(s: str) -> bool:
+    if s.len() == 0: return false
+    var i = 0
+    while i as i64 < s.len():
+        let c = s.byte_at(i as i64)
+        if c < 48 or c > 57: return false
+        i = i + 1
+    true
+
 // Operator precedence table. Larger = binds tighter. Used by Phase-B
 // B3 to decide when to drop redundant parens; Phase A always wraps
 // binary / unary expressions in explicit parentheses.
@@ -246,12 +259,22 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
     if kind == CiExprKind.CIE_IDENT:
         return exprs.get_string(exprs.get_d0(id))
 
-    // Arithmetic / logical
+    // Arithmetic / logical. For unsigned wrap arithmetic
+    // (+%, -%, *%) where BOTH operands are bare decimal literals,
+    // wrap the LHS in `(L as c_uint)` so With's literal-type
+    // inference picks unsigned. When at least one operand is a
+    // typed expression, the typed side anchors inference and a
+    // bare literal adopts its type.
     if kind == CiExprKind.CIE_BINARY:
         let op = exprs.get_d0(id)
         let lhs = (exprs.get_d1(id)) as CiExprId
         let rhs = (exprs.get_d2(id)) as CiExprId
-        return "(" ++ ci_print_expr(exprs, types, lhs, 0, 0) ++ " " ++ ci_bin_op_str(op) ++ " " ++ ci_print_expr(exprs, types, rhs, 0, 0) ++ ")"
+        var lhs_str = ci_print_expr(exprs, types, lhs, 0, 0)
+        let rhs_str = ci_print_expr(exprs, types, rhs, 0, 0)
+        if op == CiBinOp.CIBO_ADD_WRAP or op == CiBinOp.CIBO_SUB_WRAP or op == CiBinOp.CIBO_MUL_WRAP:
+            if ci_is_decimal_literal_str(lhs_str) and ci_is_decimal_literal_str(rhs_str):
+                lhs_str = "(" ++ lhs_str ++ " as c_uint)"
+        return "(" ++ lhs_str ++ " " ++ ci_bin_op_str(op) ++ " " ++ rhs_str ++ ")"
     if kind == CiExprKind.CIE_UNARY:
         let op = exprs.get_d0(id)
         let operand = (exprs.get_d1(id)) as CiExprId
