@@ -6534,6 +6534,34 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
         if (for_id as i32) != 0:
             return for_id
 
+    // Structural do-while. Desugars to:
+    //     while true:
+    //         body
+    //         if not (cond):
+    //             break
+    if kind == CXK_DO_STMT:
+        let dnc = with_ci_num_children(session, cursor)
+        if dnc >= 2:
+            let body_cursor = with_ci_child(session, cursor, 0)
+            let cond_cursor = with_ci_child(session, cursor, 1)
+            // Complex condition: defer to legacy.
+            if not ci_condition_needs_stmt_eval(session, cond_cursor):
+                let cond_text = ci_trans_bool_expr(session, cond_cursor, scope)
+                if cond_text.len() > 0:
+                    let body_id = ci_lower_stmt_ir(session, body_cursor, stmts, exprs, types, 0, scope)
+                    if (body_id as i32) != 0:
+                        // `if not (cond): break`
+                        let not_cond_id = exprs.raw_string("not (" ++ cond_text ++ ")", 0 as CiTypeId)
+                        let break_id = stmts.break_()
+                        let if_break = stmts.if_stmt(not_cond_id, break_id, 0 as CiStmtId)
+                        // Block: [body, if_break]
+                        let bstart = stmts.extra.len() as i32
+                        let _ = stmts.add_extra(body_id as i32)
+                        let _ = stmts.add_extra(if_break as i32)
+                        let block_id = stmts.block(bstart, 2)
+                        let true_cond = exprs.raw_string("true", 0 as CiTypeId)
+                        return stmts.while_stmt(true_cond, block_id)
+
     // Compound statement with gotos (B8a). The legacy transforms
     // the whole body into a `while true: match __pc: ...` state
     // machine via ci_lower_goto_body. For the first step of B8 we
