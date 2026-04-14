@@ -6475,48 +6475,79 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
             if (val_id as i32) != 0:
                 return stmts.return_(val_id)
 
-    // Structural if statement (B5i). Bails to the generic
-    // fallback if the condition needs statement-level lowering
-    // (side-effect temp vars — legacy uses ci_trans_condition_
-    // prepare + a local bool temp). Otherwise stashes the
-    // legacy ci_trans_bool_expr result as a raw cond, recurses
-    // on then/else through ci_lower_stmt_ir, and emits a
-    // CIS_IF whose printer handles the per-level re-indent.
+    // Structural if statement (B5i). Handles both simple-cond
+    // and complex-cond (ci_condition_needs_stmt_eval) forms.
+    // For complex conditions, emit a setup block plus a structural
+    // CIS_IF whose cond is a boolean temp.
     if kind == CXK_IF_STMT:
         let ifnc = with_ci_num_children(session, cursor)
         if ifnc >= 2:
             let cond_cursor = with_ci_child(session, cursor, 0)
-            if not ci_condition_needs_stmt_eval(session, cond_cursor):
-                let then_child = with_ci_child(session, cursor, 1)
+            let then_child = with_ci_child(session, cursor, 1)
+            let complex_cond = ci_condition_needs_stmt_eval(session, cond_cursor)
+            var cond_id: CiExprId = 0 as CiExprId
+            var setup_stmt_id: CiStmtId = 0 as CiStmtId
+            if complex_cond:
+                let cond_name = ci_condition_temp_name(session, cond_cursor, "if")
+                let setup_text = ci_trans_condition_prepare(session, cond_cursor, cond_name, scope)
+                if setup_text.len() > 0:
+                    setup_stmt_id = stmts.raw_string(ci_strip_trailing_newline(setup_text))
+                    cond_id = exprs.raw_string(cond_name, 0 as CiTypeId)
+            else:
                 let cond_str = ci_trans_bool_expr(session, cond_cursor, scope)
                 if cond_str.len() > 0:
-                    let then_id = ci_lower_stmt_ir(session, then_child, stmts, exprs, types, 0, scope)
-                    // If the then body is empty (NULL_STMT,
-                    // legacy bypass returned empty, or an empty
-                    // compound `{}` like the FWRITE_IGNORE macro
-                    // expansion), fall through to the legacy
-                    // fallback — legacy drops the whole if
-                    // statement when then_body is empty.
-                    var then_empty = (then_id as i32) == 0
-                    if not then_empty and stmts.kind(then_id) == CiStmtKind.CIS_BLOCK:
-                        if stmts.get_d1(then_id) == 0:
-                            then_empty = true
-                    if not then_empty:
-                        var else_id: CiStmtId = 0 as CiStmtId
-                        if ifnc > 2:
-                            let else_child = with_ci_child(session, cursor, 2)
-                            else_id = ci_lower_stmt_ir(session, else_child, stmts, exprs, types, 0, scope)
-                        let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
-                        return stmts.if_stmt(cond_id, then_id, else_id)
+                    cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
+            if (cond_id as i32) != 0:
+                let then_id = ci_lower_stmt_ir(session, then_child, stmts, exprs, types, 0, scope)
+                // If the then body is empty, fall through to legacy.
+                var then_empty = (then_id as i32) == 0
+                if not then_empty and stmts.kind(then_id) == CiStmtKind.CIS_BLOCK:
+                    if stmts.get_d1(then_id) == 0:
+                        then_empty = true
+                if not then_empty:
+                    var else_id: CiStmtId = 0 as CiStmtId
+                    if ifnc > 2:
+                        let else_child = with_ci_child(session, cursor, 2)
+                        else_id = ci_lower_stmt_ir(session, else_child, stmts, exprs, types, 0, scope)
+                    let if_id = stmts.if_stmt(cond_id, then_id, else_id)
+                    if (setup_stmt_id as i32) != 0:
+                        let bstart = stmts.extra.len() as i32
+                        let _ = stmts.add_extra(setup_stmt_id as i32)
+                        let _ = stmts.add_extra(if_id as i32)
+                        return stmts.block(bstart, 2)
+                    return if_id
 
-    // Structural while statement (B5j). Same bail-out as CIS_IF
-    // for complex conditions.
+    // Structural while statement (B5j). Handles simple and
+    // complex conditions. Complex conditions desugar to:
+    //     while true:
+    //         <setup>
+    //         if not (cond_name): break
+    //         body
     if kind == CXK_WHILE_STMT:
         let wnc = with_ci_num_children(session, cursor)
         if wnc >= 2:
             let cond_cursor = with_ci_child(session, cursor, 0)
-            if not ci_condition_needs_stmt_eval(session, cond_cursor):
-                let body_cursor = with_ci_child(session, cursor, 1)
+            let body_cursor = with_ci_child(session, cursor, 1)
+            let complex_cond = ci_condition_needs_stmt_eval(session, cond_cursor)
+            if complex_cond:
+                let cond_name = ci_condition_temp_name(session, cond_cursor, "while")
+                let setup_text = ci_trans_condition_prepare(session, cond_cursor, cond_name, scope)
+                if setup_text.len() > 0:
+                    let body_id = ci_lower_stmt_ir(session, body_cursor, stmts, exprs, types, 0, scope)
+                    if (body_id as i32) != 0:
+                        // Build inner: setup; if not cond_name: break; body
+                        let setup_id = stmts.raw_string(ci_strip_trailing_newline(setup_text))
+                        let not_cond_id = exprs.raw_string("not (" ++ cond_name ++ ")", 0 as CiTypeId)
+                        let break_id = stmts.break_()
+                        let if_break = stmts.if_stmt(not_cond_id, break_id, 0 as CiStmtId)
+                        let bstart = stmts.extra.len() as i32
+                        let _ = stmts.add_extra(setup_id as i32)
+                        let _ = stmts.add_extra(if_break as i32)
+                        let _ = stmts.add_extra(body_id as i32)
+                        let inner_block = stmts.block(bstart, 3)
+                        let true_cond = exprs.raw_string("true", 0 as CiTypeId)
+                        return stmts.while_stmt(true_cond, inner_block)
+            else:
                 let cond_str = ci_trans_bool_expr(session, cond_cursor, scope)
                 if cond_str.len() > 0:
                     let body_id = ci_lower_stmt_ir(session, body_cursor, stmts, exprs, types, 0, scope)
