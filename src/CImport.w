@@ -6322,7 +6322,13 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
         let ret_child = with_ci_child(session, cursor, 0)
         let ret_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, ret_child))
         let is_array_ret = ret_ty_str.len() > 0 and ret_ty_str.byte_at(0) == 91
-        if not ci_rvalue_needs_lowering(session, ret_child) and not is_array_ret:
+        // Also bail if the peeled inner is an array — libclang
+        // wraps an array-typed return value in ArrayToPointer
+        // ImplicitCast, hiding the array from a byte-prefix check.
+        // Defer to the legacy path which now applies decay using
+        // ci_peel_transparent.
+        let ret_peeled_array = ci_cursor_is_array_type(session, ci_peel_transparent(session, ret_child))
+        if not ci_rvalue_needs_lowering(session, ret_child) and not is_array_ret and not ret_peeled_array:
             let val_id = ci_lower_expr_ir(session, ret_child, exprs, types, scope)
             if (val_id as i32) != 0:
                 return stmts.return_(val_id)
@@ -6508,13 +6514,15 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
         let ret_child = with_ci_child(session, cursor, 0)
         var lowered = ci_lower_rvalue_expr(session, ret_child, scope)
         if ci_lowering_valid(lowered):
-            // Array-to-pointer decay in return
+            // Array-to-pointer decay in return. Peel through any
+            // ImplicitCast wrapper inserted by libclang so an
+            // array-typed inner expression isn't hidden behind a
+            // post-decay pointer type.
             var ret_value = lowered.value
-            let ret_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, ret_child))
-            if ret_ty_str.len() > 0 and ret_ty_str.byte_at(0) == 91:
-                let elem_start = ci_find_array_elem_start(ret_ty_str)
-                if elem_start > 0:
-                    let elem_ty = ret_ty_str.slice(elem_start as i64, ret_ty_str.len())
+            let ret_peeled = ci_peel_transparent(session, ret_child)
+            if ci_cursor_is_array_type(session, ret_peeled):
+                let elem_ty = ci_array_elem_type_from_cursor(session, ret_peeled)
+                if elem_ty.len() > 0:
                     ret_value = "(&" ++ ret_value ++ "[0] as *mut " ++ elem_ty ++ ")"
             let expr = ci_render_lowered_expr(session, ret_child, CiExprLowering {
                 setup: lowered.setup,
