@@ -4096,6 +4096,17 @@ fn ci_trans_stmt_legacy_for_ir(session: i64, cursor: i32, indent: i32, scope: st
 fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     let kind = with_ci_cursor_kind(session, cursor)
 
+    // UnexposedExpr (kind 100) — libclang's transparent wrapper
+    // for anything it can't categorize directly (decayed refs,
+    // implicit conversions inside initializers, generic-selection
+    // results). Peel the wrapper and recurse. Handles the top
+    // fallback offender in PCRE2 (~2324/2703 raw expr fallbacks).
+    if kind == 100:
+        let nc = with_ci_num_children(session, cursor)
+        if nc == 1:
+            let inner_cursor = with_ci_child(session, cursor, 0)
+            return ci_lower_expr_ir(session, inner_cursor, exprs, types, scope)
+
     // Literal + DeclRef leaves (B2).
     if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF:
         return ci_lower_literal_or_ref(session, cursor, kind, exprs, types, scope)
@@ -4268,6 +4279,7 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
 
     // Legacy fallback: bypass the cache, lower via the string path,
     // and embed the result as a verbatim raw-string node.
+    ci_record_raw_expr_kind(kind)
     let legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
     if legacy.len() == 0:
         return 0 as CiExprId
@@ -6272,6 +6284,7 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
     // on the enclosing container's depth — stashed text is always
     // level-0-relative. This matches the convention established
     // by the structural CIS_BLOCK printer.
+    ci_record_raw_stmt_kind(kind)
     let legacy = ci_trans_stmt_legacy_for_ir(session, cursor, 0, scope)
     if legacy.len() == 0:
         return 0 as CiStmtId
@@ -8018,10 +8031,18 @@ fn ci_is_stringify_macro(session: i64, name: str, depth: i32) -> bool:
         if with_cimport_macro_is_fn_like(macro_session, i) != 0:
             if with_cimport_macro_name(macro_session, i) == name:
                 let value = with_cimport_macro_value(macro_session, i)
-                // Direct stringify: body contains #param
+                // Direct stringify: body contains `#param` (a `#`
+                // not part of a `##` token-paste pair). Walk byte
+                // by byte and skip both `#`s when we see `##` so
+                // we don't misread the second `#` as a stringify.
                 var j = 0
                 while j < value.len() as i32 - 1:
-                    if value.byte_at(j as i64) == 35 and value.byte_at((j + 1) as i64) != 35:
+                    if value.byte_at(j as i64) == 35:
+                        if value.byte_at((j + 1) as i64) == 35:
+                            // `##` token paste — skip both
+                            j = j + 2
+                            continue
+                        // `#` followed by non-`#` — stringify
                         return true
                     j = j + 1
                 // Indirect: body calls another fn-like macro, e.g. STRING(s)
@@ -8595,6 +8616,63 @@ fn ci_temp_id_for_cursor(cursor: i32) -> i32:
 fn ci_migrate_ir_enabled() -> bool:
     g_migrate_ir_enabled_cache != 0
 
+// Debug trace for CXK_ kinds that still reach the raw-string
+// fallback in ci_lower_expr_ir / ci_lower_stmt_ir. Every call
+// appends; ci_dump_raw_fallback_stats aggregates at end of
+// migration.
+var g_ci_raw_expr_kinds: Vec[i32] = Vec.new()
+var g_ci_raw_stmt_kinds: Vec[i32] = Vec.new()
+
+fn ci_record_raw_expr_kind(kind: i32):
+    g_ci_raw_expr_kinds.push(kind)
+
+fn ci_record_raw_stmt_kind(kind: i32):
+    g_ci_raw_stmt_kinds.push(kind)
+
+fn ci_aggregate_kind_vec(v: &Vec[i32], label: str):
+    // Collect unique kinds into parallel vectors and count.
+    var unique: Vec[i32] = Vec.new()
+    var counts: Vec[i32] = Vec.new()
+    var i: i64 = 0
+    while i < v.len():
+        let k = v.get(i)
+        var j: i64 = 0
+        var found = false
+        while j < unique.len():
+            if unique.get(j) == k:
+                // Reconstruct-and-replace: push the current counts
+                // then rebuild into a fresh vector. Avoids using
+                // Vec.set which codegens poorly right now.
+                found = true
+                break
+            j = j + 1
+        if found:
+            // bump by rebuilding counts
+            var new_counts: Vec[i32] = Vec.new()
+            var m: i64 = 0
+            while m < counts.len():
+                if m == j:
+                    new_counts.push(counts.get(m) + 1)
+                else:
+                    new_counts.push(counts.get(m))
+                m = m + 1
+            counts = new_counts
+        else:
+            unique.push(k)
+            counts.push(1)
+        i = i + 1
+    eprint(label)
+    var u: i64 = 0
+    while u < unique.len():
+        let k = unique.get(u)
+        let c = counts.get(u)
+        eprint(f"  kind={k} count={c}")
+        u = u + 1
+
+pub fn ci_dump_raw_fallback_stats():
+    ci_aggregate_kind_vec(&g_ci_raw_expr_kinds, "migrate: raw-expr fallback by cursor kind:")
+    ci_aggregate_kind_vec(&g_ci_raw_stmt_kinds, "migrate: raw-stmt fallback by cursor kind:")
+
 // (ci_ir_shim_stmt was removed in B5e — B5d's statement-level
 // detour covers the same path at finer granularity, so the
 // function-body-level shim is redundant.)
@@ -9055,6 +9133,7 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str) -> i32:
     g_migrate_global_owner_kinds = ""
 
     let files_failed = files_scanned - files_migrated
+    ci_dump_raw_fallback_stats()
     if files_failed > 0:
         eprint(f"migrate: {files_migrated}/{files_scanned} files migrated ({files_failed} failed) from {input_dir} -> {output_dir}")
         return 1
