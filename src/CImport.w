@@ -8696,6 +8696,22 @@ fn ci_var_init_expr(session: i64, var_cursor: i32, scope: str) -> str:
                 let elem_ty = ci_array_elem_type_from_cursor(session, init_peeled)
                 if elem_ty.len() > 0:
                     init_expr = "(&" ++ init_expr ++ "[0] as " ++ vty_str ++ ")"
+            // Pointer-type mismatch: when the var is `*T` and the
+            // init expression's type is also a pointer but points
+            // to a different type (e.g. `*c_void` from a malloc-
+            // style call), emit an explicit `as *T` cast to bridge
+            // the gap. C does this implicit conversion silently;
+            // With requires it explicit.
+            //
+            // libclang wraps the call in an ImplicitCast whose
+            // outer type matches the var, so checking outer-type
+            // would always be a no-op. Peel through to the
+            // underlying call cursor and compare its type.
+            else if with_ci_type_is_pointer(session, init_cursor) != 0:
+                let init_peeled_ptr = ci_peel_transparent(session, init_cursor)
+                let init_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, init_peeled_ptr))
+                if init_ty_str.len() > 0 and init_ty_str != vty_str and with_ci_type_is_pointer(session, init_peeled_ptr) != 0:
+                    init_expr = "(" ++ init_expr ++ " as " ++ vty_str ++ ")"
         if ci_var_init_translation_is_valid(vty_str, init_expr):
             return init_expr
     if scope.len() == 0:
