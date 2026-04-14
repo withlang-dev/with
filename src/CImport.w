@@ -4948,6 +4948,10 @@ fn ci_lower_call_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, types
         let arg_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, arg_cursor))
         if arg_ty_str.len() > 0 and arg_ty_str.byte_at(0) == 91:
             return 0 as CiExprId
+        // Bail on extern incomplete array args (e.g. _pcre2_xxx_8)
+        // so legacy emits the explicit decay.
+        if ci_cursor_is_array_type(session, ci_peel_transparent(session, arg_cursor)):
+            return 0 as CiExprId
         let arg_src = with_ci_cursor_source_text(session, arg_cursor)
         let expanded = ci_expand_string_macro_sequence(session, arg_src)
         if expanded.len() > 0:
@@ -5392,13 +5396,14 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                             arg = expanded_arg
                     if arg.len() == 0:
                         return ""
-                    // Array-to-pointer decay: if arg is array type, cast to pointer
-                    let arg_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, arg_cursor))
-                    if arg_ty_str.len() > 0 and arg_ty_str.byte_at(0) == 91:
-                        // [N]T → (&arg[0] as *mut T)
-                        let elem_start = ci_find_array_elem_start(arg_ty_str)
-                        if elem_start > 0:
-                            let elem_ty = arg_ty_str.slice(elem_start as i64, arg_ty_str.len())
+                    // Array-to-pointer decay: if arg is array
+                    // type (including extern incomplete arrays
+                    // whose translated string doesn't start with
+                    // `[`), cast to pointer.
+                    let arg_peeled = ci_peel_transparent(session, arg_cursor)
+                    if ci_cursor_is_array_type(session, arg_peeled):
+                        let elem_ty = ci_array_elem_type_from_cursor(session, arg_peeled)
+                        if elem_ty.len() > 0:
                             arg = "(&" ++ arg ++ "[0] as *mut " ++ elem_ty ++ ")"
                     args = args ++ arg
                     ai = ai + 1
@@ -5928,11 +5933,10 @@ fn ci_lower_rvalue_expr(session: i64, cursor: i32, scope: str) -> CiExprLowering
                 let expanded_arg = ci_expand_string_macro_sequence(session, arg)
                 if expanded_arg.len() > 0:
                     arg = expanded_arg
-            let arg_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, arg_cursor))
-            if arg_ty_str.len() > 0 and arg_ty_str.byte_at(0) == 91:
-                let elem_start = ci_find_array_elem_start(arg_ty_str)
-                if elem_start > 0:
-                    let elem_ty = arg_ty_str.slice(elem_start as i64, arg_ty_str.len())
+            let arg_peeled = ci_peel_transparent(session, arg_cursor)
+            if ci_cursor_is_array_type(session, arg_peeled):
+                let elem_ty = ci_array_elem_type_from_cursor(session, arg_peeled)
+                if elem_ty.len() > 0:
                     arg = "(&" ++ arg ++ "[0] as *mut " ++ elem_ty ++ ")"
             args = args ++ arg
             ai = ai + 1
