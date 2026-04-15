@@ -11050,6 +11050,10 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
     ci_collect_var_decls(session, body_cursor, &mut hoisted_decls)
 
     // Build hoisted-decl raw-string nodes (one per decl).
+    // Kept as raw_string for now because CiHoistedVarDecl only
+    // stores (name, ty_str), not the original cursor — a
+    // structural CIS_VAR_DECL would need ci_type_from_libclang
+    // on the original VAR_DECL cursor. Deferred.
     var hoisted_ids: Vec[i32] = Vec.new()
     var hvi: i32 = 0
     while hvi < hoisted_decls.len() as i32:
@@ -11103,13 +11107,12 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
                 if not cur_has_content:
                     let empty_raw = stmts.raw_string("// empty")
                     cur_children.push(empty_raw as i32)
-                let fall_id = ci_goto_arm_fallthrough(stmts, target_state)
-                cur_children.push(fall_id as i32)
+                ci_goto_arm_fallthrough_push_structural(stmts, exprs, &mut cur_children, target_state)
                 // Commit the current arm: prepend entry line,
                 // then push children inline onto the flat arena.
-                let entry_raw = stmts.raw_string("(__goto_pending = 0)")
+                let entry_id = ci_goto_arm_entry_init_structural(stmts, exprs)
                 let start_idx = arm_children_flat.len() as i32
-                arm_children_flat.push(entry_raw as i32)
+                arm_children_flat.push(entry_id as i32)
                 var cpi: i64 = 0
                 while cpi < cur_children.len():
                     arm_children_flat.push(cur_children.get(cpi))
@@ -11134,7 +11137,7 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
                         if (decl_ir.stmt_id as i32) != 0:
                             body_scope = decl_ir.updated_scope
                             cur_children.push(decl_ir.stmt_id as i32)
-                            let check_id = ci_goto_arm_pending_check(stmts)
+                            let check_id = ci_goto_arm_pending_check(stmts, exprs)
                             cur_children.push(check_id as i32)
                             cur_has_content = true
                             handled_structurally = true
@@ -11149,7 +11152,7 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
                         if s.len() > 0:
                             let stmt_raw = stmts.raw_string(s)
                             cur_children.push(stmt_raw as i32)
-                            let check_id = ci_goto_arm_pending_check(stmts)
+                            let check_id = ci_goto_arm_pending_check(stmts, exprs)
                             cur_children.push(check_id as i32)
                             cur_has_content = true
 
@@ -11162,8 +11165,7 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
                 target_label = with_ci_cursor_spelling(session, child)
             let target_state = ci_label_state(label_map, target_label)
             if target_state >= 0:
-                let fall_id = ci_goto_arm_fallthrough(stmts, target_state)
-                cur_children.push(fall_id as i32)
+                ci_goto_arm_fallthrough_push_structural(stmts, exprs, &mut cur_children, target_state)
                 cur_has_content = true
 
         else if kind == CXK_DECL_STMT:
@@ -11186,7 +11188,7 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
             if s.len() > 0:
                 let stmt_raw = stmts.raw_string(s)
                 cur_children.push(stmt_raw as i32)
-                let check_id = ci_goto_arm_pending_check(stmts)
+                let check_id = ci_goto_arm_pending_check(stmts, exprs)
                 cur_children.push(check_id as i32)
                 cur_has_content = true
 
@@ -11197,9 +11199,9 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
     if not cur_has_content:
         let empty_raw = stmts.raw_string("// empty")
         cur_children.push(empty_raw as i32)
-    let entry_raw_f = stmts.raw_string("(__goto_pending = 0)")
+    let entry_id_f = ci_goto_arm_entry_init_structural(stmts, exprs)
     let fstart_idx = arm_children_flat.len() as i32
-    arm_children_flat.push(entry_raw_f as i32)
+    arm_children_flat.push(entry_id_f as i32)
     var fcpi: i64 = 0
     while fcpi < cur_children.len():
         arm_children_flat.push(cur_children.get(fcpi))
@@ -11234,15 +11236,47 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
 
     stmts.add(CiStmtKind.CIS_GOTO_BODY, meta_start, hoisted_count, arm_count, 0)
 
-// Build the per-statement break-guard: `if __goto_pending != 0:\n    continue`
-// emitted as a single CIS_RAW_STRING so its layout matches the
-// legacy output byte-for-byte.
-fn ci_goto_arm_pending_check(stmts: &mut CiStmtPool) -> CiStmtId:
-    stmts.raw_string("if __goto_pending != 0:\n    continue")
+// Build the per-statement break-guard as a structural
+// CIS_IF(CIE_BINARY(NEQ, __goto_pending, 0), CIS_CONTINUE, 0).
+// Output form: `if __goto_pending != 0:\n    continue\n`.
+fn ci_goto_arm_pending_check(stmts: &mut CiStmtPool, exprs: &mut CiExprPool) -> CiStmtId:
+    ci_trace_port("STRUCTURAL[b11.8.goto_pending_check]")
+    let pg_name_idx = exprs.add_string("__goto_pending")
+    let pg_id = exprs.ident(pg_name_idx, 0 as CiTypeId)
+    let zero_str = exprs.add_string("0")
+    let zero_id = exprs.int_lit(zero_str, 0 as CiTypeId)
+    let cond = exprs.binary(CiBinOp.CIBO_NEQ, pg_id, zero_id, 0 as CiTypeId)
+    let cont = stmts.continue_()
+    stmts.if_stmt(cond, cont, 0 as CiStmtId)
 
-// Build the tail `__pc = N; continue` transition for an arm.
-fn ci_goto_arm_fallthrough(stmts: &mut CiStmtPool, state_num: i32) -> CiStmtId:
-    stmts.raw_string("__pc = " ++ i64_to_string(state_num as i64) ++ "\ncontinue")
+// Build the entry-arm init `(__goto_pending = 0)` as a
+// CIS_EXPR wrapping a CIE_BINARY assign-expression. The
+// CIE_BINARY printer wraps assign in outer parens so the
+// CIS_EXPR prints as `(__goto_pending = 0)\n`.
+fn ci_goto_arm_entry_init_structural(stmts: &mut CiStmtPool, exprs: &mut CiExprPool) -> CiStmtId:
+    ci_trace_port("STRUCTURAL[b11.8.goto_entry_init]")
+    let pg_name_idx = exprs.add_string("__goto_pending")
+    let pg_id = exprs.ident(pg_name_idx, 0 as CiTypeId)
+    let zero_str = exprs.add_string("0")
+    let zero_id = exprs.int_lit(zero_str, 0 as CiTypeId)
+    let assign = exprs.binary(CiBinOp.CIBO_ASSIGN, pg_id, zero_id, 0 as CiTypeId)
+    stmts.expr_stmt(assign)
+
+// Push the `__pc = N; continue` fallthrough transition onto
+// an arm's child list as two separate structural stmts (a
+// CIS_ASSIGN and a CIS_CONTINUE). The goto-body printer
+// concatenates arm children with no separator, so two pushes
+// produce the same `__pc = N\ncontinue\n` output.
+fn ci_goto_arm_fallthrough_push_structural(stmts: &mut CiStmtPool, exprs: &mut CiExprPool, cur_children: &mut Vec[i32], state_num: i32):
+    ci_trace_port("STRUCTURAL[b11.8.goto_pc_transition]")
+    let pc_name_idx = exprs.add_string("__pc")
+    let pc_id = exprs.ident(pc_name_idx, 0 as CiTypeId)
+    let state_str = exprs.add_string(i64_to_string(state_num as i64))
+    let state_id = exprs.int_lit(state_str, 0 as CiTypeId)
+    let assign = stmts.assign(pc_id, state_id)
+    let cont = stmts.continue_()
+    cur_children.push(assign as i32)
+    cur_children.push(cont as i32)
 
 // Translate a statement inside a goto-containing function.
 // Same as ci_trans_stmt but replaces goto with __pc = N; continue
