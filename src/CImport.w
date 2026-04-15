@@ -6992,6 +6992,38 @@ fn ci_lower_for_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs
         return stmts.block(wstart, 2)
     while_id
 
+// Strip trailing CIS_BREAK children from a structural CIS_BLOCK,
+// returning a NEW CIS_BLOCK (or the original stmt_id when no
+// break is trailing, or when the input isn't a CIS_BLOCK). Used
+// by the structural switch arm-body lowering path to remove the
+// `break` that terminates a case before emitting the arm body
+// into a CIS_MATCH.
+fn ci_strip_trailing_break_ir(stmts: &mut CiStmtPool, stmt_id: CiStmtId) -> CiStmtId:
+    if (stmt_id as i32) == 0:
+        return stmt_id
+    if stmts.kind(stmt_id) != CiStmtKind.CIS_BLOCK:
+        // Non-block: if it's directly a CIS_BREAK, return 0 (empty).
+        if stmts.kind(stmt_id) == CiStmtKind.CIS_BREAK:
+            return 0 as CiStmtId
+        return stmt_id
+    let extra_start = stmts.get_d0(stmt_id)
+    let count = stmts.get_d1(stmt_id)
+    if count == 0:
+        return stmt_id
+    let last_child_id = (stmts.get_extra(extra_start + count - 1)) as CiStmtId
+    if stmts.kind(last_child_id) != CiStmtKind.CIS_BREAK:
+        return stmt_id
+    // Rebuild the block without the trailing CIS_BREAK.
+    let new_count = count - 1
+    if new_count == 0:
+        return 0 as CiStmtId
+    let new_start = stmts.extra.len() as i32
+    var i: i32 = 0
+    while i < new_count:
+        let _ = stmts.add_extra(stmts.get_extra(extra_start + i))
+        i = i + 1
+    stmts.block(new_start, new_count)
+
 // Structural lowering for CXK_SWITCH_STMT. Builds a CIS_MATCH
 // with raw-string subject + arm leaves. Mirrors the branching
 // structure of ci_trans_switch_body: simple per-case arms when
@@ -7006,6 +7038,13 @@ fn ci_lower_switch_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, ex
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         return 0 as CiStmtId
+    // Try the fully-structural path first (no-fallthrough +
+    // simple subject + structural case values + structural
+    // arm bodies). When it bails, fall back to the legacy-text
+    // path that wraps subject/value/body strings as raw_string.
+    let structural_id = ci_lower_switch_stmt_ir_structural(session, cursor, stmts, exprs, types, scope)
+    if (structural_id as i32) != 0:
+        return structural_id
     // Bypass the IR detour while building arm body text. The
     // legacy ci_trans_switch_body runs with cache=0 (from the
     // outer ci_trans_stmt_legacy_for_ir wrapper) and relies on
@@ -7019,6 +7058,111 @@ fn ci_lower_switch_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, ex
     let result = ci_lower_switch_stmt_ir_inner(session, cursor, stmts, exprs, types, scope)
     g_migrate_ir_enabled_cache = saved_cache
     result
+
+// Fully-structural switch lowering. Uses ci_lower_expr_ir for
+// subject and case values, ci_lower_stmt_ir for arm bodies,
+// and ci_strip_trailing_break_ir to remove the terminating break
+// from each case body. Bails (returns 0) on fallthrough,
+// statement-level subject eval, or missing case/body children —
+// those cases fall through to the legacy raw-string wrap.
+fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+    let nc = with_ci_num_children(session, cursor)
+    if nc < 2:
+        return 0 as CiStmtId
+    let cond_cursor = with_ci_child(session, cursor, 0)
+    // Complex subject that needs statement-level eval: bail.
+    if ci_condition_needs_stmt_eval(session, cond_cursor):
+        return 0 as CiStmtId
+    let body_cursor = with_ci_child(session, cursor, 1)
+    let body_nc = with_ci_num_children(session, body_cursor)
+
+    // Detect fallthrough. A case body that doesn't end in an
+    // unconditional terminator (break / return / continue /
+    // goto) falls through — the legacy uses prong-duplication
+    // which isn't structurally lowered here, so bail.
+    var ii = 0
+    while ii < body_nc:
+        let child = with_ci_child(session, body_cursor, ii)
+        let ck = with_ci_cursor_kind(session, child)
+        if ck == CXK_CASE_STMT:
+            let case_nc = with_ci_num_children(session, child)
+            if case_nc >= 2:
+                let bc = with_ci_child(session, child, 1)
+                if not ci_stmt_ends_with_terminator(session, bc):
+                    return 0 as CiStmtId
+            else:
+                return 0 as CiStmtId
+        else if ck == CXK_DEFAULT_STMT:
+            let case_nc = with_ci_num_children(session, child)
+            if case_nc >= 1:
+                let bc = with_ci_child(session, child, 0)
+                if not ci_stmt_ends_with_terminator(session, bc):
+                    return 0 as CiStmtId
+        ii = ii + 1
+
+    ci_trace_port("STRUCTURAL[b11.7.switch_subject]")
+    let subject_id = ci_lower_expr_ir(session, cond_cursor, exprs, types, scope)
+    if (subject_id as i32) == 0:
+        return 0 as CiStmtId
+
+    // Build arm records. Each record: [value_count, value_exprs..., body_stmt_id].
+    var arm_records: Vec[i32] = Vec.new()
+    var arm_count = 0
+    var default_body_id: CiStmtId = 0 as CiStmtId
+    var i = 0
+    while i < body_nc:
+        let child = with_ci_child(session, body_cursor, i)
+        let ck = with_ci_cursor_kind(session, child)
+        if ck == CXK_CASE_STMT:
+            let case_nc = with_ci_num_children(session, child)
+            if case_nc >= 2:
+                ci_trace_port("STRUCTURAL[b11.7.switch_arm_val]")
+                let val_cursor = with_ci_child(session, child, 0)
+                let val_id = ci_lower_expr_ir(session, val_cursor, exprs, types, scope)
+                if (val_id as i32) == 0:
+                    return 0 as CiStmtId
+                ci_trace_port("STRUCTURAL[b11.7.switch_arm_body]")
+                let body_child = with_ci_child(session, child, 1)
+                let raw_body_id = ci_lower_stmt_ir(session, body_child, stmts, exprs, types, 0, scope)
+                if (raw_body_id as i32) == 0:
+                    return 0 as CiStmtId
+                let body_id = ci_strip_trailing_break_ir(stmts, raw_body_id)
+                if (body_id as i32) == 0:
+                    return 0 as CiStmtId
+                arm_records.push(1)
+                arm_records.push(val_id as i32)
+                arm_records.push(body_id as i32)
+                arm_count = arm_count + 1
+            else:
+                return 0 as CiStmtId
+        else if ck == CXK_DEFAULT_STMT:
+            let case_nc = with_ci_num_children(session, child)
+            if case_nc >= 1:
+                ci_trace_port("STRUCTURAL[b11.7.switch_default_body]")
+                let body_child = with_ci_child(session, child, 0)
+                let raw_body_id = ci_lower_stmt_ir(session, body_child, stmts, exprs, types, 0, scope)
+                if (raw_body_id as i32) == 0:
+                    return 0 as CiStmtId
+                let body_id = ci_strip_trailing_break_ir(stmts, raw_body_id)
+                if (body_id as i32) == 0:
+                    return 0 as CiStmtId
+                default_body_id = body_id
+        i = i + 1
+
+    if (default_body_id as i32) != 0:
+        arm_records.push(0)
+        arm_records.push(default_body_id as i32)
+        arm_count = arm_count + 1
+
+    if arm_count == 0:
+        return 0 as CiStmtId
+
+    let arms_start = stmts.extra.len() as i32
+    var ri: i64 = 0
+    while ri < arm_records.len():
+        let _ = stmts.add_extra(arm_records.get(ri))
+        ri = ri + 1
+    stmts.add(CiStmtKind.CIS_MATCH, subject_id as i32, arms_start, arm_count, 0)
 
 fn ci_lower_switch_stmt_ir_inner(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
     let nc = with_ci_num_children(session, cursor)
@@ -8529,6 +8673,26 @@ fn ci_stmt_ends_with_break(session: i64, cursor: i32) -> bool:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
             return ci_stmt_ends_with_break(session, with_ci_child(session, cursor, nc - 1))
+    false
+
+// Broader "is this case non-fallthrough" check: accepts any
+// unconditional terminator (break, return, continue, goto) at
+// the end of the case body. Used by the structural switch
+// lowering to determine whether a case can safely become a
+// distinct match arm without needing the legacy's
+// prong-duplication.
+fn ci_stmt_ends_with_terminator(session: i64, cursor: i32) -> bool:
+    let kind = with_ci_cursor_kind(session, cursor)
+    if kind == CXK_BREAK_STMT or kind == CXK_RETURN_STMT or kind == CXK_CONTINUE_STMT or kind == CXK_GOTO_STMT:
+        return true
+    if kind == CXK_COMPOUND_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_stmt_ends_with_terminator(session, with_ci_child(session, cursor, nc - 1))
+    if kind == CXK_CASE_STMT or kind == CXK_DEFAULT_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_stmt_ends_with_terminator(session, with_ci_child(session, cursor, nc - 1))
     false
 
 // ── Scope helpers ───────────────────────────────────────────
