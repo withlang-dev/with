@@ -211,30 +211,38 @@ let BO_SHR_ASSIGN: i32 = 29
 let BO_COMMA: i32 = 30
 
 // Implicit cast kind constants
-let CI_CAST_UNKNOWN: i32 = 0
-let CI_CAST_LVALUE_TO_RVALUE: i32 = 1
-let CI_CAST_ARRAY_TO_PTR: i32 = 2
-let CI_CAST_FUNCTION_TO_PTR: i32 = 3
-let CI_CAST_INT_TO_PTR: i32 = 4
-let CI_CAST_PTR_TO_INT: i32 = 5
-let CI_CAST_BITCAST: i32 = 6
-let CI_CAST_INT_WIDEN: i32 = 7
-let CI_CAST_INT_TRUNC: i32 = 8
-let CI_CAST_FLOAT_WIDEN: i32 = 9
-let CI_CAST_FLOAT_TRUNC: i32 = 10
-let CI_CAST_FLOAT_TO_INT: i32 = 11
-let CI_CAST_INT_TO_FLOAT: i32 = 12
-let CI_CAST_INT_TO_BOOL: i32 = 13
-let CI_CAST_PTR_TO_BOOL: i32 = 14
-let CI_CAST_NOOP: i32 = 15
-let CI_CAST_NULL_TO_PTR: i32 = 16
-let CI_CAST_FLOAT_TO_BOOL: i32 = 17
-let CI_CAST_BOOL_TO_INT: i32 = -1
-let CI_CAST_TO_VOID: i32 = -1
-let CI_CAST_PTR_CAST: i32 = CI_CAST_BITCAST
-let CI_CAST_FLOAT_CAST: i32 = -1
-let CI_CAST_BOOL_TO_FLOAT: i32 = -1
-let CI_CAST_INT_WIDEN_SIGN: i32 = CI_CAST_INT_WIDEN
+// CI_CAST_* values must match the CIC_* constants in
+// rt/clang_bridge.w — with_ci_implicit_cast_kind returns CIC_*
+// values and CImport.w dispatches on them. Kinds the bridge
+// does not emit are set to distinct sentinels < 0 so they never
+// accidentally match a real return value.
+let CI_CAST_NOOP: i32 = 0
+let CI_CAST_NULL_TO_PTR: i32 = 2
+let CI_CAST_BOOL_TO_INT: i32 = 3
+let CI_CAST_INT_TO_BOOL: i32 = 5
+let CI_CAST_PTR_TO_BOOL: i32 = 7
+let CI_CAST_INT_TO_FLOAT: i32 = 9
+let CI_CAST_FLOAT_TO_INT: i32 = 10
+let CI_CAST_TO_VOID: i32 = 15
+let CI_CAST_INT_TRUNC: i32 = 16
+let CI_CAST_INT_WIDEN: i32 = 17
+let CI_CAST_ARRAY_TO_PTR: i32 = 20
+let CI_CAST_INT_TO_PTR: i32 = 21
+let CI_CAST_PTR_TO_INT: i32 = 22
+let CI_CAST_PTR_CAST: i32 = 23
+let CI_CAST_FLOAT_CAST: i32 = 24
+let CI_CAST_FLOAT_TO_BOOL: i32 = 25
+let CI_CAST_BOOL_TO_FLOAT: i32 = 26
+let CI_CAST_BITCAST: i32 = 28
+let CI_CAST_INT_WIDEN_SIGN: i32 = 29
+// Kinds the bridge does not emit — distinct negative sentinels
+// so `cast_kind == CI_CAST_*` comparisons never match anything
+// the bridge returns.
+let CI_CAST_UNKNOWN: i32 = 0 - 1
+let CI_CAST_LVALUE_TO_RVALUE: i32 = 0 - 2
+let CI_CAST_FUNCTION_TO_PTR: i32 = 0 - 3
+let CI_CAST_FLOAT_WIDEN: i32 = CI_CAST_FLOAT_CAST
+let CI_CAST_FLOAT_TRUNC: i32 = CI_CAST_FLOAT_CAST
 
 // Unary operator constants
 let UO_MINUS: i32 = 1
@@ -4307,13 +4315,20 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
     let kind = with_ci_cursor_kind(session, cursor)
 
     // UnexposedExpr (kind 100) — libclang's transparent wrapper
-    // for anything it can't categorize directly (decayed refs,
-    // implicit conversions inside initializers, generic-selection
-    // results). Peel the wrapper and recurse. Handles the top
-    // fallback offender in PCRE2 (~2324/2703 raw expr fallbacks).
+    // used for ImplicitCastExpr in this libclang build. Const-foldable
+    // cursors short-circuit to CIE_INT_LIT; everything else dispatches
+    // to ci_lower_implicit_cast, falling back to plain peel-and-recurse
+    // if the cast handler bails.
     if kind == 100:
+        if with_ci_eval_int_valid(session, cursor) != 0:
+            let ival = with_ci_eval_int_value(session, cursor)
+            let text_idx = exprs.add_string(i64_to_string(ival))
+            return exprs.int_lit(text_idx, 0 as CiTypeId)
         let nc = with_ci_num_children(session, cursor)
         if nc == 1:
+            let cast_id = ci_lower_implicit_cast(session, cursor, exprs, types, scope)
+            if (cast_id as i32) != 0:
+                return cast_id
             let inner_cursor = with_ci_child(session, cursor, 0)
             return ci_lower_expr_ir(session, inner_cursor, exprs, types, scope)
 
@@ -4517,20 +4532,21 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
             return 0 as CiExprId
         return exprs.raw_string(ue_legacy, 0 as CiTypeId)
 
-    // C-style cast.
+    // C-style cast. Structurally builds CIE_CAST over the
+    // recursively-lowered inner, using ci_type_from_libclang on
+    // the cast's destination cursor type. ci_cast_if_needed
+    // prunes no-op same-type casts and void target casts to
+    // match the legacy ci_render_cast_expr behavior.
     if kind == CXK_CSTYLE_CAST:
         let inner_child = ci_find_last_expr_child(session, cursor)
         if inner_child >= 0:
             let inner_id = ci_lower_expr_ir(session, inner_child, exprs, types, scope)
             if (inner_id as i32) != 0:
-                let inner_str = ci_print_expr(exprs, types, inner_id, 0, 0)
-                if inner_str.len() > 0:
-                    let target_ty = with_ci_cursor_type(session, cursor)
-                    let target_str = with_ci_type_translated(session, target_ty)
-                    let inner_ty = with_ci_type_translated(session, with_ci_cursor_type(session, inner_child))
-                    let rendered = ci_render_cast_expr(inner_str, inner_ty, target_str)
-                    if rendered.len() > 0:
-                        return exprs.raw_string(rendered, 0 as CiTypeId)
+                ci_trace_port("STRUCTURAL[b11.5.cstyle_cast]")
+                let target_cxtype = with_ci_cursor_type(session, cursor)
+                let target_ty_id = ci_type_from_libclang(session, target_cxtype, types)
+                if (target_ty_id as i32) != 0:
+                    return ci_cast_if_needed(target_ty_id, inner_id, inner_child, session, exprs, types)
         let cc_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
         if cc_legacy.len() == 0:
             return 0 as CiExprId
@@ -5103,12 +5119,82 @@ fn ci_lower_unary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, type
 
     0 as CiExprId
 
+// Type-string-based implicit cast classifier. Returns a CI_CAST_*
+// code determined from with_ci_type_* helpers + translated type
+// strings, avoiding with_ci_implicit_cast_kind which calls the
+// crash-prone `clang_Type_getSizeOf` on incomplete types.
+// Int-to-int size distinction (WIDEN vs TRUNC) is collapsed into
+// INT_WIDEN — both produce the same `(inner as dest)` output via
+// CIE_CAST anyway.
+fn ci_classify_implicit_cast_safe(session: i64, cursor: i32, inner_cursor: i32) -> i32:
+    let outer_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
+    let inner_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, inner_cursor))
+    if outer_ty_str.len() == 0 or inner_ty_str.len() == 0:
+        return CI_CAST_NOOP
+    if outer_ty_str == inner_ty_str:
+        return CI_CAST_NOOP
+    if outer_ty_str == "void" or outer_ty_str == "unit":
+        return CI_CAST_TO_VOID
+    // Function-to-pointer decay: a function-typed operand (fn(...))
+    // being used in pointer context is a no-op from our printer's
+    // perspective — the callsite `foo(args)` already parses as a
+    // call against the bare name. Returning NOOP keeps the inner
+    // expression unchanged.
+    if ci_starts_with(inner_ty_str, "fn("):
+        return CI_CAST_NOOP
+    let outer_is_bool = with_ci_type_is_bool(session, cursor) != 0
+    let inner_is_bool = with_ci_type_is_bool(session, inner_cursor) != 0
+    let outer_is_ptr = with_ci_type_is_pointer(session, cursor) != 0
+    let inner_is_ptr = with_ci_type_is_pointer(session, inner_cursor) != 0
+    let outer_is_float = with_ci_type_is_float(session, cursor) != 0
+    let inner_is_float = with_ci_type_is_float(session, inner_cursor) != 0
+    // Array detection: CT_ConstantArray/IncompleteArray/Variable etc.
+    // ci_cursor_is_array_type handles the incomplete-array case
+    // where with_ci_type_translated emits `*T` instead of `[]T`.
+    let inner_is_array = ci_cursor_is_array_type(session, inner_cursor) or (inner_ty_str.byte_at(0) == 91)
+    if outer_is_bool:
+        if inner_is_ptr:
+            return CI_CAST_PTR_TO_BOOL
+        if inner_is_float:
+            return CI_CAST_FLOAT_TO_BOOL
+        return CI_CAST_INT_TO_BOOL
+    if inner_is_bool:
+        if outer_is_float:
+            return CI_CAST_BOOL_TO_FLOAT
+        return CI_CAST_BOOL_TO_INT
+    if outer_is_ptr and not inner_is_ptr and not inner_is_array:
+        let inner_kind = with_ci_cursor_kind(session, inner_cursor)
+        if inner_kind == CXK_INT_LITERAL and with_ci_eval_int_valid(session, inner_cursor) != 0:
+            if with_ci_eval_int_value(session, inner_cursor) == 0:
+                return CI_CAST_NULL_TO_PTR
+    if outer_is_ptr and inner_is_array:
+        return CI_CAST_ARRAY_TO_PTR
+    if outer_is_ptr and inner_is_ptr:
+        return CI_CAST_PTR_CAST
+    if outer_is_ptr:
+        return CI_CAST_INT_TO_PTR
+    if inner_is_ptr:
+        return CI_CAST_PTR_TO_INT
+    if not outer_is_float and inner_is_float:
+        return CI_CAST_FLOAT_TO_INT
+    if outer_is_float and not inner_is_float:
+        return CI_CAST_INT_TO_FLOAT
+    if outer_is_float and inner_is_float:
+        return CI_CAST_FLOAT_CAST
+    // Fall-through: int-to-int conversion where size comparison
+    // is unsafe (would call clang_Type_getSizeOf). Use INT_WIDEN;
+    // the CIE_CAST output is the same either way.
+    CI_CAST_INT_WIDEN
+
 fn ci_lower_implicit_cast(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 1:
         return 0 as CiExprId
-    let cast_kind = with_ci_implicit_cast_kind(session, cursor)
     let inner_cursor = with_ci_child(session, cursor, 0)
+    // Use the safe type-string classifier; the raw bridge fn
+    // with_ci_implicit_cast_kind calls clang_Type_getSizeOf which
+    // crashes on certain incomplete types in libclang.
+    let cast_kind = ci_classify_implicit_cast_safe(session, cursor, inner_cursor)
 
     // NULL_TO_PTR — emit `null` verbatim (legacy: `return "null"`).
     // The child cursor isn't referenced by the legacy output.
@@ -5148,52 +5234,121 @@ fn ci_lower_implicit_cast(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
 
     // Remaining kinds (ARRAY_TO_PTR, INT_TO_PTR, PTR_TO_INT,
     // BITCAST/PTR_CAST, INT_WIDEN*, INT_TRUNC, FLOAT_WIDEN/TRUNC,
-    // FLOAT_TO_INT, INT_TO_FLOAT) funnel through the legacy's
-    // ci_render_cast_expr / type-string formatting machinery.
-    // We recursively lower the inner operand and compose with the
-    // legacy helpers — the type-string path is too intricate to
-    // reproduce in IR right now but the sub-expression tree still
-    // goes through the IR pipeline.
+    // FLOAT_TO_INT, INT_TO_FLOAT) build structural CIE_CASTs
+    // over the recursively-lowered inner operand, using
+    // ci_type_from_libclang for the target CiTypeId.
     let inner_id = ci_lower_expr_ir(session, inner_cursor, exprs, types, scope)
     if (inner_id as i32) == 0:
         return 0 as CiExprId
-    let inner_str = ci_print_expr(exprs, types, inner_id, 0, 0)
-    if inner_str.len() == 0:
-        return 0 as CiExprId
-    let inner_ty = with_ci_type_translated(session, with_ci_cursor_type(session, inner_cursor))
 
     if cast_kind == CI_CAST_INT_TO_PTR:
-        return exprs.raw_string("(" ++ inner_str ++ " as usize as *mut c_void)", 0 as CiTypeId)
+        ci_trace_port("STRUCTURAL[b11.5.int_to_ptr]")
+        // `(inner as usize as *mut c_void)`
+        let usize_idx = types.add_string("usize")
+        let usize_ty = types.ty_named(usize_idx)
+        let c_void_idx = types.add_string("c_void")
+        let c_void_ty = types.ty_named(c_void_idx)
+        let void_ptr_ty = types.ty_pointer(c_void_ty, 0)
+        let to_usize = exprs.cast(usize_ty, inner_id)
+        return exprs.cast(void_ptr_ty, to_usize)
+
     if cast_kind == CI_CAST_PTR_TO_INT:
-        let dest_ty = with_ci_cursor_type(session, cursor)
-        let dest_str = with_ci_type_translated(session, dest_ty)
-        return exprs.raw_string("(" ++ inner_str ++ " as usize as " ++ dest_str ++ ")", 0 as CiTypeId)
+        ci_trace_port("STRUCTURAL[b11.5.ptr_to_int]")
+        // `(inner as usize as DEST)`
+        let dest_cxtype = with_ci_cursor_type(session, cursor)
+        let dest_ty_id = ci_type_from_libclang(session, dest_cxtype, types)
+        if (dest_ty_id as i32) == 0:
+            return 0 as CiExprId
+        let usize_idx = types.add_string("usize")
+        let usize_ty = types.ty_named(usize_idx)
+        let to_usize = exprs.cast(usize_ty, inner_id)
+        return exprs.cast(dest_ty_id, to_usize)
+
     if cast_kind == CI_CAST_ARRAY_TO_PTR:
-        // Use the cast's full destination type so const qualifiers
-        // on the pointee are preserved. A `const T[]` decays to
-        // `*const T`, not `*mut T`.
-        let dest_ty = with_ci_cursor_type(session, cursor)
-        let dest_str = with_ci_type_translated(session, dest_ty)
-        if dest_str.len() > 0:
-            return exprs.raw_string("(&" ++ inner_str ++ "[0] as " ++ dest_str ++ ")", 0 as CiTypeId)
-        let pointee = with_ci_cursor_pointee_type(session, cursor)
-        if pointee.len() > 0:
-            return exprs.raw_string("(&" ++ inner_str ++ "[0] as *mut " ++ pointee ++ ")", 0 as CiTypeId)
-        return exprs.raw_string("&" ++ inner_str, 0 as CiTypeId)
+        ci_trace_port("STRUCTURAL[b11.5.array_to_ptr]")
+        // `(&inner[0] as DEST)` — DEST preserves pointee const
+        // qualifiers from the cast's destination type. Structural:
+        //   CIE_INDEX(inner, int_lit(0)) → inner[0]
+        //   CIE_ADDR_OF(idx_e, mut=0)    → &inner[0]
+        //   CIE_CAST(dest_ty, addr_e)    → (&inner[0] as dest)
+        let dest_cxtype = with_ci_cursor_type(session, cursor)
+        let dest_ty_id = ci_type_from_libclang(session, dest_cxtype, types)
+        if (dest_ty_id as i32) == 0:
+            return 0 as CiExprId
+        let zero_s = exprs.add_string("0")
+        let zero_e = exprs.int_lit(zero_s, 0 as CiTypeId)
+        let idx_e = exprs.add(CiExprKind.CIE_INDEX, inner_id as i32, zero_e as i32, 0, 0 as CiTypeId)
+        let addr_e = exprs.add(CiExprKind.CIE_ADDR_OF, idx_e as i32, 0, 0, 0 as CiTypeId)
+        return exprs.cast(dest_ty_id, addr_e)
+
     if cast_kind == CI_CAST_BITCAST or cast_kind == CI_CAST_PTR_CAST:
-        let dest_ty = with_ci_cursor_type(session, cursor)
-        let dest_str = with_ci_type_translated(session, dest_ty)
-        let rendered = ci_render_cast_expr(inner_str, inner_ty, dest_str)
-        if rendered.len() > 0:
-            return exprs.raw_string(rendered, 0 as CiTypeId)
-    if cast_kind == CI_CAST_INT_WIDEN_SIGN or cast_kind == CI_CAST_INT_TRUNC or cast_kind == CI_CAST_FLOAT_WIDEN or cast_kind == CI_CAST_FLOAT_TRUNC or cast_kind == CI_CAST_FLOAT_TO_INT or cast_kind == CI_CAST_INT_TO_FLOAT:
-        let dest_ty = with_ci_cursor_type(session, cursor)
-        let dest_str = with_ci_type_translated(session, dest_ty)
-        let rendered = ci_render_cast_expr(inner_str, inner_ty, dest_str)
-        if rendered.len() > 0:
-            return exprs.raw_string(rendered, 0 as CiTypeId)
+        ci_trace_port("STRUCTURAL[b11.5.bitcast]")
+        let dest_cxtype = with_ci_cursor_type(session, cursor)
+        let dest_ty_id = ci_type_from_libclang(session, dest_cxtype, types)
+        if (dest_ty_id as i32) == 0:
+            return 0 as CiExprId
+        return ci_cast_if_needed(dest_ty_id, inner_id, inner_cursor, session, exprs, types)
+
+    if cast_kind == CI_CAST_INT_WIDEN or cast_kind == CI_CAST_INT_WIDEN_SIGN:
+        ci_trace_port("STRUCTURAL[b11.5.int_widen]")
+        let dest_cxtype = with_ci_cursor_type(session, cursor)
+        let dest_ty_id = ci_type_from_libclang(session, dest_cxtype, types)
+        if (dest_ty_id as i32) == 0:
+            return 0 as CiExprId
+        return ci_cast_if_needed(dest_ty_id, inner_id, inner_cursor, session, exprs, types)
+
+    if cast_kind == CI_CAST_INT_TRUNC:
+        ci_trace_port("STRUCTURAL[b11.5.int_trunc]")
+        let dest_cxtype = with_ci_cursor_type(session, cursor)
+        let dest_ty_id = ci_type_from_libclang(session, dest_cxtype, types)
+        if (dest_ty_id as i32) == 0:
+            return 0 as CiExprId
+        return ci_cast_if_needed(dest_ty_id, inner_id, inner_cursor, session, exprs, types)
+
+    if cast_kind == CI_CAST_FLOAT_CAST:
+        ci_trace_port("STRUCTURAL[b11.5.float_cast]")
+        let dest_cxtype = with_ci_cursor_type(session, cursor)
+        let dest_ty_id = ci_type_from_libclang(session, dest_cxtype, types)
+        if (dest_ty_id as i32) == 0:
+            return 0 as CiExprId
+        return ci_cast_if_needed(dest_ty_id, inner_id, inner_cursor, session, exprs, types)
+
+    if cast_kind == CI_CAST_FLOAT_TO_INT:
+        ci_trace_port("STRUCTURAL[b11.5.float_to_int]")
+        let dest_cxtype = with_ci_cursor_type(session, cursor)
+        let dest_ty_id = ci_type_from_libclang(session, dest_cxtype, types)
+        if (dest_ty_id as i32) == 0:
+            return 0 as CiExprId
+        return ci_cast_if_needed(dest_ty_id, inner_id, inner_cursor, session, exprs, types)
+
+    if cast_kind == CI_CAST_INT_TO_FLOAT:
+        ci_trace_port("STRUCTURAL[b11.5.int_to_float]")
+        let dest_cxtype = with_ci_cursor_type(session, cursor)
+        let dest_ty_id = ci_type_from_libclang(session, dest_cxtype, types)
+        if (dest_ty_id as i32) == 0:
+            return 0 as CiExprId
+        return ci_cast_if_needed(dest_ty_id, inner_id, inner_cursor, session, exprs, types)
 
     0 as CiExprId
+
+// Helper: if target type matches the inner operand's translated
+// type string, return inner_id unchanged (matches legacy
+// ci_render_cast_expr's no-op prune for inner_ty == target_str);
+// otherwise wrap in CIE_CAST. Also returns inner_id unchanged
+// when the target is CT_VOID (legacy: target=="void" → return
+// inner). The comparison uses the PRINTED form of target_ty
+// against libclang's with_ci_type_translated of the inner
+// cursor — same strings both sides.
+fn ci_cast_if_needed(target_ty_id: CiTypeId, inner_id: CiExprId, inner_cursor: i32, session: i64, exprs: &mut CiExprPool, types: &mut CiTypePool) -> CiExprId:
+    if (target_ty_id as i32) == 0:
+        return inner_id
+    if types.kind(target_ty_id) == CiTypeKind.CT_VOID:
+        return inner_id
+    let target_str = ci_print_type(types, target_ty_id)
+    let inner_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, inner_cursor))
+    if target_str == inner_ty_str:
+        return inner_id
+    exprs.cast(target_ty_id, inner_id)
 
 fn ci_call_callee_name(session: i64, cursor: i32) -> str:
     // Walk through transparent wrappers (IMPLICIT_CAST, PAREN_EXPR,
@@ -9765,7 +9920,7 @@ fn ci_trace_port_enabled() -> bool:
 
 fn ci_trace_port(tag: str):
     if ci_trace_port_enabled():
-        with_eprint(tag ++ "\n")
+        with_eprint(tag)
 
 fn ci_record_raw_expr_kind(kind: i32):
     if ci_raw_stats_enabled():
