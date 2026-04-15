@@ -4283,13 +4283,13 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
             let cond_cursor = with_ci_child(session, cursor, 0)
             let then_cursor = with_ci_child(session, cursor, 1)
             let else_cursor = with_ci_child(session, cursor, 2)
-            let cond_str = ci_trans_bool_expr(session, cond_cursor, scope)
-            if cond_str.len() > 0:
+            ci_trace_port("STRUCTURAL[b11.1.cond_op]")
+            let cond_id = ci_lower_bool_expr(session, cond_cursor, exprs, types, scope)
+            if (cond_id as i32) != 0:
                 let then_id = ci_lower_expr_ir(session, then_cursor, exprs, types, scope)
                 if (then_id as i32) != 0:
                     let else_id = ci_lower_expr_ir(session, else_cursor, exprs, types, scope)
                     if (else_id as i32) != 0:
-                        let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
                         return exprs.add(CiExprKind.CIE_TERNARY, cond_id as i32, then_id as i32, else_id as i32, 0 as CiTypeId)
         let cond_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
         if cond_legacy.len() == 0:
@@ -4757,20 +4757,19 @@ fn ci_lower_binary_logical(session: i64, cursor: i32, exprs: &mut CiExprPool, ty
     if op != BO_LAND and op != BO_LOR:
         return 0 as CiExprId
 
-    // Legacy: `(if bool_lhs and bool_rhs: 1 else: 0)`. The bool
-    // operands come from ci_trans_bool_expr (unwraps parens/casts
-    // and short-circuits on comparisons). We call the same helper
-    // for the operands — they're string-only, so the result goes
-    // into a raw-string condition.
+    // `(if bool_lhs and bool_rhs: 1 else: 0)` — the bool operands
+    // come from ci_lower_bool_expr which unwraps parens/casts and
+    // short-circuits on comparisons. The cond_id is a structural
+    // CIE_BINARY(LOGICAL_AND/OR) node.
     let lhs_cursor = with_ci_child(session, cursor, 0)
     let rhs_cursor = with_ci_child(session, cursor, 1)
-    let bool_lhs = ci_trans_bool_expr(session, lhs_cursor, scope)
-    let bool_rhs = ci_trans_bool_expr(session, rhs_cursor, scope)
-    if bool_lhs.len() == 0 or bool_rhs.len() == 0:
+    ci_trace_port("STRUCTURAL[b11.1.binary_logical]")
+    let bool_lhs = ci_lower_bool_expr(session, lhs_cursor, exprs, types, scope)
+    let bool_rhs = ci_lower_bool_expr(session, rhs_cursor, exprs, types, scope)
+    if (bool_lhs as i32) == 0 or (bool_rhs as i32) == 0:
         return 0 as CiExprId
-    let log_op = if op == BO_LAND: "and" else: "or"
-    let cond_str = bool_lhs ++ " " ++ log_op ++ " " ++ bool_rhs
-    let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
+    let ci_log_op = if op == BO_LAND: CiBinOp.CIBO_LOGICAL_AND else: CiBinOp.CIBO_LOGICAL_OR
+    let cond_id = exprs.binary(ci_log_op, bool_lhs, bool_rhs, 0 as CiTypeId)
     let one_s = exprs.add_string("1")
     let zero_s = exprs.add_string("0")
     let one = exprs.int_lit(one_s, 0 as CiTypeId)
@@ -6284,6 +6283,89 @@ fn ci_trans_condition_prepare(session: i64, cursor: i32, target: str, scope: str
         return ""
     "var " ++ target ++ ": bool = false\n" ++ eval
 
+// Structural counterpart of ci_trans_bool_expr — produces a
+// CiExprId representing a boolean expression. Mirrors the legacy
+// peel / comparison / LAND / LOR / LNOT / ternary arms but builds
+// CIE_BINARY(CIBO_EQ/NEQ/LT/…), CIE_UNARY(CIUO_LOGICAL_NOT),
+// CIE_TERNARY, and truthy-fallback CIE_BINARY(CIBO_NEQ, x, 0/null/0.0).
+//
+// Returns 0 as CiExprId only when the inner expression itself can't
+// be structurally lowered (ci_lower_expr_ir returns 0). Callers
+// that hit this case must themselves bail so the caller's outer
+// cursor falls through to the legacy path.
+fn ci_lower_bool_expr(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    let kind = with_ci_cursor_kind(session, cursor)
+
+    // Transparent wrappers — peel and recurse.
+    if (kind == CXK_PAREN_EXPR or kind == 100 or kind == CXK_IMPLICIT_CAST) and with_ci_num_children(session, cursor) == 1:
+        return ci_lower_bool_expr(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+
+    if kind == CXK_BINARY_OP:
+        let op = with_ci_binary_op(session, cursor)
+        let nc = with_ci_num_children(session, cursor)
+        // Comparison: structural CIE_BINARY with comparison op.
+        if (op == BO_EQ or op == BO_NE or op == BO_LT or op == BO_GT or op == BO_LE or op == BO_GE) and nc >= 2:
+            let lhs_cursor = with_ci_child(session, cursor, 0)
+            let rhs_cursor = with_ci_child(session, cursor, 1)
+            let lhs_id = ci_lower_expr_ir(session, lhs_cursor, exprs, types, scope)
+            let rhs_id = ci_lower_expr_ir(session, rhs_cursor, exprs, types, scope)
+            if (lhs_id as i32) != 0 and (rhs_id as i32) != 0:
+                var ci_op: i32 = 0
+                if op == BO_EQ: ci_op = CiBinOp.CIBO_EQ
+                if op == BO_NE: ci_op = CiBinOp.CIBO_NEQ
+                if op == BO_LT: ci_op = CiBinOp.CIBO_LT
+                if op == BO_GT: ci_op = CiBinOp.CIBO_GT
+                if op == BO_LE: ci_op = CiBinOp.CIBO_LTE
+                if op == BO_GE: ci_op = CiBinOp.CIBO_GTE
+                return exprs.binary(ci_op, lhs_id, rhs_id, 0 as CiTypeId)
+        // Logical and / or — recurse on each side as bool.
+        if (op == BO_LAND or op == BO_LOR) and nc >= 2:
+            let bool_lhs = ci_lower_bool_expr(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+            let bool_rhs = ci_lower_bool_expr(session, with_ci_child(session, cursor, 1), exprs, types, scope)
+            if (bool_lhs as i32) != 0 and (bool_rhs as i32) != 0:
+                let ci_op = if op == BO_LAND: CiBinOp.CIBO_LOGICAL_AND else: CiBinOp.CIBO_LOGICAL_OR
+                return exprs.binary(ci_op, bool_lhs, bool_rhs, 0 as CiTypeId)
+
+    if kind == CXK_UNARY_OP:
+        let op = with_ci_unary_op(session, cursor)
+        if op == UO_LNOT:
+            let nc = with_ci_num_children(session, cursor)
+            if nc >= 1:
+                let inner = ci_lower_bool_expr(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+                if (inner as i32) != 0:
+                    return exprs.unary(CiUnaryOp.CIUO_LOGICAL_NOT, inner, 0 as CiTypeId)
+
+    // Ternary: `cond ? then : else` used as a boolean. Recurse into
+    // both arms with ci_lower_bool_expr so we don't wrap the whole
+    // thing in `(... != 0)`.
+    if kind == CXK_COND_OP:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 3:
+            let cond_id = ci_lower_bool_expr(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+            let then_id = ci_lower_bool_expr(session, with_ci_child(session, cursor, 1), exprs, types, scope)
+            let else_id = ci_lower_bool_expr(session, with_ci_child(session, cursor, 2), exprs, types, scope)
+            if (cond_id as i32) != 0 and (then_id as i32) != 0 and (else_id as i32) != 0:
+                return exprs.add(CiExprKind.CIE_TERNARY, cond_id as i32, then_id as i32, else_id as i32, 0 as CiTypeId)
+
+    // Fallback: lower as a regular expression and wrap in the
+    // appropriate truthy comparison. Matches ci_bool_truthy_expr's
+    // type-aware zero/null fallback.
+    let inner_id = ci_lower_expr_ir(session, cursor, exprs, types, scope)
+    if (inner_id as i32) == 0:
+        return 0 as CiExprId
+    if with_ci_type_is_bool(session, cursor) != 0:
+        return inner_id
+    if with_ci_type_is_pointer(session, cursor) != 0:
+        let null_e = exprs.null_ptr(0 as CiTypeId)
+        return exprs.binary(CiBinOp.CIBO_NEQ, inner_id, null_e, 0 as CiTypeId)
+    if with_ci_type_is_float(session, cursor) != 0:
+        let zero_fs = exprs.add_string("0.0")
+        let zero_f = exprs.add(CiExprKind.CIE_FLOAT_LIT, zero_fs, 0, 0, 0 as CiTypeId)
+        return exprs.binary(CiBinOp.CIBO_NEQ, inner_id, zero_f, 0 as CiTypeId)
+    let zero_is = exprs.add_string("0")
+    let zero_i = exprs.int_lit(zero_is, 0 as CiTypeId)
+    exprs.binary(CiBinOp.CIBO_NEQ, inner_id, zero_i, 0 as CiTypeId)
+
 fn ci_trans_bool_expr(session: i64, cursor: i32, scope: str) -> str:
     // Produce a true With boolean expression directly, instead of the
     // `(if X: 1 else: 0) != 0` round-trip that ci_trans_expr would emit
@@ -6295,6 +6377,10 @@ fn ci_trans_bool_expr(session: i64, cursor: i32, scope: str) -> str:
     // We unwrap parens / implicit casts and short-circuit on comparisons,
     // logical ops, and unary `!`. Anything else falls back to the int
     // round-trip (which is correct, just less optimizable).
+    //
+    // ci_trans_bool_expr remains for the legacy text-based paths
+    // (ci_trans_stmt, ci_lower_stmt_goto_aware) that still build a
+    // text condition. Structural callers use ci_lower_bool_expr above.
     let kind = with_ci_cursor_kind(session, cursor)
 
     // Transparent wrappers
@@ -6479,10 +6565,9 @@ fn ci_lower_for_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs
 
     var cond_id: CiExprId = 0 as CiExprId
     if parts.cond_cursor >= 0:
-        let cond_text = ci_trans_bool_expr(session, parts.cond_cursor, inner_scope)
-        if cond_text.len() > 0:
-            cond_id = exprs.raw_string(cond_text, 0 as CiTypeId)
-        else:
+        ci_trace_port("STRUCTURAL[b11.1.for_stmt_cond]")
+        cond_id = ci_lower_bool_expr(session, parts.cond_cursor, exprs, types, inner_scope)
+        if (cond_id as i32) == 0:
             cond_id = exprs.raw_string("true", 0 as CiTypeId)
     else:
         cond_id = exprs.raw_string("true", 0 as CiTypeId)
@@ -6751,9 +6836,8 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
                     setup_stmt_id = stmts.raw_string(ci_strip_trailing_newline(setup_text))
                     cond_id = exprs.raw_string(cond_name, 0 as CiTypeId)
             else:
-                let cond_str = ci_trans_bool_expr(session, cond_cursor, scope)
-                if cond_str.len() > 0:
-                    cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
+                ci_trace_port("STRUCTURAL[b11.1.if_stmt_ir]")
+                cond_id = ci_lower_bool_expr(session, cond_cursor, exprs, types, scope)
             if (cond_id as i32) != 0:
                 let then_id = ci_lower_stmt_ir(session, then_child, stmts, exprs, types, 0, scope)
                 // If the then body is empty, fall through to legacy.
@@ -6805,11 +6889,11 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
                         let true_cond = exprs.raw_string("true", 0 as CiTypeId)
                         return stmts.while_stmt(true_cond, inner_block)
             else:
-                let cond_str = ci_trans_bool_expr(session, cond_cursor, scope)
-                if cond_str.len() > 0:
+                ci_trace_port("STRUCTURAL[b11.1.while_stmt_ir]")
+                let cond_id = ci_lower_bool_expr(session, cond_cursor, exprs, types, scope)
+                if (cond_id as i32) != 0:
                     let body_id = ci_lower_stmt_ir(session, body_cursor, stmts, exprs, types, 0, scope)
                     if (body_id as i32) != 0:
-                        let cond_id = exprs.raw_string(cond_str, 0 as CiTypeId)
                         return stmts.while_stmt(cond_id, body_id)
 
     // Structural for statement. Desugars `for (init; cond; inc) body`
@@ -6842,12 +6926,13 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
             let cond_cursor = with_ci_child(session, cursor, 1)
             // Complex condition: defer to legacy.
             if not ci_condition_needs_stmt_eval(session, cond_cursor):
-                let cond_text = ci_trans_bool_expr(session, cond_cursor, scope)
-                if cond_text.len() > 0:
+                ci_trace_port("STRUCTURAL[b11.1.do_stmt_ir]")
+                let cond_id = ci_lower_bool_expr(session, cond_cursor, exprs, types, scope)
+                if (cond_id as i32) != 0:
                     let body_id = ci_lower_stmt_ir(session, body_cursor, stmts, exprs, types, 0, scope)
                     if (body_id as i32) != 0:
-                        // `if not (cond): break`
-                        let not_cond_id = exprs.raw_string("not (" ++ cond_text ++ ")", 0 as CiTypeId)
+                        // `if not cond: break`
+                        let not_cond_id = exprs.unary(CiUnaryOp.CIUO_LOGICAL_NOT, cond_id, 0 as CiTypeId)
                         let break_id = stmts.break_()
                         let if_break = stmts.if_stmt(not_cond_id, break_id, 0 as CiStmtId)
                         // Block: [body, if_break]
@@ -9437,6 +9522,30 @@ fn ci_raw_stats_enabled() -> bool:
         else:
             g_ci_raw_stats_enabled_cache = 0
     g_ci_raw_stats_enabled_cache != 0
+
+// B11 port verification — each sub-port adds STRUCTURAL[b11.N.site]
+// announcements at the call sites it replaces. Gated behind
+// WITH_MIGRATE_TRACE_PORT=1 so it is off during normal compiles.
+// Verification command for any commit:
+//   WITH_MIGRATE_TRACE_PORT=1 out/bin/with migrate .reference/pcre2/src/pcre2_match.c \
+//     -o /tmp/trace.w --no-c-export -I .reference/pcre2/src -D PCRE2_CODE_UNIT_WIDTH=8 \
+//     2>&1 | grep -E "^(STRUCTURAL|LEGACY)\[b11\." | sort | uniq -c
+// Every listed site for the commit must show STRUCTURAL[...] >= 1
+// and must not show any LEGACY[...] line.
+var g_ci_trace_port_cache: i32 = 0 - 1
+
+fn ci_trace_port_enabled() -> bool:
+    if g_ci_trace_port_cache == 0 - 1:
+        let v = with_getenv_str("WITH_MIGRATE_TRACE_PORT")
+        if v == "1":
+            g_ci_trace_port_cache = 1
+        else:
+            g_ci_trace_port_cache = 0
+    g_ci_trace_port_cache != 0
+
+fn ci_trace_port(tag: str):
+    if ci_trace_port_enabled():
+        with_eprint(tag ++ "\n")
 
 fn ci_record_raw_expr_kind(kind: i32):
     if ci_raw_stats_enabled():
