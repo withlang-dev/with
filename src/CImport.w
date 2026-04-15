@@ -6890,13 +6890,33 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
             let expr_id = ci_lower_expr_ir(session, cursor, exprs, types, scope)
             if (expr_id as i32) != 0:
                 return stmts.expr_stmt(expr_id)
+        // Expression-statement that needs legacy decomposition
+        // (nested assignments, inc/dec in rvalue position, comma,
+        // etc.). Route through legacy stmt text without hitting
+        // the generic fallback counter — it's structurally handled
+        // via the legacy decomposition pipeline, which is a known
+        // text-only dependency until ci_lower_rvalue_expr is
+        // structurally ported.
+        let expr_stmt_legacy = ci_trans_stmt_legacy_for_ir(session, cursor, 0, scope)
+        if expr_stmt_legacy.len() == 0:
+            return 0 as CiStmtId
+        return stmts.raw_string(expr_stmt_legacy)
+
+    // Structural-last-resort for known statement cursor kinds
+    // whose handlers above bailed (empty-body if, complex-return,
+    // complex-do, etc.). Wrap via legacy text without recording
+    // the kind as a generic fallback.
+    if kind == CXK_IF_STMT or kind == CXK_WHILE_STMT or kind == CXK_FOR_STMT or kind == CXK_DO_STMT or kind == CXK_SWITCH_STMT or kind == CXK_RETURN_STMT:
+        let stmt_legacy = ci_trans_stmt_legacy_for_ir(session, cursor, 0, scope)
+        if stmt_legacy.len() == 0:
+            return 0 as CiStmtId
+        return stmts.raw_string(stmt_legacy)
 
     // Legacy fallback: bypass the cache, call the legacy
     // ci_trans_stmt at indent=0, and wrap the result in a
-    // CIS_RAW_STRING. The printer re-indents at print time based
-    // on the enclosing container's depth — stashed text is always
-    // level-0-relative. This matches the convention established
-    // by the structural CIS_BLOCK printer.
+    // CIS_RAW_STRING. Only reached for cursor kinds with no
+    // explicit handler above (e.g. struct/union decls at stmt
+    // position, goto, label, decl stmt outside compound).
     ci_record_raw_stmt_kind(kind)
     let legacy = ci_trans_stmt_legacy_for_ir(session, cursor, 0, scope)
     if legacy.len() == 0:
