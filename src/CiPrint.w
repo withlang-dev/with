@@ -13,10 +13,6 @@
 // a bracketed `<ci:unimpl:KIND>` placeholder so the structure is
 // observable during development. Subsequent B-phase commits replace
 // the placeholders one kind at a time.
-//
-// The CIE_RAW_STRING / CIS_RAW_STRING kinds print their interned
-// text verbatim, matching the Phase-B escape-hatch discipline.
-
 use CiIR
 
 extern fn with_write(s: str) -> void
@@ -83,6 +79,11 @@ fn ci_is_decimal_literal_str(s: str) -> bool:
         if c < 48 or c > 57: return false
         i = i + 1
     true
+
+fn ci_starts_with_str(s: str, prefix: str) -> bool:
+    if prefix.len() > s.len():
+        return false
+    s.slice(0, prefix.len()) == prefix
 
 // Operator precedence table. Larger = binds tighter. Used by Phase-B
 // B3 to decide when to drop redundant parens; Phase A always wraps
@@ -319,6 +320,12 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
         return kw ++ ci_print_expr(exprs, types, operand, 0, 0)
     if kind == CiExprKind.CIE_ARRAY_DECAY:
         let operand = (exprs.get_d0(id)) as CiExprId
+        let target_ty = exprs.get_type(id)
+        if (target_ty as i32) != 0 and types.kind(target_ty) == CiTypeKind.CT_POINTER:
+            let pointee_ty = (types.get_d0(target_ty)) as CiTypeId
+            let is_const = types.get_d1(target_ty)
+            let ptr_kw = if is_const != 0: "*const " else: "*mut "
+            return "(&" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ "[0] as " ++ ptr_kw ++ ci_print_type(types, pointee_ty) ++ ")"
         let elem_ty = (exprs.get_d1(id)) as CiTypeId
         return "(&" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ "[0] as *mut " ++ ci_print_type(types, elem_ty) ++ ")"
 
@@ -362,13 +369,40 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
 
     // Initializers
     if kind == CiExprKind.CIE_INIT_LIST:
-        return "<ci:unimpl:INIT_LIST>"
+        let start = exprs.get_d0(id)
+        let count = exprs.get_d1(id)
+        let ty_id = exprs.get_type(id)
+        var items = ""
+        var i: i32 = 0
+        while i < count:
+            if i > 0:
+                items = items ++ ", "
+            let item = (exprs.get_extra(start + i)) as CiExprId
+            items = items ++ ci_print_expr(exprs, types, item, 0, 0)
+            i = i + 1
+        if (ty_id as i32) != 0 and types.kind(ty_id) == CiTypeKind.CT_ARRAY:
+            return "[" ++ items ++ "]"
+        let ty_text = ci_print_type(types, ty_id)
+        if ty_text.len() > 0 and ty_text != "i32" and not ci_starts_with_str(ty_text, "__UNSUPPORTED"):
+            return ty_text ++ " { " ++ items ++ " }"
+        return "{ " ++ items ++ " }"
     if kind == CiExprKind.CIE_DESIGNATED_INIT:
-        return "<ci:unimpl:DESIGNATED_INIT>"
-
-    // Escape hatch
-    if kind == CiExprKind.CIE_RAW_STRING:
-        return exprs.get_string(exprs.get_d0(id))
+        let start = exprs.get_d0(id)
+        let count = exprs.get_d1(id)
+        let ty_id = exprs.get_type(id)
+        var fields = ""
+        var i: i32 = 0
+        while i < count:
+            if i > 0:
+                fields = fields ++ ", "
+            let name_idx = exprs.get_extra(start + i * 2)
+            let value_id = (exprs.get_extra(start + i * 2 + 1)) as CiExprId
+            fields = fields ++ exprs.get_string(name_idx) ++ ": " ++ ci_print_expr(exprs, types, value_id, 0, 0)
+            i = i + 1
+        let ty_text = ci_print_type(types, ty_id)
+        if ty_text.len() > 0 and ty_text != "i32" and not ci_starts_with_str(ty_text, "__UNSUPPORTED"):
+            return ty_text ++ " { " ++ fields ++ " }"
+        return "{ " ++ fields ++ " }"
 
     "<ci:expr:unknown>"
 
@@ -551,11 +585,11 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         let arm_count = stmts.get_d2(id)
         var out = ""
 
-        // Hoisted decl lines.
+        // Hoisted decl lines (pre-rendered text).
         var hi: i32 = 0
         while hi < hoisted_count:
-            let decl_id = (stmts.get_extra(meta_start + hi)) as CiStmtId
-            let decl_text = ci_print_stmt(stmts, exprs, types, decl_id, 0)
+            let decl_str_idx = stmts.get_extra(meta_start + hi)
+            let decl_text = stmts.get_string(decl_str_idx)
             out = out ++ ci_reindent_spaces(decl_text, depth)
             hi = hi + 1
 
@@ -569,8 +603,9 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         out = out ++ ds1 ++ "match __pc\n"
 
         // Each arm: variable-length meta [state, label_str_idx,
-        // child_count, child_0, ..., child_(K-1)]. Arm children
-        // are concatenated inline with no trailing separators.
+        // child_count, child_str_0, ..., child_str_(K-1)]. Arm
+        // children are pre-rendered text lines; we re-indent to
+        // depth+12 and concat inline.
         var ai: i32 = 0
         var arm_cursor = meta_start + hoisted_count
         while ai < arm_count:
@@ -579,37 +614,22 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
             let child_count = stmts.get_extra(arm_cursor + 2)
             arm_cursor = arm_cursor + 3
 
-            // Arm header line.
             out = out ++ ds2 ++ i32_to_string(state_num) ++ " =>"
             if label_str_idx != 0:
                 out = out ++ "  // " ++ stmts.get_string(label_str_idx)
             out = out ++ "\n"
 
-            // Arm body: concat each child's print output, all
-            // at depth+12 (arm body level). No separators.
             var ci: i32 = 0
             while ci < child_count:
-                let child_id = (stmts.get_extra(arm_cursor + ci)) as CiStmtId
-                let child_text = ci_print_stmt(stmts, exprs, types, child_id, 0)
+                let child_str_idx = stmts.get_extra(arm_cursor + ci)
+                let child_text = stmts.get_string(child_str_idx)
                 out = out ++ ci_reindent_spaces(child_text, depth + 12)
                 ci = ci + 1
             arm_cursor = arm_cursor + child_count
             ai = ai + 1
 
-        // Default `_ => break` arm.
         out = out ++ ds2 ++ "_ => break\n"
         return out
-
-    if kind == CiStmtKind.CIS_RAW_STRING:
-        // The stashed text is always level-0-relative (the
-        // ci_lower_stmt_ir legacy fallback passes indent=0 to the
-        // bypass). Re-indent by depth at print time so the
-        // content lands at the right column for its enclosing
-        // container.
-        let text = stmts.get_string(stmts.get_d0(id))
-        if depth <= 0:
-            return text
-        return ci_reindent_spaces(text, depth)
 
     indent ++ "<ci:stmt:unknown>\n"
 
@@ -759,26 +779,11 @@ fn ci_roundtrip_fn_decl -> i32:
     let expected = "fn foo() -> i32:\n    return 42\n\n"
     ci_expect_eq("fn_decl_return_literal", actual, expected)
 
-fn ci_roundtrip_raw_string -> i32:
-    // The Phase-B escape hatch: a raw-string expr prints its interned
-    // text verbatim, and a raw-string stmt does the same.
-    var types = CiTypePool.new()
-    var exprs = CiExprPool.new()
-    var stmts = CiStmtPool.new()
-    let i32_ty = types.ty_int(32, 0)
-    let raw_e = exprs.raw_string("legacy_expr()", i32_ty)
-    let raw_s = stmts.raw_string("    legacy_stmt()\n")
-    var fails: i32 = 0
-    fails = fails + ci_expect_eq("raw_expr", ci_print_expr(&exprs, &types, raw_e, 0, 0), "legacy_expr()")
-    fails = fails + ci_expect_eq("raw_stmt", ci_print_stmt(&stmts, &exprs, &types, raw_s, 0), "    legacy_stmt()\n")
-    fails
-
 pub fn ci_ir_roundtrip_test -> i32:
     var fails: i32 = 0
     fails = fails + ci_roundtrip_types()
     fails = fails + ci_roundtrip_exprs()
     fails = fails + ci_roundtrip_fn_decl()
-    fails = fails + ci_roundtrip_raw_string()
     if fails == 0:
         with_write("ci-roundtrip: PASS\n")
         return 0
