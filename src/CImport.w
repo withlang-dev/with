@@ -3805,6 +3805,17 @@ type CiDeclLowering {
     entry_stmt: str = "",
 }
 
+// Structural counterpart of CiDeclLowering. Produced by
+// ci_lower_decl_stmt_structural; consumed by ci_lower_stmt_ir
+// compound-stmt, ci_lower_for_stmt_ir, and the goto-body
+// structural handler. `stmt_id` is the CiStmtId to emit (may
+// be 0 if the decl lowered to nothing), `updated_scope` is the
+// scope string after registering the decl's name(s).
+type CiDeclLoweringIR {
+    updated_scope: str = "",
+    stmt_id: CiStmtId = 0 as CiStmtId,
+}
+
 type CiHoistedVarDecl {
     name: str = "",
     ty: str = "",
@@ -6931,10 +6942,16 @@ fn ci_lower_for_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs
     var init_id: CiStmtId = 0 as CiStmtId
     if parts.init_cursor >= 0:
         if with_ci_cursor_kind(session, parts.init_cursor) == CXK_DECL_STMT:
-            let decl_lowered = ci_lower_decl_stmt(session, parts.init_cursor, inner_scope, false)
-            inner_scope = decl_lowered.updated_scope
-            if decl_lowered.local_stmt.len() > 0:
-                init_id = stmts.raw_string(ci_strip_trailing_newline(decl_lowered.local_stmt))
+            ci_trace_port("STRUCTURAL[b11.6.decl_for_init]")
+            let decl_ir = ci_lower_decl_stmt_structural(session, parts.init_cursor, inner_scope, false, stmts, exprs, types)
+            if (decl_ir.stmt_id as i32) != 0:
+                inner_scope = decl_ir.updated_scope
+                init_id = decl_ir.stmt_id
+            else:
+                let decl_lowered = ci_lower_decl_stmt(session, parts.init_cursor, inner_scope, false)
+                inner_scope = decl_lowered.updated_scope
+                if decl_lowered.local_stmt.len() > 0:
+                    init_id = stmts.raw_string(ci_strip_trailing_newline(decl_lowered.local_stmt))
         else:
             init_id = ci_lower_stmt_ir(session, parts.init_cursor, stmts, exprs, types, 0, inner_scope)
 
@@ -7347,11 +7364,17 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
         while ci < ccn:
             let child = with_ci_child(session, cursor, ci)
             if with_ci_cursor_kind(session, child) == CXK_DECL_STMT:
-                let decl_lowered = ci_lower_decl_stmt(session, child, block_scope, false)
-                block_scope = decl_lowered.updated_scope
-                if decl_lowered.local_stmt.len() > 0:
-                    let raw_id = stmts.raw_string(decl_lowered.local_stmt)
-                    child_ids.push(raw_id as i32)
+                ci_trace_port("STRUCTURAL[b11.6.decl_compound]")
+                let decl_ir = ci_lower_decl_stmt_structural(session, child, block_scope, false, stmts, exprs, types)
+                if (decl_ir.stmt_id as i32) != 0:
+                    block_scope = decl_ir.updated_scope
+                    child_ids.push(decl_ir.stmt_id as i32)
+                else:
+                    let decl_lowered = ci_lower_decl_stmt(session, child, block_scope, false)
+                    block_scope = decl_lowered.updated_scope
+                    if decl_lowered.local_stmt.len() > 0:
+                        let raw_id = stmts.raw_string(decl_lowered.local_stmt)
+                        child_ids.push(raw_id as i32)
             else:
                 let child_id = ci_lower_stmt_ir(session, child, stmts, exprs, types, 0, block_scope)
                 if (child_id as i32) != 0:
@@ -8639,6 +8662,123 @@ fn ci_lower_decl_stmt(session: i64, cursor: i32, scope: str, hoisted: bool) -> C
         updated_scope: new_scope,
         local_stmt,
         entry_stmt,
+    }
+
+// Structural counterpart of ci_lower_decl_stmt. Builds a
+// CIS_VAR_DECL for each VAR_DECL child, combining multiple
+// decls into a CIS_BLOCK when needed. Returns 0 as stmt_id if
+// the decl lowered to nothing. For `hoisted=true` (goto body
+// interior), emits CIS_ASSIGN to an already-hoisted variable
+// instead of a fresh CIS_VAR_DECL.
+//
+// Init expressions are lowered structurally via
+// ci_lower_expr_ir; when that bails, the init falls back to
+// CIE_RAW_STRING of ci_var_init_expr's text (matches legacy
+// byte-for-byte). Type is built via ci_type_from_libclang.
+fn ci_lower_decl_stmt_structural(session: i64, cursor: i32, scope: str, hoisted: bool, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool) -> CiDeclLoweringIR:
+    let nc = with_ci_num_children(session, cursor)
+    var new_scope = scope
+    var child_stmt_ids: Vec[i32] = Vec.new()
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, cursor, i)
+        if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
+            let raw_name = with_ci_cursor_spelling(session, child)
+            let escaped = ci_escape_reserved(raw_name)
+            let vty = with_ci_cursor_type(session, child)
+            var storage_name = escaped
+            if hoisted:
+                storage_name = ci_goto_hoisted_var_name(session, child)
+                new_scope = ci_scope_add_mangled(new_scope, escaped, storage_name)
+                ci_fn_var_names_register(storage_name)
+            else:
+                var mangled = ci_scope_mangle(new_scope, escaped)
+                if mangled == escaped and ci_fn_var_names_contains(escaped):
+                    mangled = ci_fn_var_names_unique(escaped)
+                storage_name = mangled
+                if mangled != escaped:
+                    new_scope = ci_scope_add_mangled(new_scope, escaped, mangled)
+                else:
+                    new_scope = ci_scope_add(new_scope, escaped)
+                ci_fn_var_names_register(storage_name)
+            // Resolve init expression structurally via
+            // ci_lower_expr_ir on the var's initializer cursor.
+            // Bail to legacy when the init requires rvalue
+            // sequencing (`*p++`, nested assignments, comma,
+            // compound assign) — the legacy ci_lower_rvalue_expr
+            // produces `with 0 as __ci_expr_seq_N:` setup blocks
+            // that the structural path doesn't model yet.
+            let init_cursor = ci_find_var_init_cursor(session, child)
+            var init_id: CiExprId = 0 as CiExprId
+            if init_cursor >= 0:
+                if ci_rvalue_needs_lowering(session, init_cursor):
+                    return CiDeclLoweringIR {
+                        updated_scope: scope,
+                        stmt_id: 0 as CiStmtId,
+                    }
+                init_id = ci_lower_expr_ir(session, init_cursor, exprs, types, new_scope)
+                if (init_id as i32) == 0:
+                    return CiDeclLoweringIR {
+                        updated_scope: scope,
+                        stmt_id: 0 as CiStmtId,
+                    }
+            // Build structural CiTypeId for the var's libclang type.
+            let vty_id = ci_type_from_libclang(session, vty, types)
+            if (vty_id as i32) == 0:
+                return CiDeclLoweringIR {
+                    updated_scope: scope,
+                    stmt_id: 0 as CiStmtId,
+                }
+            // Var-type-directed init adjustments (matches the
+            // legacy ci_var_init_expr post-processing for pointer
+            // vars):
+            //   var is *T, init is array T[N] → (&init[0] as *T)
+            //   var is *T, init is *U (U != T) → (init as *T)
+            if (init_id as i32) != 0 and init_cursor >= 0:
+                if types.kind(vty_id) == CiTypeKind.CT_POINTER:
+                    let init_peeled = ci_peel_transparent(session, init_cursor)
+                    let init_peeled_kind = with_ci_cursor_kind(session, init_peeled)
+                    if init_peeled_kind != CXK_STRING_LITERAL and ci_cursor_is_array_type(session, init_peeled):
+                        let zero_s = exprs.add_string("0")
+                        let zero_e = exprs.int_lit(zero_s, 0 as CiTypeId)
+                        let idx_e = exprs.add(CiExprKind.CIE_INDEX, init_id as i32, zero_e as i32, 0, 0 as CiTypeId)
+                        let addr_e = exprs.add(CiExprKind.CIE_ADDR_OF, idx_e as i32, 0, 0, 0 as CiTypeId)
+                        init_id = exprs.cast(vty_id, addr_e)
+                    else if with_ci_type_is_pointer(session, init_cursor) != 0:
+                        let init_peeled_ptr = ci_peel_transparent(session, init_cursor)
+                        if with_ci_type_is_pointer(session, init_peeled_ptr) != 0:
+                            let init_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, init_peeled_ptr))
+                            let vty_str = with_ci_type_translated(session, vty)
+                            if init_ty_str.len() > 0 and init_ty_str != vty_str:
+                                init_id = exprs.cast(vty_id, init_id)
+            let name_idx = stmts.add_string(storage_name)
+            if hoisted:
+                // Emit `storage_name = init` as a CIS_ASSIGN.
+                if (init_id as i32) != 0:
+                    let lhs_idx = exprs.add_string(storage_name)
+                    let lhs_id = exprs.ident(lhs_idx, 0 as CiTypeId)
+                    let assign_id = stmts.assign(lhs_id, init_id)
+                    child_stmt_ids.push(assign_id as i32)
+            else:
+                // Non-hoisted: CIS_VAR_DECL with is_mut=1.
+                let decl_id = stmts.var_decl(name_idx, vty_id, init_id, 1)
+                child_stmt_ids.push(decl_id as i32)
+        i = i + 1
+
+    let count = child_stmt_ids.len() as i32
+    var stmt_id: CiStmtId = 0 as CiStmtId
+    if count == 1:
+        stmt_id = (child_stmt_ids.get(0)) as CiStmtId
+    else if count > 1:
+        let extra_start = stmts.extra.len() as i32
+        var cj: i64 = 0
+        while cj < child_stmt_ids.len():
+            let _ = stmts.add_extra(child_stmt_ids.get(cj))
+            cj = cj + 1
+        stmt_id = stmts.block(extra_start, count)
+    CiDeclLoweringIR {
+        updated_scope: new_scope,
+        stmt_id,
     }
 
 fn ci_indent_str(level: i32) -> str:
@@ -10823,19 +10963,31 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
                 let label_body = with_ci_child(session, child, 0)
                 let lbk = with_ci_cursor_kind(session, label_body)
                 if lbk != CXK_LABEL_STMT:
-                    var s = ""
+                    var handled_structurally = false
                     if lbk == CXK_DECL_STMT:
-                        let decl_lowered = ci_lower_decl_stmt(session, label_body, body_scope, true)
-                        body_scope = decl_lowered.updated_scope
-                        s = decl_lowered.entry_stmt
-                    else:
-                        s = ci_lower_stmt_goto_aware(session, label_body, 0, body_scope, label_map, 0)
-                    if s.len() > 0:
-                        let stmt_raw = stmts.raw_string(s)
-                        cur_children.push(stmt_raw as i32)
-                        let check_id = ci_goto_arm_pending_check(stmts)
-                        cur_children.push(check_id as i32)
-                        cur_has_content = true
+                        ci_trace_port("STRUCTURAL[b11.6.decl_goto_child]")
+                        let decl_ir = ci_lower_decl_stmt_structural(session, label_body, body_scope, true, stmts, exprs, types)
+                        if (decl_ir.stmt_id as i32) != 0:
+                            body_scope = decl_ir.updated_scope
+                            cur_children.push(decl_ir.stmt_id as i32)
+                            let check_id = ci_goto_arm_pending_check(stmts)
+                            cur_children.push(check_id as i32)
+                            cur_has_content = true
+                            handled_structurally = true
+                    if not handled_structurally:
+                        var s = ""
+                        if lbk == CXK_DECL_STMT:
+                            let decl_lowered = ci_lower_decl_stmt(session, label_body, body_scope, true)
+                            body_scope = decl_lowered.updated_scope
+                            s = decl_lowered.entry_stmt
+                        else:
+                            s = ci_lower_stmt_goto_aware(session, label_body, 0, body_scope, label_map, 0)
+                        if s.len() > 0:
+                            let stmt_raw = stmts.raw_string(s)
+                            cur_children.push(stmt_raw as i32)
+                            let check_id = ci_goto_arm_pending_check(stmts)
+                            cur_children.push(check_id as i32)
+                            cur_has_content = true
 
         else if kind == CXK_GOTO_STMT:
             var target_label = ""
@@ -10851,12 +11003,19 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
                 cur_has_content = true
 
         else if kind == CXK_DECL_STMT:
-            let decl_lowered = ci_lower_decl_stmt(session, child, body_scope, true)
-            body_scope = decl_lowered.updated_scope
-            if decl_lowered.entry_stmt.len() > 0:
-                let raw_id = stmts.raw_string(decl_lowered.entry_stmt)
-                cur_children.push(raw_id as i32)
+            ci_trace_port("STRUCTURAL[b11.6.decl_goto_hoisted]")
+            let decl_ir = ci_lower_decl_stmt_structural(session, child, body_scope, true, stmts, exprs, types)
+            if (decl_ir.stmt_id as i32) != 0:
+                body_scope = decl_ir.updated_scope
+                cur_children.push(decl_ir.stmt_id as i32)
                 cur_has_content = true
+            else:
+                let decl_lowered = ci_lower_decl_stmt(session, child, body_scope, true)
+                body_scope = decl_lowered.updated_scope
+                if decl_lowered.entry_stmt.len() > 0:
+                    let raw_id = stmts.raw_string(decl_lowered.entry_stmt)
+                    cur_children.push(raw_id as i32)
+                    cur_has_content = true
 
         else:
             let s = ci_lower_stmt_goto_aware(session, child, 0, body_scope, label_map, 0)
