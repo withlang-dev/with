@@ -350,10 +350,11 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
     if kind == CiExprKind.CIE_COMMA:
         return "<ci:unimpl:COMMA>"
 
-    // Compile-time
+    // Compile-time. With generic-call syntax `sizeof[T]()`;
+    // the C-style `sizeof(T)` would be a plain call.
     if kind == CiExprKind.CIE_SIZEOF_TYPE:
         let t = (exprs.get_d0(id)) as CiTypeId
-        return "sizeof(" ++ ci_print_type(types, t) ++ ")"
+        return "sizeof[" ++ ci_print_type(types, t) ++ "]()"
     if kind == CiExprKind.CIE_SIZEOF_EXPR:
         return "<ci:unimpl:SIZEOF_EXPR>"
 
