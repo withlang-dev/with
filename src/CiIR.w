@@ -20,10 +20,9 @@
 // CiTypePool). The printer must not re-query libclang at print time —
 // sessions may be disposed by then.
 //
-// Phase-B escape hatch: CIE_RAW_STRING / CIS_RAW_STRING hold an
-// interned string-id and print verbatim. During incremental migration,
-// un-ported libclang constructs are represented this way until their
-// proper lowering lands. Both kinds are deleted in B11.
+// The migrator now lowers expressions and statements structurally.
+// Unsupported constructs fail by returning the null sentinel from
+// lowering, rather than escaping through verbatim raw-string nodes.
 
 extern fn with_eprint(s: str) -> void
 
@@ -403,13 +402,8 @@ enum CiStmtKind: i32:
     //    ...]
     //
     // Arm children are concatenated inline by the printer with
-    // no CIS_BLOCK trailing separators — goto state-machine arms
-    // compact their statements directly onto consecutive lines,
-    // matching the legacy ci_lower_goto_body output.
-    //
-    // Each child is typically a CIS_RAW_STRING holding a single
-    // translated statement (with internal newlines) or the
-    // `if __goto_pending != 0:\n    continue` break-guard.
+    // no CIS_BLOCK blank separators — goto state-machine arms
+    // compact their statements directly onto consecutive lines.
     //
     // label_str_idx is an index into the stmt pool's strings Vec;
     // 0 means the entry arm (no label comment on the arm header).
