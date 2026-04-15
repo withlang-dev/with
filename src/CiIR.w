@@ -180,7 +180,7 @@ enum CiExprKind: i32:
     CIE_INDEX = 32           // d0 = base, d1 = index
     CIE_CAST = 33            // d0 = target_ty_id, d1 = operand
     CIE_DEREF = 34           // d0 = operand
-    CIE_ADDR_OF = 35         // d0 = operand
+    CIE_ADDR_OF = 35         // d0 = operand, d1 = is_mut (0 = `&`, 1 = `&mut`)
     CIE_ARRAY_DECAY = 36     // d0 = operand, d1 = elem_ty_id
 
     // Side-effecting

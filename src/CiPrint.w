@@ -314,7 +314,9 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
         return ci_wrap_unsafe("*" ++ ci_print_expr(exprs, types, operand, 0, 0))
     if kind == CiExprKind.CIE_ADDR_OF:
         let operand = (exprs.get_d0(id)) as CiExprId
-        return "&" ++ ci_print_expr(exprs, types, operand, 0, 0)
+        let is_mut = exprs.get_d1(id)
+        let kw = if is_mut != 0: "&mut " else: "&"
+        return kw ++ ci_print_expr(exprs, types, operand, 0, 0)
     if kind == CiExprKind.CIE_ARRAY_DECAY:
         let operand = (exprs.get_d0(id)) as CiExprId
         let elem_ty = (exprs.get_d1(id)) as CiTypeId

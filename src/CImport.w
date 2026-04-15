@@ -5064,14 +5064,42 @@ fn ci_lower_unary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, type
         let one = exprs.int_lit(one_s, 0 as CiTypeId)
         return exprs.add(CiExprKind.CIE_TERNARY, cond_id as i32, zero as i32, one as i32, 0 as CiTypeId)
 
-    // UO_ADDR: legacy delegates to ci_render_addr_of_expr with
-    // the operand cursor and printed operand text. We reuse the
-    // helper verbatim.
+    // UO_ADDR: structurally build CIE_ADDR_OF (with is_mut flag
+    // for the simple-storage-ref + *mut target case) optionally
+    // wrapped in CIE_CAST to the target pointer type. Mirrors the
+    // legacy ci_render_addr_of_expr's three output shapes:
+    //   empty addr_ty   → `&operand`                         (bare CIE_ADDR_OF)
+    //   *const T target → `(&operand as *const T)`           (CIE_CAST over CIE_ADDR_OF)
+    //   *mut T target + simple storage ref operand
+    //                   → `(&mut operand as *mut T)`         (CIE_CAST over CIE_ADDR_OF is_mut=1)
+    //   *mut T target + non-simple operand
+    //                   → `((&operand as *const T) as *mut T)` (two nested CIE_CASTs over CIE_ADDR_OF)
     if op == UO_ADDR:
-        let child_str = ci_print_expr(exprs, types, child_id, 0, 0)
-        let rendered = ci_render_addr_of_expr(session, cursor, child_cursor, child_str)
-        if rendered.len() > 0:
-            return exprs.raw_string(rendered, 0 as CiTypeId)
+        ci_trace_port("STRUCTURAL[b11.2.addr_of]")
+        let addr_cxtype = with_ci_cursor_type(session, cursor)
+        let addr_ty_id = ci_type_from_libclang(session, addr_cxtype, types)
+        if (addr_ty_id as i32) == 0:
+            // Unknown target type — emit bare `&operand`.
+            return exprs.add(CiExprKind.CIE_ADDR_OF, child_id as i32, 0, 0, 0 as CiTypeId)
+        // Determine pointer mutability: CT_POINTER with is_const==0 → *mut T.
+        var is_mut_ptr = false
+        if types.kind(addr_ty_id) == CiTypeKind.CT_POINTER:
+            if types.get_d1(addr_ty_id) == 0:
+                is_mut_ptr = true
+        if not is_mut_ptr:
+            // Const (or non-pointer) target: single CIE_CAST over plain CIE_ADDR_OF.
+            let addr_e = exprs.add(CiExprKind.CIE_ADDR_OF, child_id as i32, 0, 0, 0 as CiTypeId)
+            return exprs.cast(addr_ty_id, addr_e)
+        // *mut target: split on operand shape.
+        if ci_cursor_is_simple_storage_ref(session, child_cursor):
+            let addr_e = exprs.add(CiExprKind.CIE_ADDR_OF, child_id as i32, 1, 0, 0 as CiTypeId)
+            return exprs.cast(addr_ty_id, addr_e)
+        // Non-simple operand: cast through *const T first, then to *mut T.
+        let pointee_ty_id = (types.get_d0(addr_ty_id)) as CiTypeId
+        let const_ty_id = types.ty_pointer(pointee_ty_id, 1)
+        let addr_e = exprs.add(CiExprKind.CIE_ADDR_OF, child_id as i32, 0, 0, 0 as CiTypeId)
+        let first_cast = exprs.cast(const_ty_id, addr_e)
+        return exprs.cast(addr_ty_id, first_cast)
 
     0 as CiExprId
 
