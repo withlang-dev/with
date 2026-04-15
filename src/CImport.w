@@ -5395,13 +5395,20 @@ fn ci_lower_call_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, types
         return 0 as CiExprId
 
     // Libc-mapped calls (malloc, memcpy, strlen, isalpha, ...).
-    // Probe ci_map_libc_call with the FULL translated callee text
-    // so `gcontext->memctl.malloc` doesn't match libc `malloc`.
-    // On a match, lower args through the IR, join the printed
-    // arg texts comma-separated, and delegate to the mapper;
-    // wrap the remapped call as a raw-string CiExpr leaf.
+    // Try the structural rename path first; on bail falls back
+    // to the legacy ci_map_libc_call text wrap.
     let callee_text = ci_print_expr(exprs, types, callee_id, 0, 0)
     if callee_text.len() > 0 and ci_map_libc_call(callee_text, "").len() > 0:
+        // Attempt structural port: for simple-rename libc calls
+        // (strlen, strcmp, isalpha, etc.) build CIE_CALL with
+        // the mapped identifier; for malloc/free wrap in the
+        // required result/arg CIE_CASTs. Compound-expression
+        // mappings (isgraph, ispunct, iscntrl, memcpy arg
+        // rewrites) stay on the legacy raw-string wrap.
+        let structural_libc = ci_lower_libc_call_structural(session, cursor, callee_text, exprs, types, scope)
+        if (structural_libc as i32) != 0:
+            return structural_libc
+        // Structural bail — fall through to legacy text wrap.
         var parts_buf: str = ""
         var la: i32 = 1
         while la < nc:
@@ -11895,6 +11902,107 @@ fn ci_is_mapped_libc_fn(name: str) -> bool:
 
 // Map C standard library function calls to With equivalents.
 // This enables migrated code to be pure With (no c_import needed).
+// Return the structurally-mappable target identifier for a libc
+// callee (e.g. "strlen" → "string_len"). Empty string means the
+// callee isn't handled structurally and the caller should fall
+// through to the text-based ci_map_libc_call.
+fn ci_libc_simple_rename(callee: str) -> str:
+    if callee == "strlen": return "string_len"
+    if callee == "strcmp": return "string_cmp"
+    if callee == "strncmp": return "strncmp"
+    if callee == "strchr": return "string_find_char"
+    if callee == "isalpha": return "is_alpha"
+    if callee == "isdigit": return "is_digit"
+    if callee == "isalnum": return "is_alnum"
+    if callee == "isspace": return "is_space"
+    if callee == "isupper": return "is_upper"
+    if callee == "islower": return "is_lower"
+    if callee == "isxdigit": return "is_xdigit"
+    if callee == "isprint": return "is_print"
+    if callee == "tolower": return "to_lower"
+    if callee == "toupper": return "to_upper"
+    ""
+
+// Structural libc-call lowering. For simple-rename callees
+// (strlen, isalpha, etc.) builds CIE_CALL with the renamed
+// callee ident. For malloc, wraps in the required size cast +
+// result *mut c_void cast. Returns 0 for callees that need
+// compound-expression mappings (isgraph, ispunct, memcpy arg
+// rewrites) — those fall through to the legacy text path.
+fn ci_lower_libc_call_structural(session: i64, cursor: i32, callee_text: str, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    let nc = with_ci_num_children(session, cursor)
+    let arg_count = nc - 1
+    let renamed = ci_libc_simple_rename(callee_text)
+    if renamed.len() > 0:
+        ci_trace_port("STRUCTURAL[b11.9.libc_call]")
+        // Lower each argument structurally.
+        var arg_ids: Vec[i32] = Vec.new()
+        var ai: i32 = 1
+        while ai < nc:
+            let arg_cursor = with_ci_child(session, cursor, ai)
+            let arg_id = ci_lower_expr_ir(session, arg_cursor, exprs, types, scope)
+            if (arg_id as i32) == 0:
+                return 0 as CiExprId
+            arg_ids.push(arg_id as i32)
+            ai = ai + 1
+        // Build a new callee ident for the renamed fn.
+        let renamed_idx = exprs.add_string(renamed)
+        let renamed_callee = exprs.ident(renamed_idx, 0 as CiTypeId)
+        // Push args into the exprs pool's extra vec.
+        let args_start = exprs.extra.len() as i32
+        var j: i64 = 0
+        while j < arg_ids.len():
+            let _ = exprs.add_extra(arg_ids.get(j))
+            j = j + 1
+        return exprs.add(CiExprKind.CIE_CALL, renamed_callee as i32, args_start, arg_count, 0 as CiTypeId)
+    // malloc(N) → (with_alloc(N as i64) as *mut c_void)
+    if callee_text == "malloc":
+        if arg_count != 1:
+            return 0 as CiExprId
+        ci_trace_port("STRUCTURAL[b11.9.libc_call]")
+        let arg_cursor = with_ci_child(session, cursor, 1)
+        let arg_id = ci_lower_expr_ir(session, arg_cursor, exprs, types, scope)
+        if (arg_id as i32) == 0:
+            return 0 as CiExprId
+        // Cast arg to i64.
+        let i64_idx = types.add_string("i64")
+        let i64_ty = types.ty_named(i64_idx)
+        let arg_as_i64 = exprs.cast(i64_ty, arg_id)
+        // Build callee ident "with_alloc".
+        let wa_idx = exprs.add_string("with_alloc")
+        let wa_callee = exprs.ident(wa_idx, 0 as CiTypeId)
+        // Push arg.
+        let args_start = exprs.extra.len() as i32
+        let _ = exprs.add_extra(arg_as_i64 as i32)
+        let call_id = exprs.add(CiExprKind.CIE_CALL, wa_callee as i32, args_start, 1, 0 as CiTypeId)
+        // Wrap in *mut c_void cast.
+        let cvoid_idx = types.add_string("c_void")
+        let cvoid_ty = types.ty_named(cvoid_idx)
+        let void_ptr_ty = types.ty_pointer(cvoid_ty, 0)
+        return exprs.cast(void_ptr_ty, call_id)
+    // free(p) → with_free(p as *i8)
+    if callee_text == "free":
+        if arg_count != 1:
+            return 0 as CiExprId
+        ci_trace_port("STRUCTURAL[b11.9.libc_call]")
+        let arg_cursor = with_ci_child(session, cursor, 1)
+        let arg_id = ci_lower_expr_ir(session, arg_cursor, exprs, types, scope)
+        if (arg_id as i32) == 0:
+            return 0 as CiExprId
+        let i8_idx = types.add_string("i8")
+        let i8_ty = types.ty_named(i8_idx)
+        let i8_ptr_ty = types.ty_pointer(i8_ty, 0)
+        let arg_cast = exprs.cast(i8_ptr_ty, arg_id)
+        let wf_idx = exprs.add_string("with_free")
+        let wf_callee = exprs.ident(wf_idx, 0 as CiTypeId)
+        let args_start = exprs.extra.len() as i32
+        let _ = exprs.add_extra(arg_cast as i32)
+        return exprs.add(CiExprKind.CIE_CALL, wf_callee as i32, args_start, 1, 0 as CiTypeId)
+    // calloc / realloc / memcpy / memmove / memset / memcmp /
+    // __builtin_* / isgraph / ispunct / iscntrl — compound /
+    // arg-rewriting mappings stay on the legacy raw-string path.
+    0 as CiExprId
+
 fn ci_map_libc_call(callee: str, args: str) -> str:
     // Memory allocation — use runtime externs with pointer casts.
     // with_alloc returns *i8 but C malloc callers usually assign
