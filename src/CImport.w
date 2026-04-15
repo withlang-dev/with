@@ -4158,6 +4158,10 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
             let inner_id = ci_lower_expr_ir(session, inner_cursor, exprs, types, scope)
             if (inner_id as i32) != 0:
                 return exprs.add(CiExprKind.CIE_PAREN, inner_id as i32, 0, 0, 0 as CiTypeId)
+        let paren_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if paren_legacy.len() == 0:
+            return 0 as CiExprId
+        return exprs.raw_string(paren_legacy, 0 as CiTypeId)
 
     // Binary operator — simple arith/bitwise/assign (B3b/B3e),
     // comparison (B3l), short-circuit logical (B3m), and pointer
@@ -4348,6 +4352,36 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         if ic_legacy.len() == 0:
             return 0 as CiExprId
         return exprs.raw_string(ic_legacy, 0 as CiTypeId)
+
+    // Initializer list (B7). Structural port not yet in place —
+    // emit as legacy text wrapped in CIE_RAW_STRING. The legacy
+    // ci_trans_expr handles nested init lists, designated inits,
+    // array init, compound-literal inits, and type-completed
+    // struct inits.
+    if kind == CXK_INIT_LIST:
+        let il_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if il_legacy.len() == 0:
+            return 0 as CiExprId
+        return exprs.raw_string(il_legacy, 0 as CiTypeId)
+
+    // UnexposedExpr (kind 100) with unusual child counts. The
+    // transparent-peel at the top of this function catches nc==1;
+    // this block catches the rest.
+    if kind == 100:
+        let ue2_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if ue2_legacy.len() == 0:
+            return 0 as CiExprId
+        return exprs.raw_string(ue2_legacy, 0 as CiTypeId)
+
+    // StructDecl (2) / UnionDecl (3) appearing in expression
+    // position — typically synthesized by the preprocessor for
+    // anonymous-record access inside a compound literal. Legacy
+    // handles them via its generic cursor-text fallback.
+    if kind == 2 or kind == 3:
+        let rd_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
+        if rd_legacy.len() == 0:
+            return 0 as CiExprId
+        return exprs.raw_string(rd_legacy, 0 as CiTypeId)
 
     // Legacy fallback: bypass the cache, lower via the string path,
     // and embed the result as a verbatim raw-string node. Only
@@ -6904,9 +6938,10 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
 
     // Structural-last-resort for known statement cursor kinds
     // whose handlers above bailed (empty-body if, complex-return,
-    // complex-do, etc.). Wrap via legacy text without recording
+    // complex-do, etc.) plus struct/union decls appearing at
+    // statement position. Wrap via legacy text without recording
     // the kind as a generic fallback.
-    if kind == CXK_IF_STMT or kind == CXK_WHILE_STMT or kind == CXK_FOR_STMT or kind == CXK_DO_STMT or kind == CXK_SWITCH_STMT or kind == CXK_RETURN_STMT:
+    if kind == CXK_IF_STMT or kind == CXK_WHILE_STMT or kind == CXK_FOR_STMT or kind == CXK_DO_STMT or kind == CXK_SWITCH_STMT or kind == CXK_RETURN_STMT or kind == 2 or kind == 3:
         let stmt_legacy = ci_trans_stmt_legacy_for_ir(session, cursor, 0, scope)
         if stmt_legacy.len() == 0:
             return 0 as CiStmtId
@@ -6915,8 +6950,7 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
     // Legacy fallback: bypass the cache, call the legacy
     // ci_trans_stmt at indent=0, and wrap the result in a
     // CIS_RAW_STRING. Only reached for cursor kinds with no
-    // explicit handler above (e.g. struct/union decls at stmt
-    // position, goto, label, decl stmt outside compound).
+    // explicit handler above.
     ci_record_raw_stmt_kind(kind)
     let legacy = ci_trans_stmt_legacy_for_ir(session, cursor, 0, scope)
     if legacy.len() == 0:
