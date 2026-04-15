@@ -20,6 +20,11 @@
 // CiTypePool). The printer must not re-query libclang at print time —
 // sessions may be disposed by then.
 //
+// Phase-B escape hatch: CIE_RAW_STRING / CIS_RAW_STRING hold an
+// interned string-id and print verbatim. During incremental migration,
+// un-ported libclang constructs are represented this way until their
+// proper lowering lands. Both kinds are deleted in B11.
+
 extern fn with_eprint(s: str) -> void
 
 // ── CiType ────────────────────────────────────────────────────
@@ -198,6 +203,9 @@ enum CiExprKind: i32:
     CIE_INIT_LIST = 70         // d0 = extra_start, d1 = count
     CIE_DESIGNATED_INIT = 71   // d0 = extra_start (alt [field_sym_idx, expr_id]), d1 = field_count
 
+    // Phase-B escape hatch — deleted in B11.
+    CIE_RAW_STRING = 90        // d0 = string_idx of verbatim With source
+
 enum CiBinOp: i32:
     CIBO_ADD = 0
     CIBO_SUB = 1
@@ -354,6 +362,10 @@ fn CiExprPool.unary(self: &mut CiExprPool, op: i32, operand: CiExprId, ty: CiTyp
 fn CiExprPool.cast(self: &mut CiExprPool, target: CiTypeId, operand: CiExprId) -> CiExprId:
     self.add(CiExprKind.CIE_CAST, target as i32, operand as i32, 0, target)
 
+fn CiExprPool.raw_string(self: &mut CiExprPool, text: str, ty: CiTypeId) -> CiExprId:
+    let idx = self.add_string(text)
+    self.add(CiExprKind.CIE_RAW_STRING, idx, 0, 0, ty)
+
 
 // ── CiStmt ────────────────────────────────────────────────────
 
@@ -375,6 +387,36 @@ enum CiStmtKind: i32:
     CIS_LABEL = 13           // d0 = label_sym
     CIS_GOTO_SYM = 14        // d0 = label_sym — resolved by B8a
     CIS_GOTO_STATE = 15      // d0 = state_num (rewritten in B8b from CIS_GOTO_SYM)
+
+    // Complete goto state-machine body (B8b structural lowering).
+    // d0 = meta_extra_start into the stmt pool's `extra` Vec
+    // d1 = hoisted_decl_count
+    // d2 = arm_count (excluding the implicit `_ => break` default
+    //                  which the printer emits automatically)
+    //
+    // Meta layout in extra (all i32):
+    //   [hoisted_decl_0_stmt_id, ..., hoisted_decl_(N-1)_stmt_id,
+    //    arm_0_state, arm_0_label_str_idx, arm_0_child_count,
+    //    arm_0_child_0, arm_0_child_1, ..., arm_0_child_(K-1),
+    //    arm_1_state, arm_1_label_str_idx, arm_1_child_count,
+    //    arm_1_child_0, ..., arm_1_child_(L-1),
+    //    ...]
+    //
+    // Arm children are concatenated inline by the printer with
+    // no CIS_BLOCK trailing separators — goto state-machine arms
+    // compact their statements directly onto consecutive lines,
+    // matching the legacy ci_lower_goto_body output.
+    //
+    // Each child is typically a CIS_RAW_STRING holding a single
+    // translated statement (with internal newlines) or the
+    // `if __goto_pending != 0:\n    continue` break-guard.
+    //
+    // label_str_idx is an index into the stmt pool's strings Vec;
+    // 0 means the entry arm (no label comment on the arm header).
+    CIS_GOTO_BODY = 16
+
+    // Phase-B escape hatch — deleted in B11.
+    CIS_RAW_STRING = 90      // d0 = string_idx of verbatim With source
 
 // A match arm is stored in the stmt pool's `extra` as:
 //   [value_count, value0_expr, value1_expr, ..., body_block_stmt_id]
@@ -503,6 +545,10 @@ fn CiStmtPool.goto_sym(self: &mut CiStmtPool, label_sym: i32) -> CiStmtId:
 
 fn CiStmtPool.goto_state(self: &mut CiStmtPool, state_num: i32) -> CiStmtId:
     self.add(CiStmtKind.CIS_GOTO_STATE, state_num, 0, 0, 0)
+
+fn CiStmtPool.raw_string(self: &mut CiStmtPool, text: str) -> CiStmtId:
+    let idx = self.add_string(text)
+    self.add(CiStmtKind.CIS_RAW_STRING, idx, 0, 0, 0)
 
 
 // ── CiDecl ────────────────────────────────────────────────────
