@@ -86,8 +86,15 @@ extern fn with_ci_cursor_spelling(session: i64, cursor: i32) -> str
 extern fn with_ci_cursor_type(session: i64, cursor: i32) -> i32
 extern fn with_ci_type_kind(session: i64, ty: i32) -> i32
 extern fn with_ci_type_array_element(session: i64, ty: i32) -> i32
+extern fn with_ci_type_array_size(session: i64, ty: i32) -> i64
 extern fn with_ci_type_declaration(session: i64, ty: i32) -> i32
 extern fn with_ci_type_translated(session: i64, ty: i32) -> str
+extern fn with_ci_type_pointee(session: i64, ty: i32) -> i32
+extern fn with_ci_type_is_const(session: i64, ty: i32) -> i32
+extern fn with_ci_type_canonical(session: i64, ty: i32) -> i32
+extern fn with_ci_type_result(session: i64, ty: i32) -> i32
+extern fn with_ci_type_arg_count(session: i64, ty: i32) -> i32
+extern fn with_ci_type_arg(session: i64, ty: i32, idx: i32) -> i32
 extern fn with_ci_cursor_is_definition(session: i64, cursor: i32) -> i32
 extern fn with_ci_cursor_in_file(session: i64, cursor: i32, path: str) -> i32
 extern fn with_ci_cursor_location(session: i64, cursor: i32) -> str
@@ -4118,6 +4125,170 @@ fn ci_literal_token_text(session: i64, cursor: i32) -> str:
 // Returns 0 (the null sentinel) when even the legacy fallback
 // fails, which signals callers to fall through entirely.
 
+// ── libclang CXType kind constants (subset) ────────────────
+// Mirror `rt/clang_bridge.w` CXType_* values; kept inline so
+// ci_type_from_libclang can switch on them without re-importing
+// the bridge's let-constants.
+let CXT_Void: i32 = 2
+let CXT_Bool: i32 = 3
+let CXT_Char_U: i32 = 4
+let CXT_UChar: i32 = 5
+let CXT_UShort: i32 = 8
+let CXT_UInt: i32 = 9
+let CXT_ULong: i32 = 10
+let CXT_ULongLong: i32 = 11
+let CXT_UInt128: i32 = 12
+let CXT_Char_S: i32 = 13
+let CXT_SChar: i32 = 14
+let CXT_Short: i32 = 16
+let CXT_Int: i32 = 17
+let CXT_Long: i32 = 18
+let CXT_LongLong: i32 = 19
+let CXT_Int128: i32 = 20
+let CXT_Float: i32 = 21
+let CXT_Double: i32 = 22
+let CXT_LongDouble: i32 = 23
+let CXT_Float128: i32 = 30
+let CXT_Half: i32 = 31
+let CXT_Float16: i32 = 32
+let CXT_Pointer: i32 = 101
+let CXT_Record: i32 = 105
+let CXT_Enum: i32 = 106
+let CXT_FunctionNoProto: i32 = 110
+let CXT_FunctionProto: i32 = 111
+
+fn ci_cxtype_kind_is_int(kind: i32) -> bool:
+    kind == CXT_Char_U or kind == CXT_UChar or kind == CXT_UShort or kind == CXT_UInt or kind == CXT_ULong or kind == CXT_ULongLong or kind == CXT_UInt128 or kind == CXT_Char_S or kind == CXT_SChar or kind == CXT_Short or kind == CXT_Int or kind == CXT_Long or kind == CXT_LongLong or kind == CXT_Int128
+
+fn ci_cxtype_kind_is_float(kind: i32) -> bool:
+    kind == CXT_Float or kind == CXT_Double or kind == CXT_LongDouble or kind == CXT_Float128 or kind == CXT_Half or kind == CXT_Float16
+
+// ci_type_from_libclang — walks a libclang CXType tree into
+// CiType nodes, preserving structural decomposition for
+// pointers / arrays / function pointers and using CT_NAMED at
+// leaves with the bridge's `with_ci_type_translated` spelling
+// so the printed text matches the legacy translator byte-for-byte.
+//
+// Returns 0 as CiTypeId when the type is unrepresentable (e.g.
+// CXType_Invalid, empty translated name, unbounded recursion).
+// Callers that hit this must bail to the legacy text path.
+//
+// Structural recursion stops at leaves: integer/float/record/enum
+// types produce CT_NAMED(spelling) rather than CT_INT(bits) so
+// the printed output is `c_int` / `u8` / `f32` / `struct Foo`
+// exactly as with_ci_type_translated would print them. The
+// structural value is in the pointer/array/fn_ptr nesting.
+fn ci_type_from_libclang(session: i64, cxtype: i32, types: &mut CiTypePool) -> CiTypeId:
+    if cxtype < 0:
+        return 0 as CiTypeId
+    let kind = with_ci_type_kind(session, cxtype)
+
+    if kind == CXT_Void:
+        ci_trace_port("STRUCTURAL[b11.3.ty_void]")
+        return types.ty_void()
+
+    if kind == CXT_Bool:
+        ci_trace_port("STRUCTURAL[b11.3.ty_bool]")
+        return types.ty_bool()
+
+    if ci_cxtype_kind_is_int(kind):
+        ci_trace_port("STRUCTURAL[b11.3.ty_int]")
+        let name = with_ci_type_translated(session, cxtype)
+        if name.len() == 0:
+            return 0 as CiTypeId
+        let name_idx = types.add_string(name)
+        return types.ty_named(name_idx)
+
+    if ci_cxtype_kind_is_float(kind):
+        ci_trace_port("STRUCTURAL[b11.3.ty_float]")
+        let name = with_ci_type_translated(session, cxtype)
+        if name.len() == 0:
+            return 0 as CiTypeId
+        let name_idx = types.add_string(name)
+        return types.ty_named(name_idx)
+
+    if kind == CXT_Pointer:
+        ci_trace_port("STRUCTURAL[b11.3.ty_ptr]")
+        let pointee_idx = with_ci_type_pointee(session, cxtype)
+        if pointee_idx < 0:
+            return 0 as CiTypeId
+        // is_const comes from the pointee's qualifiers, matching
+        // translate_type_recursive's `clang_isConstQualifiedType(pointee)`.
+        let is_const = with_ci_type_is_const(session, pointee_idx)
+        let pointee_ty = ci_type_from_libclang(session, pointee_idx, types)
+        if (pointee_ty as i32) == 0:
+            return 0 as CiTypeId
+        return types.ty_pointer(pointee_ty, is_const)
+
+    if kind == CXT_ConstantArray:
+        ci_trace_port("STRUCTURAL[b11.3.ty_array]")
+        let elem_idx = with_ci_type_array_element(session, cxtype)
+        if elem_idx < 0:
+            return 0 as CiTypeId
+        let elem_ty = ci_type_from_libclang(session, elem_idx, types)
+        if (elem_ty as i32) == 0:
+            return 0 as CiTypeId
+        let size = (with_ci_type_array_size(session, cxtype)) as i32
+        return types.ty_array(elem_ty, size)
+
+    if kind == CXT_IncompleteArray or kind == CXT_VariableArray or kind == CXT_DependentSizedArray:
+        ci_trace_port("STRUCTURAL[b11.3.ty_array]")
+        let elem_idx = with_ci_type_array_element(session, cxtype)
+        if elem_idx < 0:
+            return 0 as CiTypeId
+        let elem_ty = ci_type_from_libclang(session, elem_idx, types)
+        if (elem_ty as i32) == 0:
+            return 0 as CiTypeId
+        return types.ty_array(elem_ty, CI_SIZE_INCOMPLETE)
+
+    if kind == CXT_Record:
+        ci_trace_port("STRUCTURAL[b11.3.ty_struct]")
+        let name = with_ci_type_translated(session, cxtype)
+        if name.len() == 0:
+            return 0 as CiTypeId
+        let name_idx = types.add_string(name)
+        return types.ty_struct(name_idx)
+
+    if kind == CXT_Enum:
+        ci_trace_port("STRUCTURAL[b11.3.ty_enum]")
+        let name = with_ci_type_translated(session, cxtype)
+        if name.len() == 0:
+            return 0 as CiTypeId
+        let name_idx = types.add_string(name)
+        return types.ty_enum(name_idx)
+
+    if kind == CXT_FunctionProto or kind == CXT_FunctionNoProto:
+        ci_trace_port("STRUCTURAL[b11.3.ty_fn_ptr]")
+        let ret_idx = with_ci_type_result(session, cxtype)
+        if ret_idx < 0:
+            return 0 as CiTypeId
+        let ret_ty = ci_type_from_libclang(session, ret_idx, types)
+        if (ret_ty as i32) == 0:
+            return 0 as CiTypeId
+        let arg_count = with_ci_type_arg_count(session, cxtype)
+        let params_start = types.extra.len() as i32
+        var i: i32 = 0
+        while i < arg_count:
+            let arg_idx = with_ci_type_arg(session, cxtype, i)
+            if arg_idx < 0:
+                return 0 as CiTypeId
+            let arg_ty = ci_type_from_libclang(session, arg_idx, types)
+            if (arg_ty as i32) == 0:
+                return 0 as CiTypeId
+            let _ = types.add_extra(arg_ty as i32)
+            i = i + 1
+        return types.ty_fn_ptr(ret_ty, params_start, arg_count)
+
+    // Typedef, elaborated, atomic, and other named wrappers —
+    // use CT_NAMED with the translated name so the printer
+    // emits exactly what the legacy translator would.
+    ci_trace_port("STRUCTURAL[b11.3.ty_named]")
+    let name = with_ci_type_translated(session, cxtype)
+    if name.len() == 0:
+        return 0 as CiTypeId
+    let name_idx = types.add_string(name)
+    types.ty_named(name_idx)
+
 fn ci_trans_expr_legacy_for_ir(session: i64, cursor: i32, scope: str) -> str:
     let prev = g_migrate_ir_enabled_cache
     g_migrate_ir_enabled_cache = 0
@@ -4309,17 +4480,38 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
             return 0 as CiExprId
         return exprs.raw_string(cl_legacy, 0 as CiTypeId)
 
-    // sizeof expression.
+    // sizeof expression. Structurally builds CIE_SIZEOF_TYPE on
+    // the argument's libclang type via ci_type_from_libclang. For
+    // array operand types `[N]T`, legacy emits `(N * sizeof[T]())`;
+    // mirror that with CIE_BINARY(MUL, int_lit(N), CIE_SIZEOF_TYPE(T)).
     if kind == CXK_UNARY_EXPR:
         let src = with_ci_cursor_source_text(session, cursor)
         if ci_starts_with(src, "sizeof"):
             let nc = with_ci_num_children(session, cursor)
             if nc > 0:
+                ci_trace_port("STRUCTURAL[b11.4.sizeof_ue]")
                 let arg_ty = with_ci_cursor_type(session, with_ci_child(session, cursor, 0))
-                let ty_str = with_ci_type_translated(session, arg_ty)
-                let rendered = ci_render_sizeof_type(ty_str)
-                if rendered.len() > 0:
-                    return exprs.raw_string(rendered, 0 as CiTypeId)
+                let arg_ty_id = ci_type_from_libclang(session, arg_ty, types)
+                if (arg_ty_id as i32) != 0:
+                    // Unwrap outer array layers: `sizeof([N][M]T)` →
+                    // `(N * (M * sizeof[T]()))`.
+                    var cur_ty = arg_ty_id
+                    var accum_factor: i32 = 1
+                    var saw_array = false
+                    while types.kind(cur_ty) == CiTypeKind.CT_ARRAY:
+                        let size = types.get_d1(cur_ty)
+                        if size == CI_SIZE_INCOMPLETE:
+                            break
+                        accum_factor = accum_factor * size
+                        cur_ty = (types.get_d0(cur_ty)) as CiTypeId
+                        saw_array = true
+                    let sizeof_id = exprs.add(CiExprKind.CIE_SIZEOF_TYPE, cur_ty as i32, 0, 0, 0 as CiTypeId)
+                    if not saw_array:
+                        return sizeof_id
+                    let factor_text = i64_to_string(accum_factor as i64)
+                    let factor_idx = exprs.add_string(factor_text)
+                    let factor_id = exprs.int_lit(factor_idx, 0 as CiTypeId)
+                    return exprs.binary(CiBinOp.CIBO_MUL, factor_id, sizeof_id, 0 as CiTypeId)
         let ue_legacy = ci_trans_expr_legacy_for_ir(session, cursor, scope)
         if ue_legacy.len() == 0:
             return 0 as CiExprId
