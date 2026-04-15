@@ -174,7 +174,7 @@ fn ci_print_type(types: &CiTypePool, id: CiTypeId) -> str:
         return "<ci:ty:0>"
     let kind = types.kind(id)
     if kind == CiTypeKind.CT_VOID:
-        return "unit"
+        return "void"
     if kind == CiTypeKind.CT_BOOL:
         return "bool"
     if kind == CiTypeKind.CT_INT:
