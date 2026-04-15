@@ -85,6 +85,26 @@ fn ci_starts_with_str(s: str, prefix: str) -> bool:
         return false
     s.slice(0, prefix.len()) == prefix
 
+fn ci_strip_one_outer_paren(s: str) -> str:
+    if s.len() < 2:
+        return s
+    if s.byte_at(0) != 40 or s.byte_at(s.len() - 1) != 41:
+        return s
+    var depth = 0
+    var i = 0
+    while i as i64 < s.len():
+        let c = s.byte_at(i as i64)
+        if c == 40:
+            depth = depth + 1
+        else if c == 41:
+            depth = depth - 1
+            if depth == 0 and i as i64 != s.len() - 1:
+                return s
+        i = i + 1
+    if depth != 0:
+        return s
+    s.slice(1, s.len() - 1)
+
 // Operator precedence table. Larger = binds tighter. Used by Phase-B
 // B3 to decide when to drop redundant parens; Phase A always wraps
 // binary / unary expressions in explicit parentheses.
@@ -167,6 +187,88 @@ fn ci_float_type_name(bits: i32) -> str:
 // it cheap to change the convention later.
 fn ci_wrap_unsafe(inner: str) -> str:
     "(unsafe: " ++ inner ++ ")"
+
+fn ci_print_compact_stmt_local(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id: CiStmtId, depth: i32) -> str:
+    if (id as i32) == 0:
+        return ""
+    let kind = stmts.kind(id)
+    let indent = ci_make_indent(depth)
+
+    if kind == CiStmtKind.CIS_BLOCK:
+        let start = stmts.get_d0(id)
+        let count = stmts.get_d1(id)
+        var out = ""
+        var i: i32 = 0
+        while i < count:
+            out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, (stmts.get_extra(start + i)) as CiStmtId, depth)
+            i = i + 1
+        return out
+
+    if kind == CiStmtKind.CIS_EXPR:
+        let e = (stmts.get_d0(id)) as CiExprId
+        return indent ++ ci_print_expr(exprs, types, e, 0, 0) ++ "\n"
+
+    if kind == CiStmtKind.CIS_RETURN:
+        let e = (stmts.get_d0(id)) as CiExprId
+        if (e as i32) == 0:
+            return indent ++ "return\n"
+        var expr_text = ci_print_expr(exprs, types, e, 0, 0)
+        if exprs.kind(e) == CiExprKind.CIE_CAST:
+            expr_text = "(" ++ expr_text ++ ")"
+        return indent ++ "return " ++ expr_text ++ "\n"
+
+    if kind == CiStmtKind.CIS_IF:
+        let cond = (stmts.get_d0(id)) as CiExprId
+        let then_b = (stmts.get_d1(id)) as CiStmtId
+        let else_b = (stmts.get_d2(id)) as CiStmtId
+        var out = indent ++ "if " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
+        out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, then_b, depth + 4)
+        if (else_b as i32) != 0:
+            out = out ++ indent ++ "else:\n"
+            out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, else_b, depth + 4)
+        return out
+
+    if kind == CiStmtKind.CIS_WHILE:
+        let cond = (stmts.get_d0(id)) as CiExprId
+        let body = (stmts.get_d1(id)) as CiStmtId
+        var out = indent ++ "while " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
+        out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, body, depth + 4)
+        return out
+
+    if kind == CiStmtKind.CIS_VAR_DECL:
+        let name_sym = stmts.get_d0(id)
+        let ty_id = (stmts.get_d1(id)) as CiTypeId
+        let init = (stmts.get_d2(id)) as CiExprId
+        let flags = stmts.get_flags(id)
+        let is_mut = flags % 2
+        let kw = if is_mut != 0: "var " else: "let "
+        let name = stmts.get_string(name_sym)
+        var out = indent ++ kw ++ name ++ ": " ++ ci_print_type(types, ty_id)
+        if (init as i32) != 0:
+            var init_text = ci_print_expr(exprs, types, init, 0, 0)
+            if exprs.kind(init) == CiExprKind.CIE_CAST:
+                init_text = "(" ++ init_text ++ ")"
+            out = out ++ " = " ++ init_text
+        return out ++ "\n"
+
+    if kind == CiStmtKind.CIS_ASSIGN:
+        let lhs = (stmts.get_d0(id)) as CiExprId
+        let rhs = (stmts.get_d1(id)) as CiExprId
+        var rhs_str = ci_print_expr(exprs, types, rhs, 0, 0)
+        if exprs.kind(rhs) == CiExprKind.CIE_CAST:
+            rhs_str = "(" ++ rhs_str ++ ")"
+        else if exprs.kind(rhs) == CiExprKind.CIE_BINARY:
+            let op = exprs.get_d0(rhs)
+            if op == CiBinOp.CIBO_ADD or op == CiBinOp.CIBO_SUB or op == CiBinOp.CIBO_MUL or op == CiBinOp.CIBO_DIV or op == CiBinOp.CIBO_MOD or op == CiBinOp.CIBO_BIT_AND or op == CiBinOp.CIBO_BIT_OR or op == CiBinOp.CIBO_BIT_XOR or op == CiBinOp.CIBO_SHL or op == CiBinOp.CIBO_SHR:
+                rhs_str = ci_strip_one_outer_paren(rhs_str)
+        return indent ++ "(" ++ ci_print_expr(exprs, types, lhs, 0, 0) ++ " = " ++ rhs_str ++ ")\n"
+
+    if kind == CiStmtKind.CIS_BREAK:
+        return indent ++ "break\n"
+    if kind == CiStmtKind.CIS_CONTINUE:
+        return indent ++ "continue\n"
+
+    ci_print_stmt(stmts, exprs, types, id, depth)
 
 // ── CiType printing ──────────────────────────────────────────
 
@@ -355,7 +457,11 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
         let cond = (exprs.get_d0(id)) as CiExprId
         let then_e = (exprs.get_d1(id)) as CiExprId
         let else_e = (exprs.get_d2(id)) as CiExprId
-        return "(if " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ": " ++ ci_print_expr(exprs, types, then_e, 0, 0) ++ " else: " ++ ci_print_expr(exprs, types, else_e, 0, 0) ++ ")"
+        var cond_str = ci_print_expr(exprs, types, cond, 0, 0)
+        let cond_kind = exprs.kind(cond)
+        if cond_kind == CiExprKind.CIE_BINARY or cond_kind == CiExprKind.CIE_UNARY or cond_kind == CiExprKind.CIE_PAREN:
+            cond_str = ci_strip_one_outer_paren(cond_str)
+        return "(if " ++ cond_str ++ ": " ++ ci_print_expr(exprs, types, then_e, 0, 0) ++ " else: " ++ ci_print_expr(exprs, types, else_e, 0, 0) ++ ")"
     if kind == CiExprKind.CIE_COMMA:
         return "<ci:unimpl:COMMA>"
 
@@ -422,9 +528,37 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         let e = (stmts.get_d0(id)) as CiExprId
         if (e as i32) == 0:
             return indent ++ "return\n"
-        return indent ++ "return " ++ ci_print_expr(exprs, types, e, 0, 0) ++ "\n"
+        var expr_text = ci_print_expr(exprs, types, e, 0, 0)
+        if exprs.kind(e) == CiExprKind.CIE_CAST:
+            expr_text = "(" ++ expr_text ++ ")"
+        return indent ++ "return " ++ expr_text ++ "\n"
 
     if kind == CiStmtKind.CIS_BLOCK:
+        let start = stmts.get_d0(id)
+        let count = stmts.get_d1(id)
+        if count >= 3:
+            let first = (stmts.get_extra(start)) as CiStmtId
+            let last = (stmts.get_extra(start + count - 1)) as CiStmtId
+            if stmts.kind(first) == CiStmtKind.CIS_VAR_DECL and stmts.kind(last) == CiStmtKind.CIS_ASSIGN:
+                let init = (stmts.get_d2(first)) as CiExprId
+                let lhs = (stmts.get_d0(last)) as CiExprId
+                let rhs = (stmts.get_d1(last)) as CiExprId
+                if (init as i32) == 0 and exprs.kind(lhs) == CiExprKind.CIE_IDENT:
+                    let decl_name = stmts.get_string(stmts.get_d0(first))
+                    let lhs_name = exprs.get_string(exprs.get_d0(lhs))
+                    if decl_name == lhs_name:
+                        let flags = stmts.get_flags(first)
+                        let is_mut = flags % 2
+                        let kw = if is_mut != 0: "var " else: "let "
+                        let ty_id = (stmts.get_d1(first)) as CiTypeId
+                        var out = indent ++ kw ++ decl_name ++ ": " ++ ci_print_type(types, ty_id)
+                        out = out ++ " = with 0 as __ci_expr_seq_" ++ i32_to_string(id as i32) ++ ":\n"
+                        var si: i32 = 1
+                        while si < count - 1:
+                            out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, (stmts.get_extra(start + si)) as CiStmtId, depth + 4)
+                            si = si + 1
+                        out = out ++ ci_make_indent(depth + 4) ++ ci_print_expr(exprs, types, rhs, 0, 0) ++ "\n"
+                        return out
         // Block composition convention matches the legacy
         // compound_stmt arm: each child is rendered at depth 0
         // (so the child produces level-0-relative text), then
@@ -432,8 +566,6 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         // bare "\n" separator. Blank lines between children stay
         // bare; blank lines *within* a child get re-indented by
         // ci_reindent_spaces, matching ci_indent_block's behavior.
-        let start = stmts.get_d0(id)
-        let count = stmts.get_d1(id)
         var out = ""
         var i: i32 = 0
         while i < count:
@@ -445,13 +577,10 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         return out
 
     if kind == CiStmtKind.CIS_IF:
-        // The legacy if arm calls ci_trans_stmt(body, 0, scope)
-        // and then ci_indent_block(body, indent + 1). We match
-        // that by printing body at depth=0 (so the body produces
-        // level-0-relative text) and re-indenting by 4. The
-        // per-level re-indent is what lets inner CIS_BLOCK bare
-        // separators accumulate spaces correctly at each
-        // enclosing container.
+        // Print body at depth=0 so it produces level-0-relative
+        // text, then re-indent by 4 spaces. The per-level
+        // re-indent is what lets inner CIS_BLOCK bare separators
+        // accumulate spaces correctly at each enclosing container.
         let cond = (stmts.get_d0(id)) as CiExprId
         let then_b = (stmts.get_d1(id)) as CiStmtId
         let else_b = (stmts.get_d2(id)) as CiStmtId
@@ -540,13 +669,23 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         let name = stmts.get_string(name_sym)
         var out = indent ++ kw ++ name ++ ": " ++ ci_print_type(types, ty_id)
         if (init as i32) != 0:
-            out = out ++ " = " ++ ci_print_expr(exprs, types, init, 0, 0)
+            var init_text = ci_print_expr(exprs, types, init, 0, 0)
+            if exprs.kind(init) == CiExprKind.CIE_CAST:
+                init_text = "(" ++ init_text ++ ")"
+            out = out ++ " = " ++ init_text
         return out ++ "\n"
 
     if kind == CiStmtKind.CIS_ASSIGN:
         let lhs = (stmts.get_d0(id)) as CiExprId
         let rhs = (stmts.get_d1(id)) as CiExprId
-        return indent ++ ci_print_expr(exprs, types, lhs, 0, 0) ++ " = " ++ ci_print_expr(exprs, types, rhs, 0, 0) ++ "\n"
+        var rhs_str = ci_print_expr(exprs, types, rhs, 0, 0)
+        if exprs.kind(rhs) == CiExprKind.CIE_CAST:
+            rhs_str = "(" ++ rhs_str ++ ")"
+        else if exprs.kind(rhs) == CiExprKind.CIE_BINARY:
+            let op = exprs.get_d0(rhs)
+            if op == CiBinOp.CIBO_ADD or op == CiBinOp.CIBO_SUB or op == CiBinOp.CIBO_MUL or op == CiBinOp.CIBO_DIV or op == CiBinOp.CIBO_MOD or op == CiBinOp.CIBO_BIT_AND or op == CiBinOp.CIBO_BIT_OR or op == CiBinOp.CIBO_BIT_XOR or op == CiBinOp.CIBO_SHL or op == CiBinOp.CIBO_SHR:
+                rhs_str = ci_strip_one_outer_paren(rhs_str)
+        return indent ++ "(" ++ ci_print_expr(exprs, types, lhs, 0, 0) ++ " = " ++ rhs_str ++ ")\n"
 
     if kind == CiStmtKind.CIS_LABEL:
         let sym = stmts.get_d0(id)
@@ -585,12 +724,12 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         let arm_count = stmts.get_d2(id)
         var out = ""
 
-        // Hoisted decl lines (pre-rendered text).
+        // Hoisted decl stmts.
         var hi: i32 = 0
         while hi < hoisted_count:
-            let decl_str_idx = stmts.get_extra(meta_start + hi)
-            let decl_text = stmts.get_string(decl_str_idx)
-            out = out ++ ci_reindent_spaces(decl_text, depth)
+            let decl_id = (stmts.get_extra(meta_start + hi)) as CiStmtId
+            let decl_text = ci_print_stmt(stmts, exprs, types, decl_id, depth)
+            out = out ++ decl_text
             hi = hi + 1
 
         // State-machine frame.
@@ -603,9 +742,8 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         out = out ++ ds1 ++ "match __pc\n"
 
         // Each arm: variable-length meta [state, label_str_idx,
-        // child_count, child_str_0, ..., child_str_(K-1)]. Arm
-        // children are pre-rendered text lines; we re-indent to
-        // depth+12 and concat inline.
+        // child_count, child_stmt_0, ..., child_stmt_(K-1)].
+        // Arm children are compact-printed inline.
         var ai: i32 = 0
         var arm_cursor = meta_start + hoisted_count
         while ai < arm_count:
@@ -621,9 +759,8 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
 
             var ci: i32 = 0
             while ci < child_count:
-                let child_str_idx = stmts.get_extra(arm_cursor + ci)
-                let child_text = stmts.get_string(child_str_idx)
-                out = out ++ ci_reindent_spaces(child_text, depth + 12)
+                let child_id = (stmts.get_extra(arm_cursor + ci)) as CiStmtId
+                out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, child_id, depth + 12)
                 ci = ci + 1
             arm_cursor = arm_cursor + child_count
             ai = ai + 1
