@@ -14,8 +14,8 @@
 // observable during development. Subsequent B-phase commits replace
 // the placeholders one kind at a time.
 //
-// The CIE_RAW_STRING / CIS_RAW_STRING kinds print their interned
-// text verbatim, matching the Phase-B escape-hatch discipline.
+// The Phase-B escape-hatch kinds (CIE_RAW_STRING / CIS_RAW_STRING)
+// have been removed; the printer only handles structural kinds.
 
 use CiIR
 
@@ -363,10 +363,6 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
     if kind == CiExprKind.CIE_DESIGNATED_INIT:
         return "<ci:unimpl:DESIGNATED_INIT>"
 
-    // Escape hatch
-    if kind == CiExprKind.CIE_RAW_STRING:
-        return exprs.get_string(exprs.get_d0(id))
-
     "<ci:expr:unknown>"
 
 // ── CiStmt printing ──────────────────────────────────────────
@@ -521,93 +517,6 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         let n = stmts.get_d0(id)
         return indent ++ "__pc = " ++ i32_to_string(n) ++ "\n" ++ indent ++ "__goto_pending = 1\n"
 
-    if kind == CiStmtKind.CIS_GOTO_BODY:
-        // Full goto state-machine body. Layout matches the
-        // legacy ci_lower_goto_body byte-for-byte so pcre2
-        // diffs stay at zero.
-        //
-        // Output shape (at depth=0):
-        //     <hoisted decls>
-        //     var __pc: i32 = 0
-        //     var __goto_pending: i32 = 0
-        //     while true:
-        //         match __pc
-        //             0 =>
-        //                 <arm 0 body>
-        //             N =>  // label_name
-        //                 <arm N body>
-        //             _ => break
-        //
-        // Depths: var/while at `depth`, match at depth+4, arm
-        // header at depth+8, arm body at depth+12. Arm child
-        // statements are concatenated inline (no blank line
-        // separators) — the goto state machine compacts
-        // consecutive statements.
-        let meta_start = stmts.get_d0(id)
-        let hoisted_count = stmts.get_d1(id)
-        let arm_count = stmts.get_d2(id)
-        var out = ""
-
-        // Hoisted decl lines.
-        var hi: i32 = 0
-        while hi < hoisted_count:
-            let decl_id = (stmts.get_extra(meta_start + hi)) as CiStmtId
-            let decl_text = ci_print_stmt(stmts, exprs, types, decl_id, 0)
-            out = out ++ ci_reindent_spaces(decl_text, depth)
-            hi = hi + 1
-
-        // State-machine frame.
-        let ds = ci_make_indent(depth)
-        let ds1 = ci_make_indent(depth + 4)
-        let ds2 = ci_make_indent(depth + 8)
-        out = out ++ ds ++ "var __pc: i32 = 0\n"
-        out = out ++ ds ++ "var __goto_pending: i32 = 0\n"
-        out = out ++ ds ++ "while true:\n"
-        out = out ++ ds1 ++ "match __pc\n"
-
-        // Each arm: variable-length meta [state, label_str_idx,
-        // child_count, child_0, ..., child_(K-1)]. Arm children
-        // are concatenated inline with no trailing separators.
-        var ai: i32 = 0
-        var arm_cursor = meta_start + hoisted_count
-        while ai < arm_count:
-            let state_num = stmts.get_extra(arm_cursor)
-            let label_str_idx = stmts.get_extra(arm_cursor + 1)
-            let child_count = stmts.get_extra(arm_cursor + 2)
-            arm_cursor = arm_cursor + 3
-
-            // Arm header line.
-            out = out ++ ds2 ++ i32_to_string(state_num) ++ " =>"
-            if label_str_idx != 0:
-                out = out ++ "  // " ++ stmts.get_string(label_str_idx)
-            out = out ++ "\n"
-
-            // Arm body: concat each child's print output, all
-            // at depth+12 (arm body level). No separators.
-            var ci: i32 = 0
-            while ci < child_count:
-                let child_id = (stmts.get_extra(arm_cursor + ci)) as CiStmtId
-                let child_text = ci_print_stmt(stmts, exprs, types, child_id, 0)
-                out = out ++ ci_reindent_spaces(child_text, depth + 12)
-                ci = ci + 1
-            arm_cursor = arm_cursor + child_count
-            ai = ai + 1
-
-        // Default `_ => break` arm.
-        out = out ++ ds2 ++ "_ => break\n"
-        return out
-
-    if kind == CiStmtKind.CIS_RAW_STRING:
-        // The stashed text is always level-0-relative (the
-        // ci_lower_stmt_ir legacy fallback passes indent=0 to the
-        // bypass). Re-indent by depth at print time so the
-        // content lands at the right column for its enclosing
-        // container.
-        let text = stmts.get_string(stmts.get_d0(id))
-        if depth <= 0:
-            return text
-        return ci_reindent_spaces(text, depth)
-
     indent ++ "<ci:stmt:unknown>\n"
 
 // ── CiDecl printing ──────────────────────────────────────────
@@ -756,26 +665,11 @@ fn ci_roundtrip_fn_decl -> i32:
     let expected = "fn foo() -> i32:\n    return 42\n\n"
     ci_expect_eq("fn_decl_return_literal", actual, expected)
 
-fn ci_roundtrip_raw_string -> i32:
-    // The Phase-B escape hatch: a raw-string expr prints its interned
-    // text verbatim, and a raw-string stmt does the same.
-    var types = CiTypePool.new()
-    var exprs = CiExprPool.new()
-    var stmts = CiStmtPool.new()
-    let i32_ty = types.ty_int(32, 0)
-    let raw_e = exprs.raw_string("legacy_expr()", i32_ty)
-    let raw_s = stmts.raw_string("    legacy_stmt()\n")
-    var fails: i32 = 0
-    fails = fails + ci_expect_eq("raw_expr", ci_print_expr(&exprs, &types, raw_e, 0, 0), "legacy_expr()")
-    fails = fails + ci_expect_eq("raw_stmt", ci_print_stmt(&stmts, &exprs, &types, raw_s, 0), "    legacy_stmt()\n")
-    fails
-
 pub fn ci_ir_roundtrip_test -> i32:
     var fails: i32 = 0
     fails = fails + ci_roundtrip_types()
     fails = fails + ci_roundtrip_exprs()
     fails = fails + ci_roundtrip_fn_decl()
-    fails = fails + ci_roundtrip_raw_string()
     if fails == 0:
         with_write("ci-roundtrip: PASS\n")
         return 0
