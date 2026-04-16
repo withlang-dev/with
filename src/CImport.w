@@ -1571,19 +1571,21 @@ fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: str, projec
     while i < count:
         if with_cimport_decl_kind(session, i) == CK_VAR:
             let name = with_cimport_decl_name(session, i)
-            let cursor = with_cimport_decl_cursor(session, i)
-            let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
-            if not ci_is_system_decl(name) and not (loc.len() > 0 and ci_is_system_path(loc)):
-                output = output ++ ci_migrate_translate_var(session, i, count, primary_path, true, project_active, project)
+            if not ci_migrate_is_width_family_name(name):
+                let cursor = with_cimport_decl_cursor(session, i)
+                let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
+                if not ci_is_system_decl(name) and not (loc.len() > 0 and ci_is_system_path(loc)):
+                    output = output ++ ci_migrate_translate_var(session, i, count, primary_path, true, project_active, project)
         i = i + 1
     i = 0
     while i < count:
         if with_cimport_decl_kind(session, i) == CK_VAR:
             let name = with_cimport_decl_name(session, i)
-            let cursor = with_cimport_decl_cursor(session, i)
-            let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
-            if not ci_is_system_decl(name) and not (loc.len() > 0 and ci_is_system_path(loc)):
-                output = output ++ ci_migrate_translate_var(session, i, count, primary_path, false, project_active, project)
+            if not ci_migrate_is_width_family_name(name):
+                let cursor = with_cimport_decl_cursor(session, i)
+                let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
+                if not ci_is_system_decl(name) and not (loc.len() > 0 and ci_is_system_path(loc)):
+                    output = output ++ ci_migrate_translate_var(session, i, count, primary_path, false, project_active, project)
         i = i + 1
     output
 
@@ -1734,6 +1736,10 @@ fn ci_translate_macros(session: i64, extern_vars: str, macro_source: str) -> str
 
         // Skip self-defined macros: #define FOO FOO (common feature-test pattern)
         if fn_like == 0 and value == name:
+            continue
+
+        // C2: skip width-family macros when width slicing is active
+        if ci_migrate_is_width_family_name(name):
             continue
 
         // Try to translate function-like macros; fall back to comptime_error
@@ -8934,6 +8940,43 @@ var g_migrate_no_c_export: i32 = 0
 pub fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val
 
+// Width-slice mode: when > 0, skip declarations belonging to
+// non-target PCRE2 width families during migration.
+// Value is the target code-unit width (e.g. 8). Widths != target
+// are pruned. Set via migrate_set_width_slice().
+var g_migrate_width_slice: i32 = 0
+
+pub fn migrate_set_width_slice(val: i32):
+    g_migrate_width_slice = val
+
+// Check whether a C declaration name belongs to a width family
+// that should be pruned. Matches the same patterns as the former
+// prune_width_family_decls shell function:
+//   - PCRE2_UCHAR16, PCRE2_UCHAR32, PCRE2_SPTR16, PCRE2_SPTR32
+//   - Any identifier ending in _16 or _32
+fn ci_migrate_is_width_family_name(name: str) -> bool:
+    if g_migrate_width_slice == 0:
+        return false
+    let len = name.len() as i32
+    if len < 3:
+        return false
+    // Check explicit non-underscore-prefixed width types
+    if name == "PCRE2_UCHAR16" or name == "PCRE2_UCHAR32":
+        return true
+    if name == "PCRE2_SPTR16" or name == "PCRE2_SPTR32":
+        return true
+    // Check identifiers ending in _16 or _32
+    if len >= 3 and name.byte_at((len - 3) as i64) == 95:
+        let d1 = name.byte_at((len - 2) as i64)
+        let d2 = name.byte_at((len - 1) as i64)
+        // _16: d1='1'(49), d2='6'(54)
+        if d1 == 49 and d2 == 54:
+            return true
+        // _32: d1='3'(51), d2='2'(50)
+        if d1 == 51 and d2 == 50:
+            return true
+    false
+
 // Per-function temp counter state (B9). The same cursor can be
 // visited multiple times during string-based lowering — the
 // memoization map keeps the assigned id stable per cursor so
@@ -9426,6 +9469,10 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
         // Skip declarations from system headers (check source location)
         let decl_loc = ci_get_decl_location(session, decl_name)
         if decl_loc.len() > 0 and ci_is_system_path(decl_loc):
+            i = i + 1
+            continue
+        // C2: skip width-family declarations when width slicing is active
+        if ci_migrate_is_width_family_name(decl_name):
             i = i + 1
             continue
         let kind = with_cimport_decl_kind(session, i)

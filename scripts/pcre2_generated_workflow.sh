@@ -79,87 +79,6 @@ for module_path in module_paths:
 PY
 }
 
-prune_width_family_decls() {
-    local generated_dir="$1"
-    python3 - "$generated_dir" <<'PY'
-from __future__ import annotations
-
-import re
-import sys
-from pathlib import Path
-
-generated_dir = Path(sys.argv[1])
-decl_pattern = re.compile(r"^(?:extern fn|fn|extern var|var|extern let|let|type)\b")
-attr_pattern = re.compile(r"^@\[[^]]+\]$")
-width_token_pattern = re.compile(
-    r"\b(?:PCRE2_UCHAR16|PCRE2_UCHAR32|PCRE2_SPTR16|PCRE2_SPTR32|[A-Za-z_][A-Za-z0-9_]*_(?:16|32))\b"
-)
-
-
-def is_top_level(line: str) -> bool:
-    return len(line) == 0 or line[0] not in " \t"
-
-
-def is_decl_start(line: str) -> bool:
-    return is_top_level(line) and decl_pattern.match(line) is not None
-
-
-def is_attr_line(line: str) -> bool:
-    return is_top_level(line) and attr_pattern.match(line) is not None
-
-
-def next_decl_boundary(lines: list[str], start: int, is_fn_block: bool) -> int:
-    if not is_fn_block:
-        return start + 1
-    i = start + 1
-    while i < len(lines):
-        line = lines[i]
-        if len(line) > 0 and line[0] in " \t":
-            i += 1
-            continue
-        if line == "":
-            i += 1
-            continue
-        break
-    return i
-
-
-for module_path in sorted(generated_dir.glob("*.w")):
-    lines = module_path.read_text().splitlines()
-    kept: list[str] = []
-    i = 0
-    while i < len(lines):
-        if is_attr_line(lines[i]):
-            attrs: list[str] = []
-            while i < len(lines) and is_attr_line(lines[i]):
-                attrs.append(lines[i])
-                i += 1
-            if i < len(lines) and is_decl_start(lines[i]):
-                header = lines[i]
-                end = next_decl_boundary(lines, i, header.startswith("fn "))
-                if width_token_pattern.search(header) is None:
-                    kept.extend(attrs)
-                    kept.extend(lines[i:end])
-                i = end
-                continue
-            kept.extend(attrs)
-            continue
-
-        if is_decl_start(lines[i]):
-            header = lines[i]
-            end = next_decl_boundary(lines, i, header.startswith("fn "))
-            if width_token_pattern.search(header) is None:
-                kept.extend(lines[i:end])
-            i = end
-            continue
-
-        kept.append(lines[i])
-        i += 1
-
-    module_path.write_text("\n".join(kept) + ("\n" if len(kept) > 0 else ""))
-PY
-}
-
 is_excluded() {
     case "$1" in
         pcre2test.w|pcre2demo.w|pcre2grep.w|pcre2posix.w|pcre2posix_test.w|\
@@ -229,7 +148,8 @@ prepare_generated_tree() {
         } > "$dst"
     done
 
-    prune_width_family_decls "$generated_dir"
+    # Width-family pruning is now handled by `with migrate --width-slice 8`
+    # in the raw migration step (C2). No post-processing needed.
 
     for dst in "$generated_dir"/*.w; do
         perl -0pi -e 's/\(\(0 as \*mut c_void\)\)/null/g' "$dst"

@@ -963,6 +963,10 @@ fn run_migrate_command(argc: i32) -> i32:
             migrate_set_no_c_export(1)
             ai = ai + 1
             continue
+        if arg == "--width-slice" and ai + 1 < argc:
+            migrate_set_width_slice(cli_parse_small_int(with_arg_at(ai + 1)))
+            ai = ai + 2
+            continue
         if arg == "--exclude" and ai + 1 < argc:
             exclude_basenames = exclude_basenames ++ "|" ++ with_arg_at(ai + 1) ++ "|"
             ai = ai + 2
@@ -1220,6 +1224,17 @@ fn print_help_attributes:
     )
 
 // ── Package management commands ─────────────────────────────────
+
+fn cli_parse_small_int(s: str) -> i32:
+    var result = 0
+    var i = 0
+    let len = s.len() as i32
+    while i < len:
+        let ch = s.byte_at(i as i64)
+        if ch >= 48 and ch <= 57:
+            result = result * 10 + (ch - 48)
+        i = i + 1
+    result
 
 fn cli_flag_value(argc: i32, flag: str) -> str:
     var i = 2

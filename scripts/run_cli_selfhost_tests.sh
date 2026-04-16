@@ -901,6 +901,11 @@ EOF
 }
 
 expect_pcre2_prepare_width_prunes_whole_decls() {
+  # Width-family pruning is now done by `with migrate --width-slice 8`
+  # (C2) during the raw migration step. The raw output no longer
+  # contains _16/_32 declarations. This test verifies that the prepare
+  # step preserves non-width content and that local variables whose
+  # names happen to contain _16 are kept.
   local case_dir="$tmpdir/pcre2_prepare_width_prune_case"
   local raw_dir="$case_dir/raw"
   local generated_dir="$case_dir/generated"
@@ -917,7 +922,6 @@ extern fn strlen(s: *const i8) -> i64
 extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void
 extern fn preamble_helper() -> void
 type BOOL = c_int
-type PCRE2_UCHAR16 = c_ushort
 EOF
 
   cat >"$raw_dir/pcre2_compile.w" <<'EOF'
@@ -926,9 +930,7 @@ type c_int = i32
 type c_uint = u32
 extern fn preamble_helper() -> void
 type BOOL = c_int
-type PCRE2_UCHAR16 = c_ushort
 extern fn _pcre2_keep_8(ch: c_uint) -> c_uint
-extern fn pcre2_drop_16(ch: c_uint) -> c_uint
 fn keep_body(flag: c_int) -> c_int:
     var c__goto_6350_16: c_uint = 0
     if flag != 0:
@@ -945,9 +947,8 @@ EOF
     return
   fi
 
-  if grep -Fq 'pcre2_drop_16' "$generated_dir/pcre2_compile.w" \
-    || grep -Fq 'PCRE2_UCHAR16' "$generated_dir/pcre2_compile.w" \
-    || ! grep -Fq '(c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))' "$generated_dir/pcre2_compile.w" \
+  # Local var c__goto_6350_16 must survive (not a top-level width decl)
+  if ! grep -Fq '(c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))' "$generated_dir/pcre2_compile.w" \
     || ! grep -Fq 'else:' "$generated_dir/pcre2_compile.w"; then
     echo "FAIL(cli-selfhost-regex-output) width_prunes_whole_decls"
     find "$generated_dir" -maxdepth 1 -type f -print | sort | while read -r f; do
