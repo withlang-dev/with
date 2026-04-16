@@ -24,6 +24,15 @@ bash "./scripts/prepare_pcre2_reference.sh" "$PCRE2_SRC"
 echo "=== Step 2: Run with migrate ==="
 rm -rf "$MIGRATE_OUT" && mkdir -p "$MIGRATE_OUT"
 $WITH migrate "$PCRE2_SRC/" -o "$MIGRATE_OUT/" \
+    --exclude pcre2test.c \
+    --exclude pcre2demo.c \
+    --exclude pcre2grep.c \
+    --exclude pcre2posix.c \
+    --exclude pcre2posix_test.c \
+    --exclude pcre2_jit_test.c \
+    --exclude pcre2_jit_compile.c \
+    --exclude pcre2_dftables.c \
+    --exclude pcre2_fuzzsupport.c \
     -I "$PCRE2_SRC" \
     -D PCRE2_CODE_UNIT_WIDTH=8 \
     -D HAVE_CONFIG_H=1

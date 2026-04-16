@@ -929,7 +929,7 @@ fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, 
 
 fn run_migrate_command(argc: i32) -> i32:
     if argc < 3:
-        eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir]")
+        eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir] [--exclude basename]")
         return 1
 
     // Hidden developer mode: run the CiIR/CiPrint roundtrip harness
@@ -940,6 +940,7 @@ fn run_migrate_command(argc: i32) -> i32:
     // Parse arguments
     var source_path = ""
     var output_path = ""
+    var exclude_basenames = ""
     var ai = 2
     while ai < argc:
         let arg = with_arg_at(ai)
@@ -962,6 +963,14 @@ fn run_migrate_command(argc: i32) -> i32:
             migrate_set_no_c_export(1)
             ai = ai + 1
             continue
+        if arg == "--exclude" and ai + 1 < argc:
+            exclude_basenames = exclude_basenames ++ "|" ++ with_arg_at(ai + 1) ++ "|"
+            ai = ai + 2
+            continue
+        if arg.len() > 10 and arg.slice(0, 10) == "--exclude=":
+            exclude_basenames = exclude_basenames ++ "|" ++ arg.slice(10, arg.len()) ++ "|"
+            ai = ai + 1
+            continue
         if arg.len() > 0 and arg.byte_at(0) != 45:  // not a flag
             source_path = arg
         ai = ai + 1
@@ -977,7 +986,7 @@ fn run_migrate_command(argc: i32) -> i32:
         // Directory mode
         if output_path.len() == 0:
             output_path = source_path ++ "_migrated"
-        return migrate_c_directory(source_path, output_path)
+        return migrate_c_directory(source_path, output_path, exclude_basenames)
 
     // Single file mode — default output: replace .c with .w
     if output_path.len() == 0:

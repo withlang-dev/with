@@ -222,17 +222,29 @@ fn ci_print_compact_stmt_local(stmts: &CiStmtPool, exprs: &CiExprPool, types: &C
         let then_b = (stmts.get_d1(id)) as CiStmtId
         let else_b = (stmts.get_d2(id)) as CiStmtId
         var out = indent ++ "if " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
-        out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, then_b, depth + 4)
+        let then_text = ci_print_compact_stmt_local(stmts, exprs, types, then_b, depth + 4)
+        if then_text.len() > 0:
+            out = out ++ then_text
+        else:
+            out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         if (else_b as i32) != 0:
             out = out ++ indent ++ "else:\n"
-            out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, else_b, depth + 4)
+            let else_text = ci_print_compact_stmt_local(stmts, exprs, types, else_b, depth + 4)
+            if else_text.len() > 0:
+                out = out ++ else_text
+            else:
+                out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         return out
 
     if kind == CiStmtKind.CIS_WHILE:
         let cond = (stmts.get_d0(id)) as CiExprId
         let body = (stmts.get_d1(id)) as CiStmtId
         var out = indent ++ "while " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
-        out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, body, depth + 4)
+        let body_text = ci_print_compact_stmt_local(stmts, exprs, types, body, depth + 4)
+        if body_text.len() > 0:
+            out = out ++ body_text
+        else:
+            out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         return out
 
     if kind == CiStmtKind.CIS_VAR_DECL:
@@ -586,11 +598,17 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         let else_b = (stmts.get_d2(id)) as CiStmtId
         var out = indent ++ "if " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
         let then_text = ci_print_stmt(stmts, exprs, types, then_b, 0)
-        out = out ++ ci_reindent_spaces(then_text, 4)
+        if then_text.len() > 0:
+            out = out ++ ci_reindent_spaces(then_text, 4)
+        else:
+            out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         if (else_b as i32) != 0:
             out = out ++ indent ++ "else:\n"
             let else_text = ci_print_stmt(stmts, exprs, types, else_b, 0)
-            out = out ++ ci_reindent_spaces(else_text, 4)
+            if else_text.len() > 0:
+                out = out ++ ci_reindent_spaces(else_text, 4)
+            else:
+                out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         return out
 
     if kind == CiStmtKind.CIS_WHILE:
@@ -600,7 +618,10 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         let body = (stmts.get_d1(id)) as CiStmtId
         var out = indent ++ "while " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
         let body_text = ci_print_stmt(stmts, exprs, types, body, 0)
-        out = out ++ ci_reindent_spaces(body_text, 4)
+        if body_text.len() > 0:
+            out = out ++ ci_reindent_spaces(body_text, 4)
+        else:
+            out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         return out
 
     if kind == CiStmtKind.CIS_DO_WHILE:
@@ -649,8 +670,14 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
             let body_id = (stmts.get_extra(cursor)) as CiStmtId
             cursor = cursor + 1
             out = out ++ ci_make_indent(depth + 4) ++ arm_head ++ " =>\n"
-            let body_text = ci_print_stmt(stmts, exprs, types, body_id, 0)
-            out = out ++ ci_reindent_spaces(body_text, depth + 8)
+            if (body_id as i32) == 0:
+                out = out ++ ci_make_indent(depth + 8) ++ "0\n"
+            else:
+                let body_text = ci_print_stmt(stmts, exprs, types, body_id, 0)
+                if body_text.len() > 0:
+                    out = out ++ ci_reindent_spaces(body_text, depth + 8)
+                else:
+                    out = out ++ ci_make_indent(depth + 8) ++ "0\n"
             ai = ai + 1
         return out
 
