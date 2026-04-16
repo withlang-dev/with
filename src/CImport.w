@@ -369,7 +369,7 @@ fn process_c_import(header_spec: str) -> str:
         if kind == CK_FUNCTION:
             output = output ++ ci_translate_function(session, i, translated_structs)
         else if kind == CK_STRUCT or kind == CK_UNION:
-            let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs, demoted_types, typedef_shadowed)
+            let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs, demoted_types)
             output = output ++ struct_result
             // Track struct name for typedef resolution (only if actually translated)
             if struct_result.len() > 0:
@@ -387,7 +387,7 @@ fn process_c_import(header_spec: str) -> str:
         else if kind == CK_VAR:
             output = output ++ ci_translate_var(session, i, translated_structs)
         else if kind == CK_TYPEDEF:
-            let td_result = ci_translate_typedef(session, i, translated_structs)
+            let td_result = ci_translate_typedef(session, i)
             output = output ++ td_result
             // Track typedef name if it aliases a translated struct
             if td_result.len() > 0:
@@ -1152,7 +1152,7 @@ fn ci_pointer_type_explicit_mut(ty: str) -> str:
 
 // ── Struct/Union translation ────────────────────────────────
 
-fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: str, demoted_types: str, typedef_shadowed: str) -> str:
+fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: str, demoted_types: str) -> str:
     let name = with_cimport_decl_name(session, idx)
     if name.len() == 0:
         return ""
@@ -1617,7 +1617,7 @@ fn ci_map_builtin_typedef(name: str) -> str:
     if name == "va_list": return "opaque"
     ""
 
-fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
+fn ci_translate_typedef(session: i64, idx: i32) -> str:
     let name = with_cimport_decl_name(session, idx)
     if name.len() == 0:
         return ""
@@ -9554,7 +9554,7 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
         if kind == CK_FUNCTION:
             output = output ++ ci_migrate_translate_function(session, i, translated_structs)
         else if kind == CK_STRUCT or kind == CK_UNION:
-            let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs, demoted_types, typedef_shadowed)
+            let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs, demoted_types)
             output = output ++ struct_result
             if struct_result.len() > 0:
                 let sname = with_cimport_decl_name(session, i)
@@ -9568,7 +9568,7 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
         else if kind == CK_ENUM:
             output = output ++ ci_translate_enum(session, i)
         else if kind == CK_TYPEDEF:
-            let td_result = ci_translate_typedef(session, i, translated_structs)
+            let td_result = ci_translate_typedef(session, i)
             output = output ++ td_result
             if td_result.len() > 0:
                 let td_name = with_cimport_decl_name(session, i)
