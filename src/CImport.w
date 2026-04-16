@@ -9019,6 +9019,27 @@ fn ci_migrate_shared_let_add(let_line: str, name: str) -> bool:
     g_migrate_shared_let_buf = g_migrate_shared_let_buf ++ let_line ++ "\n"
     true
 
+// Replace all occurrences of needle with replacement, assuming few matches.
+// Unlike ci_str_replace (O(n²) char-by-char concatenation), this is O(n * k)
+// where k = number of matches, suitable for large outputs with sparse matches.
+fn ci_replace_sparse(text: str, needle: str, replacement: str) -> str:
+    if needle.len() == 0 or needle.len() > text.len():
+        return text
+    var result = ""
+    var start: i64 = 0
+    let tlen = text.len()
+    let nlen = needle.len()
+    while start < tlen:
+        let tail = text.slice(start, tlen)
+        let rel = ci_find_str(tail, needle)
+        if rel < 0:
+            result = result ++ tail
+            return result
+        let abs_idx = start + rel as i64
+        result = result ++ text.slice(start, abs_idx) ++ replacement
+        start = abs_idx + nlen
+    result
+
 // Write the shared defs module (defs.w) to output_dir.
 // Contains: preamble + hardcoded extras + shared macro let declarations.
 fn ci_migrate_write_shared_defs(output_dir: str):
@@ -9593,6 +9614,13 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
     g_macro_type_names = ""
     g_macro_type_aliases = ""
     g_migrate_file_error = ""
+
+    // C4: post-process output — unsigned -1 in assignment/binding context.
+    // ~(size_t)0 evaluates to -1 as a signed constant, but in unsigned context
+    // it represents ULONG_MAX. Replace "= (-1" and "else: (-1" with wrapping form.
+    if ci_migrate_shared_defs_active():
+        output = ci_replace_sparse(output, "= (-1", "= ((0 -% 1)")
+        output = ci_replace_sparse(output, "else: (-1", "else: ((0 -% 1)")
 
     // Write output
     let write_result = with_fs_write_file(output_path, output)

@@ -419,10 +419,10 @@ $(REGEX_RAW_STAMP): $(CANONICAL_BIN) $(REGEX_REF_SOURCES) scripts/prepare_pcre2_
 	echo "raw migration: $$count .w files in $$out"; \
 	touch "$@"
 
-$(REGEX_PREPARE_STAMP): $(REGEX_RAW_STAMP) scripts/pcre2_generated_workflow.sh | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
-	@bash "$(ROOT_DIR)/scripts/pcre2_generated_workflow.sh" prepare \
-		"$(ROOT_DIR)/$(REGEX_RAW_DIR)" \
-		"$(ROOT_DIR)/$(REGEX_GENERATED_DIR)"
+$(REGEX_PREPARE_STAMP): $(REGEX_RAW_STAMP) | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
+	@rm -rf "$(ROOT_DIR)/$(REGEX_GENERATED_DIR)" && \
+	mkdir -p "$(ROOT_DIR)/$(REGEX_GENERATED_DIR)" && \
+	cp "$(ROOT_DIR)/$(REGEX_RAW_DIR)"/*.w "$(ROOT_DIR)/$(REGEX_GENERATED_DIR)/"
 	@touch "$@"
 
 $(COMPAT_RUNTIME_SRC): rt/compat_runtime.w $(EMBEDDED_STDLIB_RUNTIME_SRC) | $(OUT_GEN_DIR)
