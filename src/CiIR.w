@@ -25,6 +25,12 @@
 // lowering, rather than escaping through verbatim raw-string nodes.
 
 extern fn with_eprint(s: str) -> void
+extern fn with_str_clone(s: str) -> str
+
+fn ci_ir_owned_text(text: str) -> str:
+    if text.len() == 0:
+        return ""
+    with_str_clone(text)
 
 // ── CiType ────────────────────────────────────────────────────
 
@@ -715,5 +721,134 @@ fn CiModule.add_decl(self: &mut CiModule, decl: CiDeclId):
 
 fn CiModule.add_import(self: &mut CiModule, path: str):
     self.imports.push(path)
+
+
+// ── CiProject ────────────────────────────────────────────────
+//
+// Phase C threads all directory-mode modules through a project symbol
+// table so ownership and cross-module type resolution come from the
+// compiler rather than shell-side string rewriting.
+
+enum CiProjectSymbolKind: i32:
+    CIPS_VAR = 1
+    CIPS_FN = 2
+    CIPS_TYPE = 3
+    CIPS_MACRO = 4
+
+type CiProjectSymbol {
+    name: str,
+    kind: i32,
+    owner_module: i32,
+    resolved_ty: CiTypeId,
+    resolved_ty_text: str,
+    consumers: str,
+    owner_rank: i32,
+    owner_definition_kind: i32,
+}
+
+fn CiProjectSymbol.new(name: str, kind: i32) -> CiProjectSymbol:
+    CiProjectSymbol {
+        name: ci_ir_owned_text(name),
+        kind: kind,
+        owner_module: 0 - 1,
+        resolved_ty: 0 as CiTypeId,
+        resolved_ty_text: "",
+        consumers: "",
+        owner_rank: 0 - 1,
+        owner_definition_kind: 0,
+    }
+
+fn ci_pipe_i32_contains(items: str, want: i32) -> bool:
+    let needle = "|" ++ i64_to_string(want as i64) ++ "|"
+    var i = 0
+    let ilen = items.len() as i32
+    let nlen = needle.len() as i32
+    while i <= ilen - nlen:
+        if items.slice(i as i64, (i + nlen) as i64) == needle:
+            return true
+        i = i + 1
+    false
+
+fn CiProjectSymbol.add_consumer(self: &mut CiProjectSymbol, module_id: i32):
+    if module_id < 0:
+        return
+    if ci_pipe_i32_contains(self.consumers, module_id):
+        return
+    self.consumers = self.consumers ++ "|" ++ i64_to_string(module_id as i64) ++ "|"
+
+fn CiProjectSymbol.owned_copy(self: CiProjectSymbol) -> CiProjectSymbol:
+    CiProjectSymbol {
+        name: ci_ir_owned_text(self.name),
+        kind: self.kind,
+        owner_module: self.owner_module,
+        resolved_ty: self.resolved_ty,
+        resolved_ty_text: ci_ir_owned_text(self.resolved_ty_text),
+        consumers: ci_ir_owned_text(self.consumers),
+        owner_rank: self.owner_rank,
+        owner_definition_kind: self.owner_definition_kind,
+    }
+
+fn ci_project_symbol_key(kind: i32, name: str) -> str:
+    if kind == CiProjectSymbolKind.CIPS_VAR:
+        return "v:" ++ name
+    if kind == CiProjectSymbolKind.CIPS_FN:
+        return "f:" ++ name
+    if kind == CiProjectSymbolKind.CIPS_TYPE:
+        return "t:" ++ name
+    "m:" ++ name
+
+type CiProject {
+    module_paths: Vec[str],
+    symbols: Vec[CiProjectSymbol],
+    types: CiTypePool,
+}
+
+fn CiProject.new -> CiProject:
+    CiProject {
+        module_paths: Vec.new(),
+        symbols: Vec.new(),
+        types: CiTypePool.new(),
+    }
+
+fn CiProject.ensure_module(self: &mut CiProject, path: str) -> i32:
+    var i = 0
+    while i < self.module_paths.len() as i32:
+        if self.module_paths.get(i as i64) == path:
+            return i
+        i = i + 1
+    let id = self.module_paths.len() as i32
+    self.module_paths.push(ci_ir_owned_text(path))
+    id
+
+fn CiProject.find_symbol(self: &CiProject, kind: i32, name: str) -> i32:
+    let key = ci_project_symbol_key(kind, name)
+    var i = self.symbols.len() as i32 - 1
+    while i >= 0:
+        let symbol = self.symbols.get(i as i64)
+        if ci_project_symbol_key(symbol.kind, symbol.name) == key:
+            return i
+        i = i - 1
+    0 - 1
+
+fn CiProject.ensure_symbol(self: &mut CiProject, kind: i32, name: str) -> i32:
+    let existing = self.find_symbol(kind, name)
+    if existing >= 0:
+        return existing
+    let id = self.symbols.len() as i32
+    self.symbols.push(CiProjectSymbol.new(name, kind))
+    id
+
+fn CiProject.update_symbol(self: &mut CiProject, symbol_id: i32, symbol: CiProjectSymbol):
+    if symbol_id < 0 or symbol_id >= self.symbols.len() as i32:
+        return
+    self.symbols.push(symbol.owned_copy())
+
+fn CiProject.owner_module_path(self: &CiProject, symbol_id: i32) -> str:
+    if symbol_id < 0 or symbol_id >= self.symbols.len() as i32:
+        return ""
+    let owner_module = self.symbols.get(symbol_id as i64).owner_module
+    if owner_module < 0 or owner_module >= self.module_paths.len() as i32:
+        return ""
+    self.module_paths.get(owner_module as i64)
 
 let _ci_ir_eof_guard = 0

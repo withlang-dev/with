@@ -1497,7 +1497,7 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
         let var_kw = if g_migrate_no_c_export != 0: "var " else: "extern var "
         tl_attr ++ var_kw ++ safe_name ++ ": " ++ actual_type ++ "\n"
 
-fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: str, want_definitions: bool) -> str:
+fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: str, want_definitions: bool, project_active: bool, project: &CiProject) -> str:
     let name = with_cimport_decl_name(session, idx)
     if name.len() == 0:
         return ""
@@ -1514,7 +1514,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: st
     if ci_migrate_find_best_var_decl(session, count, name, primary_path) != idx:
         return ""
 
-    let resolved_type = ci_migrate_var_resolved_type(session, idx, count, primary_path)
+    let resolved_type = ci_migrate_var_resolved_type(session, idx, count, primary_path, project_active, project)
     if resolved_type.len() == 0:
         return ""
     if ci_starts_with(resolved_type, "__UNSUPPORTED:"):
@@ -1524,7 +1524,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: st
         return ""
 
     let definition_kind = ci_migrate_var_definition_kind(session, idx)
-    let emits_definition = ci_migrate_var_emits_definition(session, idx, primary_path)
+    let emits_definition = ci_migrate_var_emits_definition(session, idx, primary_path, project_active, project)
     if want_definitions and not emits_definition:
         return ""
     if not want_definitions and emits_definition:
@@ -1565,7 +1565,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: st
         return tl_attr ++ "extern let " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
     tl_attr ++ "extern var " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
 
-fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: str) -> str:
+fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: str, project_active: bool, project: &CiProject) -> str:
     var output = ""
     var i = 0
     while i < count:
@@ -1574,7 +1574,7 @@ fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: str) -> str
             let cursor = with_cimport_decl_cursor(session, i)
             let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
             if not ci_is_system_decl(name) and not (loc.len() > 0 and ci_is_system_path(loc)):
-                output = output ++ ci_migrate_translate_var(session, i, count, primary_path, true)
+                output = output ++ ci_migrate_translate_var(session, i, count, primary_path, true, project_active, project)
         i = i + 1
     i = 0
     while i < count:
@@ -1583,7 +1583,7 @@ fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: str) -> str
             let cursor = with_cimport_decl_cursor(session, i)
             let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
             if not ci_is_system_decl(name) and not (loc.len() > 0 and ci_is_system_path(loc)):
-                output = output ++ ci_migrate_translate_var(session, i, count, primary_path, false)
+                output = output ++ ci_migrate_translate_var(session, i, count, primary_path, false, project_active, project)
         i = i + 1
     output
 
@@ -6875,25 +6875,28 @@ fn ci_location_path(loc: str) -> str:
         return loc
     loc.slice(0, second_last as i64)
 
-fn ci_pipe_kv_lookup(entries: str, key: str) -> str:
-    if key.len() == 0:
-        return ""
-    let needle = "|" ++ key ++ "="
-    let pos = ci_find_str(entries, needle)
-    if pos < 0:
-        return ""
-    let start = pos + needle.len() as i32
-    var end = start
-    while end < entries.len() as i32 and entries.byte_at(end as i64) != 124:
-        end = end + 1
-    entries.slice(start as i64, end as i64)
 
-fn ci_pipe_kv_put(entries: str, key: str, value: str) -> str:
-    if key.len() == 0:
-        return entries
-    if ci_pipe_kv_lookup(entries, key).len() > 0:
-        return entries
-    entries ++ "|" ++ key ++ "=" ++ value ++ "|"
+fn ci_migrate_project_var_symbol(project_active: bool, project: &CiProject, name: str) -> i32:
+    if not project_active or name.len() == 0:
+        return 0 - 1
+    project.find_symbol(CiProjectSymbolKind.CIPS_VAR, name)
+
+fn ci_migrate_project_var_owner_path(project_active: bool, project: &CiProject, name: str) -> str:
+    let symbol_id = ci_migrate_project_var_symbol(project_active, project, name)
+    if symbol_id < 0:
+        return ""
+    project.owner_module_path(symbol_id)
+
+fn ci_migrate_project_var_resolved_type(project_active: bool, project: &CiProject, name: str) -> str:
+    let symbol_id = ci_migrate_project_var_symbol(project_active, project, name)
+    if symbol_id < 0:
+        return ""
+    let symbol = project.symbols.get(symbol_id as i64)
+    if symbol.resolved_ty_text.len() > 0:
+        return symbol.resolved_ty_text
+    if (symbol.resolved_ty as i32) != 0:
+        return ci_print_type(project.types, symbol.resolved_ty)
+    ""
 
 fn ci_array_elem_type(ty: str) -> str:
     if ty.len() == 0 or ty.byte_at(0) != 91:
@@ -6915,14 +6918,14 @@ fn ci_migrate_var_definition_kind(session: i64, idx: i32) -> i32:
 fn ci_migrate_var_is_definition(session: i64, idx: i32) -> bool:
     ci_migrate_var_definition_kind(session, idx) != CI_VAR_DECL_ONLY
 
-fn ci_migrate_var_emits_definition(session: i64, idx: i32, primary_path: str) -> bool:
+fn ci_migrate_var_emits_definition(session: i64, idx: i32, primary_path: str, project_active: bool, project: &CiProject) -> bool:
     if ci_migrate_var_definition_kind(session, idx) == CI_VAR_DECL_ONLY:
         return false
-    if g_migrate_directory_mode != 0 and with_cimport_var_storage_class(session, idx) != CX_SC_STATIC:
+    if project_active and with_cimport_var_storage_class(session, idx) != CX_SC_STATIC:
         let name = with_cimport_decl_name(session, idx)
-        let owner_path = ci_pipe_kv_lookup(g_migrate_global_owner_paths, name)
-        if owner_path.len() > 0 and owner_path != primary_path:
-            return false
+        let owner_path = ci_migrate_project_var_owner_path(project_active, project, name)
+        if owner_path.len() > 0:
+            return owner_path == primary_path
     true
 
 fn ci_migrate_var_in_primary_file(session: i64, idx: i32, primary_path: str) -> bool:
@@ -6977,17 +6980,17 @@ fn ci_migrate_var_owner_type(session: i64, idx: i32) -> str:
                         actual_type = init_type
     actual_type
 
-fn ci_migrate_var_resolved_type(session: i64, idx: i32, count: i32, primary_path: str) -> str:
+fn ci_migrate_var_resolved_type(session: i64, idx: i32, count: i32, primary_path: str, project_active: bool, project: &CiProject) -> str:
     let name = with_cimport_decl_name(session, idx)
+    if with_cimport_var_storage_class(session, idx) != CX_SC_STATIC:
+        let shared_type = ci_migrate_project_var_resolved_type(project_active, project, name)
+        if shared_type.len() > 0:
+            return shared_type
     let best = ci_migrate_find_best_var_decl(session, count, name, primary_path)
     if best >= 0 and ci_migrate_var_definition_kind(session, best) != CI_VAR_DECL_ONLY:
         let owner_type = ci_migrate_var_owner_type(session, best)
         if owner_type.len() > 0:
             return owner_type
-    if with_cimport_var_storage_class(session, idx) != CX_SC_STATIC:
-        let shared_type = ci_pipe_kv_lookup(g_migrate_global_owner_types, name)
-        if shared_type.len() > 0:
-            return shared_type
     let decl_type = with_cimport_var_type_translated(session, idx)
     if decl_type.len() > 0:
         return decl_type
@@ -7012,14 +7015,6 @@ fn ci_try_eval_var_init(session: i64, idx: i32) -> str:
         if expr.len() > 0:
             return expr
     ""
-
-fn ci_small_int_from_string(s: str) -> i32:
-    if s.len() == 0:
-        return 0
-    let c = s.byte_at(0)
-    if c >= 48 and c <= 57:
-        return (c - 48) as i32
-    0
 
 fn ci_str_compare(a: str, b: str) -> i32:
     let alen = a.len() as i32
@@ -8803,10 +8798,6 @@ var g_migrate_preprocessed_source: str = ""
 var g_migrate_current_input_path: str = ""
 var g_macro_type_names: str = ""
 var g_macro_type_aliases: str = ""
-var g_migrate_directory_mode: i32 = 0
-var g_migrate_global_owner_types: str = ""
-var g_migrate_global_owner_paths: str = ""
-var g_migrate_global_owner_kinds: str = ""
 var g_migrate_file_error: str = ""
 
 // When true, skip @[c_export] attributes and extern fn declarations
@@ -9054,7 +9045,25 @@ fn ci_migrate_wrapped_source(input_path: str) -> str:
     let line_directive = "#line 1 \"" ++ input_path ++ "\"\n"
     source_prefix ++ line_directive ++ raw_source
 
-fn ci_migrate_scan_file_owner_types(input_path: str) -> i32:
+fn ci_migrate_project_var_owner_rank(definition_kind: i32) -> i32:
+    if definition_kind == CI_VAR_FULL_DEF:
+        return 2
+    if definition_kind == CI_VAR_TENTATIVE_DEF:
+        return 1
+    0
+
+fn ci_migrate_project_var_type_id(session: i64, idx: i32, owner_type: str, project: &mut CiProject) -> CiTypeId:
+    let cursor = with_cimport_decl_cursor(session, idx)
+    if cursor < 0:
+        return 0 as CiTypeId
+    var ty_id = ci_type_from_libclang(session, with_ci_cursor_type(session, cursor), &mut project.types)
+    if owner_type.len() == 0:
+        return ty_id
+    if (ty_id as i32) == 0 or ci_print_type(project.types, ty_id) != owner_type:
+        ty_id = ci_type_from_translated_text(&mut project.types, owner_type)
+    ty_id
+
+fn ci_migrate_project_scan_file(input_path: str, project: &mut CiProject) -> i32:
     ci_migrate_prepare_include_path(input_path)
     let source = ci_migrate_wrapped_source(input_path)
     if source.len() == 0:
@@ -9072,6 +9081,7 @@ fn ci_migrate_scan_file_owner_types(input_path: str) -> i32:
         with_cimport_dispose(session)
         return 1
 
+    let module_id = project.ensure_module(input_path)
     let count = with_cimport_decl_count(session)
     var i = 0
     while i < count:
@@ -9079,50 +9089,68 @@ fn ci_migrate_scan_file_owner_types(input_path: str) -> i32:
             let name = with_cimport_decl_name(session, i)
             let cursor = with_cimport_decl_cursor(session, i)
             let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
-            if name.len() > 0 and not ci_is_system_decl(name) and not (loc.len() > 0 and ci_is_system_path(loc)):
-                let owner_kind = ci_migrate_var_definition_kind(session, i)
-                if ci_migrate_var_in_primary_file(session, i, input_path) and owner_kind != CI_VAR_DECL_ONLY and with_cimport_var_storage_class(session, i) != CX_SC_STATIC:
-                    let owner_type = ci_migrate_var_owner_type(session, i)
-                    if owner_type.len() == 0 or ci_starts_with(owner_type, "__UNSUPPORTED:"):
-                        eprint("migrate: unsupported global owner type for " ++ name ++ " in " ++ input_path)
-                        with_cimport_dispose(session)
-                        return 1
-                    let existing_path = ci_pipe_kv_lookup(g_migrate_global_owner_paths, name)
-                    let existing_type = ci_pipe_kv_lookup(g_migrate_global_owner_types, name)
-                    let existing_kind = ci_small_int_from_string(ci_pipe_kv_lookup(g_migrate_global_owner_kinds, name))
-                    if existing_path.len() == 0:
-                        g_migrate_global_owner_paths = ci_pipe_kv_put(g_migrate_global_owner_paths, name, input_path)
-                        g_migrate_global_owner_types = ci_pipe_kv_put(g_migrate_global_owner_types, name, owner_type)
-                        g_migrate_global_owner_kinds = ci_pipe_kv_put(g_migrate_global_owner_kinds, name, i64_to_string(owner_kind as i64))
-                    else:
-                        if existing_type != owner_type:
-                            eprint("migrate: conflicting global owner type for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
-                            with_cimport_dispose(session)
-                            return 1
-                        if existing_kind == CI_VAR_FULL_DEF and owner_kind == CI_VAR_FULL_DEF and existing_path != input_path:
-                            eprint("migrate: duplicate full global definition for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
-                            with_cimport_dispose(session)
-                            return 1
-                        if owner_kind > existing_kind or (owner_kind == existing_kind and ci_str_compare(input_path, existing_path) < 0):
-                            g_migrate_global_owner_paths = ci_pipe_kv_put(g_migrate_global_owner_paths, name, input_path)
-                            g_migrate_global_owner_types = ci_pipe_kv_put(g_migrate_global_owner_types, name, owner_type)
-                            g_migrate_global_owner_kinds = ci_pipe_kv_put(g_migrate_global_owner_kinds, name, i64_to_string(owner_kind as i64))
+            if name.len() == 0 or ci_is_system_decl(name) or (loc.len() > 0 and ci_is_system_path(loc)):
+                i = i + 1
+                continue
+            if with_cimport_var_storage_class(session, i) == CX_SC_STATIC:
+                i = i + 1
+                continue
+            let symbol_id = project.ensure_symbol(CiProjectSymbolKind.CIPS_VAR, name)
+            var symbol = project.symbols.get(symbol_id as i64)
+            symbol.add_consumer(module_id)
+            project.update_symbol(symbol_id, symbol)
+
+            let owner_kind = ci_migrate_var_definition_kind(session, i)
+            if cursor < 0 or owner_kind == CI_VAR_DECL_ONLY or not ci_migrate_var_in_primary_file(session, i, input_path):
+                i = i + 1
+                continue
+
+            let owner_type = ci_migrate_var_owner_type(session, i)
+            if owner_type.len() == 0 or ci_starts_with(owner_type, "__UNSUPPORTED:"):
+                eprint("migrate: unsupported global owner type for " ++ name ++ " in " ++ input_path)
+                with_cimport_dispose(session)
+                return 1
+
+            let owner_rank = ci_migrate_project_var_owner_rank(owner_kind)
+            if symbol.owner_module < 0:
+                symbol.owner_module = module_id
+                symbol.owner_rank = owner_rank
+                symbol.owner_definition_kind = owner_kind
+                symbol.resolved_ty_text = owner_type
+                symbol.resolved_ty = ci_migrate_project_var_type_id(session, i, owner_type, project)
+                project.update_symbol(symbol_id, symbol)
+                i = i + 1
+                continue
+
+            let existing_path = project.owner_module_path(symbol_id)
+            if symbol.owner_rank == owner_rank:
+                if symbol.owner_definition_kind == CI_VAR_FULL_DEF and owner_kind == CI_VAR_FULL_DEF and existing_path != input_path:
+                    eprint("migrate: duplicate full global definition for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
+                    with_cimport_dispose(session)
+                    return 1
+                if symbol.resolved_ty_text.len() > 0 and symbol.resolved_ty_text != owner_type:
+                    eprint("migrate: conflicting global owner type for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
+                    with_cimport_dispose(session)
+                    return 1
+            if owner_rank > symbol.owner_rank or (owner_rank == symbol.owner_rank and ci_str_compare(input_path, existing_path) < 0):
+                symbol.owner_module = module_id
+                symbol.owner_rank = owner_rank
+                symbol.owner_definition_kind = owner_kind
+                symbol.resolved_ty_text = owner_type
+                symbol.resolved_ty = ci_migrate_project_var_type_id(session, i, owner_type, project)
+                project.update_symbol(symbol_id, symbol)
         i = i + 1
 
     with_cimport_dispose(session)
     0
 
-pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
+fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool, project: &CiProject) -> i32:
     if with_cimport_available() == 0:
         eprint("migrate: libclang not available")
         return 1
 
     ci_migrate_prepare_include_path(input_path)
 
-    if g_migrate_directory_mode == 0:
-        g_migrate_global_owner_types = ""
-        g_migrate_global_owner_paths = ""
-        g_migrate_global_owner_kinds = ""
     g_migrate_file_error = ""
     g_migrate_macro_values = ""
     g_migrate_macro_session = 0
@@ -9304,7 +9332,7 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
                 output = output ++ "// static_assert: " ++ sa_name ++ "\n"
         i = i + 1
 
-    output = output ++ ci_migrate_translate_vars(session, count, input_path)
+    output = output ++ ci_migrate_translate_vars(session, count, input_path, project_active, project)
     if g_migrate_file_error.len() > 0:
         eprint(g_migrate_file_error)
         g_macro_type_names = ci_collect_macro_type_names(session)
@@ -9355,6 +9383,10 @@ pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
     eprint(f"migrate: {input_path} -> {output_path} ({goto_count} gotos, {unsafe_count} unsafe)")
     0
 
+pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
+    var project = CiProject.new()
+    ci_migrate_file_inner(input_path, output_path, false, &project)
+
 // Translate a directory of .c files to .w files.
 pub fn migrate_c_directory(input_dir: str, output_dir: str) -> i32:
     // Create output directory
@@ -9385,18 +9417,11 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str) -> i32:
                 files.push(file_path)
         pos = line_end + 1
 
-    g_migrate_directory_mode = 1
-    g_migrate_global_owner_types = ""
-    g_migrate_global_owner_paths = ""
-    g_migrate_global_owner_kinds = ""
+    var project = CiProject.new()
 
     var fi = 0
     while fi < files.len() as i32:
-        if ci_migrate_scan_file_owner_types(files.get(fi as i64)) != 0:
-            g_migrate_directory_mode = 0
-            g_migrate_global_owner_types = ""
-            g_migrate_global_owner_paths = ""
-            g_migrate_global_owner_kinds = ""
+        if ci_migrate_project_scan_file(files.get(fi as i64), &mut project) != 0:
             return 1
         fi = fi + 1
 
@@ -9421,15 +9446,10 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str) -> i32:
         if dir_end > 0:
             with_fs_mkdir_p(out_path.slice(0, dir_end as i64))
 
-        let rc = migrate_c_file(file_path, out_path)
+        let rc = ci_migrate_file_inner(file_path, out_path, true, &project)
         if rc == 0:
             files_migrated = files_migrated + 1
         fi = fi + 1
-
-    g_migrate_directory_mode = 0
-    g_migrate_global_owner_types = ""
-    g_migrate_global_owner_paths = ""
-    g_migrate_global_owner_kinds = ""
 
     let files_failed = files_scanned - files_migrated
     ci_dump_raw_fallback_stats()
