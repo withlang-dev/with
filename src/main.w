@@ -967,6 +967,10 @@ fn run_migrate_command(argc: i32) -> i32:
             migrate_set_width_slice(cli_parse_small_int(with_arg_at(ai + 1)))
             ai = ai + 2
             continue
+        if arg == "--shared-defs" and ai + 1 < argc:
+            migrate_set_shared_defs(with_arg_at(ai + 1))
+            ai = ai + 2
+            continue
         if arg == "--exclude" and ai + 1 < argc:
             exclude_basenames = exclude_basenames ++ "|" ++ with_arg_at(ai + 1) ++ "|"
             ai = ai + 2

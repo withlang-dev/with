@@ -1871,29 +1871,39 @@ fn ci_translate_macros(session: i64, extern_vars: str, macro_source: str) -> str
             let clean_value = ci_strip_int_suffix(stripped)
             with_cimport_mark_name_emitted(name)
             known_values = known_values ++ name ++ "=" ++ clean_value ++ "|"
-            output = output ++ "let " ++ safe_name ++ ": " ++ int_ty ++ " = " ++ clean_value ++ "\n"
+            let let_line = "let " ++ safe_name ++ ": " ++ int_ty ++ " = " ++ clean_value
+            if not ci_migrate_shared_let_add(let_line, safe_name):
+                output = output ++ let_line ++ "\n"
         else if ci_is_char_literal(stripped):
             let char_val = ci_char_to_int(stripped)
             if char_val.len() > 0:
                 let safe_name = ci_escape_reserved(name)
                 with_cimport_mark_name_emitted(name)
                 known_values = known_values ++ name ++ "=" ++ char_val ++ "|"
-                output = output ++ "let " ++ safe_name ++ ": c_int = " ++ char_val ++ "\n"
+                let let_line = "let " ++ safe_name ++ ": c_int = " ++ char_val
+                if not ci_migrate_shared_let_add(let_line, safe_name):
+                    output = output ++ let_line ++ "\n"
         else if ci_is_float_literal(stripped):
             let safe_name = ci_escape_reserved(name)
             let float_ty = ci_float_type_from_suffix(stripped)
             let clean_value = ci_strip_float_suffix(stripped)
             with_cimport_mark_name_emitted(name)
-            output = output ++ "let " ++ safe_name ++ ": " ++ float_ty ++ " = " ++ clean_value ++ "\n"
+            let let_line = "let " ++ safe_name ++ ": " ++ float_ty ++ " = " ++ clean_value
+            if not ci_migrate_shared_let_add(let_line, safe_name):
+                output = output ++ let_line ++ "\n"
         else if ci_is_concatenated_string(stripped):
             let safe_name = ci_escape_reserved(name)
             let concat_value = ci_concat_strings(stripped)
             with_cimport_mark_name_emitted(name)
-            output = output ++ "let " ++ safe_name ++ " = " ++ concat_value ++ "\n"
+            let let_line = "let " ++ safe_name ++ " = " ++ concat_value
+            if not ci_migrate_shared_let_add(let_line, safe_name):
+                output = output ++ let_line ++ "\n"
         else if ci_is_string_literal(stripped):
             let safe_name = ci_escape_reserved(name)
             with_cimport_mark_name_emitted(name)
-            output = output ++ "let " ++ safe_name ++ " = " ++ stripped ++ "\n"
+            let let_line = "let " ++ safe_name ++ " = " ++ stripped
+            if not ci_migrate_shared_let_add(let_line, safe_name):
+                output = output ++ let_line ++ "\n"
         else:
             let cast_expr_result = ci_translate_c_expr(stripped, "", known_values)
             let semantic_expr_ty = ci_lookup_known(name, object_macro_types)
@@ -1901,14 +1911,18 @@ fn ci_translate_macros(session: i64, extern_vars: str, macro_source: str) -> str
             if cast_expr_result.len() > 0 and cast_expr_ty.len() > 0:
                 let safe_name = ci_escape_reserved(name)
                 with_cimport_mark_name_emitted(name)
-                output = output ++ "let " ++ safe_name ++ ": " ++ cast_expr_ty ++ " = " ++ cast_expr_result ++ "\n"
+                let let_line = "let " ++ safe_name ++ ": " ++ cast_expr_ty ++ " = " ++ cast_expr_result
+                if not ci_migrate_shared_let_add(let_line, safe_name):
+                    output = output ++ let_line ++ "\n"
             else:
                 let eval_result = ci_eval_const_expr_ctx(stripped, known_values)
                 if eval_result.len() > 0:
                     let safe_name = ci_escape_reserved(name)
                     with_cimport_mark_name_emitted(name)
                     known_values = known_values ++ name ++ "=" ++ eval_result ++ "|"
-                    output = output ++ "let " ++ safe_name ++ ": c_int = " ++ eval_result ++ "\n"
+                    let let_line = "let " ++ safe_name ++ ": c_int = " ++ eval_result
+                    if not ci_migrate_shared_let_add(let_line, safe_name):
+                        output = output ++ let_line ++ "\n"
                 else:
                     // Try expression translation — may reference extern vars
                     let expr_result = cast_expr_result
@@ -1920,7 +1934,9 @@ fn ci_translate_macros(session: i64, extern_vars: str, macro_source: str) -> str
                             // References a mutable extern var — emit as function
                             output = output ++ "fn " ++ safe_name ++ "() -> " ++ expr_ty ++ ":\n    " ++ expr_result ++ "\n"
                         else:
-                            output = output ++ "let " ++ safe_name ++ ": " ++ expr_ty ++ " = " ++ expr_result ++ "\n"
+                            let let_line = "let " ++ safe_name ++ ": " ++ expr_ty ++ " = " ++ expr_result
+                            if not ci_migrate_shared_let_add(let_line, safe_name):
+                                output = output ++ let_line ++ "\n"
     g_macro_type_names = ""
     g_macro_type_aliases = ""
     output
@@ -8977,6 +8993,109 @@ fn ci_migrate_is_width_family_name(name: str) -> bool:
             return true
     false
 
+// C3: Shared-defs mode. When prefix is non-empty, the migrator:
+//   1. Skips the preamble in individual modules, emits `use <prefix>` instead
+//   2. Redirects macro-derived `let` declarations to a shared buffer
+//   3. After all files, emits a defs.w containing preamble + shared lets
+var g_migrate_shared_defs_prefix: str = ""
+var g_migrate_shared_let_buf: str = ""
+var g_migrate_shared_let_names: str = ""
+
+pub fn migrate_set_shared_defs(prefix: str):
+    g_migrate_shared_defs_prefix = prefix
+
+fn ci_migrate_shared_defs_active() -> bool:
+    g_migrate_shared_defs_prefix.len() > 0
+
+// Append a let declaration to the shared buffer if not already present.
+// Returns true if the let was redirected (caller should skip per-file emit).
+fn ci_migrate_shared_let_add(let_line: str, name: str) -> bool:
+    if not ci_migrate_shared_defs_active():
+        return false
+    let key = "|" ++ name ++ "|"
+    if ci_find_str(g_migrate_shared_let_names, key) >= 0:
+        return true  // already in shared buffer, skip duplicate
+    g_migrate_shared_let_names = g_migrate_shared_let_names ++ key
+    g_migrate_shared_let_buf = g_migrate_shared_let_buf ++ let_line ++ "\n"
+    true
+
+// Write the shared defs module (defs.w) to output_dir.
+// Contains: preamble + hardcoded extras + shared macro let declarations.
+fn ci_migrate_write_shared_defs(output_dir: str):
+    var defs = "// " ++ g_migrate_shared_defs_prefix ++ " — shared definitions for migrated PCRE2\n\n"
+    defs = defs ++ ci_migrate_preamble_text()
+    // Hardcoded extras from pcre2_internal.h
+    defs = defs ++ "// PCRE2 string constants (from pcre2_internal.h macros)\n"
+    defs = defs ++ "let STRING_MARK: *const u8 = \"MARK\"\n"
+    defs = defs ++ "let STRING_DEFINE: *const u8 = \"DEFINE\"\n"
+    defs = defs ++ "let STRING_VERSION: *const u8 = \"VERSION\"\n"
+    defs = defs ++ "let STRING_WEIRD_STARTWORD: *const u8 = \"[:<:]]\"\n"
+    defs = defs ++ "let STRING_WEIRD_ENDWORD: *const u8 = \"[:>:]]\"\n"
+    defs = defs ++ "\n// strchr mapping (migrator emits string_find_char for strchr)\n"
+    defs = defs ++ "fn string_find_char(s: *const i8, c: i32) -> *const i8: (memchr((s as *const c_void), c, strlen(s)) as *const i8)\n"
+    // Shared let declarations collected during migration
+    if g_migrate_shared_let_buf.len() > 0:
+        defs = defs ++ "\n" ++ g_migrate_shared_let_buf
+    let defs_path = output_dir ++ "/defs.w"
+    let rc = with_fs_write_file(defs_path, defs)
+    if rc != 0:
+        eprint("migrate: failed to write shared defs: " ++ defs_path)
+    else:
+        eprint("migrate: wrote shared defs: " ++ defs_path)
+
+// Generate the self-contained preamble that every migrated file needs.
+// In shared-defs mode this goes into defs.w; otherwise into each file.
+fn ci_migrate_preamble_text() -> str:
+    var p = ""
+    // Inline ctype helpers (pure functions, no dependencies).
+    p = p ++ "fn is_alpha(c: i32) -> bool: (c >= 65 and c <= 90) or (c >= 97 and c <= 122)\n"
+    p = p ++ "fn is_digit(c: i32) -> bool: c >= 48 and c <= 57\n"
+    p = p ++ "fn is_space(c: i32) -> bool: c == 32 or c == 9 or c == 10 or c == 13 or c == 12 or c == 11\n"
+    p = p ++ "fn is_alnum(c: i32) -> bool: is_alpha(c) or is_digit(c)\n"
+    p = p ++ "fn is_upper(c: i32) -> bool: c >= 65 and c <= 90\n"
+    p = p ++ "fn is_lower(c: i32) -> bool: c >= 97 and c <= 122\n"
+    p = p ++ "fn is_xdigit(c: i32) -> bool: (c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)\n"
+    p = p ++ "fn is_print(c: i32) -> bool: c >= 32 and c <= 126\n"
+    p = p ++ "fn to_lower(c: i32) -> i32: if c >= 65 and c <= 90: c + 32 else: c\n"
+    p = p ++ "fn to_upper(c: i32) -> i32: if c >= 97 and c <= 122: c - 32 else: c\n"
+    // String functions from libc
+    p = p ++ "extern fn strlen(s: *const i8) -> i64\n"
+    p = p ++ "extern fn strcmp(a: *const i8, b: *const i8) -> i32\n"
+    p = p ++ "extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32\n"
+    p = p ++ "extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void\n"
+    p = p ++ "fn string_len(s: *const i8) -> i64: strlen(s)\n"
+    p = p ++ "fn string_cmp(a: *const i8, b: *const i8) -> i32: strcmp(a, b)\n"
+    p = p ++ "\ntype c_void = opaque\n"
+    p = p ++ "type c_char = i8\n"
+    p = p ++ "type c_short = i16\n"
+    p = p ++ "type c_ushort = u16\n"
+    p = p ++ "type c_int = i32\n"
+    p = p ++ "type c_uint = u32\n"
+    p = p ++ "type c_long = i64\n"
+    p = p ++ "type c_ulong = u64\n"
+    p = p ++ "type c_longlong = i64\n"
+    p = p ++ "type c_ulonglong = u64\n"
+    p = p ++ "type c_longdouble = f64\n"
+    // Builtin and runtime wrappers
+    p = p ++ "extern fn with_clz(x: i32) -> i32\n"
+    p = p ++ "extern fn with_ctz(x: i32) -> i32\n"
+    p = p ++ "extern fn with_popcount(x: i32) -> i32\n"
+    p = p ++ "extern fn with_bswap16(x: u16) -> u16\n"
+    p = p ++ "extern fn with_bswap32(x: u32) -> u32\n"
+    p = p ++ "extern fn with_bswap64(x: u64) -> u64\n"
+    p = p ++ "extern fn with_clzl(x: i64) -> i32\n"
+    p = p ++ "extern fn with_clzll(x: i64) -> i32\n"
+    p = p ++ "extern fn with_ctzl(x: i64) -> i32\n"
+    p = p ++ "extern fn with_ctzll(x: i64) -> i32\n"
+    p = p ++ "extern fn with_abs(x: i32) -> i32\n"
+    p = p ++ "extern fn with_alloc(size: i64) -> *i8\n"
+    p = p ++ "extern fn with_free(ptr: *i8) -> void\n"
+    p = p ++ "extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> void\n"
+    p = p ++ "extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> void\n"
+    p = p ++ "extern fn with_memset(ptr: *i8, c: i32, n: i64) -> void\n"
+    p = p ++ "extern fn with_memcmp(a: *i8, b: *i8, n: i64) -> i32\n\n"
+    p
+
 // Per-function temp counter state (B9). The same cursor can be
 // visited multiple times during string-based lowering — the
 // memoization map keeps the assigned id stable per cursor so
@@ -9362,82 +9481,17 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
         g_migrate_macro_session = macro_session
         ci_capture_macro_values(macro_session)
 
-    var output = "// Generated by: with migrate " ++ input_path ++ "\n\n"
+    var output = ""
 
-    // Self-contained preamble — no std imports.
-    // Inline ctype helpers (pure functions, no dependencies).
-    output = output ++ "fn is_alpha(c: i32) -> bool: (c >= 65 and c <= 90) or (c >= 97 and c <= 122)\n"
-    output = output ++ "fn is_digit(c: i32) -> bool: c >= 48 and c <= 57\n"
-    output = output ++ "fn is_space(c: i32) -> bool: c == 32 or c == 9 or c == 10 or c == 13 or c == 12 or c == 11\n"
-    output = output ++ "fn is_alnum(c: i32) -> bool: is_alpha(c) or is_digit(c)\n"
-    output = output ++ "fn is_upper(c: i32) -> bool: c >= 65 and c <= 90\n"
-    output = output ++ "fn is_lower(c: i32) -> bool: c >= 97 and c <= 122\n"
-    output = output ++ "fn is_xdigit(c: i32) -> bool: (c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)\n"
-    output = output ++ "fn is_print(c: i32) -> bool: c >= 32 and c <= 126\n"
-    output = output ++ "fn to_lower(c: i32) -> i32: if c >= 65 and c <= 90: c + 32 else: c\n"
-    output = output ++ "fn to_upper(c: i32) -> i32: if c >= 97 and c <= 122: c - 32 else: c\n"
-    // String functions from libc (linker has libSystem)
-    output = output ++ "extern fn strlen(s: *const i8) -> i64\n"
-    output = output ++ "extern fn strcmp(a: *const i8, b: *const i8) -> i32\n"
-    output = output ++ "extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32\n"
-    output = output ++ "extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void\n"
-    output = output ++ "fn string_len(s: *const i8) -> i64: strlen(s)\n"
-    output = output ++ "fn string_cmp(a: *const i8, b: *const i8) -> i32: strcmp(a, b)\n"
-    output = output ++ "\n"
+    // C3: in shared-defs mode, skip the preamble and emit `use <prefix>` instead.
+    // The preamble goes into defs.w (written by ci_migrate_write_shared_defs).
+    if ci_migrate_shared_defs_active():
+        output = "// Migrated from PCRE2\nuse " ++ g_migrate_shared_defs_prefix ++ "\n\n"
+    else:
+        output = "// Generated by: with migrate " ++ input_path ++ "\n\n"
+        output = output ++ ci_migrate_preamble_text()
 
     let count = with_cimport_decl_count(session)
-
-    // Emit c_void opaque type
-    if with_cimport_is_name_emitted("c_void") == 0:
-        output = output ++ "type c_void = opaque\n"
-        with_cimport_mark_name_emitted("c_void")
-
-    // Emit C type aliases
-    if with_cimport_is_name_emitted("c_char") == 0:
-        output = output ++ "type c_char = i8\n"
-        output = output ++ "type c_short = i16\n"
-        output = output ++ "type c_ushort = u16\n"
-        output = output ++ "type c_int = i32\n"
-        output = output ++ "type c_uint = u32\n"
-        output = output ++ "type c_long = i64\n"
-        output = output ++ "type c_ulong = u64\n"
-        output = output ++ "type c_longlong = i64\n"
-        output = output ++ "type c_ulonglong = u64\n"
-        output = output ++ "type c_longdouble = f64\n"
-        with_cimport_mark_name_emitted("c_char")
-        with_cimport_mark_name_emitted("c_short")
-        with_cimport_mark_name_emitted("c_ushort")
-        with_cimport_mark_name_emitted("c_int")
-        with_cimport_mark_name_emitted("c_uint")
-        with_cimport_mark_name_emitted("c_long")
-        with_cimport_mark_name_emitted("c_ulong")
-        with_cimport_mark_name_emitted("c_longlong")
-        with_cimport_mark_name_emitted("c_ulonglong")
-        with_cimport_mark_name_emitted("c_longdouble")
-
-    // Emit builtin and runtime wrappers
-    if with_cimport_is_name_emitted("with_clz") == 0:
-        output = output ++ "extern fn with_clz(x: i32) -> i32\n"
-        output = output ++ "extern fn with_ctz(x: i32) -> i32\n"
-        output = output ++ "extern fn with_popcount(x: i32) -> i32\n"
-        output = output ++ "extern fn with_bswap16(x: u16) -> u16\n"
-        output = output ++ "extern fn with_bswap32(x: u32) -> u32\n"
-        output = output ++ "extern fn with_bswap64(x: u64) -> u64\n"
-        output = output ++ "extern fn with_clzl(x: i64) -> i32\n"
-        output = output ++ "extern fn with_clzll(x: i64) -> i32\n"
-        output = output ++ "extern fn with_ctzl(x: i64) -> i32\n"
-        output = output ++ "extern fn with_ctzll(x: i64) -> i32\n"
-        output = output ++ "extern fn with_abs(x: i32) -> i32\n"
-        // Memory operations from rt_core.o — all use *i8, cast at call site
-        output = output ++ "extern fn with_alloc(size: i64) -> *i8\n"
-        output = output ++ "extern fn with_free(ptr: *i8) -> void\n"
-        output = output ++ "extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> void\n"
-        output = output ++ "extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> void\n"
-        output = output ++ "extern fn with_memset(ptr: *i8, c: i32, n: i64) -> void\n"
-        output = output ++ "extern fn with_memcmp(a: *i8, b: *i8, n: i64) -> i32\n"
-        with_cimport_mark_name_emitted("with_clz")
-
-    output = output ++ "\n"
 
     // Pre-scan: collect demoted types and prepopulate names
     let demoted_types = ci_collect_demoted_types(session, count)
@@ -9642,6 +9696,10 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: s
         if rc == 0:
             files_migrated = files_migrated + 1
         fi = fi + 1
+
+    // C3: emit shared defs module after all files are translated
+    if ci_migrate_shared_defs_active():
+        ci_migrate_write_shared_defs(output_dir)
 
     let files_failed = files_scanned - files_migrated
     ci_dump_raw_fallback_stats()
