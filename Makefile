@@ -38,6 +38,16 @@ REGEX_PCRE2_SRC := .reference/pcre2/src
 REGEX_RAW_DIR := $(OUT)/pcre2_migrate_raw
 REGEX_GENERATED_DIR := $(OUT)/pcre2_generated
 REGEX_PROMOTE_DIR := lib/std/re
+REGEX_EXCLUDED_C_SOURCES := \
+	pcre2test.c \
+	pcre2demo.c \
+	pcre2grep.c \
+	pcre2posix.c \
+	pcre2posix_test.c \
+	pcre2_jit_test.c \
+	pcre2_jit_compile.c \
+	pcre2_dftables.c \
+	pcre2_fuzzsupport.c
 
 RUNTIME_LINK := $(OUT_BIN_DIR)/runtime
 BOOTSTRAP_RUNTIME_STAMP := $(OUT_GEN_DIR)/.bootstrap-runtime-ready
@@ -400,7 +410,7 @@ $(REGEX_RAW_STAMP): $(CANONICAL_BIN) $(REGEX_REF_SOURCES) scripts/prepare_pcre2_
 	bash "$(ROOT_DIR)/scripts/prepare_pcre2_reference.sh" "$$src"; \
 	rm -rf "$$out"; \
 	mkdir -p "$$out"; \
-	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$out/" --no-c-export -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1; \
+	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$out/" --no-c-export $(foreach f,$(REGEX_EXCLUDED_C_SOURCES),--exclude $(f)) -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1; \
 	count=$$(ls "$$out"/*.w 2>/dev/null | wc -l); \
 	if [ "$$count" -lt 30 ]; then \
 		echo "error: only $$count files migrated — expected at least 30" >&2; \
