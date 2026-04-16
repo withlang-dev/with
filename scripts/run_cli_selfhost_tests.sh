@@ -845,33 +845,45 @@ EOF
 }
 
 expect_pcre2_prepare_shared_externs() {
+  # Var ownership is now handled by C1 at migration time. The raw output
+  # already has correct var/extern var distinctions. This test verifies
+  # the prepare step preserves them during copy + text rewrites.
   local case_dir="$tmpdir/pcre2_prepare_case"
   local raw_dir="$case_dir/raw"
   local generated_dir="$case_dir/generated"
   mkdir -p "$raw_dir"
 
-  cat >"$raw_dir/pcre2_tables.w" <<'EOF'
-// raw tables
+  # Synthetic raw files reflecting C1 ownership output
+  cat >"$raw_dir/defs.w" <<'EOF'
+// std.re.defs — shared definitions
 extern fn preamble_helper() -> void
+EOF
+
+  cat >"$raw_dir/pcre2_tables.w" <<'EOF'
+// Migrated from PCRE2
+use std.re.defs
+
 type BOOL = c_int
 var _pcre2_utf8_table1: *c_int
 var _pcre2_OP_lengths_8: *u8
 EOF
 
   cat >"$raw_dir/pcre2_compile.w" <<'EOF'
-// raw compile
-extern fn preamble_helper() -> void
+// Migrated from PCRE2
+use std.re.defs
+
 type BOOL = c_int
-var _pcre2_utf8_table1: *c_int
+extern var _pcre2_utf8_table1: *c_int
 var _pcre2_posix_class_maps8: *c_int
 EOF
 
   cat >"$raw_dir/pcre2_compile_class.w" <<'EOF'
-// raw compile_class
-extern fn preamble_helper() -> void
+// Migrated from PCRE2
+use std.re.defs
+
 type BOOL = c_int
-var _pcre2_utf8_table1: *c_int
-var _pcre2_posix_class_maps8: *c_int
+extern var _pcre2_utf8_table1: *c_int
+extern var _pcre2_posix_class_maps8: *c_int
 EOF
 
   if ! bash "$ROOT_DIR/scripts/pcre2_generated_workflow.sh" prepare "$raw_dir" "$generated_dir" >"$tmpdir/out" 2>"$tmpdir/err"; then
@@ -883,7 +895,6 @@ EOF
 
   if ! grep -Fq 'var _pcre2_utf8_table1: *c_int' "$generated_dir/pcre2_tables.w" \
     || ! grep -Fq 'var _pcre2_OP_lengths_8: *u8' "$generated_dir/pcre2_tables.w" \
-    || grep -Fq '_pcre2_utf8_table1' "$generated_dir/defs.w" \
     || ! grep -Fq 'extern var _pcre2_utf8_table1: *c_int' "$generated_dir/pcre2_compile.w" \
     || ! grep -Fq 'var _pcre2_posix_class_maps8: *c_int' "$generated_dir/pcre2_compile.w" \
     || ! grep -Fq 'extern var _pcre2_utf8_table1: *c_int' "$generated_dir/pcre2_compile_class.w" \
@@ -901,34 +912,36 @@ EOF
 }
 
 expect_pcre2_prepare_width_prunes_whole_decls() {
-  # Width-family pruning is now done by `with migrate --width-slice 8`
-  # (C2) during the raw migration step. The raw output no longer
-  # contains _16/_32 declarations. This test verifies that the prepare
-  # step preserves non-width content and that local variables whose
-  # names happen to contain _16 are kept.
+  # Width-family pruning (C2) and shared-defs (C3) are now done at migration
+  # time. This test verifies that prepare preserves non-width content and
+  # that local variables whose names happen to contain _16 are kept.
   local case_dir="$tmpdir/pcre2_prepare_width_prune_case"
   local raw_dir="$case_dir/raw"
   local generated_dir="$case_dir/generated"
   local wrapper="$case_dir/wrapper.w"
   mkdir -p "$raw_dir"
 
-  cat >"$raw_dir/pcre2_tables.w" <<'EOF'
-// raw tables
+  cat >"$raw_dir/defs.w" <<'EOF'
+// std.re.defs — shared definitions
 type c_void = opaque
 type c_int = i32
 type c_uint = u32
 type c_ushort = u16
 extern fn strlen(s: *const i8) -> i64
 extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void
-extern fn preamble_helper() -> void
+EOF
+
+  cat >"$raw_dir/pcre2_tables.w" <<'EOF'
+// Migrated from PCRE2
+use std.re.defs
+
 type BOOL = c_int
 EOF
 
   cat >"$raw_dir/pcre2_compile.w" <<'EOF'
-// raw compile
-type c_int = i32
-type c_uint = u32
-extern fn preamble_helper() -> void
+// Migrated from PCRE2
+use std.re.defs
+
 type BOOL = c_int
 extern fn _pcre2_keep_8(ch: c_uint) -> c_uint
 fn keep_body(flag: c_int) -> c_int:
@@ -960,7 +973,7 @@ EOF
   fi
 
   {
-    tail -n +2 "$generated_dir/defs.w"
+    cat "$generated_dir/defs.w"
     tail -n +3 "$generated_dir/pcre2_compile.w"
     printf '\nfn main: print("ok")\n'
   } >"$wrapper"
@@ -978,35 +991,43 @@ EOF
 }
 
 expect_pcre2_prepare_shared_lets() {
+  # Shared-let dedup is now handled by C3 (--shared-defs) at migration time.
+  # The raw output already has shared lets in defs.w and module-specific lets
+  # in their modules. This test verifies the prepare step preserves this.
   local case_dir="$tmpdir/pcre2_prepare_shared_lets_case"
   local raw_dir="$case_dir/raw"
   local generated_dir="$case_dir/generated"
   mkdir -p "$raw_dir"
 
-  cat >"$raw_dir/pcre2_tables.w" <<'EOF'
-// raw tables
-extern fn preamble_helper() -> void
-type BOOL = c_int
+  # defs.w has shared lets (produced by compiler)
+  cat >"$raw_dir/defs.w" <<'EOF'
+// std.re.defs — shared definitions
 let ucp_C: c_uint = 0
 let ucp_L: c_uint = 1
+EOF
+
+  # Modules have only their own lets (shared lets already in defs.w)
+  cat >"$raw_dir/pcre2_tables.w" <<'EOF'
+// Migrated from PCRE2
+use std.re.defs
+
+type BOOL = c_int
 let LOCAL_TABLE_ONLY: c_uint = 99
 EOF
 
   cat >"$raw_dir/pcre2_compile.w" <<'EOF'
-// raw compile
-extern fn preamble_helper() -> void
+// Migrated from PCRE2
+use std.re.defs
+
 type BOOL = c_int
-let ucp_C: c_uint = 0
-let ucp_L: c_uint = 1
 let COMPILE_ONLY: c_uint = 7
 EOF
 
   cat >"$raw_dir/pcre2_match.w" <<'EOF'
-// raw match
-extern fn preamble_helper() -> void
+// Migrated from PCRE2
+use std.re.defs
+
 type BOOL = c_int
-let ucp_C: c_uint = 0
-let ucp_L: c_uint = 1
 let MATCH_ONLY: c_uint = 8
 EOF
 
@@ -1017,6 +1038,7 @@ EOF
     return
   fi
 
+  # Verify shared lets in defs.w and module-specific lets preserved
   if ! grep -Fq 'let ucp_C: c_uint = 0' "$generated_dir/defs.w" \
     || ! grep -Fq 'let ucp_L: c_uint = 1' "$generated_dir/defs.w" \
     || grep -Fq 'let ucp_C: c_uint = 0' "$generated_dir/pcre2_tables.w" \
