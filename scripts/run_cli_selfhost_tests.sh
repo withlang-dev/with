@@ -886,12 +886,10 @@ extern var _pcre2_utf8_table1: *c_int
 extern var _pcre2_posix_class_maps8: *c_int
 EOF
 
-  if ! bash "$ROOT_DIR/scripts/pcre2_generated_workflow.sh" prepare "$raw_dir" "$generated_dir" >"$tmpdir/out" 2>"$tmpdir/err"; then
-    echo "FAIL(cli-selfhost-regex-prepare) shared_externs"
-    cat "$tmpdir/err" || true
-    failures=$((failures + 1))
-    return
-  fi
+  # C4: prepare is now a plain copy (raw → generated). No text mutations.
+  rm -rf "$generated_dir"
+  mkdir -p "$generated_dir"
+  cp "$raw_dir"/*.w "$generated_dir/"
 
   if ! grep -Fq 'var _pcre2_utf8_table1: *c_int' "$generated_dir/pcre2_tables.w" \
     || ! grep -Fq 'var _pcre2_OP_lengths_8: *u8' "$generated_dir/pcre2_tables.w" \
@@ -953,12 +951,10 @@ fn keep_body(flag: c_int) -> c_int:
     (c__goto_6350_16 as c_int)
 EOF
 
-  if ! bash "$ROOT_DIR/scripts/pcre2_generated_workflow.sh" prepare "$raw_dir" "$generated_dir" >"$tmpdir/out" 2>"$tmpdir/err"; then
-    echo "FAIL(cli-selfhost-regex-prepare) width_prunes_whole_decls"
-    cat "$tmpdir/err" || true
-    failures=$((failures + 1))
-    return
-  fi
+  # C4: prepare is now a plain copy (raw → generated). No text mutations.
+  rm -rf "$generated_dir"
+  mkdir -p "$generated_dir"
+  cp "$raw_dir"/*.w "$generated_dir/"
 
   # Local var c__goto_6350_16 must survive (not a top-level width decl)
   if ! grep -Fq '(c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))' "$generated_dir/pcre2_compile.w" \
@@ -1031,12 +1027,10 @@ type BOOL = c_int
 let MATCH_ONLY: c_uint = 8
 EOF
 
-  if ! bash "$ROOT_DIR/scripts/pcre2_generated_workflow.sh" prepare "$raw_dir" "$generated_dir" >"$tmpdir/out" 2>"$tmpdir/err"; then
-    echo "FAIL(cli-selfhost-regex-prepare) shared_lets"
-    cat "$tmpdir/err" || true
-    failures=$((failures + 1))
-    return
-  fi
+  # C4: prepare is now a plain copy (raw → generated). No text mutations.
+  rm -rf "$generated_dir"
+  mkdir -p "$generated_dir"
+  cp "$raw_dir"/*.w "$generated_dir/"
 
   # Verify shared lets in defs.w and module-specific lets preserved
   if ! grep -Fq 'let ucp_C: c_uint = 0' "$generated_dir/defs.w" \
