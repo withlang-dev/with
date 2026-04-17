@@ -1,20 +1,19 @@
 // Tests for the Nebula telemetry daemon example
 
-use test.testing
 
 // --- Domain types (standalone for testing) ---
 
-type Status = Ok | Warning(str) | Fatal(code: i32)
+enum Status { Ok | Warning(str) | Fatal(code: i32) }
 
-type Telemetry = {
+type Telemetry {
     device_id: str,
     temp: f64,
     status: Status,
 }
 
-type Severity = Low | Medium | High | Critical
+enum Severity { Low | Medium | High | Critical }
 
-type ServerConfig = {
+type ServerConfig {
     host: str,
     port: i32,
     max_clients: i32,
@@ -96,7 +95,7 @@ fn batch_temp(index: i32) -> f64:
 
 // --- Session stats ---
 
-type SessionStats = {
+type SessionStats {
     active_count: i32,
     total_packets: i32,
     total_bytes: i32,
@@ -127,74 +126,74 @@ fn window_count(len: i32, size: i32) -> i32:
 @[test]
 fn test_nebula_example:
     // Test Status matching
-    assert_true(is_fatal(Fatal(code: 42)))
-    assert_true(not is_fatal(Ok))
-    assert_true(not is_fatal(Warning("test")))
+    assert(is_fatal(Fatal(code: 42)))
+    assert(not is_fatal(Ok))
+    assert(not is_fatal(Warning("test")))
 
     // Test status_label
-    assert_true(status_label(Ok) == 0)
-    assert_true(status_label(Warning("oops")) == 1)
-    assert_true(status_label(Fatal(code: 1)) == 2)
+    assert(status_label(Ok) == 0)
+    assert(status_label(Warning("oops")) == 1)
+    assert(status_label(Fatal(code: 1)) == 2)
 
     // Test temperature classification
-    assert_true(classify_temp(25.0) == 0)   // Low
-    assert_true(classify_temp(65.0) == 1)   // Medium
-    assert_true(classify_temp(85.0) == 2)   // High
-    assert_true(classify_temp(105.0) == 3)  // Critical
+    assert(classify_temp(25.0) == 0)   // Low
+    assert(classify_temp(65.0) == 1)   // Medium
+    assert(classify_temp(85.0) == 2)   // High
+    assert(classify_temp(105.0) == 3)  // Critical
 
     // Test should_alert
-    assert_true(not should_alert(0))  // Low
-    assert_true(not should_alert(1))  // Medium
-    assert_true(should_alert(2))      // High
-    assert_true(should_alert(3))      // Critical
+    assert(not should_alert(0))  // Low
+    assert(not should_alert(1))  // Medium
+    assert(should_alert(2))      // High
+    assert(should_alert(3))      // Critical
 
     // Test default config
     let cfg = default_config()
-    assert_true(cfg.port == 8080)
-    assert_true(cfg.max_clients == 1000)
-    assert_true(cfg.idle_timeout_secs == 30)
+    assert(cfg.port == 8080)
+    assert(cfg.max_clients == 1000)
+    assert(cfg.idle_timeout_secs == 30)
 
     // Test config with port override (record update)
     let custom = config_with_port(cfg, 9090)
-    assert_true(custom.port == 9090)
-    assert_true(custom.max_clients == 1000)  // Unchanged
-    assert_true(custom.idle_timeout_secs == 30)  // Unchanged
+    assert(custom.port == 9090)
+    assert(custom.max_clients == 1000)  // Unchanged
+    assert(custom.idle_timeout_secs == 30)  // Unchanged
 
     // Test packet line counting
     let lines: [5]i32 = [3, 0, 5, 2, 0]
-    assert_true(count_nonempty_lines(lines, 5) == 3)
-    assert_true(count_nonempty_lines(lines, 2) == 1)
+    assert(count_nonempty_lines(lines, 5) == 3)
+    assert(count_nonempty_lines(lines, 2) == 1)
 
     // Test field parsing
     let fields: [4]i32 = [5, 3, 0, 7]
-    assert_true(parse_field_count(fields, 4) == 3)
-    assert_true(parse_field_count(fields, 2) == 2)
+    assert(parse_field_count(fields, 4) == 3)
+    assert(parse_field_count(fields, 2) == 2)
 
     // Test batch status assignment
-    assert_true(build_batch_status(0) == 2)   // 0 % 10 == 0 → Fatal
-    assert_true(build_batch_status(5) == 1)   // 5 % 5 == 0 → Warning
-    assert_true(build_batch_status(3) == 0)   // else → Ok
-    assert_true(build_batch_status(10) == 2)  // 10 % 10 == 0 → Fatal
-    assert_true(build_batch_status(15) == 1)  // 15 % 5 == 0 → Warning
-    assert_true(build_batch_status(7) == 0)   // else → Ok
+    assert(build_batch_status(0) == 2)   // 0 % 10 == 0 → Fatal
+    assert(build_batch_status(5) == 1)   // 5 % 5 == 0 → Warning
+    assert(build_batch_status(3) == 0)   // else → Ok
+    assert(build_batch_status(10) == 2)  // 10 % 10 == 0 → Fatal
+    assert(build_batch_status(15) == 1)  // 15 % 5 == 0 → Warning
+    assert(build_batch_status(7) == 0)   // else → Ok
 
     // Test batch temperature
-    assert_true(batch_temp(0) == 20.0)
-    assert_true(batch_temp(10) == 25.0)
-    assert_true(batch_temp(20) == 30.0)
+    assert(batch_temp(0) == 20.0)
+    assert(batch_temp(10) == 25.0)
+    assert(batch_temp(20) == 30.0)
 
     // Test session stats aggregation
     let counts: [3]i32 = [1, 1, 0]
     let packets: [3]i32 = [10, 20, 0]
     let bytes: [3]i32 = [100, 200, 0]
     let stats = aggregate_stats(counts, packets, bytes)
-    assert_true(stats.active_count == 2)
-    assert_true(stats.total_packets == 30)
-    assert_true(stats.total_bytes == 300)
+    assert(stats.active_count == 2)
+    assert(stats.total_packets == 30)
+    assert(stats.total_bytes == 300)
 
     // Test sliding window count
-    assert_true(window_count(10, 3) == 8)
-    assert_true(window_count(3, 3) == 1)
-    assert_true(window_count(2, 3) == 0)
-    assert_true(window_count(5, 1) == 5)
-    assert_true(window_count(0, 1) == 0)
+    assert(window_count(10, 3) == 8)
+    assert(window_count(3, 3) == 1)
+    assert(window_count(2, 3) == 0)
+    assert(window_count(5, 1) == 5)
+    assert(window_count(0, 1) == 0)

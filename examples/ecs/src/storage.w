@@ -9,7 +9,7 @@ use std.collections.HashMap
 // This is the standard ECS storage pattern: cache-friendly iteration
 // with O(1) random access by entity handle.
 
-type DenseStorage[T] = {
+type DenseStorage[T] {
     dense_entities: Vec[Entity],
     dense_data: Vec[T],
     sparse: HashMap[Entity, usize],
@@ -25,9 +25,9 @@ extend DenseStorage[T]:
 
     fn insert(self: &mut DenseStorage[T], entity: Entity, component: T):
         match self.sparse.get(&entity):
-            Some(&idx) ->
+            Some(&idx) =>
                 self.dense_data[idx] = component
-            None ->
+            None =>
                 self.sparse.insert(entity, self.dense_data.len())
                 self.dense_entities.push(entity)
                 self.dense_data.push(component)
@@ -40,7 +40,7 @@ extend DenseStorage[T]:
 
     fn remove(self: &mut DenseStorage[T], entity: Entity) -> Option[T]:
         match self.sparse.remove(&entity):
-            Some(idx) ->
+            Some(idx) =>
                 let last = self.dense_data.len() - 1
                 if idx != last:
                     self.dense_entities.swap(idx, last)

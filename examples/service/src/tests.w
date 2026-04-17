@@ -10,7 +10,7 @@ use std.time.Duration
 
 // --- In-Memory Mock Repository ---
 
-type MockUserRepo = {
+type MockUserRepo {
     users: RwLock[HashMap[UserId, User]],
     next_id: Mutex[i64],
 }
@@ -55,7 +55,7 @@ impl UserRepository for MockUserRepo:
     async fn update(self: &MockUserRepo, id: UserId, fields: &UserUpdate) -> Result[Unit, DbError]:
         with self.users.write() as mut users:
             match users.get_mut(&id):
-                Some(user) ->
+                Some(user) =>
                     if let Some(name) = &fields.name then user.name = name.clone()
                     if let Some(email) = &fields.email then user.email = email.clone()
                     if let Some(role) = &fields.role then user.role = *role
@@ -76,7 +76,7 @@ impl UserRepository for MockUserRepo:
 
 // --- In-Memory Mock Cache ---
 
-type MockCache = {
+type MockCache {
     store: RwLock[HashMap[str, Vec[u8]]],
 }
 
@@ -111,7 +111,7 @@ type NotificationLog = Arc[Mutex[Vec[Notification]]]
 fn new_notification_log -> NotificationLog:
     Arc.new(Mutex.new(Vec.new()))
 
-type MockNotifier = {
+type MockNotifier {
     sent: NotificationLog,
 }
 
@@ -137,7 +137,7 @@ impl NotificationService for MockNotifier:
 
 // --- No-Op Audit Log ---
 
-type MockAudit = {}
+type MockAudit {}
 
 impl AuditLog for MockAudit:
     async fn record(self: &MockAudit, _actor: UserId, _action: &str, _detail: &str) -> Result[Unit, DbError]:
@@ -204,7 +204,7 @@ async fn test_duplicate_email_rejected:
 
     // Second create with same email fails
     match svc.create_user(req, UserId(0)).await:
-        Err(.Validation(msg)) ->
+        Err(.Validation(msg)) =>
             assert(msg.contains("already registered"))
         _ => unreachable()
 

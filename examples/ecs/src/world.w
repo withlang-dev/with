@@ -9,7 +9,7 @@ use ecs.components.*
 // use-after-remove (generation mismatch returns None).
 type Entity = Handle[EntityRow]
 
-type EntityRow = {
+type EntityRow {
     name: str,
 }
 
@@ -18,7 +18,7 @@ type EntityRow = {
 // fields, the borrow checker allows simultaneous access to disjoint
 // storages — enabling parallel system execution.
 
-type World = {
+type World {
     entities: SlotMap[EntityRow],
 
     // Component storages — one field per component type.

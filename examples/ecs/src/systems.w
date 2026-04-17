@@ -54,10 +54,10 @@ fn run_player_controller(
         if let Some(vel) = velocities.get_mut(entity):
             var dx: f32 = 0.0
             var dy: f32 = 0.0
-            if input.up    then dy -= speed
-            if input.down  then dy += speed
-            if input.left  then dx -= speed
-            if input.right then dx += speed
+            if input.up: dy -= speed
+            if input.down: dy += speed
+            if input.left: dx -= speed
+            if input.right: dx += speed
             vel.linear = Vec2.new(dx, dy)
 
 // --- Movement System ---
@@ -145,7 +145,7 @@ fn run_collision(
 //
 // Reads: transforms, sprites   Uses: frame_arena
 
-type RenderEntry = {
+type RenderEntry {
     entity: Entity,
     position: Vec2,
     rotation: f32,
@@ -154,7 +154,7 @@ type RenderEntry = {
     width: u16,
     height: u16,
     layer: i32,
-} with Copy
+}
 
 fn run_render(
     transforms: &DenseStorage[Transform],

@@ -5,7 +5,7 @@ use app.domain.*
 use app.errors.ServiceError
 use std.sync.Arc
 
-type AppState = {
+type AppState {
     service: Arc[UserService],
 }
 

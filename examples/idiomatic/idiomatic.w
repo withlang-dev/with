@@ -6,7 +6,7 @@ use std.http
 use std.json
 use std.time
 
-type Dashboard = {
+type Dashboard {
     user: User,
     posts: Vec[Post],
     notifications: Vec[Notification],
@@ -14,13 +14,13 @@ type Dashboard = {
     generated_at: Timestamp,
 }
 
-type UserStatus = Active(User) | Suspended(str) | Deleted
+enum UserStatus { Active(User) | Suspended(str) | Deleted }
 
 async fn get_dashboard(req: &Request, db: &Pool) -> Result[Response, ApiError]:
     let user_id = req.param("id")? |> parse[UserId]?
 
     match db.find_user(user_id).await?:
-        .Active(user) ->
+        .Active(user) =>
             // fetch everything concurrently
             let (posts, notifs) = (
                 db.recent_posts(user_id, limit: 20),
@@ -37,10 +37,10 @@ async fn get_dashboard(req: &Request, db: &Pool) -> Result[Response, ApiError]:
 
             Response.ok() |> json(dashboard)
 
-        .Suspended(reason) ->
+        .Suspended(reason) =>
             Response.forbidden() |> json({ message: "Account suspended: {reason}" })
 
-        .Deleted ->
+        .Deleted =>
             Response.not_found() |> json({ message: "User not found" })
 
 

@@ -9,8 +9,8 @@ error AppError = DbError(str) | ProcessError | Cancelled
 // 1. SETUP: Custom `Scoped` implementation to test `with` lowering
 // ============================================================================
 
-type DbConnection = { id: i32 }
-type ConnectionPool = { url: str }
+type DbConnection { id: i32 }
+type ConnectionPool { url: str }
 
 // To support `with pool as conn:`, a type implements `Scoped[T]`.
 // The `enter` function uses `defer` to guarantee cleanup.
@@ -30,7 +30,7 @@ trait Processor:
     fn process(self: &Self, data: &str) -> str
 
 // An ephemeral struct capturing a borrowed view.
-type BorrowingProcessor = ephemeral { prefix: StrView }
+type BorrowingProcessor ephemeral { prefix: StrView }
 
 impl Processor for BorrowingProcessor:
     fn process(self: &BorrowingProcessor, data: &str) -> str:

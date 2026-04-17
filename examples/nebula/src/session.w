@@ -27,7 +27,7 @@ use nebula.db.Database
 
 // --- Session Types ---
 
-pub type Session = {
+pub type Session {
     id: u64,
     addr: str,
     buffer: Vec[u8] = Vec.new(),
@@ -140,7 +140,7 @@ pub async fn handle_client(
 
         // select await biased: timeout arm has lower priority than IO
         select await biased
-            bytes_read = stream.read(&mut buf) ->
+            bytes_read = stream.read(&mut buf) =>
                 // let ... else for early exit on error or EOF
                 let Ok(n) = bytes_read else break
                 if n == 0 then break
@@ -163,7 +163,7 @@ pub async fn handle_client(
                 if not valid_packets.is_empty():
                     db.insert_bulk(&valid_packets)?
 
-            _ = timeout(30.secs()) ->
+            _ = timeout(30.secs()) =>
                 print("Session timeout for handle {handle}")
                 break
 
@@ -172,7 +172,7 @@ pub async fn handle_client(
 // Query the arena to compute aggregate statistics.
 // Uses pipeline operators and with-block for read access.
 
-pub type SessionStats = {
+pub type SessionStats {
     active_count: usize,
     total_packets: u64,
     total_bytes: u64,

@@ -15,18 +15,18 @@ module channels
 
 // --- Domain Types ---
 
-type WorkItem = {
+type WorkItem {
     id: u64,
     payload: str,
 }
 
-type ProcessedItem = {
+type ProcessedItem {
     id: u64,
     result: str,
     worker_id: u32,
 }
 
-type Stats = {
+type Stats {
     total: u64 = 0,
     successes: u64 = 0,
     failures: u64 = 0,
@@ -58,7 +58,7 @@ async fn worker(
 ):
     loop:
         match rx.recv().await:
-            Some(item) ->
+            Some(item) =>
                 // Simulate async processing
                 sleep(Duration.from_millis(10)).await
                 let result = ProcessedItem {
@@ -84,14 +84,14 @@ async fn collect_results(
             if remaining == 0:
                 break
             select await
-                opt = rx.recv() ->
+                opt = rx.recv() =>
                     let Some(item) = opt else
                         print("  channel closed with {remaining} items remaining")
                         break
                     print("  collected #{item.id} from worker {item.worker_id}: {item.result}")
                     results.push(item)
                     remaining = remaining - 1
-                _ = timeout(Duration.from_secs(5)) ->
+                _ = timeout(Duration.from_secs(5)) =>
                     print("  timeout waiting for results!")
                     break
 
@@ -207,15 +207,15 @@ async fn demo_select:
             if total >= 8:
                 break
             select await
-                opt = fast_rx.recv() ->
+                opt = fast_rx.recv() =>
                     let Some(msg) = opt else break
                     print("  fast: {msg}")
                     total = total + 1
-                opt = slow_rx.recv() ->
+                opt = slow_rx.recv() =>
                     let Some(msg) = opt else break
                     print("  slow: {msg}")
                     total = total + 1
-                _ = timeout(Duration.from_secs(1)) ->
+                _ = timeout(Duration.from_secs(1)) =>
                     print("  timeout — done waiting")
                     break
 

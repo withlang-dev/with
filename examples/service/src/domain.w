@@ -1,8 +1,8 @@
 module app.domain
 
-type UserId = distinct i64
+type UserId { value: i64 }
 
-type User = {
+type User {
     id: UserId,
     name: str,
     email: str,
@@ -10,33 +10,33 @@ type User = {
     active: bool = true,
 }
 
-type Role = | Admin | Moderator | Member | Guest
+enum Role { | Admin | Moderator | Member | Guest }
 
-type UserProfile = {
+type UserProfile {
     user: User,
     post_count: i32,
     followers: i32,
     last_login: Option[Instant] = None,
 }
 
-type CreateUserRequest = {
+type CreateUserRequest {
     name: str,
     email: str,
     role: Role,
 }
 
-type UserUpdate = {
+type UserUpdate {
     name: Option[str],
     email: Option[str],
     role: Option[Role],
     active: Option[bool],
 }
 
-type Notification = {
+type Notification {
     recipient: str,
     subject: str,
     body: str,
     priority: Priority,
 }
 
-type Priority = | Urgent | Normal | Low
+enum Priority { | Urgent | Normal | Low }

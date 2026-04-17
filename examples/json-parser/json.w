@@ -16,18 +16,19 @@ module json
 
 // --- JSON Value Type ---
 
-type JsonValue =
-    | Null
+enum JsonValue {
+    Null
     | Bool(bool)
     | Number(f64)
     | Str(str)
     | Array(Vec[JsonValue])
     | Object(Vec[(str, JsonValue)])
+}
 
 // --- Errors ---
 
 error JsonError =
-    | UnexpectedChar(pos: usize, expected: str, got: u8)
+    UnexpectedChar(pos: usize, expected: str, got: u8)
     | UnexpectedEof(pos: usize, context: str)
     | InvalidNumber(pos: usize, text: str)
     | InvalidEscape(pos: usize, ch: u8)
@@ -35,8 +36,8 @@ error JsonError =
 
 // --- Token Types ---
 
-type Token =
-    | LBrace
+enum Token {
+    LBrace
     | RBrace
     | LBracket
     | RBracket
@@ -46,10 +47,11 @@ type Token =
     | TBool(bool)
     | TNumber(f64)
     | TString(str)
+}
 
 // --- Tokenizer ---
 
-type Tokenizer = {
+type Tokenizer {
     input: Vec[u8],
     pos: usize = 0,
 }
@@ -81,7 +83,7 @@ extend Tokenizer:
     fn skip_whitespace(self: &mut Self):
         loop:
             match self.peek():
-                Some(ch) if is_whitespace(ch) ->
+                Some(ch) if is_whitespace(ch) =>
                     self.pos = self.pos + 1
                 _ => break
 
@@ -163,7 +165,7 @@ extend Tokenizer:
 
 // --- Recursive Descent Parser ---
 
-type Parser = {
+type Parser {
     tokenizer: Tokenizer,
     current: Option[Token],
 }
@@ -179,10 +181,10 @@ extend Parser:
 
     fn expect_token(self: &mut Self, description: str) -> Result[Token, JsonError]:
         match self.current.take():
-            Some(tok) ->
+            Some(tok) =>
                 self.bump()?
                 tok
-            None ->
+            None =>
                 Err(.UnexpectedEof(
                     pos: self.tokenizer.pos,
                     context: description,
@@ -192,28 +194,28 @@ extend Parser:
         match &self.current:
             Some(.LBrace)   => self.parse_object()
             Some(.LBracket) => self.parse_array()
-            Some(.TNull)    ->
+            Some(.TNull)    =>
                 self.bump()?
                 .Null
-            Some(.TBool(_)) ->
+            Some(.TBool(_)) =>
                 match self.expect_token("bool")?:
                     .TBool(b) => .Bool(b)
                     _ => .Null
-            Some(.TNumber(_)) ->
+            Some(.TNumber(_)) =>
                 match self.expect_token("number")?:
                     .TNumber(n) => .Number(n)
                     _ => .Null
-            Some(.TString(_)) ->
+            Some(.TString(_)) =>
                 match self.expect_token("string")?:
                     .TString(s) => .Str(s)
                     _ => .Null
-            Some(_) ->
+            Some(_) =>
                 Err(.UnexpectedChar(
                     pos: self.tokenizer.pos,
                     expected: "JSON value",
                     got: 0,
                 ))
-            None ->
+            None =>
                 Err(.UnexpectedEof(
                     pos: self.tokenizer.pos,
                     context: "JSON value",
@@ -231,10 +233,10 @@ extend Parser:
             // remaining elements
             loop:
                 match &self.current:
-                    Some(.Comma) ->
+                    Some(.Comma) =>
                         self.bump()?
                         items.push(self.parse_value()?)
-                    Some(.RBracket) ->
+                    Some(.RBracket) =>
                         self.bump()?
                         break
                     _ => return Err(.UnexpectedEof(
@@ -255,10 +257,10 @@ extend Parser:
             // remaining pairs
             loop:
                 match &self.current:
-                    Some(.Comma) ->
+                    Some(.Comma) =>
                         self.bump()?
                         entries.push(self.parse_kv()?)
-                    Some(.RBrace) ->
+                    Some(.RBrace) =>
                         self.bump()?
                         break
                     _ => return Err(.UnexpectedEof(
@@ -300,14 +302,14 @@ fn parse(input: str) -> Result[JsonValue, JsonError]:
 
 gen fn walk_leaves(value: &JsonValue, path: str) -> (str, &JsonValue):
     match value:
-        .Null | .Bool(_) | .Number(_) | .Str(_) ->
+        .Null | .Bool(_) | .Number(_) | .Str(_) =>
             yield (path, value)
-        .Array(items) ->
+        .Array(items) =>
             for (i, item) in items.iter().enumerate():
                 let child_path = "{path}[{i}]"
                 for leaf in walk_leaves(item, child_path):
                     yield leaf
-        .Object(entries) ->
+        .Object(entries) =>
             for (key, val) in entries:
                 let child_path = if path.is_empty() then key.clone() else "{path}.{key}"
                 for leaf in walk_leaves(val, child_path):
@@ -322,13 +324,13 @@ extend JsonValue:
             .Bool(b)    => "{b}"
             .Number(n)  => "{n}"
             .Str(s)     => "\"{s}\""
-            .Array(items) ->
+            .Array(items) =>
                 let inner = items.iter()
                     |> map(item => "{item}")
                     |> collect[Vec]()
                     |> join(", ")
                 "[{inner}]"
-            .Object(entries) ->
+            .Object(entries) =>
                 let inner = entries.iter()
                     |> map(entry => "\"{entry.0}\": {entry.1}")
                     |> collect[Vec]()
@@ -339,7 +341,7 @@ extend JsonValue:
 
     fn get(self: &Self, key: &str) -> Option[&JsonValue]:
         match self:
-            .Object(entries) ->
+            .Object(entries) =>
                 entries.iter()
                     |> find(entry => entry.0 == key)
                     |> Option.map(entry => &entry.1)
@@ -363,7 +365,7 @@ fn main:
     print("Input ({input.len()} bytes):\n{input}\n")
 
     match parse(input):
-        Ok(value) ->
+        Ok(value) =>
             print("Parsed successfully!\n")
             print("Pretty: {value}\n")
 
@@ -387,7 +389,7 @@ fn main:
             let feature_count = value.get("features")?.as_array()?.len() ?? 0
             print("\nFeature count: {feature_count}")
 
-        Err(e) ->
+        Err(e) =>
             print("Parse error: {e}")
 
     // Demonstrate error handling
