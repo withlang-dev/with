@@ -50,11 +50,11 @@ fn ci_migrate_is_width_family_name(name: str) -> bool:
 
 // C3: Shared-defs mode. When prefix is non-empty, the migrator:
 //   1. Skips the preamble in individual modules, emits `use <prefix>` instead
-//   2. Redirects macro-derived `let` declarations to a shared buffer
-//   3. After all files, emits a defs.w containing preamble + shared lets
+//   2. Redirects duplicated top-level declarations to a shared buffer
+//   3. After all files, emits a defs.w containing preamble + shared decls
 var g_migrate_shared_defs_prefix: str = ""
-var g_migrate_shared_let_buf: str = ""
-var g_migrate_shared_let_names: str = ""
+var g_migrate_shared_decl_buf: str = ""
+var g_migrate_shared_decl_keys: str = ""
 
 pub fn migrate_set_shared_defs(prefix: str):
     g_migrate_shared_defs_prefix = prefix
@@ -62,16 +62,22 @@ pub fn migrate_set_shared_defs(prefix: str):
 fn ci_migrate_shared_defs_active() -> bool:
     g_migrate_shared_defs_prefix.len() > 0
 
-// Append a let declaration to the shared buffer if not already present.
-// Returns true if the let was redirected (caller should skip per-file emit).
-fn ci_migrate_shared_let_add(let_line: str, name: str) -> bool:
+// Single dedup entry point for every declaration kind that the migrator
+// emits into a shared buffer. `kind` is a short disambiguating prefix
+// ("let", "type", "fn", "extern_fn", "extern_var", "extern_let");
+// `name` is the declaration's identifier; `rendered` is the exact With
+// source line(s) to emit on first sighting. Returns true if the
+// declaration was redirected to the shared buffer (caller must skip
+// per-file emit). Returns false when shared-defs mode is off OR when
+// the declaration was already seen (caller's per-file emit is a no-op).
+fn ci_migrate_shared_decl_add(kind: str, name: str, rendered: str) -> bool:
     if not ci_migrate_shared_defs_active():
         return false
-    let key = "|" ++ name ++ "|"
-    if ci_find_str(g_migrate_shared_let_names, key) >= 0:
-        return true  // already in shared buffer, skip duplicate
-    g_migrate_shared_let_names = g_migrate_shared_let_names ++ key
-    g_migrate_shared_let_buf = g_migrate_shared_let_buf ++ let_line ++ "\n"
+    let key = "|" ++ kind ++ ":" ++ name ++ "|"
+    if ci_find_str(g_migrate_shared_decl_keys, key) >= 0:
+        return true
+    g_migrate_shared_decl_keys = g_migrate_shared_decl_keys ++ key
+    g_migrate_shared_decl_buf = g_migrate_shared_decl_buf ++ rendered ++ "\n"
     true
 
 // Replace all occurrences of needle with replacement, assuming few matches.
@@ -96,7 +102,7 @@ fn ci_replace_sparse(text: str, needle: str, replacement: str) -> str:
     result
 
 // Write the shared defs module (defs.w) to output_dir.
-// Contains: preamble + hardcoded extras + shared macro let declarations.
+// Contains: preamble + hardcoded extras + shared declarations.
 fn ci_migrate_write_shared_defs(output_dir: str):
     var defs = "// " ++ g_migrate_shared_defs_prefix ++ " — shared definitions for migrated PCRE2\n\n"
     defs = defs ++ ci_migrate_preamble_text()
@@ -109,9 +115,9 @@ fn ci_migrate_write_shared_defs(output_dir: str):
     defs = defs ++ "let STRING_WEIRD_ENDWORD: *const u8 = \"[:>:]]\"\n"
     defs = defs ++ "\n// strchr mapping (migrator emits string_find_char for strchr)\n"
     defs = defs ++ "fn string_find_char(s: *const i8, c: i32) -> *const i8: (memchr((s as *const c_void), c, strlen(s)) as *const i8)\n"
-    // Shared let declarations collected during migration
-    if g_migrate_shared_let_buf.len() > 0:
-        defs = defs ++ "\n" ++ g_migrate_shared_let_buf
+    // Shared declarations collected during migration.
+    if g_migrate_shared_decl_buf.len() > 0:
+        defs = defs ++ "\n" ++ g_migrate_shared_decl_buf
     let defs_path = output_dir ++ "/defs.w"
     let rc = with_fs_write_file(defs_path, defs)
     if rc != 0:
@@ -307,7 +313,7 @@ fn ci_migrate_project_scan_file(input_path: str, project: &mut CiProject) -> i32
             project.update_symbol(symbol_id, symbol)
 
             let owner_kind = ci_migrate_var_definition_kind(session, i)
-            if cursor < 0 or owner_kind == CI_VAR_DECL_ONLY or not ci_migrate_var_in_primary_file(session, i, input_path):
+            if cursor < 0 or owner_kind == CI_VAR_DECL_ONLY:
                 i = i + 1
                 continue
 
@@ -770,7 +776,10 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
             return "fn " ++ safe_name ++ "(" ++ params ++ ") -> Never:\n    comptime_error(\"untranslatable function body\")\n\n"
     let cc = with_cimport_fn_calling_conv(session, idx)
     let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
-    cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
+    let rendered = cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
+    if ci_migrate_shared_decl_add("extern_fn", safe_name, rendered):
+        return ""
+    rendered
 
 
 // ── ci_migrate_var_* helpers (moved from CImport.w in D3) ─────
@@ -927,31 +936,48 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: st
     with_cimport_mark_name_emitted(name)
 
     if emits_definition:
+        var rendered = ""
         if definition_kind == CI_VAR_FULL_DEF:
-            let init_val = ci_try_eval_var_init(session, idx)
+            let init_val = ci_try_eval_var_init_for_type(session, idx, resolved_type)
             if init_val.len() == 0:
                 let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
                 ci_migrate_set_error("migrate: untranslatable global initializer for " ++ name ++ if loc.len() > 0: " at " ++ loc else: "")
                 return ""
             if is_const != 0:
-                return tl_attr ++ "let " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ init_val ++ "\n"
-            return tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ init_val ++ "\n"
+                rendered = tl_attr ++ "let " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ init_val ++ "\n"
+            else:
+                rendered = tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ init_val ++ "\n"
+        else:
+            // Tentative definitions own storage in C and are zero-initialized.
+            let default_val = ci_default_for_type(resolved_type)
+            if is_const != 0:
+                if default_val.len() == 0:
+                    let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
+                    ci_migrate_set_error("migrate: no default initializer for tentative const global " ++ name ++ if loc.len() > 0: " at " ++ loc else: "")
+                    return ""
+                rendered = tl_attr ++ "let " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ default_val ++ "\n"
+            else if default_val.len() > 0:
+                rendered = tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ default_val ++ "\n"
+            else:
+                rendered = tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
+        let kind = if is_const != 0: "let" else: "var"
+        if ci_migrate_shared_decl_add(kind, safe_name, rendered):
+            return ""
+        return rendered
 
-        // Tentative definitions own storage in C and are zero-initialized.
-        let default_val = ci_default_for_type(resolved_type)
-        if is_const != 0:
-            if default_val.len() == 0:
-                let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
-                ci_migrate_set_error("migrate: no default initializer for tentative const global " ++ name ++ if loc.len() > 0: " at " ++ loc else: "")
-                return ""
-            return tl_attr ++ "let " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ default_val ++ "\n"
-        if default_val.len() > 0:
-            return tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ default_val ++ "\n"
-        return tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
-
+    if ci_migrate_shared_defs_active():
+        let owner_path = ci_migrate_project_var_owner_path(project_active, project, name)
+        if owner_path.len() > 0:
+            return ""
     if is_const != 0:
-        return tl_attr ++ "extern let " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
-    tl_attr ++ "extern var " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
+        let rendered = tl_attr ++ "extern let " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
+        if ci_migrate_shared_decl_add("extern_let", safe_name, rendered):
+            return ""
+        return rendered
+    let rendered = tl_attr ++ "extern var " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
+    if ci_migrate_shared_decl_add("extern_var", safe_name, rendered):
+        return ""
+    rendered
 
 fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: str, project_active: bool, project: &CiProject) -> str:
     var output = ""
