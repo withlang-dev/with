@@ -50,6 +50,7 @@ type Parser {
     last_param_required_count: i32,
     last_where_start: i32,
     last_where_count: i32,
+    if_chain_form: i32,
 }
 
 type InterpolatedExprParseAttempt {
@@ -102,6 +103,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         last_param_required_count: 0,
         last_where_start: 0,
         last_where_count: 0,
+        if_chain_form: 0,
     }
 
 // ── Token helpers ────────────────────────────────────────────────
@@ -3753,27 +3755,33 @@ fn is_first_on_line(source: str, pos: i32) -> i32:
 
 fn Parser.parse_if_expr(self: Parser) -> NodeId:
     let start = self.current_start()
+    let saved_chain_form = self.if_chain_form
     self.advance()  // consume if
     self.skip_newlines()
 
     if self.peek() == TokenKind.TK_KW_LET:
-        return self.parse_if_let(start)
+        let result = self.parse_if_let(start)
+        self.if_chain_form = saved_chain_form
+        return result
 
     let cond = self.parse_expr()
     var use_block = false
     if self.peek() == TokenKind.TK_KW_THEN:
+        if self.if_chain_form == 1:
+            self.emit_error("cannot mix block ':' and inline 'then' in if/else chain")
+        self.if_chain_form = 2
         self.advance()
         self.skip_newlines()
     else if self.peek() == TokenKind.TK_COLON:
+        if self.if_chain_form == 2:
+            self.emit_error("cannot mix inline 'then' and block ':' in if/else chain")
+        self.if_chain_form = 1
         self.advance()
         use_block = true
     else:
         self.skip_newlines()
 
     let if_col = column_of(self.source, start)
-    // Dangling-else resolution: for block-form if that starts a new line,
-    // only accept else at the same column. This prevents a nested if from
-    // stealing an outer if's else. Inline ifs and else-if chains are exempt.
     let is_stmt_if = use_block and is_first_on_line(self.source, start) != 0
     let then_body = if use_block: self.parse_block_or_expr() else: self.parse_expr()
     var else_body: NodeId = 0 as NodeId
@@ -3792,6 +3800,7 @@ fn Parser.parse_if_expr(self: Parser) -> NodeId:
     else:
         self.pos = save
 
+    self.if_chain_form = saved_chain_form
     self.pool.add_node(NodeKind.NK_IF_EXPR, start, self.prev_end(), cond, then_body, else_body)
 
 fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
@@ -3830,9 +3839,15 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
 
     var use_block = false
     if self.peek() == TokenKind.TK_KW_THEN:
+        if self.if_chain_form == 1:
+            self.emit_error("cannot mix block ':' and inline 'then' in if/else chain")
+        self.if_chain_form = 2
         self.advance()
         self.skip_newlines()
     else if self.peek() == TokenKind.TK_COLON:
+        if self.if_chain_form == 2:
+            self.emit_error("cannot mix inline 'then' and block ':' in if/else chain")
+        self.if_chain_form = 1
         self.advance()
         use_block = true
     else:
