@@ -79,9 +79,38 @@ fn is_unary_prefix(tag: i32, prev: i32) -> bool:
         return true
     false
 
+// ── Block keyword detection ─────────────────────────────────────
+
+fn is_block_keyword(tag: i32) -> bool:
+    if tag == TokenKind.TK_KW_FN: return true
+    if tag == TokenKind.TK_KW_IF: return true
+    if tag == TokenKind.TK_KW_ELSE: return true
+    if tag == TokenKind.TK_KW_WHILE: return true
+    if tag == TokenKind.TK_KW_FOR: return true
+    if tag == TokenKind.TK_KW_LOOP: return true
+    if tag == TokenKind.TK_KW_UNSAFE: return true
+    false
+
+fn next_is_newline_or_eof(tokens: TokenList, pos: i32, count: i32) -> bool:
+    var j = pos + 1
+    while j < count:
+        let t = tokens.get_tag(j)
+        if t == TokenKind.TK_COMMENT:
+            j = j + 1
+            continue
+        return t == TokenKind.TK_NEWLINE or t == TokenKind.TK_EOF
+    true
+
+fn emit_indent(indent: i32) -> str:
+    var s = ""
+    for sp in 0..indent:
+        s = s ++ " "
+    s
+
 // ── Core formatter ──────────────────────────────────────────────
 
-fn format_source(source: str) -> str:
+// style: 0=preserve, 1=prefer-colon, 2=prefer-curly
+fn format_source_styled(source: str, style: i32) -> str:
     var lexer = Lexer.init(source, 0)
     let tokens = lexer.tokenize_with_comments()
     let count = tokens.len()
@@ -91,6 +120,10 @@ fn format_source(source: str) -> str:
     var prev_tag = 0
     var prev_was_newline = false
     var line_indent = 0
+    var block_kw_active = false
+    var close_stack: Vec[i32] = Vec.new()
+    var suppress_stack: Vec[i32] = Vec.new()
+    var brace_depth = 0
 
     var i = 0
     while i < count:
@@ -111,38 +144,126 @@ fn format_source(source: str) -> str:
             i = i + 1
             continue
 
-        // Non-whitespace token on a new line
+        if is_block_keyword(tag):
+            block_kw_active = true
+
         if at_line_start:
-            // Determine indentation from source column
             line_indent = column_of(source, start)
-            // Allow at most 1 blank line between sections
-            if blank_lines > 0 and prev_tag != 0:
-                out = out ++ "\n"
-            blank_lines = 0
-            // Emit indentation
-            for sp in 0..line_indent:
-                out = out ++ " "
-            at_line_start = false
-            prev_was_newline = false
+
+            // prefer-curly: close blocks when indent drops
+            if style == 2:
+                while close_stack.len() > 0:
+                    let top = close_stack.get(close_stack.len() - 1)
+                    if line_indent > top:
+                        break
+                    let _ = close_stack.pop()
+                    if tag == TokenKind.TK_KW_ELSE and top == line_indent:
+                        if blank_lines > 0 and prev_tag != 0:
+                            out = out ++ "\n"
+                        blank_lines = 0
+                        out = out ++ emit_indent(top) ++ "} "
+                        at_line_start = false
+                        prev_was_newline = false
+                        prev_tag = TokenKind.TK_R_BRACE
+                        break
+                    else:
+                        out = out ++ emit_indent(top) ++ "}\n"
+                        prev_tag = TokenKind.TK_R_BRACE
+
+            // prefer-colon: suppress } at line start
+            if style == 1 and at_line_start and tag == TokenKind.TK_R_BRACE:
+                let after_brace = brace_depth - 1
+                if suppress_stack.len() > 0 and suppress_stack.get(suppress_stack.len() - 1) == after_brace:
+                    let _ = suppress_stack.pop()
+                    brace_depth = after_brace
+                    var j = i + 1
+                    while j < count and tokens.get_tag(j) == TokenKind.TK_NEWLINE:
+                        j = j + 1
+                    if j < count and tokens.get_tag(j) == TokenKind.TK_KW_ELSE:
+                        if blank_lines > 0 and prev_tag != 0:
+                            out = out ++ "\n"
+                        blank_lines = 0
+                        out = out ++ emit_indent(line_indent)
+                        out = out ++ "else"
+                        block_kw_active = true
+                        prev_tag = TokenKind.TK_KW_ELSE
+                        at_line_start = false
+                        prev_was_newline = false
+                        i = j + 1
+                        continue
+                    blank_lines = 0
+                    i = i + 1
+                    if i < count and tokens.get_tag(i) == TokenKind.TK_NEWLINE:
+                        i = i + 1
+                    continue
+
+            if at_line_start:
+                if blank_lines > 0 and prev_tag != 0:
+                    out = out ++ "\n"
+                blank_lines = 0
+                for sp in 0..line_indent:
+                    out = out ++ " "
+                at_line_start = false
+                prev_was_newline = false
         else:
-            // Within a line — decide spacing before this token
-            let space = needs_space_before(tag, prev_tag)
+            // Determine effective tag for spacing (colon conversion)
+            var space_tag = tag
+            if style == 1 and tag == TokenKind.TK_L_BRACE and block_kw_active:
+                if next_is_newline_or_eof(tokens, i, count):
+                    space_tag = TokenKind.TK_COLON
+            let space = needs_space_before(space_tag, prev_tag)
             if space:
                 out = out ++ " "
 
-        // Emit token text from source
+        // prefer-curly: convert block-introducing : to {
+        if style == 2 and tag == TokenKind.TK_COLON and block_kw_active:
+            if next_is_newline_or_eof(tokens, i, count):
+                out = out ++ " {"
+                close_stack.push(line_indent)
+                block_kw_active = false
+                prev_tag = TokenKind.TK_L_BRACE
+                i = i + 1
+                continue
+
+        // prefer-colon: convert block-introducing { to :
+        if style == 1 and tag == TokenKind.TK_L_BRACE and block_kw_active:
+            if next_is_newline_or_eof(tokens, i, count):
+                out = out ++ ":"
+                suppress_stack.push(brace_depth)
+                brace_depth = brace_depth + 1
+                block_kw_active = false
+                prev_tag = TokenKind.TK_COLON
+                i = i + 1
+                continue
+
+        if tag == TokenKind.TK_L_BRACE:
+            brace_depth = brace_depth + 1
+        if tag == TokenKind.TK_R_BRACE:
+            brace_depth = brace_depth - 1
+
+        if tag == TokenKind.TK_L_BRACE:
+            block_kw_active = false
+
         let text = with_str_slice(source, start as i64, end as i64)
         out = out ++ text
         prev_tag = tag
         i = i + 1
 
+    // prefer-curly: close any remaining open blocks
+    if style == 2:
+        while close_stack.len() > 0:
+            let top = close_stack.pop()
+            out = out ++ emit_indent(top) ++ "}\n"
+
     // Ensure file ends with exactly one newline
     if out.len() > 0:
-        // Strip trailing newlines
         while out.len() > 0 and with_str_byte_at(out, with_str_len(out) - 1) == 10:
             out = with_str_slice(out, 0, with_str_len(out) - 1)
         out = out ++ "\n"
     out
+
+fn format_source(source: str) -> str:
+    format_source_styled(source, 0)
 
 // Decide whether to emit a space before `cur` given `prev`.
 fn needs_space_before(cur: i32, prev: i32) -> bool:
