@@ -1010,12 +1010,16 @@ fn run_fmt_command(argc: i32) -> i32:
     let write_mode = cli_has_flag(argc, "-w")
     let list_mode = cli_has_flag(argc, "-l")
     let check_mode = cli_has_flag(argc, "--check")
-    // Collect file arguments
+    let prefer_curly = cli_has_flag(argc, "--prefer-curly")
+    let prefer_colon = cli_has_flag(argc, "--prefer-colon")
+    var fmt_style = 0
+    if prefer_curly: fmt_style = 2
+    if prefer_colon: fmt_style = 1
     var files: Vec[str] = Vec.new()
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
-        if arg == "-w" or arg == "-l" or arg == "--check":
+        if arg == "-w" or arg == "-l" or arg == "--check" or arg == "--prefer-curly" or arg == "--prefer-colon":
             i = i + 1
             continue
         if with_str_starts_with(arg, "-") != 0:
@@ -1024,9 +1028,8 @@ fn run_fmt_command(argc: i32) -> i32:
         files.push(arg)
         i = i + 1
     if files.len() == 0:
-        // Read from stdin
         let source = with_fs_read_file("/dev/stdin")
-        let formatted = format_source(source)
+        let formatted = format_source_styled(source, fmt_style)
         with_write(formatted)
         return 0
     var any_changed = false
@@ -1034,7 +1037,7 @@ fn run_fmt_command(argc: i32) -> i32:
     while fi < files.len() as i32:
         let path = files.get(fi as i64)
         let source = with_fs_read_file(path)
-        let formatted = format_source(source)
+        let formatted = format_source_styled(source, fmt_style)
         if formatted != source:
             any_changed = true
             if list_mode:
@@ -1064,6 +1067,7 @@ fn print_usage:
     with_write("  run [file.w]      Build + run a source file\n")
     with_write("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed/--dump-mir/--dump-async-mir)\n")
     with_write("  test <file.w|dir> Run tests from a source file or directory\n")
+    with_write("  fmt <files>       Format source files (-w write, --check, --prefer-curly, --prefer-colon)\n")
     with_write("  clean             Delete out/ and legacy .with/ artifacts\n")
     with_write("  ir <file.w>       Dump LLVM IR (debug)\n")
     with_write("  ast <file.w>      Parse and dump the AST (debug)\n")
