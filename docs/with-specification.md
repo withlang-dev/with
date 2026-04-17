@@ -6436,16 +6436,18 @@ let view: &str = "hello"                     // no allocation, static memory
 ```
 
 **How it works:** A bare string literal produces an owned `str`.
-Treat this as an allocation unless a `&str` context is explicit or
-the compiler proves the allocation can be removed. The optimization
-is not a source-level guarantee for bare literals; use an explicit
+The compiler may elide the allocation when it can prove the string
+is never mutated, never stored in a heap structure, and never
+escapes the current scope — but this is an optimization, not a
+source-level guarantee. Performance-sensitive code should not rely
+on the optimizer proving allocation unnecessary. Use an explicit
 `&str` annotation or pass to an `&str` parameter for guaranteed
 zero-cost static storage.
 
 When the type context is `&str` (function parameter, explicit
 annotation), the literal is a zero-cost static reference with no
-allocation. This is an optimization the compiler applies
-automatically.
+allocation. This guarantee is unconditional — it does not depend
+on optimizer analysis.
 
 ```
 let s = "hello"        // s: str (owned — the default)
