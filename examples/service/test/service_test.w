@@ -20,7 +20,7 @@ type ServiceConfig = {
 type ServiceResult = Ok | NotFound | InvalidInput | ServerError
 
 fn result_code(r: ServiceResult) -> i32:
-    match r
+    match r:
         Ok => 0
         NotFound => 1
         InvalidInput => 2
@@ -56,12 +56,12 @@ fn validate_id(id: i32) -> ServiceResult: if id in 1..=1000 then Ok else Invalid
 
 fn validate_and_find(users: [5]User, id: i32) -> ServiceResult:
     let validation = validate_id(id)
-    match validation
+    match validation:
         Ok => find_user(users, id)
         _ => validation
 
 fn handle_request(users: [5]User, endpoint: i32, user_id: i32) -> ServiceResult:
-    match endpoint
+    match endpoint:
         1 => validate_and_find(users, user_id)
         2 => Ok
         _ => NotFound

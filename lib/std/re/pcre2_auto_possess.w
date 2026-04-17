@@ -207,7 +207,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
             (list[1] = (if (((c == OP_STAR) or (c == OP_PLUS)) or (c == OP_QUERY)) or (c == OP_UPTO): 1 else: 0))
             
             if ((end != null) and (compare_opcodes(end, utf, ucp, cb, ((&list[0] as *mut c_uint) as *const c_uint), end, (&mut rec_limit as *mut c_int)) != 0)):
-                match c
+                match c:
                     OP_STAR =>
                         ((unsafe: *code) = (unsafe: *code) + (OP_POSSTAR - OP_STAR))
                     OP_MINSTAR =>
@@ -243,7 +243,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                     (list[1] = (if ((c & 1)) == 0: 1 else: 0))
                     
                     if ((end != null) and (compare_opcodes(end, utf, ucp, cb, ((&list[0] as *mut c_uint) as *const c_uint), end, (&mut rec_limit as *mut c_int)) != 0)):
-                        match c
+                        match c:
                             OP_CRSTAR =>
                                 ((unsafe: *repeat_opcode) = 106)
                             OP_CRMINSTAR =>
@@ -266,7 +266,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                 (c = (unsafe: *code))
                 
         
-        match c
+        match c:
             OP_END =>
                 return 0
             OP_TYPESTAR =>
@@ -328,7 +328,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
         code = code + _pcre2_OP_lengths_8[c]
         
         if (utf != 0):
-            match c
+            match c:
                 OP_CHAR =>
                     if ((code[-1]) >= 192):
                         (code = code + (_pcre2_utf8_table4[((code[-1]) & 63)]))
@@ -531,7 +531,7 @@ fn check_char_prop(c: c_uint, ptype: c_uint, pdata: c_uint, negated: c_int) -> c
 
     var prop: *const ucd_record = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c) as c_int) / 128)] * 128) + (((c) as c_int) % 128))] as isize as usize)))
 
-    match ptype
+    match ptype:
         0 =>
             return (if ((if ((prop.chartype == ucp_Lu) or (prop.chartype == ucp_Ll)) or (prop.chartype == ucp_Lt): 1 else: 0)) == negated: 1 else: 0)
         1 =>
@@ -546,7 +546,7 @@ fn check_char_prop(c: c_uint, ptype: c_uint, pdata: c_uint, negated: c_int) -> c
         5 =>
             return (if ((if (_pcre2_ucp_gentype_8[prop.chartype] == 1) or (_pcre2_ucp_gentype_8[prop.chartype] == 3): 1 else: 0)) == negated: 1 else: 0)
         6 =>
-            match c
+            match c:
                 9 =>
                     (rc = negated)
                 32 =>
@@ -603,7 +603,7 @@ fn check_char_prop(c: c_uint, ptype: c_uint, pdata: c_uint, negated: c_int) -> c
                     (rc = (if ((if _pcre2_ucp_gentype_8[prop.chartype] == 6: 1 else: 0)) == negated: 1 else: 0))
             return rc
         7 =>
-            match c
+            match c:
                 9 =>
                     (rc = negated)
                 32 =>
@@ -718,7 +718,7 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
         
         (list[1] = ((if (((c != OP_PLUS) and (c != OP_MINPLUS)) and (c != OP_EXACT)) and (c != OP_POSPLUS): 1 else: 0)))
         
-        match base
+        match base:
             OP_STAR =>
                 (list[0] = 29)
             OP_STARI =>
@@ -735,7 +735,7 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
         (c = list[0])
         
 
-    match c
+    match c:
         OP_NOT_DIGIT =>
             return code
         OP_DIGIT =>
@@ -1002,7 +1002,7 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             else:
                 (end = (code + (32 / sizeof[u8]())))
             (class_end = end)
-            match (unsafe: *end)
+            match (unsafe: *end):
                 OP_CRSTAR =>
                     (list[1] = 1)
                     var __ci_expr_old_8: *const u8 = end
@@ -1055,7 +1055,7 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             else:
                 (end = (code + (32 / sizeof[u8]())))
             (class_end = end)
-            match (unsafe: *end)
+            match (unsafe: *end):
                 OP_CRSTAR =>
                     (list[1] = 1)
                     var __ci_expr_old_8: *const u8 = end
@@ -1108,7 +1108,7 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             else:
                 (end = (code + (32 / sizeof[u8]())))
             (class_end = end)
-            match (unsafe: *end)
+            match (unsafe: *end):
                 OP_CRSTAR =>
                     (list[1] = 1)
                     var __ci_expr_old_8: *const u8 = end
@@ -1161,7 +1161,7 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             else:
                 (end = (code + (32 / sizeof[u8]())))
             (class_end = end)
-            match (unsafe: *end)
+            match (unsafe: *end):
                 OP_CRSTAR =>
                     (list[1] = 1)
                     var __ci_expr_old_8: *const u8 = end
@@ -1277,14 +1277,14 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
             (c = (unsafe: *code))
             
         
-        match c
+        match c:
             OP_END =>
                 return (if base_list[1] != 0: 1 else: 0)
             OP_KET =>
                 if (base_list[1] == 0):
                     return 0
                 (bracode = (code - ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint)))
-                match (unsafe: *bracode)
+                match (unsafe: *bracode):
                     OP_CBRA =>
                         if (cb.had_recurse != 0):
                             return 0
@@ -1361,7 +1361,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                 if (base_list[1] == 0):
                     return 0
                 (bracode = (code - ((((((code)[1] << 8)) | (code)[((1) + 1)])) as c_uint)))
-                match (unsafe: *bracode)
+                match (unsafe: *bracode):
                     OP_CBRA =>
                         if (cb.had_recurse != 0):
                             return 0
@@ -1567,7 +1567,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                     
                     (invert_bits = 0)
                     
-                    match list_ptr[0]
+                    match list_ptr[0]:
                         110 =>
                             (set2 = ((((if (list_ptr == ((&list[0] as *mut c_uint) as *const c_uint)): code else: base_end)) - list_ptr[2])))
                         111 =>
@@ -1674,7 +1674,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                                 
                                 (n = propposstab[base_list[2]][list[2]])
                                 
-                                match n
+                                match n:
                                     1 =>
                                         (accepted = bothprop)
                                     2 =>
@@ -1738,7 +1738,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
         while true:
             (chr = (unsafe: *chr_ptr))
             
-            match list_ptr[0]
+            match list_ptr[0]:
                 29 =>
                     (ochr_ptr = (list_ptr + (2 as isize as usize)))
                     while true:
@@ -1782,7 +1782,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                     if ((chr > 255) or (((cb.ctypes[chr] & 16)) == 0)):
                         return 0
                 19 =>
-                    match chr
+                    match chr:
                         9 =>
                             return 0
                         32 =>
@@ -1823,7 +1823,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                             return 0
                         _ => 0
                 18 =>
-                    match chr
+                    match chr:
                         9 => 0
                         32 => 0
                         160 => 0
@@ -1846,7 +1846,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         _ =>
                             return 0
                 17 =>
-                    match chr
+                    match chr:
                         10 =>
                             return 0
                         11 =>
@@ -1863,7 +1863,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                             return 0
                         _ => 0
                 21 =>
-                    match chr
+                    match chr:
                         10 =>
                             return 0
                         11 =>
@@ -1880,7 +1880,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                             return 0
                         _ => 0
                 20 =>
-                    match chr
+                    match chr:
                         10 => 0
                         11 => 0
                         12 => 0
@@ -1891,7 +1891,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         _ =>
                             return 0
                 25 =>
-                    match chr
+                    match chr:
                         13 =>
                             return 0
                         10 =>
@@ -1908,7 +1908,7 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                             return 0
                         _ => 0
                 23 =>
-                    match chr
+                    match chr:
                         13 =>
                             return 0
                         10 =>

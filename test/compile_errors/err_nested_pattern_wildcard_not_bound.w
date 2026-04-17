@@ -7,6 +7,6 @@ fn parse() -> Result[i32, ParseErr]:
     Err(.Bad("nope"))
 
 fn main:
-    let _ = match parse()
+    let _ = match parse():
         Err(.Bad(_)) => msg
         _ => "ok"

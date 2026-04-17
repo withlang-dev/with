@@ -85,7 +85,7 @@ const TEXTURE_WALL: TextureId   = TextureId(2)
 const TEXTURE_BULLET: TextureId = TextureId(3)
 
 fn texture_name(id: TextureId) -> &str:
-    match id
+    match id:
         TextureId(0) => "player.png"
         TextureId(1) => "enemy.png"
         TextureId(2) => "wall.png"

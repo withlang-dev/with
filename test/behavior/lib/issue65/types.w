@@ -39,6 +39,6 @@ pub fn imported_if_err(ok: bool) -> ImportedErr:
     if ok then ImportedErr.Empty else ImportedErr.Bad("imported-if")
 
 pub fn imported_match_tok(ok: bool) -> ImportedToken:
-    match ok
+    match ok:
         true => ImportedToken.Text("match-yes")
         false => ImportedToken.End

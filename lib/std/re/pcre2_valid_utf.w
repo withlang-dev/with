@@ -226,7 +226,7 @@ fn _pcre2_valid_utf_8(string: *const u8, __param_length: c_ulong, erroroffset: *
         if (length < ab):
             ((unsafe: *erroroffset) = ((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong))
             
-            match (ab -% length)
+            match (ab -% length):
                 1 =>
                     return (-3)
                 2 =>
@@ -253,7 +253,7 @@ fn _pcre2_valid_utf_8(string: *const u8, __param_length: c_ulong, erroroffset: *
             
         
         
-        match ab
+        match ab:
             1 =>
                 if (((c & 62)) == 0):
                     ((unsafe: *erroroffset) = (((((p as usize -% string as usize) / sizeof[u8]())) as c_ulong) -% 1))

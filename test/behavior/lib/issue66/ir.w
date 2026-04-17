@@ -13,7 +13,7 @@ pub fn count_float_values(prog: IRProgram) -> i32:
     var count: i32 = 0
     for ip in 0..prog.insts.len():
         let inst = prog.insts[ip]
-        match inst.dtype
+        match inst.dtype:
             .Float32 => count = count + 1
             .Int32 => continue
     count

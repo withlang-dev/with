@@ -1,5 +1,5 @@
 fn score(v: i32) -> i32:
-    match v
+    match v:
         0 -> 1
         n -> n
 

@@ -4,7 +4,7 @@ error ParseErr =
     Bad(msg: str)
 
 fn tag(pair: (Result[i32, ParseErr], i32)) -> i32:
-    match pair
+    match pair:
         (Err(.Bad(msg)), code) if msg == "oops" => code
         (Ok(v), code) => v + code
         _ => -1

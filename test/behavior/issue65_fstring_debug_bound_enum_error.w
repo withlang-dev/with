@@ -17,7 +17,7 @@ fn main:
     assert(f"{missing:?}" == "Missing(dbg.w, 5)")
     assert(f"{tok:?}" == "Text(dbg)")
 
-    let match_err = match false
+    let match_err = match false:
         true => LocalErr.Empty
         false => LocalErr.Bad("match-dbg")
     assert(f"{match_err:?}" == "Bad(match-dbg)")

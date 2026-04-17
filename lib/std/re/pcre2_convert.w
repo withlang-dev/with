@@ -105,7 +105,7 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
         
         var dummyrun: c_int = (if (buffptr == null) or ((unsafe: *buffptr) == null): 1 else: 0)
         
-        match pattype
+        match pattype:
             16 =>
                 (rc = convert_glob((options & (0 - 16 - 1)), pattern, plength, utf, use_buffer, use_length, bufflenptr, dummyrun, ccontext))
             4 =>
@@ -343,7 +343,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 posix__goto_154_12 = pattern
@@ -480,7 +480,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                             if __goto_pending != 0:
                                 break
                         else:
-                            match posix_state__goto_161_10
+                            match posix_state__goto_161_10:
                                 5 =>
                                     if (((c__goto_178_12) >= 97) and ((c__goto_178_12) <= 122)):
                                         break
@@ -558,7 +558,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                         if __goto_pending != 0:
                             break
                     else:
-                        match sc__goto_178_15
+                        match sc__goto_178_15:
                             91 =>
                                 while ((unsafe: *s__goto_253_5) != 0):
                                     if (p__goto_155_14 >= endp__goto_157_14):
@@ -1010,7 +1010,7 @@ fn convert_glob_char_in_class(class_index: c_int, c: u8) -> c_int:
 
     var cbit: c_int
 
-    match class_index
+    match class_index:
         1 =>
             if (c == 95):
                 return 0

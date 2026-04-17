@@ -16,7 +16,7 @@ fn local_if(ok: bool) -> LocalEntry:
     if ok then LocalEntry { name: "local-if", rank: 10 } else LocalEntry { name: "local-else", rank: 11 }
 
 fn local_match(ok: bool) -> LocalEntry:
-    match ok
+    match ok:
         true => LocalEntry { name: "local-match-yes", rank: 12 }
         false => LocalEntry { name: "local-match-no", rank: 13 }
 
@@ -43,24 +43,24 @@ fn test_local_aggregate_flow:
     assert(match_val.name == "local-match-no")
     assert(match_val.rank == 13)
 
-    let some_val = match local_option(true)
+    let some_val = match local_option(true):
         Some(v) => v
         None => LocalEntry { name: "missing", rank: -1 }
     assert(some_val.name == "local-some")
     assert(some_val.rank == 14)
 
-    let none_val = match local_option(false)
+    let none_val = match local_option(false):
         Some(v) => v
         None => LocalEntry { name: "none", rank: -2 }
     assert(none_val.rank == -2)
 
-    let ok_val = match local_result(true)
+    let ok_val = match local_result(true):
         Ok(v) => v
         Err(_) => LocalEntry { name: "err", rank: -3 }
     assert(ok_val.name == "local-ok")
     assert(ok_val.rank == 15)
 
-    let err_val = match local_result(false)
+    let err_val = match local_result(false):
         Ok(v) => v
         Err(_) => LocalEntry { name: "err", rank: -4 }
     assert(err_val.rank == -4)
@@ -82,24 +82,24 @@ fn test_imported_aggregate_flow:
     assert(match_val.name == "imported-match-yes")
     assert(match_val.rank == 30)
 
-    let some_val = match imported_option(true)
+    let some_val = match imported_option(true):
         Some(v) => v
         None => ImportedEntry { name: "missing", rank: -5 }
     assert(some_val.name == "imported-some")
     assert(some_val.rank == 40)
 
-    let none_val = match imported_option(false)
+    let none_val = match imported_option(false):
         Some(v) => v
         None => ImportedEntry { name: "none", rank: -6 }
     assert(none_val.rank == -6)
 
-    let ok_val = match imported_result(true)
+    let ok_val = match imported_result(true):
         Ok(v) => v
         Err(_) => ImportedEntry { name: "err", rank: -7 }
     assert(ok_val.name == "imported-ok")
     assert(ok_val.rank == 50)
 
-    let err_val = match imported_result(false)
+    let err_val = match imported_result(false):
         Ok(v) => v
         Err(_) => ImportedEntry { name: "err", rank: -8 }
     assert(err_val.rank == -8)

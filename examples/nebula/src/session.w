@@ -80,7 +80,7 @@ fn parse_telemetry(raw: &str) -> Option[Telemetry]:
         let temp = temp_str.trim().parse_f64() ?? 0.0
 
         let status = if let Some(status_str) = parts.get(2):
-            match status_str.trim()
+            match status_str.trim():
                 "ok"      => .Ok
                 "warning" => .Warning("from device")
                 "fatal"   => .Fatal(code: 1)

@@ -9,7 +9,7 @@ enum Msg: i32:
     Write(str) = 2
 
 fn describe(m: Msg) -> str:
-    match m
+    match m:
         .Quit => "quit"
         .Move(x, y) => "move " ++ int_to_string(x) ++ " " ++ int_to_string(y)
         .Write(s) => "write " ++ s

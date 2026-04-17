@@ -18,7 +18,7 @@ fn parse(ok: bool) -> Result[Source, ParseErr]:
     if ok then Ok(parsed_source()) else Err(.Bad)
 
 fn compile_text_source(ok: bool) -> Source:
-    match parse(ok)
+    match parse(ok):
         Ok(v) => v
         Err(_) =>
             assert(true)

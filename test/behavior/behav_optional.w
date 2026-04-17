@@ -9,7 +9,7 @@ fn test_option_some:
 
 fn test_option_none:
     let x: Option[i32] = None
-    let val = match x
+    let val = match x:
         Some(v) => v
         None => -1
     assert(val == -1)
@@ -21,7 +21,7 @@ fn test_option_match:
     assert(unwrap_or(b, 0) == 0)
 
 fn unwrap_or(opt: Option[i32], default: i32) -> i32:
-    match opt
+    match opt:
         Some(v) => v
         None => default
 
@@ -39,7 +39,7 @@ fn test_option_from_function:
 fn test_option_none_from_function:
     let arr2 = [-3, -1, 0, -5, -10]
     let result = find_first_positive(arr2)
-    let val = match result
+    let val = match result:
         Some(v) => v
         None => -999
     assert(val == -999)
@@ -47,10 +47,10 @@ fn test_option_none_from_function:
 fn test_option_is_some:
     let a: Option[i32] = Some(1)
     let b: Option[i32] = None
-    let a_has_val = match a
+    let a_has_val = match a:
         Some(_) => true
         None => false
-    let b_has_val = match b
+    let b_has_val = match b:
         Some(_) => true
         None => false
     assert(a_has_val)
@@ -59,7 +59,7 @@ fn test_option_is_some:
 fn test_option_map_pattern:
     let x: Option[i32] = Some(5)
     // Map: transform the value inside
-    let val = match x
+    let val = match x:
         Some(v) => v * 2
         None => -1
     assert(val == 10)
@@ -67,7 +67,7 @@ fn test_option_map_pattern:
 fn test_option_chain_pattern:
     let x: Option[i32] = Some(10)
     // and_then pattern: chain optional operations
-    let val = match x
+    let val = match x:
         Some(v) if v > 5 => v + 100
         Some(_) => -1
         None => -1

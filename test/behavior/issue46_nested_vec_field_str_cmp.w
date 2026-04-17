@@ -70,7 +70,7 @@ fn main:
     let entries: Vec[Entry] = Vec.new()
     entries.push(Entry { name: "a" })
     entries.push(Entry { name: "out" })
-    let out = match resolve(Sig { params }, Bindings { entries })
+    let out = match resolve(Sig { params }, Bindings { entries }):
         Ok(v) => v
         Err(_) => Vec.new()
     assert(out.len() == 2)

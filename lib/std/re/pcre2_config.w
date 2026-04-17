@@ -20,7 +20,7 @@ type pcre2_substitute_callout_block_8 { version: c_uint = 0, input: *const u8 = 
 type struct_pcre2_substitute_callout_block_8 = pcre2_substitute_callout_block_8
 fn pcre2_config_8(what: c_uint, where_: *mut c_void) -> c_int:
     if (where_ == null):
-        match what
+        match what:
             0 =>
                 return 4
             14 =>
@@ -53,7 +53,7 @@ fn pcre2_config_8(what: c_uint, where_: *mut c_void) -> c_int:
                 return (-34)
         
 
-    match what
+    match what:
         0 =>
             ((unsafe: *((where_ as *mut c_uint))) = 1)
         14 =>

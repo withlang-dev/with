@@ -6,17 +6,17 @@
 fn main:
     let arr = [1, 2, 3]
     // Exhaustive: exact element count match for [3]i32
-    let r1 = match arr
+    let r1 = match arr:
         [a, b, c] => "three: " ++ int_to_string(a + b + c)
     print(r1)
 
     // Exhaustive: head + rest covers all arrays of length >= 1
-    let r2 = match arr
+    let r2 = match arr:
         [first, ..rest] => "first: " ++ int_to_string(first)
     print(r2)
 
     // Exhaustive: both ends extraction
-    let r3 = match arr
+    let r3 = match arr:
         [first, ..mid, last] => int_to_string(first) ++ " to " ++ int_to_string(last)
     print(r3)
 

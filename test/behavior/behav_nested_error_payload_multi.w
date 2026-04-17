@@ -9,7 +9,7 @@ fn parse(ok: bool) -> Result[i32, ParseErr]:
     Err(.Span(3, 8))
 
 fn classify(ok: bool) -> i32:
-    match parse(ok)
+    match parse(ok):
         Err(.Span(start, end)) => start + end
         Ok(v) => v
 

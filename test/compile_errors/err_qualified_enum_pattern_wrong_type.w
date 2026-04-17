@@ -9,6 +9,6 @@ enum Other:
 
 fn main:
     let shape = Shape.Circle
-    let _ = match shape
+    let _ = match shape:
         Other.Square => 1
         Shape.Circle => 2

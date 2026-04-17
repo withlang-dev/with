@@ -3,7 +3,7 @@
 //! expect-stdout: ok
 
 fn check_empty(arr: [0]i32) -> str:
-    match arr
+    match arr:
         [] => "matched empty"
         _ => "no match"
 
@@ -12,7 +12,7 @@ fn main:
     print(check_empty(empty))
     // Non-empty array uses different match
     let full = [1, 2, 3]
-    let r = match full
+    let r = match full:
         [a, b, c] => "has elements"
         _ => "other"
     print(r)

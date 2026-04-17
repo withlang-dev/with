@@ -7,11 +7,11 @@ fn parse() -> Result[i32, ParseErr]:
     Err(.Bad("nope"))
 
 fn code(err: ParseErr) -> i32:
-    match err
+    match err:
         .Bad(_) => 10
 
 fn extract() -> i32:
-    match parse()
+    match parse():
         Err(err @ .Bad(msg)) if msg == "nope" => code(err)
         _ => 0
 

@@ -13,7 +13,7 @@ fn parse_dtype(token: str) -> Result[DType, E]:
     Err(.ParseError("unknown dtype"))
 
 fn take_dtype(dtype: DType) -> i32:
-    match dtype
+    match dtype:
         .Int32 => 1
         .Float32 => 2
 

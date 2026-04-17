@@ -7,13 +7,13 @@ enum Color { Red | Green | Blue }
 
 fn test_stmt_match_partial_int:
     let x = 1
-    match x
+    match x:
         1 => print("one")
         _ => print("other")
 
 fn test_expr_match_enum_exhaustive:
     let c: Color = .Red
-    let v = match c
+    let v = match c:
         .Red => 1
         .Green => 2
         .Blue => 3
@@ -22,7 +22,7 @@ fn test_expr_match_enum_exhaustive:
 fn test_stmt_match_enum_partial:
     // Partial match in statement position — only Red handled, no warning
     let c: Color = .Red
-    match c
+    match c:
         .Red => print("red matched")
 
 fn main:

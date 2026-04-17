@@ -6,7 +6,7 @@ enum Shape:
     Empty
 
 fn area(shape: Shape) -> i32:
-    match shape
+    match shape:
         Shape.Circle(r) => r * r
         Shape.Rect(w, h) => w * h
         Shape.Empty => 0
@@ -24,8 +24,8 @@ fn test_if_let:
         assert(false)
 
 fn nested_tag(shape: Shape) -> i32:
-    match shape
-        Shape.Circle(r) => match Shape.Circle(r + 1)
+    match shape:
+        Shape.Circle(r) => match Shape.Circle(r + 1):
             Shape.Circle(inner) => inner
             Shape.Rect(_, _) => 0
             Shape.Empty => 0

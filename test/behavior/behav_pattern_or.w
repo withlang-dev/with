@@ -3,7 +3,7 @@
 // Behavior test: or-patterns in match expressions
 
 fn classify(n: i32) -> str:
-    match n
+    match n:
         1 | 2 | 3 => "small"
         4 | 5 | 6 => "medium"
         _ => "large"

@@ -246,7 +246,7 @@ fn do_bumpalong(match_data: *mut pcre2_real_match_data_8, offset: c_ulong) -> c_
     var utf: c_int = (if ((match_data.code.overall_options & 524288)) != 0: 1 else: 0)
 
     if (((subject[offset] == 13) and ((offset +% 1) < subject_length)) and (subject[(offset +% 1)] == 10)):
-        match match_data.code.newline_convention
+        match match_data.code.newline_convention:
             3 =>
                 return (offset +% 2)
             4 =>

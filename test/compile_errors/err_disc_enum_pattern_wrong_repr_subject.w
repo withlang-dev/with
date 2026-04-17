@@ -6,6 +6,6 @@ enum TypeKind: i32:
 
 fn main:
     let kind: i64 = 5
-    let _ = match kind
+    let _ = match kind:
         TypeKind.TY_STR => "str"
         _ => "other"

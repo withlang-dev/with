@@ -8,6 +8,6 @@ fn parse() -> Result[i32, ParseErr]:
     Err(.Span(3, 8))
 
 fn classify() -> i32:
-    match parse()
+    match parse():
         Err(.Span(start, end)) => start + end
         Ok(v) => v

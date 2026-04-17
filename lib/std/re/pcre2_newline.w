@@ -201,7 +201,7 @@ fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr:
         (c = (unsafe: *ptr))
 
     if (type_ == 2):
-        match c
+        match c:
             10 =>
                 ((unsafe: *lenptr) = 1)
                 return 1
@@ -211,7 +211,7 @@ fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr:
             _ =>
                 return 0
     else:
-        match c
+        match c:
             10 =>
                 ((unsafe: *lenptr) = 1)
                 return 1
@@ -284,7 +284,7 @@ fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const 
         (c = (unsafe: *ptr))
 
     if (type_ == 2):
-        match c
+        match c:
             10 =>
                 ((unsafe: *lenptr) = (if ((ptr > startptr) and (ptr[-1] == 13)): 2 else: 1))
                 return 1
@@ -294,7 +294,7 @@ fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const 
             _ =>
                 return 0
     else:
-        match c
+        match c:
             10 =>
                 ((unsafe: *lenptr) = (if ((ptr > startptr) and (ptr[-1] == 13)): 2 else: 1))
                 return 1

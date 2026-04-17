@@ -11,7 +11,7 @@ fn score(entry: ImportedEntry) -> i32:
     entry.rank
 
 fn local_from_match(ok: bool) -> LocalPair:
-    match ok
+    match ok:
         true =>
             let base = 4
             LocalPair { left: base, right: base + 1 }
@@ -20,7 +20,7 @@ fn local_from_match(ok: bool) -> LocalPair:
             LocalPair { left: base, right: base + 1 }
 
 fn imported_from_match(ok: bool) -> ImportedEntry:
-    match imported_result(ok)
+    match imported_result(ok):
         Ok(v) =>
             assert(true)
             v
@@ -30,7 +30,7 @@ fn imported_from_match(ok: bool) -> ImportedEntry:
 
 fn score_from_match(ok: bool) -> i32:
     score(
-        match imported_result(ok)
+        match imported_result(ok):
             Ok(v) =>
                 assert(true)
                 v
@@ -40,7 +40,7 @@ fn score_from_match(ok: bool) -> i32:
     )
 
 fn after_match_value(ok: bool) -> i32:
-    let _ = match ok
+    let _ = match ok:
         true =>
             assert(true)
             7

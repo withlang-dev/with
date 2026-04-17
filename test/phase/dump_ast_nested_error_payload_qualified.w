@@ -8,6 +8,6 @@ fn parse() -> Result[i32, ParseErr]:
     Err(.Bad("nope"))
 
 fn lift() -> Result[i32, str]:
-    match parse()
+    match parse():
         Err(ParseErr.Bad(msg)) => Err(msg)
         Ok(v) => Ok(v)

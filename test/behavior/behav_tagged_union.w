@@ -10,7 +10,7 @@ enum Value:
     | NoneVal
 
 fn value_to_int(v: Value) -> i32:
-    match v
+    match v:
         .IntVal(i) => i
         .FloatVal(f) => f as i32
         .BoolVal(b) => if b: 1 else: 0
@@ -35,7 +35,7 @@ fn test_tagged_union_none:
     assert(value_to_int(v) == -1)
 
 fn is_int_val(v: Value) -> bool:
-    match v
+    match v:
         .IntVal(_) => true
         _ => false
 
@@ -50,7 +50,7 @@ enum Message:
     | Move(x: i32, y: i32)
 
 fn handle_message(msg: Message) -> str:
-    match msg
+    match msg:
         .Quit => "quit"
         .Echo(s) => s
         .Move(x, y) => "move"
@@ -63,7 +63,7 @@ fn test_message_variants:
 enum Tree { Leaf(i32) | Node(i32) }
 
 fn tree_value(t: Tree) -> i32:
-    match t
+    match t:
         .Leaf(v) => v
         .Node(v) => v
 

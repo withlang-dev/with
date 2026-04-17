@@ -10,7 +10,7 @@ enum Color: i32 { Red = 1 | Green = 2 | Blue = 4 }
 fn test_enum_shorthand:
     // Use shorthand syntax with type annotation for simple enums
     let d: Direction = .South
-    let result = match d
+    let result = match d:
         .North => "north"
         .South => "south"
         .East => "east"
@@ -19,7 +19,7 @@ fn test_enum_shorthand:
 
 fn test_enum_match_wildcard:
     let d: Direction = .East
-    let result = match d
+    let result = match d:
         .North => "north"
         _ => "other"
     assert(result == "other")
@@ -43,7 +43,7 @@ fn test_enum_call_arg:
 
 fn test_discriminant_enum:
     let c = Color.Green
-    let result = match c
+    let result = match c:
         .Red => "red"
         .Green => "green"
         .Blue => "blue"
@@ -58,7 +58,7 @@ fn test_discriminant_cast:
 
 fn test_discriminant_shorthand:
     let c: Color = .Blue
-    let r = match c
+    let r = match c:
         .Red => "r"
         .Green => "g"
         .Blue => "b"

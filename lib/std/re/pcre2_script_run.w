@@ -258,9 +258,9 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
             if ((script != ucp_Common) and (script != ucp_Inherited)):
                 ((&(map)[0] as *mut c_uint)[((script) / 32)] = (&(map)[0] as *mut c_uint)[((script) / 32)] | ((1 << (((script) % 32)))))
             
-            match require_state
+            match require_state:
                 0 =>
-                    match script
+                    match script:
                         30 =>
                             (require_state = 2)
                         27 =>
@@ -321,7 +321,7 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
                     (i_1 = i_1 + 1)
                     if (not ((OK != 0))):
                         return 0
-                    match script
+                    match script:
                         30 =>
                             (require_state = 2)
                         27 =>

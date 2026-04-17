@@ -24,7 +24,7 @@ fn run_input_events(
 ):
     for (_, state) in iter_mut(input_states):
         for event in events:
-            match event
+            match event:
                 .KeyDown(.Up)    => state.up = true
                 .KeyUp(.Up)      => state.up = false
                 .KeyDown(.Down)  => state.down = true

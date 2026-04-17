@@ -31,21 +31,21 @@ fn get_result(x: i32) -> Result[i32, str]:
 fn test_result_basic:
     let r: Result[i32, str] = for x in get_result(5); y in get_result(x * 2):
         yield x + y
-    match r
+    match r:
         Ok(v) => assert(v == 15)
         Err(_) => assert(false)
 
 fn test_result_err_propagation:
     let r: Result[i32, str] = for x in get_result(0 - 1); y in get_result(1):
         yield x + y
-    match r
+    match r:
         Ok(_) => assert(false)
         Err(e) => assert(e == "negative")
 
 fn test_result_second_err:
     let r: Result[i32, str] = for x in get_result(5); y in get_result(0 - 1):
         yield x + y
-    match r
+    match r:
         Ok(_) => assert(false)
         Err(e) => assert(e == "negative")
 

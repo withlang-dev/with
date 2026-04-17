@@ -169,7 +169,7 @@ fn test_match_basic:
     assert(describe(99) == 0)
 
 fn describe(x: i32) -> i32:
-    match x
+    match x:
         1 => 1
         2 => 2
         _ => 0

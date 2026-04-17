@@ -3,7 +3,7 @@
 enum Val { Num(i32) | Empty }
 
 fn extract(v: Val) -> i32:
-    match v
+    match v:
         .Num(n) => n
         .Empty => 0
 

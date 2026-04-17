@@ -32,7 +32,7 @@ fn test_min_max_destructure:
 
 fn test_tuple_match_destructure:
     let p = (1, 2)
-    let sum = match p
+    let sum = match p:
         (a, b) => a + b
     assert(sum == 3)
 

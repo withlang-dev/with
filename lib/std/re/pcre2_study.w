@@ -210,7 +210,7 @@ fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int:
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 count__goto_1917_5 = 0
@@ -262,7 +262,7 @@ fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int:
                                 (c__goto_1963_13 = i__goto_1952_9)
                                 if __goto_pending != 0:
                                     break
-                                match x__goto_1960_15
+                                match x__goto_1960_15:
                                     1 => 0
                                     2 =>
                                         (c__goto_1963_13 = c__goto_1963_13 + 1)
@@ -363,7 +363,7 @@ fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int:
                     (min__goto_2056_7 = find_minlength((re as *const pcre2_real_code_8), (code__goto_1918_14 as *const u8), (code__goto_1918_14 as *const u8), utf__goto_1919_6, (null as *mut recurse_check), (&mut count__goto_1917_5 as *mut c_int), (&backref_cache__goto_2057_7[0] as *mut c_int)))
                     if __goto_pending != 0:
                         continue
-                    match min__goto_2056_7
+                    match min__goto_2056_7:
                         -1 => 0
                         -2 =>
                             return 2
@@ -419,7 +419,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 length__goto_106_5 = -1
@@ -462,7 +462,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                     (op__goto_138_15 = (unsafe: *cc__goto_116_12))
                     if __goto_pending != 0:
                         break
-                    match op__goto_138_15
+                    match op__goto_138_15:
                         OP_COND =>
                             (cs__goto_139_14 = (cc__goto_116_12 + ((((((cc__goto_116_12)[1] << 8)) | (cc__goto_116_12)[((1) + 1)])) as c_uint)))
                             if ((unsafe: *cs__goto_139_14) != OP_ALT):
@@ -1105,7 +1105,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 (cc__goto_116_12 = cc__goto_116_12 + ((((((cc__goto_116_12)[1] << 8)) | (cc__goto_116_12)[((1) + 1)])) as c_uint))
                             else:
                                 (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
-                            match (unsafe: *cc__goto_116_12)
+                            match (unsafe: *cc__goto_116_12):
                                 OP_CRPLUS =>
                                     var __ci_expr_old_9: c_int = branchlength__goto_107_5
                                     (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
@@ -1156,7 +1156,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 (cc__goto_116_12 = cc__goto_116_12 + ((((((cc__goto_116_12)[1] << 8)) | (cc__goto_116_12)[((1) + 1)])) as c_uint))
                             else:
                                 (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
-                            match (unsafe: *cc__goto_116_12)
+                            match (unsafe: *cc__goto_116_12):
                                 OP_CRPLUS =>
                                     var __ci_expr_old_9: c_int = branchlength__goto_107_5
                                     (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
@@ -1207,7 +1207,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 (cc__goto_116_12 = cc__goto_116_12 + ((((((cc__goto_116_12)[1] << 8)) | (cc__goto_116_12)[((1) + 1)])) as c_uint))
                             else:
                                 (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
-                            match (unsafe: *cc__goto_116_12)
+                            match (unsafe: *cc__goto_116_12):
                                 OP_CRPLUS =>
                                     var __ci_expr_old_9: c_int = branchlength__goto_107_5
                                     (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
@@ -1258,7 +1258,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 (cc__goto_116_12 = cc__goto_116_12 + ((((((cc__goto_116_12)[1] << 8)) | (cc__goto_116_12)[((1) + 1)])) as c_uint))
                             else:
                                 (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
-                            match (unsafe: *cc__goto_116_12)
+                            match (unsafe: *cc__goto_116_12):
                                 OP_CRPLUS =>
                                     var __ci_expr_old_9: c_int = branchlength__goto_107_5
                                     (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
@@ -1633,7 +1633,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 if __goto_pending != 0:
                                     break
                             (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                            match (unsafe: *cc__goto_116_12)
+                            match (unsafe: *cc__goto_116_12):
                                 OP_CRSTAR =>
                                     (min__goto_137_10 = 0)
                                     var __ci_expr_old_16: *const u8 = cc__goto_116_12
@@ -1770,7 +1770,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 if __goto_pending != 0:
                                     break
                             (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                            match (unsafe: *cc__goto_116_12)
+                            match (unsafe: *cc__goto_116_12):
                                 OP_CRSTAR =>
                                     (min__goto_137_10 = 0)
                                     var __ci_expr_old_16: *const u8 = cc__goto_116_12
@@ -2346,7 +2346,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 yield___goto_1097_5 = SSB_DONE
@@ -2373,7 +2373,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                         classmap__goto_1120_20 = ((null as *const u8) as *const u8)
                         if __goto_pending != 0:
                             break
-                        match (unsafe: *tcode__goto_1111_14)
+                        match (unsafe: *tcode__goto_1111_14):
                             OP_ACCEPT =>
                                 return SSB_FAIL
                             OP_ASSERT_ACCEPT =>
@@ -2575,7 +2575,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 (ncode__goto_1119_16 = ncode__goto_1119_16 + (1 + 2))
                                 done__goto_1264_17 = 0
                                 while (not ((done__goto_1264_17 != 0))):
-                                    match (unsafe: *ncode__goto_1119_16)
+                                    match (unsafe: *ncode__goto_1119_16):
                                         OP_ASSERT =>
                                             (ncode__goto_1119_16 = ncode__goto_1119_16 + ((((((ncode__goto_1119_16)[1] << 8)) | (ncode__goto_1119_16)[((1) + 1)])) as c_uint))
                                             while ((unsafe: *ncode__goto_1119_16) == OP_ALT):
@@ -2647,7 +2647,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         break
                                     if __goto_pending != 0:
                                         break
-                                match (unsafe: *ncode__goto_1119_16)
+                                match (unsafe: *ncode__goto_1119_16):
                                     OP_PROP =>
                                         if (ncode__goto_1119_16[1] != 9):
                                             break
@@ -2740,7 +2740,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 (ncode__goto_1119_16 = ncode__goto_1119_16 + (1 + 2))
                                 done__goto_1264_17 = 0
                                 while (not ((done__goto_1264_17 != 0))):
-                                    match (unsafe: *ncode__goto_1119_16)
+                                    match (unsafe: *ncode__goto_1119_16):
                                         OP_ASSERT =>
                                             (ncode__goto_1119_16 = ncode__goto_1119_16 + ((((((ncode__goto_1119_16)[1] << 8)) | (ncode__goto_1119_16)[((1) + 1)])) as c_uint))
                                             while ((unsafe: *ncode__goto_1119_16) == OP_ALT):
@@ -2812,7 +2812,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         break
                                     if __goto_pending != 0:
                                         break
-                                match (unsafe: *ncode__goto_1119_16)
+                                match (unsafe: *ncode__goto_1119_16):
                                     OP_PROP =>
                                         if (ncode__goto_1119_16[1] != 9):
                                             break
@@ -3361,7 +3361,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
                             OP_TYPEUPTO =>
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-                                match tcode__goto_1111_14[1]
+                                match tcode__goto_1111_14[1]:
                                     OP_ANY =>
                                         return SSB_FAIL
                                     OP_ALLANY =>
@@ -3435,7 +3435,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
                             OP_TYPEMINUPTO =>
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-                                match tcode__goto_1111_14[1]
+                                match tcode__goto_1111_14[1]:
                                     OP_ANY =>
                                         return SSB_FAIL
                                     OP_ALLANY =>
@@ -3509,7 +3509,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
                             OP_TYPEPOSUPTO =>
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-                                match tcode__goto_1111_14[1]
+                                match tcode__goto_1111_14[1]:
                                     OP_ANY =>
                                         return SSB_FAIL
                                     OP_ALLANY =>
@@ -3582,7 +3582,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         return SSB_FAIL
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
                             OP_TYPESTAR =>
-                                match tcode__goto_1111_14[1]
+                                match tcode__goto_1111_14[1]:
                                     OP_ANY =>
                                         return SSB_FAIL
                                     OP_ALLANY =>
@@ -3655,7 +3655,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         return SSB_FAIL
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
                             OP_TYPEMINSTAR =>
-                                match tcode__goto_1111_14[1]
+                                match tcode__goto_1111_14[1]:
                                     OP_ANY =>
                                         return SSB_FAIL
                                     OP_ALLANY =>
@@ -3728,7 +3728,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         return SSB_FAIL
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
                             OP_TYPEPOSSTAR =>
-                                match tcode__goto_1111_14[1]
+                                match tcode__goto_1111_14[1]:
                                     OP_ANY =>
                                         return SSB_FAIL
                                     OP_ALLANY =>
@@ -3801,7 +3801,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         return SSB_FAIL
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
                             OP_TYPEQUERY =>
-                                match tcode__goto_1111_14[1]
+                                match tcode__goto_1111_14[1]:
                                     OP_ANY =>
                                         return SSB_FAIL
                                     OP_ALLANY =>
@@ -3874,7 +3874,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         return SSB_FAIL
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
                             OP_TYPEMINQUERY =>
-                                match tcode__goto_1111_14[1]
+                                match tcode__goto_1111_14[1]:
                                     OP_ANY =>
                                         return SSB_FAIL
                                     OP_ALLANY =>
@@ -3947,7 +3947,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         return SSB_FAIL
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
                             OP_TYPEPOSQUERY =>
-                                match tcode__goto_1111_14[1]
+                                match tcode__goto_1111_14[1]:
                                     OP_ANY =>
                                         return SSB_FAIL
                                     OP_ALLANY =>
@@ -4037,7 +4037,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         var __ci_expr_old_6: *const u8 = p__goto_1750_20
                                         (p__goto_1750_20 = p__goto_1750_20 + 1)
                                         var __ci_expr_switch_7: c_int = (unsafe: *__ci_expr_old_6)
-                                        match __ci_expr_switch_7
+                                        match __ci_expr_switch_7:
                                             1 =>
                                                 var __ci_expr_old_8: *const u8 = p__goto_1750_20
                                                 (p__goto_1750_20 = p__goto_1750_20 + 1)
@@ -4140,7 +4140,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                             break
                                     if __goto_pending != 0:
                                         break
-                                match (unsafe: *tcode__goto_1111_14)
+                                match (unsafe: *tcode__goto_1111_14):
                                     OP_CRSTAR =>
                                         var __ci_expr_old_18: *const u8 = tcode__goto_1111_14
                                         (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
@@ -4237,7 +4237,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                             break
                                     if __goto_pending != 0:
                                         break
-                                match (unsafe: *tcode__goto_1111_14)
+                                match (unsafe: *tcode__goto_1111_14):
                                     OP_CRSTAR =>
                                         var __ci_expr_old_18: *const u8 = tcode__goto_1111_14
                                         (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
@@ -4327,7 +4327,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                             break
                                     if __goto_pending != 0:
                                         break
-                                match (unsafe: *tcode__goto_1111_14)
+                                match (unsafe: *tcode__goto_1111_14):
                                     OP_CRSTAR =>
                                         var __ci_expr_old_18: *const u8 = tcode__goto_1111_14
                                         (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)

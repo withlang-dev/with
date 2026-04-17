@@ -19,7 +19,7 @@ extend RedisCache:
 impl CacheService for RedisCache:
     async fn get_bytes(self: &RedisCache, key: &str) -> Result[Option[Vec[u8]], CacheError]:
         let full_key = self.prefixed_key(key)
-        match self.client.get(&full_key).await
+        match self.client.get(&full_key).await:
             Ok(Some(bytes)) => Ok(Some(bytes))
             Ok(None)        => Ok(None)
             Err(_)          => Err(.ConnectionLost)

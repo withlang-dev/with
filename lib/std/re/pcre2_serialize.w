@@ -194,7 +194,7 @@ fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_o
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 data__goto_164_30 = (bytes as *const pcre2_serialized_data)

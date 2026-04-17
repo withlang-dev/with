@@ -204,7 +204,7 @@ fn _pcre2_find_bracket_8(__param_code: *const u8, utf: c_int, number: c_int) -> 
                         code = code + _pcre2_OP_lengths_8[c]
                         
                     else:
-                        match c
+                        match c:
                             OP_TYPESTAR =>
                                 if ((code[1] == OP_PROP) or (code[1] == OP_NOTPROP)):
                                     (code = code + 2)
@@ -258,7 +258,7 @@ fn _pcre2_find_bracket_8(__param_code: *const u8, utf: c_int, number: c_int) -> 
                         code = code + _pcre2_OP_lengths_8[c]
                         
                         if (utf != 0):
-                            match c
+                            match c:
                                 OP_CHAR =>
                                     if ((code[-1]) >= 192):
                                         (code = code + (_pcre2_utf8_table4[((code[-1]) & 63)]))
