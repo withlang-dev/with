@@ -701,12 +701,16 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     self.parse_optional_where_clause()
 
     // Body
+    var body: NodeId = 0 as NodeId
     if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
         self.advance()
+        body = self.parse_block_or_expr()
+    else if self.peek() == TokenKind.TK_L_BRACE:
+        self.advance()
+        body = self.parse_braced_body()
     else:
-        self.emit_error("expected '=' or ':'")
+        self.emit_error("expected '=', ':' or '{'")
         return self.poisoned_expr()
-    let body = self.parse_block_or_expr()
     if body == 0:
         return self.poisoned_expr()
 
@@ -1889,10 +1893,14 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
     // Parse optional type parameters: trait Iter[T] = ...
     let trait_tp_start = self.pool.extra_len()
     let trait_tp_count = self.parse_type_params()
-    if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
+    var trait_braced = false
+    if self.peek() == TokenKind.TK_L_BRACE:
+        trait_braced = true
+        self.advance()
+    else if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
         self.advance()
     else:
-        self.emit_error("expected '=' or ':'")
+        self.emit_error("expected '=', ':' or '{'")
         return
     self.skip_newlines()
 
@@ -1909,10 +1917,13 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
     var assoc_default_types: Vec[i32] = Vec.new()
     var assoc_bounds_flat: Vec[i32] = Vec.new()
 
-    while self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_TYPE or self.peek() == TokenKind.TK_KW_ASYNC:
-        let fn_col = column_of(self.source, self.current_start())
-        if fn_col == 0:
+    while self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_TYPE or self.peek() == TokenKind.TK_KW_ASYNC or (trait_braced and self.peek() == TokenKind.TK_R_BRACE):
+        if trait_braced and self.peek() == TokenKind.TK_R_BRACE:
             break
+        if not trait_braced:
+            let fn_col = column_of(self.source, self.current_start())
+            if fn_col == 0:
+                break
 
         if self.peek() == TokenKind.TK_KW_TYPE:
             self.advance()
@@ -1975,6 +1986,9 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
         if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
             self.advance()
             method_body = self.parse_block_or_expr()
+        else if self.peek() == TokenKind.TK_L_BRACE:
+            self.advance()
+            method_body = self.parse_braced_body()
 
         method_names.push(mname)
         method_param_starts.push(params_start)
@@ -1991,6 +2005,8 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
         method_flags.push(mflags)
         self.skip_newlines()
 
+    if trait_braced:
+        self.expect(TokenKind.TK_R_BRACE)
     let extra_start = self.pool.extra_len()
     // Type params: count and start index into extra pool
     self.pool.add_extra(trait_tp_count)
@@ -2121,7 +2137,11 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
 
     self.parse_optional_where_clause()
 
-    if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
+    var impl_braced = false
+    if self.peek() == TokenKind.TK_L_BRACE:
+        impl_braced = true
+        self.advance()
+    else if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
         self.advance()
     self.skip_newlines()
 
@@ -2130,10 +2150,13 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
     let extra_start = self.pool.extra_len()
     var method_count = 0
 
-    while self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_TYPE:
-        let fn_col = column_of(self.source, self.current_start())
-        if fn_col == 0:
+    while self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_TYPE or (impl_braced and self.peek() == TokenKind.TK_R_BRACE):
+        if impl_braced and self.peek() == TokenKind.TK_R_BRACE:
             break
+        if not impl_braced:
+            let fn_col = column_of(self.source, self.current_start())
+            if fn_col == 0:
+                break
 
         // Associated type binding: type Name = ConcreteType
         if self.peek() == TokenKind.TK_KW_TYPE:
@@ -2188,12 +2211,16 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
 
         self.parse_optional_where_clause()
 
+        var body: NodeId = 0 as NodeId
         if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
             self.advance()
+            body = self.parse_block_or_expr()
+        else if self.peek() == TokenKind.TK_L_BRACE:
+            self.advance()
+            body = self.parse_braced_body()
         else:
-            self.emit_error("expected '=' or ':'")
+            self.emit_error("expected '=', ':' or '{'")
             break
-        let body = self.parse_block_or_expr()
 
         var flags = 0
         if method_vis == Visibility.Public:
@@ -2209,6 +2236,8 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
         method_count = method_count + 1
         self.skip_newlines()
 
+    if impl_braced:
+        self.expect(TokenKind.TK_R_BRACE)
     // Emit impl_decl node. Store assoc types + method_count in extra.
     let impl_extra = self.pool.extra_len()
     let impl_assoc_count = impl_assoc_names.len() as i32
@@ -3764,8 +3793,12 @@ fn Parser.parse_if_expr(self: Parser) -> NodeId:
         self.if_chain_form = saved_chain_form
         return result
 
+    let saved_sb = self.suppress_brace
+    self.suppress_brace = 1
     let cond = self.parse_expr()
+    self.suppress_brace = saved_sb
     var use_block = false
+    var use_brace = false
     if self.peek() == TokenKind.TK_KW_THEN:
         if self.if_chain_form == 1:
             self.emit_error("cannot mix block ':' and inline 'then' in if/else chain")
@@ -3778,12 +3811,24 @@ fn Parser.parse_if_expr(self: Parser) -> NodeId:
         self.if_chain_form = 1
         self.advance()
         use_block = true
+    else if self.peek() == TokenKind.TK_L_BRACE:
+        if self.if_chain_form == 2:
+            self.emit_error("cannot mix inline 'then' and block '{' in if/else chain")
+        self.if_chain_form = 1
+        self.advance()
+        use_brace = true
     else:
         self.skip_newlines()
 
     let if_col = column_of(self.source, start)
-    let is_stmt_if = use_block and is_first_on_line(self.source, start) != 0
-    let then_body = if use_block: self.parse_block_or_expr() else: self.parse_expr()
+    let is_stmt_if = (use_block or use_brace) and is_first_on_line(self.source, start) != 0
+    var then_body: NodeId = 0 as NodeId
+    if use_brace:
+        then_body = self.parse_braced_body()
+    else if use_block:
+        then_body = self.parse_block_or_expr()
+    else:
+        then_body = self.parse_expr()
     var else_body: NodeId = 0 as NodeId
     let save = self.pos
     self.skip_newlines()
@@ -3794,9 +3839,13 @@ fn Parser.parse_if_expr(self: Parser) -> NodeId:
             self.pos = save
         else:
             self.advance()
-            if self.peek() == TokenKind.TK_COLON:
+            if self.peek() == TokenKind.TK_L_BRACE:
                 self.advance()
-            else_body = self.parse_block_or_expr()
+                else_body = self.parse_braced_body()
+            else:
+                if self.peek() == TokenKind.TK_COLON:
+                    self.advance()
+                else_body = self.parse_block_or_expr()
     else:
         self.pos = save
 
@@ -3808,7 +3857,10 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
     let pat = self.parse_pattern()
     if self.expect(TokenKind.TK_EQ) == 0:
         return self.poisoned_expr()
+    let saved_sb = self.suppress_brace
+    self.suppress_brace = 1
     let subject = self.parse_expr()
+    self.suppress_brace = saved_sb
 
     // Store clauses as flat triples: (kind, data0, data1).
     // kind=0 → let clause (data0=pattern, data1=subject)
@@ -3838,6 +3890,7 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
             clauses.push(0)
 
     var use_block = false
+    var use_brace = false
     if self.peek() == TokenKind.TK_KW_THEN:
         if self.if_chain_form == 1:
             self.emit_error("cannot mix block ':' and inline 'then' in if/else chain")
@@ -3850,12 +3903,24 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
         self.if_chain_form = 1
         self.advance()
         use_block = true
+    else if self.peek() == TokenKind.TK_L_BRACE:
+        if self.if_chain_form == 2:
+            self.emit_error("cannot mix inline 'then' and block '{' in if/else chain")
+        self.if_chain_form = 1
+        self.advance()
+        use_brace = true
     else:
         self.skip_newlines()
 
     let if_col = column_of(self.source, start)
-    let is_stmt_if = use_block and is_first_on_line(self.source, start) != 0
-    let then_body = if use_block: self.parse_block_or_expr() else: self.parse_expr()
+    let is_stmt_if = (use_block or use_brace) and is_first_on_line(self.source, start) != 0
+    var then_body: NodeId = 0 as NodeId
+    if use_brace:
+        then_body = self.parse_braced_body()
+    else if use_block:
+        then_body = self.parse_block_or_expr()
+    else:
+        then_body = self.parse_expr()
 
     var else_body: NodeId = 0 as NodeId
     let save = self.pos
@@ -3867,9 +3932,13 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
             self.pos = save
         else:
             self.advance()
-            if self.peek() == TokenKind.TK_COLON:
+            if self.peek() == TokenKind.TK_L_BRACE:
                 self.advance()
-            else_body = self.parse_block_or_expr()
+                else_body = self.parse_braced_body()
+            else:
+                if self.peek() == TokenKind.TK_COLON:
+                    self.advance()
+                else_body = self.parse_block_or_expr()
     else:
         self.pos = save
     if else_body == 0:
@@ -3922,9 +3991,14 @@ fn Parser.parse_errdefer(self: Parser) -> NodeId:
 fn Parser.parse_unsafe(self: Parser) -> NodeId:
     let start = self.current_start()
     self.advance()
-    if self.peek() == TokenKind.TK_COLON:
+    var body: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_L_BRACE:
         self.advance()
-    let body = self.parse_block_or_expr()
+        body = self.parse_braced_body()
+    else:
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+        body = self.parse_block_or_expr()
     self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, start, self.prev_end(), body, 0, 0)
 
 fn Parser.parse_asm_expr(self: Parser) -> NodeId:
@@ -4075,21 +4149,35 @@ fn Parser.parse_async_expr(self: Parser) -> NodeId:
             if self.peek() == TokenKind.TK_IDENT:
                 scope_name = self.expect_ident()
             self.expect(TokenKind.TK_PIPE)
-        if self.peek() == TokenKind.TK_COLON:
+        var body: NodeId = 0 as NodeId
+        if self.peek() == TokenKind.TK_L_BRACE:
             self.advance()
-        let body = self.parse_block_or_expr()
+            body = self.parse_braced_body()
+        else:
+            if self.peek() == TokenKind.TK_COLON:
+                self.advance()
+            body = self.parse_block_or_expr()
         return self.pool.add_node(NodeKind.NK_ASYNC_SCOPE, start, self.prev_end(), scope_name, body, 0)
 
-    if self.peek() == TokenKind.TK_COLON:
+    var body: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_L_BRACE:
         self.advance()
-    let body = self.parse_block_or_expr()
+        body = self.parse_braced_body()
+    else:
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+        body = self.parse_block_or_expr()
     self.pool.add_node(NodeKind.NK_ASYNC_BLOCK, start, self.prev_end(), body, 0, 0)
 
 fn Parser.parse_select_await(self: Parser) -> NodeId:
     let start = self.current_start()
     self.advance()  // consume select
     self.expect(TokenKind.TK_KW_AWAIT)
-    if self.peek() == TokenKind.TK_COLON:
+    var select_braced = false
+    if self.peek() == TokenKind.TK_L_BRACE:
+        select_braced = true
+        self.advance()
+    else if self.peek() == TokenKind.TK_COLON:
         self.advance()
     self.skip_newlines()
 
@@ -4098,13 +4186,16 @@ fn Parser.parse_select_await(self: Parser) -> NodeId:
     var arm_col = -1
 
     while self.peek() != TokenKind.TK_EOF:
+        if select_braced and self.peek() == TokenKind.TK_R_BRACE:
+            break
         if self.peek() != TokenKind.TK_IDENT:
             break
-        let cur_col = column_of(self.source, self.current_start())
-        if arm_col >= 0 and cur_col != arm_col:
-            break
-        if arm_col < 0:
-            arm_col = cur_col
+        if not select_braced:
+            let cur_col = column_of(self.source, self.current_start())
+            if arm_col >= 0 and cur_col != arm_col:
+                break
+            if arm_col < 0:
+                arm_col = cur_col
         if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) != TokenKind.TK_EQ:
             break
         let name_sym = self.expect_ident()
@@ -4112,10 +4203,6 @@ fn Parser.parse_select_await(self: Parser) -> NodeId:
             break
         self.advance()
         self.skip_newlines()
-        // Parse task expression with closure suppression:
-        // In select arms, `name = task_expr => body`, we must not
-        // parse `task_expr => body` as a closure. Use suppress_as
-        // flag repurposed: instead, parse ident_or_call directly.
         let task_expr = self.parse_ident_or_call()
         self.expect(TokenKind.TK_FAT_ARROW)
         let body = self.parse_block_or_expr()
@@ -4124,15 +4211,22 @@ fn Parser.parse_select_await(self: Parser) -> NodeId:
         arm_entries.push(body as i32)
         arm_count = arm_count + 1
 
-        let save = self.pos
-        self.skip_newlines()
-        if self.peek() == TokenKind.TK_IDENT and self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_EQ:
-            let next_col = column_of(self.source, self.current_start())
-            if arm_col >= 0 and next_col == arm_col:
-                continue
-        self.pos = save
-        break
+        if select_braced:
+            self.skip_newlines()
+            if self.peek() == TokenKind.TK_R_BRACE:
+                break
+        else:
+            let save = self.pos
+            self.skip_newlines()
+            if self.peek() == TokenKind.TK_IDENT and self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_EQ:
+                let next_col = column_of(self.source, self.current_start())
+                if arm_col >= 0 and next_col == arm_col:
+                    continue
+            self.pos = save
+            break
 
+    if select_braced:
+        self.expect(TokenKind.TK_R_BRACE)
     let extra_start = self.pool.extra_len()
     for ei in 0..arm_entries.len() as i32:
         self.pool.add_extra(arm_entries.get(ei as i64))
@@ -4148,10 +4242,18 @@ fn Parser.parse_while(self: Parser, label: i32) -> NodeId:
     if self.peek() == TokenKind.TK_KW_LET:
         return self.parse_while_let(start)
 
+    let saved_sb = self.suppress_brace
+    self.suppress_brace = 1
     let cond = self.parse_expr()
-    if self.peek() == TokenKind.TK_COLON:
+    self.suppress_brace = saved_sb
+    var body: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_L_BRACE:
         self.advance()
-    let body = self.parse_block_or_expr()
+        body = self.parse_braced_body()
+    else:
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+        body = self.parse_block_or_expr()
     self.pool.add_node(NodeKind.NK_WHILE, start, self.prev_end(), cond, body, label)
 
 fn Parser.parse_while_let(self: Parser, start: i32) -> NodeId:
@@ -4159,10 +4261,18 @@ fn Parser.parse_while_let(self: Parser, start: i32) -> NodeId:
     let pat = self.parse_pattern()
     if self.expect(TokenKind.TK_EQ) == 0:
         return self.poisoned_expr()
+    let saved_sb = self.suppress_brace
+    self.suppress_brace = 1
     let subject = self.parse_expr()
-    if self.peek() == TokenKind.TK_COLON:
+    self.suppress_brace = saved_sb
+    var body: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_L_BRACE:
         self.advance()
-    let body = self.parse_block_or_expr()
+        body = self.parse_braced_body()
+    else:
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+        body = self.parse_block_or_expr()
 
     // Desugar to: loop: match subject { pat -> body, _ -> break }
     let break_node = self.pool.add_node(NodeKind.NK_BREAK, start, start, 0, 0, 0)
@@ -4178,9 +4288,14 @@ fn Parser.parse_while_let(self: Parser, start: i32) -> NodeId:
 fn Parser.parse_loop(self: Parser, label: i32) -> NodeId:
     let start = self.current_start()
     self.advance()
-    if self.peek() == TokenKind.TK_COLON:
+    var body: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_L_BRACE:
         self.advance()
-    let body = self.parse_block_or_expr()
+        body = self.parse_braced_body()
+    else:
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+        body = self.parse_block_or_expr()
     self.pool.add_node(NodeKind.NK_LOOP, start, self.prev_end(), body, label, 0)
 
 fn Parser.parse_for(self: Parser, label: i32) -> NodeId:
@@ -4203,15 +4318,23 @@ fn Parser.parse_for(self: Parser, label: i32) -> NodeId:
     if self.expect(TokenKind.TK_KW_IN) == 0:
         return self.poisoned_expr()
     self.skip_newlines()
+    let saved_sb = self.suppress_brace
+    self.suppress_brace = 1
     let iterable = self.parse_expr()
+    self.suppress_brace = saved_sb
 
     // For-comprehension: if followed by ';', parse as monadic chaining
     if self.peek() == TokenKind.TK_SEMICOLON:
         return self.parse_for_comprehension(start, binding, iterable)
 
-    if self.peek() == TokenKind.TK_COLON:
+    var body: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_L_BRACE:
         self.advance()
-    let body = self.parse_block_or_expr()
+        body = self.parse_braced_body()
+    else:
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+        body = self.parse_block_or_expr()
 
     var for_node = self.pool.add_node(NodeKind.NK_FOR, start, self.prev_end(), binding, iterable, body)
     self.pool.add_for_meta(for_node, index_binding, label)
@@ -4225,9 +4348,14 @@ fn Parser.parse_for(self: Parser, label: i32) -> NodeId:
     let else_col = column_of(self.source, self.current_start())
     if self.peek() == TokenKind.TK_KW_ELSE and else_col == for_col:
         self.advance()
-        if self.peek() == TokenKind.TK_COLON:
+        var else_body: NodeId = 0 as NodeId
+        if self.peek() == TokenKind.TK_L_BRACE:
             self.advance()
-        let else_body = self.parse_block_or_expr()
+            else_body = self.parse_braced_body()
+        else:
+            if self.peek() == TokenKind.TK_COLON:
+                self.advance()
+            else_body = self.parse_block_or_expr()
         // Build: var __for_ran: bool = false
         let flag_sym = self.intern.intern("__for_ran")
         let false_lit = self.pool.add_node(NodeKind.NK_BOOL_LIT, start, start, 0, 0, 0)
@@ -4290,7 +4418,11 @@ fn Parser.parse_for_comprehension(self: Parser, start: i32, first_binding: i32, 
         bind_exprs.push(bexpr as i32)
         bind_kinds.push(0)
 
-    if self.peek() == TokenKind.TK_COLON:
+    var comp_braced = false
+    if self.peek() == TokenKind.TK_L_BRACE:
+        comp_braced = true
+        self.advance()
+    else if self.peek() == TokenKind.TK_COLON:
         self.advance()
     self.skip_newlines()
 
@@ -4301,7 +4433,11 @@ fn Parser.parse_for_comprehension(self: Parser, start: i32, first_binding: i32, 
         self.advance()
         self.skip_newlines()
 
-    let body_expr = self.parse_block_or_expr()
+    var body_expr: NodeId = 0 as NodeId
+    if comp_braced:
+        body_expr = self.parse_braced_body()
+    else:
+        body_expr = self.parse_block_or_expr()
 
     // Build nested match from inside out
     // Use placeholder variant names — sema resolves to Some/None or Ok/Err
@@ -5086,9 +5222,14 @@ fn Parser.parse_with_expr(self: Parser) -> NodeId:
             let source = self.parse_expr()
             self.skip_newlines()
             self.expect(TokenKind.TK_R_PAREN)
-            if self.peek() == TokenKind.TK_COLON:
+            var body: NodeId = 0 as NodeId
+            if self.peek() == TokenKind.TK_L_BRACE:
                 self.advance()
-            let body = self.parse_block_or_expr()
+                body = self.parse_braced_body()
+            else:
+                if self.peek() == TokenKind.TK_COLON:
+                    self.advance()
+                body = self.parse_block_or_expr()
             return self.pool.add_node(NodeKind.NK_WITH_IMPLICIT, start, self.prev_end(), source, body, binding_name)
         self.pos = save
     // Existing syntax: with expr as name: body
@@ -5104,9 +5245,14 @@ fn Parser.parse_with_expr(self: Parser) -> NodeId:
         is_mut = 1
         self.advance()
     let name = self.expect_ident()
-    if self.peek() == TokenKind.TK_COLON:
+    var body: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_L_BRACE:
         self.advance()
-    let body = self.parse_block_or_expr()
+        body = self.parse_braced_body()
+    else:
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+        body = self.parse_block_or_expr()
     let encoded_name = encode_with_binding(name, is_mut)
     self.pool.add_node(NodeKind.NK_WITH_EXPR, start, self.prev_end(), source, body, encoded_name)
 
@@ -5329,11 +5475,15 @@ fn Parser.parse_closure(self: Parser) -> NodeId:
         self.parse_type_expr()
         self.skip_newlines()
 
-    let body = if self.peek() == TokenKind.TK_COLON:
+    var body: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_L_BRACE:
         self.advance()
-        self.parse_block_or_expr()
+        body = self.parse_braced_body()
+    else if self.peek() == TokenKind.TK_COLON:
+        self.advance()
+        body = self.parse_block_or_expr()
     else:
-        self.parse_expr()
+        body = self.parse_expr()
     self.pool.add_node(NodeKind.NK_CLOSURE, start, self.prev_end(), body, extra_start, param_count)
 
 fn Parser.parse_move_closure(self: Parser) -> NodeId:
@@ -5393,6 +5543,42 @@ fn Parser.parse_block_or_expr(self: Parser) -> NodeId:
     let stmt_count = stmts.len() as i32
     let blk_node = self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(stmts.get(0)), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
     blk_node
+
+fn Parser.parse_braced_body(self: Parser) -> NodeId:
+    let brace_start = self.prev_end()
+    self.skip_newlines()
+    if self.peek() == TokenKind.TK_R_BRACE:
+        let end = self.current_end()
+        self.advance()
+        return self.pool.add_node(NodeKind.NK_BLOCK, brace_start, end, 0, 0, 0)
+
+    var stmts: Vec[i32] = Vec.new()
+    var last_expr = self.parse_expr()
+
+    while true:
+        let cur = self.peek()
+        if cur == TokenKind.TK_EOF or cur == TokenKind.TK_R_BRACE:
+            break
+        if cur == TokenKind.TK_NEWLINE or cur == TokenKind.TK_SEMICOLON:
+            while self.peek() == TokenKind.TK_NEWLINE or self.peek() == TokenKind.TK_SEMICOLON:
+                self.advance()
+            if self.peek() == TokenKind.TK_R_BRACE or self.peek() == TokenKind.TK_EOF:
+                break
+            stmts.push(last_expr as i32)
+            last_expr = self.parse_expr()
+            continue
+        break
+
+    self.expect(TokenKind.TK_R_BRACE)
+
+    if stmts.len() == 0:
+        return last_expr
+
+    let extra_start = self.pool.extra_len()
+    for i in 0..stmts.len() as i32:
+        self.pool.add_extra(stmts.get(i as i64))
+    let stmt_count = stmts.len() as i32
+    self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(stmts.get(0)), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
 
 // ── Type expression parsing ──────────────────────────────────────
 
