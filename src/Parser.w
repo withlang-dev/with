@@ -3358,6 +3358,15 @@ fn Parser.parse_struct_literal(self: Parser, lhs: i32) -> NodeId:
     var field_count = 0
     while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
         let fname = self.expect_ident()
+        // expect_ident() emits a diagnostic and returns 0 on failure
+        // WITHOUT consuming the offending token. If the caller doesn't
+        // stop here the while loop would spin forever on the same
+        // token — and because method calls in the loop body reserve
+        // fresh stack slots per iteration, the compiler SIGSEGVs on
+        // the stack guard page before any diagnostic is rendered.
+        // See test/compile_errors/err_struct_lit_* and #134.
+        if fname == 0:
+            break
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
             self.skip_newlines()
