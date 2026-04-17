@@ -4393,6 +4393,8 @@ fn Parser.parse_match_expr(self: Parser) -> NodeId:
     self.advance()
     self.skip_newlines()
     let subject = self.parse_expr()
+    if self.peek() == TokenKind.TK_COLON:
+        self.advance()
     self.skip_newlines()
     let arm_count = self.parse_match_arms()
     let extra_start = if arm_count > 0: self.pool.extra_len() - arm_count else: self.pool.extra_len()
