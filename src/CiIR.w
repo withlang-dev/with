@@ -841,7 +841,15 @@ fn CiProject.ensure_symbol(self: &mut CiProject, kind: i32, name: str) -> i32:
 fn CiProject.update_symbol(self: &mut CiProject, symbol_id: i32, symbol: CiProjectSymbol):
     if symbol_id < 0 or symbol_id >= self.symbols.len() as i32:
         return
-    self.symbols.push(symbol.owned_copy())
+    var updated: Vec[CiProjectSymbol] = Vec.new()
+    var i = 0
+    while i < self.symbols.len() as i32:
+        if i == symbol_id:
+            updated.push(symbol.owned_copy())
+        else:
+            updated.push(self.symbols.get(i as i64).owned_copy())
+        i = i + 1
+    self.symbols = updated
 
 fn CiProject.owner_module_path(self: &CiProject, symbol_id: i32) -> str:
     if symbol_id < 0 or symbol_id >= self.symbols.len() as i32:
