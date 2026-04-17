@@ -564,12 +564,13 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
                         let kw = if is_mut != 0: "var " else: "let "
                         let ty_id = (stmts.get_d1(first)) as CiTypeId
                         var out = indent ++ kw ++ decl_name ++ ": " ++ ci_print_type(types, ty_id)
-                        out = out ++ " = with 0 as __ci_expr_seq_" ++ i32_to_string(id as i32) ++ ":\n"
+                        out = out ++ " = with 0 as __ci_expr_seq_" ++ i32_to_string(id as i32) ++ " {\n"
                         var si: i32 = 1
                         while si < count - 1:
                             out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, (stmts.get_extra(start + si)) as CiStmtId, depth + 4)
                             si = si + 1
                         out = out ++ ci_make_indent(depth + 4) ++ ci_print_expr(exprs, types, rhs, 0, 0) ++ "\n"
+                        out = out ++ indent ++ "}\n"
                         return out
         // Block composition convention matches the legacy
         // compound_stmt arm: each child is rendered at depth 0
@@ -596,19 +597,20 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         let cond = (stmts.get_d0(id)) as CiExprId
         let then_b = (stmts.get_d1(id)) as CiStmtId
         let else_b = (stmts.get_d2(id)) as CiStmtId
-        var out = indent ++ "if " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
+        var out = indent ++ "if " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ " {\n"
         let then_text = ci_print_stmt(stmts, exprs, types, then_b, 0)
         if then_text.len() > 0:
             out = out ++ ci_reindent_spaces(then_text, 4)
         else:
             out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         if (else_b as i32) != 0:
-            out = out ++ indent ++ "else:\n"
+            out = out ++ indent ++ "} else {\n"
             let else_text = ci_print_stmt(stmts, exprs, types, else_b, 0)
             if else_text.len() > 0:
                 out = out ++ ci_reindent_spaces(else_text, 4)
             else:
                 out = out ++ ci_make_indent(depth + 4) ++ "0\n"
+        out = out ++ indent ++ "}\n"
         return out
 
     if kind == CiStmtKind.CIS_WHILE:
@@ -616,12 +618,13 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         // then re-indented by 4 at the while's container level.
         let cond = (stmts.get_d0(id)) as CiExprId
         let body = (stmts.get_d1(id)) as CiStmtId
-        var out = indent ++ "while " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
+        var out = indent ++ "while " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ " {\n"
         let body_text = ci_print_stmt(stmts, exprs, types, body, 0)
         if body_text.len() > 0:
             out = out ++ ci_reindent_spaces(body_text, 4)
         else:
             out = out ++ ci_make_indent(depth + 4) ++ "0\n"
+        out = out ++ indent ++ "}\n"
         return out
 
     if kind == CiStmtKind.CIS_DO_WHILE:
@@ -654,7 +657,6 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         while ai < arm_count:
             let value_count = stmts.get_extra(cursor)
             cursor = cursor + 1
-            // Compose the arm header (value patterns or `_`)
             var arm_head = ""
             if value_count == 0:
                 arm_head = "_"
@@ -765,7 +767,7 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         let ds2 = ci_make_indent(depth + 8)
         out = out ++ ds ++ "var __pc: i32 = 0\n"
         out = out ++ ds ++ "var __goto_pending: i32 = 0\n"
-        out = out ++ ds ++ "while true:\n"
+        out = out ++ ds ++ "while true {\n"
         out = out ++ ds1 ++ "match __pc:\n"
 
         // Each arm: variable-length meta [state, label_str_idx,
@@ -793,6 +795,7 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
             ai = ai + 1
 
         out = out ++ ds2 ++ "_ => break\n"
+        out = out ++ ds ++ "}\n"
         return out
 
     indent ++ "<ci:stmt:unknown>\n"
@@ -813,11 +816,12 @@ fn ci_print_decl(decls: &CiDeclPool, stmts: &CiStmtPool, exprs: &CiExprPool, typ
         var out = ""
         if (flags / CID_FLAG_C_EXPORT) % 2 == 1:
             out = out ++ "@[c_export(\"" ++ name ++ "\")]\n"
-        out = out ++ "fn " ++ name ++ "() -> " ++ ci_print_type(types, ret_ty) ++ ":\n"
+        out = out ++ "fn " ++ name ++ "() -> " ++ ci_print_type(types, ret_ty) ++ " {\n"
         if (body as i32) != 0:
             out = out ++ ci_print_stmt(stmts, exprs, types, body, 4)
         else:
             out = out ++ "    // <ci:decl:fn:no-body>\n"
+        out = out ++ "}\n"
         return out
 
     if kind == CiDeclKind.CID_VAR_GLOBAL:
@@ -940,7 +944,7 @@ fn ci_roundtrip_fn_decl -> i32:
     // CIS_BLOCK now appends a bare `\n` separator after each
     // child to match the legacy compound_stmt's blank-line
     // convention.
-    let expected = "fn foo() -> i32:\n    return 42\n\n"
+    let expected = "fn foo() -> i32 {\n    return 42\n\n}\n"
     ci_expect_eq("fn_decl_return_literal", actual, expected)
 
 pub fn ci_ir_roundtrip_test -> i32:
