@@ -2843,9 +2843,7 @@ the program.
 ```
 @[tailrec]
 fn factorial(n: Int, acc: Int) -> Int:
-    match n:
-        0 => acc
-        _ => factorial(n - 1, n * acc)
+    match n { 0 => acc, _ => factorial(n - 1, n * acc) }
 ```
 
 Tail position means:
@@ -3060,16 +3058,37 @@ names |> map(normalize) |> collect[Vec]()
 
 Pattern matching is the primary control flow for algebraic data types.
 It is expression-oriented, exhaustive, and supports deep structural
-matching. `match` is always block form and requires `:` after the
-subject. Omitting the colon is a syntax error.
+matching. `match` has two forms:
 
-**Basic:**
+- **Block match** uses `:` after the subject and separates arms with
+  newlines.
+- **Inline match** uses `{}` around arms and separates arms with
+  commas.
+
+Semicolons are not valid match arm separators.
+
+**Block form:**
 ```
 match shape:
     Circle(r)         => pi * r * r
     Rectangle(w, h)   => w * h
     Triangle(a, b, c) => herons_formula(a, b, c)
 ```
+
+The colon is required in block form. Omitting it is a syntax error.
+Block arms are separated by newlines; commas and leading `|` arm
+separators are not used.
+
+**Inline form:**
+```
+match n { 0 => 1, _ => n * factorial(n - 1) }
+let x = match result { Ok(v) => v, Err(_) => default }
+```
+
+Inline match is an expression form. Arms are written as
+`pattern => expr`; guards use `pattern if cond => expr`. Arms are
+comma-separated, and a trailing comma is allowed under §29.2. The
+semicolon-separated form used in earlier examples is invalid.
 
 **Guards:**
 ```
@@ -9190,16 +9209,12 @@ fn test:
 // PASS: valid
 @[tailrec]
 fn factorial(n: Int, acc: Int) -> Int:
-    match n:
-        0 => acc
-        _ => factorial(n - 1, n * acc)
+    match n { 0 => acc, _ => factorial(n - 1, n * acc) }
 
 // FAIL: not in tail position
 @[tailrec]
 fn bad(n: Int) -> Int:
-    match n:
-        0 => 1
-        _ => n * bad(n - 1)  // ERROR
+    match n { 0 => 1, _ => n * bad(n - 1) }  // ERROR
 
 // FAIL: defer prevents tail-call guarantee
 @[tailrec]
