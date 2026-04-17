@@ -1694,6 +1694,20 @@ fn Sema.check_for(self: Sema, node: i32) -> i32:
     self.pop_scope()
     self.ty_void as i32
 
+fn Sema.struct_field_info_by_index(self: Sema, struct_type: i32, index: i32) -> i64:
+    if struct_type == 0:
+        return 0
+    let resolved = self.resolve_alias(struct_type)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_STRUCT:
+        let te_start = self.get_type_d1(resolved)
+        let field_count = self.get_type_d2(resolved)
+        if index >= 0 and index < field_count:
+            let f_name = self.type_extra.get((te_start + index * 3) as i64)
+            let f_type = self.type_extra.get((te_start + index * 3 + 1) as i64)
+            return (f_name as i64) | ((f_type as i64) * 4294967296)
+    0
+
 fn Sema.struct_field_type(self: Sema, struct_type: i32, field: i32) -> i32:
     if struct_type == 0:
         return 0
@@ -2041,6 +2055,10 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
     let field_count = self.ast.get_data2(node)
 
     let tid = self.lookup_named_type_visible(name)
+    if tid == 0:
+        if self.pool_resolve(name) != "Self":
+            self.emit_error("unknown type '" ++ self.pool_resolve(name) ++ "' in struct literal", node)
+        return 0
     if tid != 0:
         let resolved = self.resolve_alias(tid as TypeId)
         if self.get_type_kind(resolved) == TypeKind.TY_STRUCT:
@@ -2061,7 +2079,13 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
             for fi in 0..field_count:
                 let f_name = self.ast.get_extra(extra_start + fi * 2)
                 let f_value = self.ast.get_extra(extra_start + fi * 2 + 1)
-                let field_expected = if expected_struct_ty != 0: self.struct_field_type(expected_struct_ty as i32, f_name) else: 0
+                var field_expected = 0
+                if expected_struct_ty != 0:
+                    if f_name == 0:
+                        let info = self.struct_field_info_by_index(expected_struct_ty as i32, fi)
+                        field_expected = (info / 4294967296) as i32
+                    else:
+                        field_expected = self.struct_field_type(expected_struct_ty as i32, f_name)
                 let val_ty = if field_expected != 0: self.check_expr_with_expected(f_value, field_expected as TypeId) else: self.check_expr(f_value)
                 val_types.push(val_ty as i32)
             // Check if struct has type params — infer GenericInst
@@ -2086,17 +2110,16 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                             let tp_name = self.ast.get_extra(tp_pos)
                             let bc = self.ast.get_extra(tp_pos + 1)
                             // Find a field whose type is this param
+                            let positional = if field_count > 0: self.ast.get_extra(extra_start) == 0 else: false
                             for fi in 0..fc:
                                 let base = td_extra + 1 + fi * 3
                                 let f_name_sym = self.ast.get_extra(base)
                                 let f_type_node = self.ast.get_extra(base + 1)
                                 if self.ast.kind(f_type_node) == NodeKind.NK_TYPE_NAMED:
                                     if self.ast.get_data0(f_type_node) == tp_name:
-                                        // Match field name in literal to get value type
-                                        for li in 0..field_count:
-                                            let lit_f = self.ast.get_extra(extra_start + li * 2)
-                                            if lit_f == f_name_sym:
-                                                let vt = val_types.get(li as i64)
+                                        if positional:
+                                            if fi < field_count:
+                                                let vt = val_types.get(fi as i64)
                                                 if vt > 0:
                                                     if ti == 0: ga0 = vt
                                                     if ti == 1: ga1 = vt
@@ -2104,7 +2127,19 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                                                     if ti == 3: ga3 = vt
                                                     inferred = inferred + 1
                                                 break
-                                        break
+                                        else:
+                                            for li in 0..field_count:
+                                                let lit_f = self.ast.get_extra(extra_start + li * 2)
+                                                if lit_f == f_name_sym:
+                                                    let vt = val_types.get(li as i64)
+                                                    if vt > 0:
+                                                        if ti == 0: ga0 = vt
+                                                        if ti == 1: ga1 = vt
+                                                        if ti == 2: ga2 = vt
+                                                        if ti == 3: ga3 = vt
+                                                        inferred = inferred + 1
+                                                    break
+                                            break
                             tp_pos = tp_pos + 2 + bc
                         if inferred == tp_count:
                             let gi_args: Vec[i32] = Vec.new()

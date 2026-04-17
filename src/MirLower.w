@@ -4451,11 +4451,18 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             let f_name_sym = self.ast.get_extra(sl_fields_start + i * 2)
             let f_val_node = self.ast.get_extra(sl_fields_start + i * 2 + 1)
             let saved_expected = self.expected_type
-            let f_ty = self.struct_field_type(sl_struct_ty, f_name_sym)
+            var resolved_name = f_name_sym
+            var f_ty = 0
+            if f_name_sym == 0:
+                let info = self.sema.struct_field_info_by_index(sl_struct_ty, i)
+                resolved_name = (info % 4294967296) as i32
+                f_ty = (info / 4294967296) as i32
+            else:
+                f_ty = self.struct_field_type(sl_struct_ty, f_name_sym)
             if f_ty != 0:
                 self.expected_type = f_ty
             sl_fields.push(self.lower_expr(f_val_node))
-            sl_names.push(f_name_sym)
+            sl_names.push(resolved_name)
             self.expected_type = saved_expected
         let sl_fid = self.body.new_agg_fields(sl_fields, sl_names)
         let sl_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, sl_fid, 0)

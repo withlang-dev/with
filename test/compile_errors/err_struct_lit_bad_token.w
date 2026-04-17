@@ -1,6 +1,3 @@
-//! expect-check-fail: expected identifier
-// Any non-identifier at a field position (here `123`) must surface
-// a diagnostic instead of looping forever. See
-// err_struct_lit_nested_needs_colon.w for the root cause.
+//! expect-check-fail: unknown type 'Foo'
 fn main:
     let g = Foo { 123 }

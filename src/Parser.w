@@ -3195,10 +3195,19 @@ fn Parser.parse_postfix(self: Parser, lhs_in: i32) -> NodeId:
         else if t == TokenKind.TK_L_BRACE:
             if self.suppress_brace != 0:
                 return lhs
-            // Struct literal only when lhs is an identifier
             if self.pool.kind(lhs) != NodeKind.NK_IDENT:
                 return lhs
             lhs = self.parse_struct_literal(lhs)
+        else if t == TokenKind.TK_COLON:
+            if self.suppress_brace != 0:
+                return lhs
+            if self.pool.kind(lhs) != NodeKind.NK_IDENT:
+                return lhs
+            if self.pos + 1 >= self.tokens.len():
+                return lhs
+            if self.tokens.get_tag(self.pos + 1) != TokenKind.TK_NEWLINE:
+                return lhs
+            lhs = self.parse_block_struct_literal(lhs)
         else if t == TokenKind.TK_L_BRACKET:
             lhs = self.parse_index_or_slice(lhs)
         else if t == TokenKind.TK_KW_AS:
@@ -3388,21 +3397,30 @@ fn Parser.build_composed_closure(self: Parser, lhs_fn: i32, rhs_fn: i32, is_forw
         1,
     )
 
+fn Parser.is_positional_struct_literal(self: Parser) -> i32:
+    if self.peek() == TokenKind.TK_R_BRACE:
+        return 0
+    if self.peek() != TokenKind.TK_IDENT:
+        return 1
+    if self.pos + 1 >= self.tokens.len():
+        return 0
+    let next = self.tokens.get_tag(self.pos + 1)
+    if next == TokenKind.TK_COLON or next == TokenKind.TK_COMMA or next == TokenKind.TK_R_BRACE:
+        return 0
+    1
+
 fn Parser.parse_struct_literal(self: Parser, lhs: i32) -> NodeId:
     let struct_name = self.pool.get_data0(lhs)
     self.advance()  // consume {
     self.skip_newlines()
+
+    if self.is_positional_struct_literal() != 0:
+        return self.parse_positional_struct_literal(lhs, struct_name)
+
     var fields: Vec[i32] = Vec.new()
     var field_count = 0
     while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
         let fname = self.expect_ident()
-        // expect_ident() emits a diagnostic and returns 0 on failure
-        // WITHOUT consuming the offending token. If the caller doesn't
-        // stop here the while loop would spin forever on the same
-        // token — and because method calls in the loop body reserve
-        // fresh stack slots per iteration, the compiler SIGSEGVs on
-        // the stack guard page before any diagnostic is rendered.
-        // See test/compile_errors/err_struct_lit_* and #134.
         if fname == 0:
             break
         if self.peek() == TokenKind.TK_COLON:
@@ -3422,6 +3440,67 @@ fn Parser.parse_struct_literal(self: Parser, lhs: i32) -> NodeId:
             self.advance()
             self.skip_newlines()
     self.expect(TokenKind.TK_R_BRACE)
+    let extra_start = self.pool.extra_len()
+    for fi in 0..fields.len() as i32:
+        self.pool.add_extra(fields.get(fi as i64))
+    self.pool.add_node(NodeKind.NK_STRUCT_LIT, self.pool.get_start(lhs), self.prev_end(), struct_name, extra_start, field_count)
+
+fn Parser.parse_positional_struct_literal(self: Parser, lhs: i32, struct_name: i32) -> NodeId:
+    var fields: Vec[i32] = Vec.new()
+    var field_count = 0
+    while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
+        let val = self.parse_expr()
+        fields.push(0)
+        fields.push(val as i32)
+        field_count = field_count + 1
+        self.skip_newlines()
+        if self.peek() == TokenKind.TK_COMMA:
+            self.advance()
+            self.skip_newlines()
+    self.expect(TokenKind.TK_R_BRACE)
+    let extra_start = self.pool.extra_len()
+    for fi in 0..fields.len() as i32:
+        self.pool.add_extra(fields.get(fi as i64))
+    self.pool.add_node(NodeKind.NK_STRUCT_LIT, self.pool.get_start(lhs), self.prev_end(), struct_name, extra_start, field_count)
+
+fn Parser.parse_block_struct_literal(self: Parser, lhs: i32) -> NodeId:
+    let struct_name = self.pool.get_data0(lhs)
+    self.advance()  // consume :
+    self.skip_newlines()
+    let block_col = column_of(self.source, self.current_start())
+    var fields: Vec[i32] = Vec.new()
+    var field_count = 0
+    while self.peek() != TokenKind.TK_EOF:
+        let cur_col = column_of(self.source, self.current_start())
+        if cur_col < block_col:
+            break
+        if self.peek() != TokenKind.TK_IDENT:
+            break
+        let fname = self.expect_ident()
+        if fname == 0:
+            break
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+            self.skip_newlines()
+            let val = self.parse_expr()
+            fields.push(fname)
+            fields.push(val as i32)
+        else:
+            let ident_node = self.pool.add_node(NodeKind.NK_IDENT, self.pool.get_start(lhs), self.prev_end(), fname, 0, 0)
+            fields.push(fname)
+            fields.push(ident_node as i32)
+        field_count = field_count + 1
+        if self.peek() == TokenKind.TK_NEWLINE:
+            let save = self.pos
+            self.skip_newlines()
+            if self.peek() == TokenKind.TK_EOF:
+                break
+            let next_col = column_of(self.source, self.current_start())
+            if next_col < block_col:
+                self.pos = save
+                break
+        else:
+            break
     let extra_start = self.pool.extra_len()
     for fi in 0..fields.len() as i32:
         self.pool.add_extra(fields.get(fi as i64))
