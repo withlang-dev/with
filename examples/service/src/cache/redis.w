@@ -4,7 +4,7 @@ use app.traits.CacheService
 use app.errors.CacheError
 use std.time.Duration
 
-type RedisCache = {
+type RedisCache {
     client: RedisClient,
     prefix: str,
 }

@@ -1,12 +1,11 @@
 // Tests for ephemerality + with-lowering interactions
 
-use test.testing
 use std.time.Duration
 
 error AppError = DbError(str) | ProcessError | Cancelled
 
-type DbConnection = { id: i32 }
-type ConnectionPool = { url: str }
+type DbConnection { id: i32 }
+type ConnectionPool { url: str }
 
 impl Scoped[DbConnection] for ConnectionPool:
     fn enter[R](self: &ConnectionPool, f: fn(&DbConnection) -> R) -> R:
@@ -19,7 +18,7 @@ impl Scoped[DbConnection] for ConnectionPool:
 trait Processor:
     fn process(self: &Self, data: &str) -> str
 
-type BorrowingProcessor = ephemeral { prefix: StrView }
+type BorrowingProcessor ephemeral { prefix: StrView }
 
 impl Processor for BorrowingProcessor:
     fn process(self: &BorrowingProcessor, data: &str) -> str:
@@ -40,7 +39,7 @@ fn test_ephemeral_boundaries:
     let items: &[&str] = &["login", "logout"]
     let results = apply_processor(dyn_proc, items)
 
-    assert_true(results[0] == "TRACE: login")
+    assert(results[0] == "TRACE: login")
 
 @[test]
 async fn test_async_ephemeral_interaction -> Result[Unit, AppError]:
@@ -57,7 +56,7 @@ async fn test_async_ephemeral_interaction -> Result[Unit, AppError]:
             sleep(Duration.millis(5)).await
             task.await?
 
-    assert_true(shared_buffer.len() == 4)
+    assert(shared_buffer.len() == 4)
 
 async fn process_buffer(data: &mut Vec[i32]) -> Result[Unit, AppError]:
     sleep(Duration.millis(10)).await

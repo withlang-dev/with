@@ -19,13 +19,14 @@ module nebula.schema
 
 // --- Domain Types ---
 
-pub type Status =
-    | Ok
+pub enum Status {
+    Ok
     | Warning(str)
     | Fatal(code: i32)
+}
 
 @[derive(Debug, Clone)]
-pub type Telemetry = {
+pub type Telemetry {
     device_id: str,
     temp: f64 = 0.0,
     status: Status = .Ok,
@@ -84,7 +85,7 @@ pub fn status_label(s: &Status) -> str:
 // Uses default fields — construct with only the fields that differ.
 // Record update syntax creates a new config from an existing one.
 
-pub type ServerConfig = {
+pub type ServerConfig {
     host: str = "0.0.0.0",
     port: u16 = 8080,
     max_clients: usize = 1000,
@@ -102,7 +103,7 @@ pub fn load_config(env_port: Option[u16]) -> ServerConfig:
 //
 // Uses the `in` operator for membership tests against literal arrays.
 
-pub type Severity = Low | Medium | High | Critical
+pub enum Severity { Low | Medium | High | Critical }
 
 pub fn classify_temp(temp: f64) -> Severity:
     if temp > 100.0 then .Critical

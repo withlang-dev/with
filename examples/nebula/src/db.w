@@ -32,7 +32,7 @@ pub error DbError =
 // automatically — even on panic or early return via ?.
 // The Mutex ensures thread-safe access from multiple fibers.
 
-pub type Database = {
+pub type Database {
     handle: *mut sqlite3,
     path: str,
     lock: Mutex[Unit],

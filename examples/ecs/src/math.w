@@ -2,8 +2,7 @@ module ecs.math
 
 // --- Vec2: 2D vector ---
 
-type Vec2 = { x: f32, y: f32 } with Copy
-
+type Vec2 { x: f32, y: f32 }
 extend Vec2:
     fn zero: Vec2 { x: 0.0, y: 0.0 }
     fn new(x: f32, y: f32): Vec2 { x, y }
@@ -35,8 +34,7 @@ impl Neg for Vec2:
 
 // --- AABB: axis-aligned bounding box ---
 
-type AABB = { min: Vec2, max: Vec2 } with Copy
-
+type AABB { min: Vec2, max: Vec2 }
 extend AABB:
     fn from_center(center: Vec2, half_size: Vec2):
         AABB { min: center - half_size, max: center + half_size }

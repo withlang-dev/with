@@ -31,7 +31,7 @@ error SqliteError =
 //
 // Owns a raw *mut sqlite3 handle. Drop closes the connection.
 
-type Database = {
+type Database {
     handle: *mut sqlite3,
     path: str,
 }
@@ -107,10 +107,10 @@ extend Database:
     ) -> Result[T, SqliteError]:
         self.execute("BEGIN")?
         match body(self):
-            Ok(value) ->
+            Ok(value) =>
                 self.execute("COMMIT")?
                 value
-            Err(e) ->
+            Err(e) =>
                 // Rollback, but don't mask the original error
                 let _ = self.execute("ROLLBACK")
                 Err(e)
@@ -119,7 +119,7 @@ extend Database:
 //
 // Owns a raw *mut sqlite3_stmt. Drop finalizes it.
 
-type Statement = {
+type Statement {
     handle: *mut sqlite3_stmt,
 }
 

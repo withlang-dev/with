@@ -4,7 +4,7 @@ use app.traits.NotificationService
 use app.domain.{Notification, Priority}
 use app.errors.NotifyError
 
-type EmailNotifier = {
+type EmailNotifier {
     smtp_host: str,
     smtp_port: u16 = 587,
     from_addr: str,

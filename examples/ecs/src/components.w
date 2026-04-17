@@ -9,7 +9,7 @@ use ecs.math.Vec2
 // IDs to determine which systems can run in parallel (non-overlapping
 // component access).
 
-type ComponentId = distinct u32 with Copy, Eq, Hash
+type ComponentId { value: u32 }
 
 comptime fn component_id[T: type] -> ComponentId:
     ComponentId(comptime hash_str(T.name()) as u32)
@@ -36,44 +36,44 @@ comptime fn register_components[Ts: [type]]:
 // --- Game Components ---
 
 @[component]
-type Transform = {
+type Transform {
     position: Vec2,
     rotation: f32,
     scale: f32,
-} with Copy
+}
 
 @[component]
-type Velocity = {
+type Velocity {
     linear: Vec2,
     angular: f32,
-} with Copy
+}
 
 @[component]
-type Collider = {
+type Collider {
     radius: f32,
     layer: u8,      // collision layer for filtering
     mask: u8,       // which layers this collides with
-} with Copy
+}
 
-type TextureId = distinct u32 with Copy, Eq
+type TextureId { value: u32 }
 
 @[component]
-type Sprite = {
+type Sprite {
     texture: TextureId,
     width: u16,
     height: u16,
     layer: i32,
     visible: bool,
-} with Copy
+}
 
 @[component]
-type InputState = {
+type InputState {
     up: bool = false,
     down: bool = false,
     left: bool = false,
     right: bool = false,
     fire: bool = false,
-} with Copy
+}
 
 // Default field values allow InputState {} with all-false fields
 
@@ -102,14 +102,15 @@ const INPUT_STATE_ID: ComponentId = comptime component_id[InputState]()
 
 // --- Event Types ---
 
-type InputEvent =
-    | KeyDown(key: Key)
+enum InputEvent {
+    KeyDown(key: Key)
     | KeyUp(key: Key)
+}
 
-type Key = | Up | Down | Left | Right | Space | Escape
+enum Key { | Up | Down | Left | Right | Space | Escape }
 
-type CollisionEvent = {
+type CollisionEvent {
     entity_a: Entity,
     entity_b: Entity,
     overlap: f32,
-} with Copy
+}

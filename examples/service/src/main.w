@@ -48,13 +48,13 @@ async fn main -> Result[Unit, ServiceError]:
         loop:
             // Race: accept a new connection OR receive shutdown signal
             select await
-                result = listener.accept() ->
+                result = listener.accept() =>
                     match result:
-                        Ok(conn) ->
+                        Ok(conn) =>
                             s.track(handle_connection(state.clone(), conn))
-                        Err(e) ->
+                        Err(e) =>
                             eprint("Accept error: {e}")
-                _ = shutdown ->
+                _ = shutdown =>
                     print("Shutdown signal received, draining connections...")
                     break
 
@@ -100,8 +100,8 @@ async fn with_timeout[T](
     let timer = async_sleep(limit)
 
     select await
-        result = task ->
+        result = task =>
             result
-        _ = timer ->
+        _ = timer =>
             task.cancel()
             Err(.Timeout("request", limit))

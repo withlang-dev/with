@@ -1,23 +1,22 @@
 // Tests for the service example
 
-use test.testing
 
 extern fn puts(s: *const i8) -> i32
 
-type User = {
+type User {
     id: i32,
     name: str,
     email: str,
     score: i32,
 }
 
-type ServiceConfig = {
+type ServiceConfig {
     max_retries: i32,
     timeout_ms: i32,
     cache_enabled: bool,
 }
 
-type ServiceResult = Ok | NotFound | InvalidInput | ServerError
+enum ServiceResult { Ok | NotFound | InvalidInput | ServerError }
 
 fn result_code(r: ServiceResult) -> i32:
     match r:
@@ -42,7 +41,7 @@ fn get_user_score(users: [5]User, id: i32) -> i32:
             score = users[i].score
     score
 
-type Service = {
+type Service {
     config: ServiceConfig,
     request_count: i32,
 }
@@ -75,23 +74,23 @@ fn display_user(user: User): print("User #{user.id}: {user.name}")
 @[test]
 fn test_service_example:
     // Test ServiceResult enum
-    assert_true(result_code(Ok) == 0)
-    assert_true(result_code(NotFound) == 1)
-    assert_true(result_code(InvalidInput) == 2)
-    assert_true(result_code(ServerError) == 3)
+    assert(result_code(Ok) == 0)
+    assert(result_code(NotFound) == 1)
+    assert(result_code(InvalidInput) == 2)
+    assert(result_code(ServerError) == 3)
 
     // Test validate_id
-    assert_true(result_code(validate_id(1)) == 0)
-    assert_true(result_code(validate_id(500)) == 0)
-    assert_true(result_code(validate_id(1000)) == 0)
-    assert_true(result_code(validate_id(0)) == 2)
-    assert_true(result_code(validate_id(-1)) == 2)
-    assert_true(result_code(validate_id(1001)) == 2)
+    assert(result_code(validate_id(1)) == 0)
+    assert(result_code(validate_id(500)) == 0)
+    assert(result_code(validate_id(1000)) == 0)
+    assert(result_code(validate_id(0)) == 2)
+    assert(result_code(validate_id(-1)) == 2)
+    assert(result_code(validate_id(1001)) == 2)
 
     // Test make_user
     let u = make_user(1, "Alice", "alice@example.com", 95)
-    assert_true(u.id == 1)
-    assert_true(u.score == 95)
+    assert(u.id == 1)
+    assert(u.score == 95)
 
     // Test ServiceConfig and Service
     let config = ServiceConfig {
@@ -99,13 +98,13 @@ fn test_service_example:
         timeout_ms: 5000,
         cache_enabled: true,
     }
-    assert_true(config.max_retries == 3)
-    assert_true(config.timeout_ms == 5000)
-    assert_true(config.cache_enabled)
+    assert(config.max_retries == 3)
+    assert(config.timeout_ms == 5000)
+    assert(config.cache_enabled)
 
     let service = Service.new(config)
-    assert_true(service.get_timeout() == 5000)
-    assert_true(service.request_count == 0)
+    assert(service.get_timeout() == 5000)
+    assert(service.request_count == 0)
 
     // Test user repository
     let users: [5]User = [
@@ -117,42 +116,42 @@ fn test_service_example:
     ]
 
     // Test find_user
-    assert_true(result_code(find_user(users, 1)) == 0)
-    assert_true(result_code(find_user(users, 3)) == 0)
-    assert_true(result_code(find_user(users, 5)) == 0)
-    assert_true(result_code(find_user(users, 99)) == 1)
+    assert(result_code(find_user(users, 1)) == 0)
+    assert(result_code(find_user(users, 3)) == 0)
+    assert(result_code(find_user(users, 5)) == 0)
+    assert(result_code(find_user(users, 99)) == 1)
 
     // Test get_user_score
-    assert_true(get_user_score(users, 1) == 95)
-    assert_true(get_user_score(users, 2) == 82)
-    assert_true(get_user_score(users, 5) == 88)
+    assert(get_user_score(users, 1) == 95)
+    assert(get_user_score(users, 2) == 82)
+    assert(get_user_score(users, 5) == 88)
 
     // Test validate_and_find
-    assert_true(result_code(validate_and_find(users, 1)) == 0)
-    assert_true(result_code(validate_and_find(users, 99)) == 1)
-    assert_true(result_code(validate_and_find(users, -1)) == 2)
-    assert_true(result_code(validate_and_find(users, 1001)) == 2)
+    assert(result_code(validate_and_find(users, 1)) == 0)
+    assert(result_code(validate_and_find(users, 99)) == 1)
+    assert(result_code(validate_and_find(users, -1)) == 2)
+    assert(result_code(validate_and_find(users, 1001)) == 2)
 
     // Test handle_request
-    assert_true(result_code(handle_request(users, 1, 3)) == 0)
-    assert_true(result_code(handle_request(users, 1, 99)) == 1)
-    assert_true(result_code(handle_request(users, 1, -1)) == 2)
-    assert_true(result_code(handle_request(users, 2, 1)) == 0)
-    assert_true(result_code(handle_request(users, 3, 1)) == 1)
+    assert(result_code(handle_request(users, 1, 3)) == 0)
+    assert(result_code(handle_request(users, 1, 99)) == 1)
+    assert(result_code(handle_request(users, 1, -1)) == 2)
+    assert(result_code(handle_request(users, 2, 1)) == 0)
+    assert(result_code(handle_request(users, 3, 1)) == 1)
 
     // Test generic functions
-    assert_true(identity(42) == 42)
-    assert_true(identity(true))
-    assert_true(first_of(10, 20) == 10)
-    assert_true(first_of(99, 1) == 99)
+    assert(identity(42) == 42)
+    assert(identity(true))
+    assert(first_of(10, 20) == 10)
+    assert(first_of(99, 1) == 99)
 
     // Test score computation
     var total_score = 0
     for i in 0..5:
         total_score = total_score + users[i].score
-    assert_true(total_score == 434)
+    assert(total_score == 434)
     let avg_score = total_score / 5
-    assert_true(avg_score == 86)
+    assert(avg_score == 86)
 
     // Test display helper
     display_user(u)

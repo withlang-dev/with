@@ -5,7 +5,7 @@ use app.domain.*
 use app.errors.DbError
 use std.time.Duration
 
-type PgUserRepo = {
+type PgUserRepo {
     pool: ConnectionPool,
     query_timeout: Duration = Duration.seconds(5),
 }

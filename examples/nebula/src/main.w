@@ -31,7 +31,10 @@ use nebula.schema.{load_config, ServerConfig}
 // `IoError` becomes variant `Io(IoError)`, etc. The `?` operator uses
 // the generated `From` impls for automatic conversion across boundaries.
 
-error AppError from IoError, nebula.db.DbError, nebula.session.SessionError
+error AppError =
+    Io(IoError)
+    | Db(nebula.db.DbError)
+    | Session(nebula.session.SessionError)
 
 // --- Entry Point ---
 
@@ -77,14 +80,14 @@ fn main:
             loop:
                 // Fair select await: races new connections vs shutdown.
                 select await
-                    conn_res = listener.accept() ->
+                    conn_res = listener.accept() =>
                         let Ok(stream) = conn_res else continue
 
                         // Track the new fiber — it inherits cancellation
                         // from the enclosing scope.
                         s.track(handle_client(stream, pool.clone(), db.clone()))
 
-                    _ = shutdown_rx.recv() ->
+                    _ = shutdown_rx.recv() =>
                         print("\nSIGINT received. Draining connections...")
                         break
 

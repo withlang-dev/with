@@ -102,12 +102,12 @@ extend UserService:
         // Check cache first
         let cache_key = "profile:{id}"
         match cache_get[UserProfile](&*self.cache, &cache_key).await:
-            Ok(Some(cached)) ->
+            Ok(Some(cached)) =>
                 self.bump_cache_hit()
                 return cached
-            Ok(None) ->
+            Ok(None) =>
                 self.bump_cache_miss()
-            Err(_) ->
+            Err(_) =>
                 // Cache errors are non-fatal — fall through to repo
                 self.bump_cache_miss()
 
@@ -268,7 +268,7 @@ extend UserService:
         // Try cache for first page
         if page == 1 then
             match cache_get[Vec[User]](&*self.cache, "users:active:page1").await:
-                Ok(Some(cached)) ->
+                Ok(Some(cached)) =>
                     self.bump_cache_hit()
                     return cached
                 _ => ()
