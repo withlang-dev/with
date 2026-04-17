@@ -4950,10 +4950,16 @@ fn ci_lower_binary_comparison(session: i64, cursor: i32, exprs: &mut CiExprPool,
     // recursively lower both operands, print them, then assemble
     // the `(if lhs OP rhs: 1 else: 0)` expression directly so the
     // CIE_TERNARY printer does not introduce extra parens.
-    let lhs_id = ci_lower_expr_ir(session, lhs_cursor, exprs, types, scope)
+    var lhs_id = ci_lower_expr_ir(session, lhs_cursor, exprs, types, scope)
     if (lhs_id as i32) == 0:
         return 0 as CiExprId
-    let rhs_id = ci_lower_expr_ir(session, rhs_cursor, exprs, types, scope)
+    var rhs_id = ci_lower_expr_ir(session, rhs_cursor, exprs, types, scope)
+    if (rhs_id as i32) == 0:
+        return 0 as CiExprId
+    lhs_id = ci_decay_binary_comparison_array_operands(session, lhs_cursor, lhs_id, rhs_cursor, rhs_id, 1, exprs, types)
+    if (lhs_id as i32) == 0:
+        return 0 as CiExprId
+    rhs_id = ci_decay_binary_comparison_array_operands(session, lhs_cursor, lhs_id, rhs_cursor, rhs_id, 0, exprs, types)
     if (rhs_id as i32) == 0:
         return 0 as CiExprId
     let lhs_str = ci_print_expr(exprs, types, lhs_id, 0, 0)
@@ -5569,6 +5575,31 @@ fn ci_decay_array_value_expr(session: i64, original_cursor: i32, value_id: CiExp
         return 0 as CiExprId
     exprs.add(CiExprKind.CIE_ARRAY_DECAY, value_id as i32, elem_ty as i32, 0, target_ty)
 
+fn ci_decay_binary_comparison_array_operands(session: i64, lhs_cursor: i32, lhs_id: CiExprId, rhs_cursor: i32, rhs_id: CiExprId, want_lhs: i32, exprs: &mut CiExprPool, types: &mut CiTypePool) -> CiExprId:
+    let own_cursor = if want_lhs != 0: lhs_cursor else: rhs_cursor
+    let peer_cursor = if want_lhs != 0: rhs_cursor else: lhs_cursor
+    let own_id = if want_lhs != 0: lhs_id else: rhs_id
+    let peer_id = if want_lhs != 0: rhs_id else: lhs_id
+    let own_peeled = ci_peel_transparent(session, own_cursor)
+    let peer_peeled = ci_peel_transparent(session, peer_cursor)
+    let own_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, own_cursor))
+    let own_peeled_ty = with_ci_type_translated(session, with_ci_cursor_type(session, own_peeled))
+    let peer_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, peer_cursor))
+    let peer_peeled_ty = with_ci_type_translated(session, with_ci_cursor_type(session, peer_peeled))
+    let own_expr_ty = exprs.get_type(own_id)
+    let peer_expr_ty = exprs.get_type(peer_id)
+    let own_is_array = ci_cursor_is_array_type(session, own_peeled) or (own_ty_str.len() > 0 and own_ty_str.byte_at(0) == 91) or (own_peeled_ty.len() > 0 and own_peeled_ty.byte_at(0) == 91) or ((own_expr_ty as i32) != 0 and types.kind(own_expr_ty) == CiTypeKind.CT_ARRAY)
+    let peer_is_ptr = ci_cursor_type_is_pointerish(session, peer_cursor) or ci_cursor_type_is_pointerish(session, peer_peeled) or ((peer_expr_ty as i32) != 0 and types.kind(peer_expr_ty) == CiTypeKind.CT_POINTER)
+    let peer_is_array = ci_cursor_is_array_type(session, peer_peeled) or (peer_ty_str.len() > 0 and peer_ty_str.byte_at(0) == 91) or (peer_peeled_ty.len() > 0 and peer_peeled_ty.byte_at(0) == 91) or ((peer_expr_ty as i32) != 0 and types.kind(peer_expr_ty) == CiTypeKind.CT_ARRAY)
+    if own_is_array and (peer_is_ptr or peer_is_array):
+        var target_ty = 0 as CiTypeId
+        if peer_is_ptr:
+            target_ty = ci_type_from_libclang(session, with_ci_cursor_type(session, peer_cursor), types)
+            if ((target_ty as i32) == 0 or types.kind(target_ty) != CiTypeKind.CT_POINTER) and (peer_expr_ty as i32) != 0 and types.kind(peer_expr_ty) == CiTypeKind.CT_POINTER:
+                target_ty = peer_expr_ty
+        return ci_decay_array_value_expr(session, own_cursor, own_id, target_ty, exprs, types)
+    own_id
+
 fn ci_cast_pointer_index_expr(session: i64, idx_cursor: i32, idx_id: CiExprId, exprs: &mut CiExprPool, types: &mut CiTypePool) -> CiExprId:
     if with_ci_type_is_unsigned(session, idx_cursor) != 0:
         return idx_id
@@ -5590,8 +5621,12 @@ fn ci_build_binary_value_expr_from_ids(session: i64, cursor: i32, lhs_cursor: i3
         if op == BO_GT: ci_cmp_op = CiBinOp.CIBO_GT
         if op == BO_LE: ci_cmp_op = CiBinOp.CIBO_LTE
         if op == BO_GE: ci_cmp_op = CiBinOp.CIBO_GTE
-        var lhs_cmp = lhs_id
-        var rhs_cmp = rhs_id
+        var lhs_cmp = ci_decay_binary_comparison_array_operands(session, lhs_cursor, lhs_id, rhs_cursor, rhs_id, 1, exprs, types)
+        if (lhs_cmp as i32) == 0:
+            return 0 as CiExprId
+        var rhs_cmp = ci_decay_binary_comparison_array_operands(session, lhs_cursor, lhs_cmp, rhs_cursor, rhs_id, 0, exprs, types)
+        if (rhs_cmp as i32) == 0:
+            return 0 as CiExprId
         if exprs.kind(lhs_cmp) == CiExprKind.CIE_CAST:
             lhs_cmp = exprs.add(CiExprKind.CIE_PAREN, lhs_cmp as i32, 0, 0, 0 as CiTypeId)
         if exprs.kind(rhs_cmp) == CiExprKind.CIE_CAST:
