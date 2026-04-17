@@ -1291,6 +1291,11 @@ arr.len()        // length: returns N (compile-time constant)
 - Bounds checking in debug mode, unchecked in release.
 - `Copy` if the element type is `Copy`.
 
+#### 4.3a.1 Array-to-Pointer Decay
+With has no implicit array-to-pointer decay. Use explicit decay:
+`&arr[0] as *const T` (or `*mut T`). This applies in all contexts:
+assignment, function arguments, and comparisons.
+
 ```
 fn sum(arr: [i32; 4]) -> i32:
     var total = 0
@@ -8301,6 +8306,8 @@ All code is safe unless explicitly `unsafe`.
 - Manual memory management beyond allocators
 - Calling functions marked `unsafe`
 
+Note: See issues #145 and #146 for enforcement status.
+
 ### 19.2a `unsafe fn` — Function-Level Unsafe Context
 
 Functions that pervasively perform unsafe operations (raw pointer
@@ -8529,6 +8536,18 @@ comptime if cfg.is_debug:
 // In release builds, comptime if is false — code is reachable
 let result = expensive_computation()
 ```
+
+### 20b.7 Pointer Compared to Array
+Arrays never implicitly decay to pointers, so comparing a pointer
+directly with an array is rejected:
+
+```
+// ERROR:
+ptr == arr
+```
+
+Use explicit decay (`&arr[0] as *const T`). See §4.3a.1.
+
 ---
 
 # Part II — Normative Rules
