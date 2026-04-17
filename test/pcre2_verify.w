@@ -61,12 +61,8 @@ fn main:
     let pattern = with_arg_at(1)
     let subject = with_arg_at(2)
 
-    // Runtime init: the migrator doesn't translate some static-array
-    // initializers (#102), so we wire up the OP_LENGTHS table and
-    // context defaults by hand. These steps are independent of the
-    // pattern/subject under test — they set up PCRE2's runtime state.
-    pcre2_init_op_lengths_8()
-
+    // Runtime init: set context defaults by hand. These steps are independent
+    // of the pattern/subject under test — they set up PCRE2's runtime state.
     let gcontext = pcre2_general_context_create_8(pcre2_malloc, pcre2_free, null)
     if gcontext as i64 == 0:
         print("Error: gcontext creation failed\n")
