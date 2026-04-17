@@ -1240,6 +1240,11 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
 
     // Comparison operators return bool
     if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE or op == BinaryOp.OP_IN or op == BinaryOp.OP_NOT_IN:
+        let lhs_cmp_kind = self.get_type_kind(self.resolve_alias(lhs))
+        let rhs_cmp_kind = self.get_type_kind(self.resolve_alias(rhs))
+        if (lhs_cmp_kind == TypeKind.TY_PTR and rhs_cmp_kind == TypeKind.TY_ARRAY) or (lhs_cmp_kind == TypeKind.TY_ARRAY and rhs_cmp_kind == TypeKind.TY_PTR):
+            self.emit_error("cannot compare pointer and array; use explicit &array[0]", node)
+            return 0
         return self.ty_bool as i32
 
     // Logical operators
