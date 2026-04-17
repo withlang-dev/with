@@ -24,7 +24,7 @@ extend DenseStorage[T]:
         }
 
     fn insert(self: &mut DenseStorage[T], entity: Entity, component: T):
-        match self.sparse.get(&entity)
+        match self.sparse.get(&entity):
             Some(&idx) ->
                 self.dense_data[idx] = component
             None ->
@@ -39,7 +39,7 @@ extend DenseStorage[T]:
         self.sparse.get(&entity).map(|&idx| &mut self.dense_data[idx])
 
     fn remove(self: &mut DenseStorage[T], entity: Entity) -> Option[T]:
-        match self.sparse.remove(&entity)
+        match self.sparse.remove(&entity):
             Some(idx) ->
                 let last = self.dense_data.len() - 1
                 if idx != last:

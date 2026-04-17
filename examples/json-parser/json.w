@@ -80,7 +80,7 @@ extend Tokenizer:
 
     fn skip_whitespace(self: &mut Self):
         loop:
-            match self.peek()
+            match self.peek():
                 Some(ch) if is_whitespace(ch) ->
                     self.pos = self.pos + 1
                 _ => break
@@ -91,7 +91,7 @@ extend Tokenizer:
 
     fn next_token(self: &mut Self) -> Result[Option[Token], JsonError]:
         self.skip_whitespace()
-        match self.advance()
+        match self.advance():
             None         => Ok(None)
             Some(123)    => Ok(Some(.LBrace))      // '{'
             Some(125)    => Ok(Some(.RBrace))      // '}'
@@ -109,11 +109,11 @@ extend Tokenizer:
     fn read_string(self: &mut Self) -> Result[str, JsonError]:
         with str.new() as mut buf:
             loop:
-                match self.advance()
+                match self.advance():
                     None => return Err(.UnexpectedEof(self.pos, "unterminated string"))
                     Some(34) => break                     // '"'
                     Some(92) =>                           // '\\'
-                        match self.advance()
+                        match self.advance():
                             Some(34)  => buf.push(34)     // '"'
                             Some(92)  => buf.push(92)     // '\\'
                             Some(47)  => buf.push(47)     // '/'
@@ -150,13 +150,13 @@ extend Tokenizer:
 
     fn read_digits(self: &mut Self):
         loop:
-            match self.peek()
+            match self.peek():
                 Some(ch) if is_digit(ch) => self.pos = self.pos + 1
                 _ => break
 
     fn expect_literal(self: &mut Self, expected: &str) -> Result[Unit, JsonError]:
         for ch in expected.bytes():
-            match self.advance()
+            match self.advance():
                 Some(got) if got == ch => ()
                 Some(got) => return Err(.UnexpectedChar(self.pos - 1, expected.to_string(), got))
                 None => return Err(.UnexpectedEof(self.pos, "literal"))
@@ -178,7 +178,7 @@ extend Parser:
         self.current = self.tokenizer.next_token()?
 
     fn expect_token(self: &mut Self, description: str) -> Result[Token, JsonError]:
-        match self.current.take()
+        match self.current.take():
             Some(tok) ->
                 self.bump()?
                 tok
@@ -189,22 +189,22 @@ extend Parser:
                 ))
 
     fn parse_value(self: &mut Self) -> Result[JsonValue, JsonError]:
-        match &self.current
+        match &self.current:
             Some(.LBrace)   => self.parse_object()
             Some(.LBracket) => self.parse_array()
             Some(.TNull)    ->
                 self.bump()?
                 .Null
             Some(.TBool(_)) ->
-                match self.expect_token("bool")?
+                match self.expect_token("bool")?:
                     .TBool(b) => .Bool(b)
                     _ => .Null
             Some(.TNumber(_)) ->
-                match self.expect_token("number")?
+                match self.expect_token("number")?:
                     .TNumber(n) => .Number(n)
                     _ => .Null
             Some(.TString(_)) ->
-                match self.expect_token("string")?
+                match self.expect_token("string")?:
                     .TString(s) => .Str(s)
                     _ => .Null
             Some(_) ->
@@ -230,7 +230,7 @@ extend Parser:
             items.push(self.parse_value()?)
             // remaining elements
             loop:
-                match &self.current
+                match &self.current:
                     Some(.Comma) ->
                         self.bump()?
                         items.push(self.parse_value()?)
@@ -254,7 +254,7 @@ extend Parser:
             entries.push(self.parse_kv()?)
             // remaining pairs
             loop:
-                match &self.current
+                match &self.current:
                     Some(.Comma) ->
                         self.bump()?
                         entries.push(self.parse_kv()?)
@@ -268,7 +268,7 @@ extend Parser:
             .Object(entries)
 
     fn parse_kv(self: &mut Self) -> Result[(str, JsonValue), JsonError]:
-        let key = match self.expect_token("object key")?
+        let key = match self.expect_token("object key")?:
             .TString(s) => s
             _ => return Err(.UnexpectedChar(
                 pos: self.tokenizer.pos,
@@ -276,7 +276,7 @@ extend Parser:
                 got: 0,
             ))
         // expect colon
-        match self.expect_token("':'")?
+        match self.expect_token("':'")?:
             .Colon => ()
             _ => return Err(.UnexpectedChar(
                 pos: self.tokenizer.pos,
@@ -299,7 +299,7 @@ fn parse(input: str) -> Result[JsonValue, JsonError]:
 // Captures &JsonValue — generator is ephemeral (cannot be stored).
 
 gen fn walk_leaves(value: &JsonValue, path: str) -> (str, &JsonValue):
-    match value
+    match value:
         .Null | .Bool(_) | .Number(_) | .Str(_) ->
             yield (path, value)
         .Array(items) ->
@@ -317,7 +317,7 @@ gen fn walk_leaves(value: &JsonValue, path: str) -> (str, &JsonValue):
 
 extend JsonValue:
     fn to_string(self: &Self) -> str:
-        match self
+        match self:
             .Null       => "null"
             .Bool(b)    => "{b}"
             .Number(n)  => "{n}"
@@ -338,7 +338,7 @@ extend JsonValue:
     // --- Accessors ---
 
     fn get(self: &Self, key: &str) -> Option[&JsonValue]:
-        match self
+        match self:
             .Object(entries) ->
                 entries.iter()
                     |> find(entry => entry.0 == key)
@@ -346,7 +346,7 @@ extend JsonValue:
             _ => None
 
     fn index(self: &Self, i: usize) -> Option[&JsonValue]:
-        match self
+        match self:
             .Array(items) if i < items.len() => Some(&items[i])
             _ => None
 
@@ -362,7 +362,7 @@ fn main:
     print("=== JSON Parser Demo ===\n")
     print("Input ({input.len()} bytes):\n{input}\n")
 
-    match parse(input)
+    match parse(input):
         Ok(value) ->
             print("Parsed successfully!\n")
             print("Pretty: {value}\n")
@@ -398,7 +398,7 @@ fn main:
         ("\"hello",     "unterminated string"),
     ]
     for (input, description) in bad_inputs:
-        match parse(input.to_string())
+        match parse(input.to_string()):
             Ok(_)  => print("  {description}: unexpectedly succeeded")
             Err(e) => print("  {description}: {e}")
 

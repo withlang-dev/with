@@ -3,7 +3,7 @@
 // Behavior test: tuple patterns in match expressions
 
 fn classify(pair: (i32, i32)) -> str:
-    match pair
+    match pair:
         (0, 0) => "origin"
         (0, _) => "y-axis"
         (_, 0) => "x-axis"

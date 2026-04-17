@@ -3,14 +3,14 @@
 // Behavior test: range patterns in match expressions
 
 fn classify(n: i32) -> str:
-    match n
+    match n:
         0 => "zero"
         1..5 => "small"
         5..=10 => "medium"
         _ => "large"
 
 fn classify_signed(n: i32) -> str:
-    match n
+    match n:
         -10..0 => "negative"
         0 => "zero"
         1..=100 => "positive"

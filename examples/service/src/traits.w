@@ -31,7 +31,7 @@ trait CacheService:
 // so they can be generic while still working with &dyn CacheService.
 
 async fn cache_get[T: Deserialize](cache: &dyn CacheService, key: &str) -> Result[Option[T], CacheError]:
-    match cache.get_bytes(key).await
+    match cache.get_bytes(key).await:
         Ok(Some(bytes)) => Ok(Some(deserialize(&bytes)?))
         Ok(None) => Ok(None)
         Err(e) => Err(e)

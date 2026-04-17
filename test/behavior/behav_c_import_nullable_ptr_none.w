@@ -23,7 +23,7 @@ fn allocish -> Result[i32, E]:
 fn main:
     assert(make_handle() == 1)
     let result = allocish()
-    let value = match result
+    let value = match result:
         .Ok(v) => assert(v == 1)
         .Err(_) => assert(false)
     let _ = value

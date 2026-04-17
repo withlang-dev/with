@@ -50,7 +50,7 @@ fn test_string_from_condition:
     assert(choose_string(false) == "no")
 
 fn test_string_in_match:
-    let result = match 1
+    let result = match 1:
         1 => "one"
         2 => "two"
         _ => "other"

@@ -18,12 +18,12 @@ fn count2() -> Result[i32, ParseError]:
     Ok(program_count(prog))
 
 fn main:
-    let first = match count1()
+    let first = match count1():
         Ok(v) => v
         Err(_) =>
             assert(false)
             0
-    let second = match count2()
+    let second = match count2():
         Ok(v) => v
         Err(_) =>
             assert(false)

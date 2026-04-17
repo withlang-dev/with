@@ -3,7 +3,7 @@
 // Behavior test: @ binding patterns in match expressions
 
 fn describe(n: i32) -> i32:
-    match n
+    match n:
         x @ 1 => x + 100
         y @ 2 => y + 200
         _ => 0

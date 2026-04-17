@@ -9,7 +9,7 @@ fn parse(ok: bool) -> Result[i32, ParseErr]:
     Err(.Bad("empty"))
 
 fn classify(ok: bool) -> i32:
-    match parse(ok)
+    match parse(ok):
         Err(.Bad(msg)) if msg == "empty" => 1
         Ok(v) => v
         _ => 0

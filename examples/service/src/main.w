@@ -49,7 +49,7 @@ async fn main -> Result[Unit, ServiceError]:
             // Race: accept a new connection OR receive shutdown signal
             select await
                 result = listener.accept() ->
-                    match result
+                    match result:
                         Ok(conn) ->
                             s.track(handle_connection(state.clone(), conn))
                         Err(e) ->
@@ -78,7 +78,7 @@ async fn handle_connection(state: Arc[AppState], conn: TcpStream):
         handle_request(&state, req),
     ).await
 
-    let resp = match result
+    let resp = match result:
         Ok(r)              => r
         Err(.Timeout(..))  => HttpResponse.json(408, "\"request timeout\"")
         Err(e)             => HttpResponse.internal_error(&e.to_string())

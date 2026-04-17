@@ -6,7 +6,7 @@ enum Status:
     | Fatal(code: i32)
 
 fn is_fatal_with_code(status: Status, expected: i32) -> bool:
-    match status
+    match status:
         .Fatal(code) => code == expected
         _ => false
 

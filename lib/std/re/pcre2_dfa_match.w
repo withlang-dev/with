@@ -110,7 +110,7 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 re__goto_3346_24 = code
@@ -396,7 +396,7 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                 (mb__goto_3377_18.nltype = 0)
                 if __goto_pending != 0:
                     continue
-                match re__goto_3346_24.newline_convention
+                match re__goto_3346_24.newline_convention:
                     1 =>
                         (mb__goto_3377_18.nllen = 1)
                         ((&mb__goto_3377_18.nl[0] as *mut u8)[0] = 13)
@@ -1293,7 +1293,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 start_subject__goto_553_12 = mb.start_subject
@@ -1753,7 +1753,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             if __goto_pending != 0:
                                 break
                             if (codevalue__goto_756_14 >= 85):
-                                match d__goto_703_15
+                                match d__goto_703_15:
                                     14 =>
                                         return (-42)
                                     15 =>
@@ -1786,7 +1786,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 break
                         if __goto_pending != 0:
                             break
-                        match codevalue__goto_756_14
+                        match codevalue__goto_756_14:
                             122 =>
                                 if (code__goto_755_16 != end_code__goto_546_12):
                                     var __ci_cond_if_21: bool = false
@@ -3297,7 +3297,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     prop__goto_1171_28 = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c__goto_703_12) as c_int) / 128)] * 128) + (((c__goto_703_12) as c_int) % 128))] as isize as usize)))
                                     if __goto_pending != 0:
                                         break
-                                    match code__goto_755_16[1]
+                                    match code__goto_755_16[1]:
                                         0 =>
                                             (chartype__goto_1169_13 = prop__goto_1171_28.chartype)
                                             (OK__goto_1168_14 = (if ((chartype__goto_1169_13 == ucp_Lu) or (chartype__goto_1169_13 == ucp_Ll)) or (chartype__goto_1169_13 == ucp_Lt): 1 else: 0))
@@ -3313,7 +3313,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             (chartype__goto_1169_13 = prop__goto_1171_28.chartype)
                                             (OK__goto_1168_14 = (if (_pcre2_ucp_gentype_8[chartype__goto_1169_13] == 1) or (_pcre2_ucp_gentype_8[chartype__goto_1169_13] == 3): 1 else: 0))
                                         6 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1168_14 = 1)
                                                 32 =>
@@ -3369,7 +3369,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 _ =>
                                                     (OK__goto_1168_14 = (if _pcre2_ucp_gentype_8[prop__goto_1171_28.chartype] == 6: 1 else: 0))
                                         7 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1168_14 = 1)
                                                 32 =>
@@ -3491,7 +3491,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     prop__goto_1171_28 = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c__goto_703_12) as c_int) / 128)] * 128) + (((c__goto_703_12) as c_int) % 128))] as isize as usize)))
                                     if __goto_pending != 0:
                                         break
-                                    match code__goto_755_16[1]
+                                    match code__goto_755_16[1]:
                                         0 =>
                                             (chartype__goto_1169_13 = prop__goto_1171_28.chartype)
                                             (OK__goto_1168_14 = (if ((chartype__goto_1169_13 == ucp_Lu) or (chartype__goto_1169_13 == ucp_Ll)) or (chartype__goto_1169_13 == ucp_Lt): 1 else: 0))
@@ -3507,7 +3507,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             (chartype__goto_1169_13 = prop__goto_1171_28.chartype)
                                             (OK__goto_1168_14 = (if (_pcre2_ucp_gentype_8[chartype__goto_1169_13] == 1) or (_pcre2_ucp_gentype_8[chartype__goto_1169_13] == 3): 1 else: 0))
                                         6 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1168_14 = 1)
                                                 32 =>
@@ -3563,7 +3563,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 _ =>
                                                     (OK__goto_1168_14 = (if _pcre2_ucp_gentype_8[prop__goto_1171_28.chartype] == 6: 1 else: 0))
                                         7 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1168_14 = 1)
                                                 32 =>
@@ -4564,7 +4564,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     prop__goto_1450_28 = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c__goto_703_12) as c_int) / 128)] * 128) + (((c__goto_703_12) as c_int) % 128))] as isize as usize)))
                                     if __goto_pending != 0:
                                         break
-                                    match code__goto_755_16[2]
+                                    match code__goto_755_16[2]:
                                         0 =>
                                             (chartype__goto_1448_13 = prop__goto_1450_28.chartype)
                                             (OK__goto_1447_14 = (if ((chartype__goto_1448_13 == ucp_Lu) or (chartype__goto_1448_13 == ucp_Ll)) or (chartype__goto_1448_13 == ucp_Lt): 1 else: 0))
@@ -4580,7 +4580,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             (chartype__goto_1448_13 = prop__goto_1450_28.chartype)
                                             (OK__goto_1447_14 = (if (_pcre2_ucp_gentype_8[chartype__goto_1448_13] == 1) or (_pcre2_ucp_gentype_8[chartype__goto_1448_13] == 3): 1 else: 0))
                                         6 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1447_14 = 1)
                                                 32 =>
@@ -4636,7 +4636,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 _ =>
                                                     (OK__goto_1447_14 = (if _pcre2_ucp_gentype_8[prop__goto_1450_28.chartype] == 6: 1 else: 0))
                                         7 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1447_14 = 1)
                                                 32 =>
@@ -4794,7 +4794,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     prop__goto_1450_28 = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c__goto_703_12) as c_int) / 128)] * 128) + (((c__goto_703_12) as c_int) % 128))] as isize as usize)))
                                     if __goto_pending != 0:
                                         break
-                                    match code__goto_755_16[2]
+                                    match code__goto_755_16[2]:
                                         0 =>
                                             (chartype__goto_1448_13 = prop__goto_1450_28.chartype)
                                             (OK__goto_1447_14 = (if ((chartype__goto_1448_13 == ucp_Lu) or (chartype__goto_1448_13 == ucp_Ll)) or (chartype__goto_1448_13 == ucp_Lt): 1 else: 0))
@@ -4810,7 +4810,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             (chartype__goto_1448_13 = prop__goto_1450_28.chartype)
                                             (OK__goto_1447_14 = (if (_pcre2_ucp_gentype_8[chartype__goto_1448_13] == 1) or (_pcre2_ucp_gentype_8[chartype__goto_1448_13] == 3): 1 else: 0))
                                         6 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1447_14 = 1)
                                                 32 =>
@@ -4866,7 +4866,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 _ =>
                                                     (OK__goto_1447_14 = (if _pcre2_ucp_gentype_8[prop__goto_1450_28.chartype] == 6: 1 else: 0))
                                         7 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1447_14 = 1)
                                                 32 =>
@@ -5024,7 +5024,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     prop__goto_1450_28 = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c__goto_703_12) as c_int) / 128)] * 128) + (((c__goto_703_12) as c_int) % 128))] as isize as usize)))
                                     if __goto_pending != 0:
                                         break
-                                    match code__goto_755_16[2]
+                                    match code__goto_755_16[2]:
                                         0 =>
                                             (chartype__goto_1448_13 = prop__goto_1450_28.chartype)
                                             (OK__goto_1447_14 = (if ((chartype__goto_1448_13 == ucp_Lu) or (chartype__goto_1448_13 == ucp_Ll)) or (chartype__goto_1448_13 == ucp_Lt): 1 else: 0))
@@ -5040,7 +5040,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             (chartype__goto_1448_13 = prop__goto_1450_28.chartype)
                                             (OK__goto_1447_14 = (if (_pcre2_ucp_gentype_8[chartype__goto_1448_13] == 1) or (_pcre2_ucp_gentype_8[chartype__goto_1448_13] == 3): 1 else: 0))
                                         6 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1447_14 = 1)
                                                 32 =>
@@ -5096,7 +5096,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 _ =>
                                                     (OK__goto_1447_14 = (if _pcre2_ucp_gentype_8[prop__goto_1450_28.chartype] == 6: 1 else: 0))
                                         7 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1447_14 = 1)
                                                 32 =>
@@ -5452,7 +5452,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     ncount__goto_1590_13 = 0
                                     if __goto_pending != 0:
                                         break
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         11 =>
                                             if (mb.bsr_convention == 2):
                                                 break
@@ -5532,7 +5532,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     ncount__goto_1590_13 = 0
                                     if __goto_pending != 0:
                                         break
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         11 =>
                                             if (mb.bsr_convention == 2):
                                                 break
@@ -5612,7 +5612,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     ncount__goto_1590_13 = 0
                                     if __goto_pending != 0:
                                         break
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         11 =>
                                             if (mb.bsr_convention == 2):
                                                 break
@@ -5689,7 +5689,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if __goto_pending != 0:
                                         break
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         10 =>
                                             (OK__goto_1632_14 = 1)
                                         11 =>
@@ -5771,7 +5771,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if __goto_pending != 0:
                                         break
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         10 =>
                                             (OK__goto_1632_14 = 1)
                                         11 =>
@@ -5853,7 +5853,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if __goto_pending != 0:
                                         break
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         10 =>
                                             (OK__goto_1632_14 = 1)
                                         11 =>
@@ -5935,7 +5935,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if __goto_pending != 0:
                                         break
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         9 =>
                                             (OK__goto_1665_14 = 1)
                                         32 =>
@@ -6041,7 +6041,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if __goto_pending != 0:
                                         break
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         9 =>
                                             (OK__goto_1665_14 = 1)
                                         32 =>
@@ -6147,7 +6147,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if __goto_pending != 0:
                                         break
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         9 =>
                                             (OK__goto_1665_14 = 1)
                                         32 =>
@@ -6265,7 +6265,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     prop__goto_1711_28 = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c__goto_703_12) as c_int) / 128)] * 128) + (((c__goto_703_12) as c_int) % 128))] as isize as usize)))
                                     if __goto_pending != 0:
                                         break
-                                    match code__goto_755_16[2]
+                                    match code__goto_755_16[2]:
                                         0 =>
                                             (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
                                             (OK__goto_1708_14 = (if ((chartype__goto_1709_13 == ucp_Lu) or (chartype__goto_1709_13 == ucp_Ll)) or (chartype__goto_1709_13 == ucp_Lt): 1 else: 0))
@@ -6281,7 +6281,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
                                             (OK__goto_1708_14 = (if (_pcre2_ucp_gentype_8[chartype__goto_1709_13] == 1) or (_pcre2_ucp_gentype_8[chartype__goto_1709_13] == 3): 1 else: 0))
                                         6 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1708_14 = 1)
                                                 32 =>
@@ -6337,7 +6337,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 _ =>
                                                     (OK__goto_1708_14 = (if _pcre2_ucp_gentype_8[prop__goto_1711_28.chartype] == 6: 1 else: 0))
                                         7 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1708_14 = 1)
                                                 32 =>
@@ -6488,7 +6488,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     prop__goto_1711_28 = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c__goto_703_12) as c_int) / 128)] * 128) + (((c__goto_703_12) as c_int) % 128))] as isize as usize)))
                                     if __goto_pending != 0:
                                         break
-                                    match code__goto_755_16[2]
+                                    match code__goto_755_16[2]:
                                         0 =>
                                             (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
                                             (OK__goto_1708_14 = (if ((chartype__goto_1709_13 == ucp_Lu) or (chartype__goto_1709_13 == ucp_Ll)) or (chartype__goto_1709_13 == ucp_Lt): 1 else: 0))
@@ -6504,7 +6504,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
                                             (OK__goto_1708_14 = (if (_pcre2_ucp_gentype_8[chartype__goto_1709_13] == 1) or (_pcre2_ucp_gentype_8[chartype__goto_1709_13] == 3): 1 else: 0))
                                         6 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1708_14 = 1)
                                                 32 =>
@@ -6560,7 +6560,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 _ =>
                                                     (OK__goto_1708_14 = (if _pcre2_ucp_gentype_8[prop__goto_1711_28.chartype] == 6: 1 else: 0))
                                         7 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1708_14 = 1)
                                                 32 =>
@@ -6711,7 +6711,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     prop__goto_1711_28 = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c__goto_703_12) as c_int) / 128)] * 128) + (((c__goto_703_12) as c_int) % 128))] as isize as usize)))
                                     if __goto_pending != 0:
                                         break
-                                    match code__goto_755_16[2]
+                                    match code__goto_755_16[2]:
                                         0 =>
                                             (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
                                             (OK__goto_1708_14 = (if ((chartype__goto_1709_13 == ucp_Lu) or (chartype__goto_1709_13 == ucp_Ll)) or (chartype__goto_1709_13 == ucp_Lt): 1 else: 0))
@@ -6727,7 +6727,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
                                             (OK__goto_1708_14 = (if (_pcre2_ucp_gentype_8[chartype__goto_1709_13] == 1) or (_pcre2_ucp_gentype_8[chartype__goto_1709_13] == 3): 1 else: 0))
                                         6 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1708_14 = 1)
                                                 32 =>
@@ -6783,7 +6783,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 _ =>
                                                     (OK__goto_1708_14 = (if _pcre2_ucp_gentype_8[prop__goto_1711_28.chartype] == 6: 1 else: 0))
                                         7 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1708_14 = 1)
                                                 32 =>
@@ -7135,7 +7135,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     ncount__goto_1868_13 = 0
                                     if __goto_pending != 0:
                                         break
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         11 =>
                                             if (mb.bsr_convention == 2):
                                                 break
@@ -7210,7 +7210,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     ncount__goto_1868_13 = 0
                                     if __goto_pending != 0:
                                         break
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         11 =>
                                             if (mb.bsr_convention == 2):
                                                 break
@@ -7285,7 +7285,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     ncount__goto_1868_13 = 0
                                     if __goto_pending != 0:
                                         break
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         11 =>
                                             if (mb.bsr_convention == 2):
                                                 break
@@ -7369,7 +7369,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 else:
                                     return (-43)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         10 =>
                                             (OK__goto_1918_14 = 1)
                                         11 =>
@@ -7444,7 +7444,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 else:
                                     return (-43)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         10 =>
                                             (OK__goto_1918_14 = 1)
                                         11 =>
@@ -7519,7 +7519,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 else:
                                     return (-43)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         10 =>
                                             (OK__goto_1918_14 = 1)
                                         11 =>
@@ -7606,7 +7606,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 else:
                                     return (-43)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         9 =>
                                             (OK__goto_1958_14 = 1)
                                         32 =>
@@ -7705,7 +7705,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 else:
                                     return (-43)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         9 =>
                                             (OK__goto_1958_14 = 1)
                                         32 =>
@@ -7804,7 +7804,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 else:
                                     return (-43)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         9 =>
                                             (OK__goto_1958_14 = 1)
                                         32 =>
@@ -7909,7 +7909,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     prop__goto_1997_28 = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c__goto_703_12) as c_int) / 128)] * 128) + (((c__goto_703_12) as c_int) % 128))] as isize as usize)))
                                     if __goto_pending != 0:
                                         break
-                                    match code__goto_755_16[((1 + 2) + 1)]
+                                    match code__goto_755_16[((1 + 2) + 1)]:
                                         0 =>
                                             (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
                                             (OK__goto_1994_14 = (if ((chartype__goto_1995_13 == ucp_Lu) or (chartype__goto_1995_13 == ucp_Ll)) or (chartype__goto_1995_13 == ucp_Lt): 1 else: 0))
@@ -7925,7 +7925,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
                                             (OK__goto_1994_14 = (if (_pcre2_ucp_gentype_8[chartype__goto_1995_13] == 1) or (_pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3): 1 else: 0))
                                         6 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1994_14 = 1)
                                                 32 =>
@@ -7981,7 +7981,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 _ =>
                                                     (OK__goto_1994_14 = (if _pcre2_ucp_gentype_8[prop__goto_1997_28.chartype] == 6: 1 else: 0))
                                         7 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1994_14 = 1)
                                                 32 =>
@@ -8161,7 +8161,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     prop__goto_1997_28 = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c__goto_703_12) as c_int) / 128)] * 128) + (((c__goto_703_12) as c_int) % 128))] as isize as usize)))
                                     if __goto_pending != 0:
                                         break
-                                    match code__goto_755_16[((1 + 2) + 1)]
+                                    match code__goto_755_16[((1 + 2) + 1)]:
                                         0 =>
                                             (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
                                             (OK__goto_1994_14 = (if ((chartype__goto_1995_13 == ucp_Lu) or (chartype__goto_1995_13 == ucp_Ll)) or (chartype__goto_1995_13 == ucp_Lt): 1 else: 0))
@@ -8177,7 +8177,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
                                             (OK__goto_1994_14 = (if (_pcre2_ucp_gentype_8[chartype__goto_1995_13] == 1) or (_pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3): 1 else: 0))
                                         6 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1994_14 = 1)
                                                 32 =>
@@ -8233,7 +8233,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 _ =>
                                                     (OK__goto_1994_14 = (if _pcre2_ucp_gentype_8[prop__goto_1997_28.chartype] == 6: 1 else: 0))
                                         7 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1994_14 = 1)
                                                 32 =>
@@ -8413,7 +8413,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     prop__goto_1997_28 = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c__goto_703_12) as c_int) / 128)] * 128) + (((c__goto_703_12) as c_int) % 128))] as isize as usize)))
                                     if __goto_pending != 0:
                                         break
-                                    match code__goto_755_16[((1 + 2) + 1)]
+                                    match code__goto_755_16[((1 + 2) + 1)]:
                                         0 =>
                                             (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
                                             (OK__goto_1994_14 = (if ((chartype__goto_1995_13 == ucp_Lu) or (chartype__goto_1995_13 == ucp_Ll)) or (chartype__goto_1995_13 == ucp_Lt): 1 else: 0))
@@ -8429,7 +8429,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
                                             (OK__goto_1994_14 = (if (_pcre2_ucp_gentype_8[chartype__goto_1995_13] == 1) or (_pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3): 1 else: 0))
                                         6 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1994_14 = 1)
                                                 32 =>
@@ -8485,7 +8485,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 _ =>
                                                     (OK__goto_1994_14 = (if _pcre2_ucp_gentype_8[prop__goto_1997_28.chartype] == 6: 1 else: 0))
                                         7 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1994_14 = 1)
                                                 32 =>
@@ -8665,7 +8665,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     prop__goto_1997_28 = (((&_pcre2_ucd_records_8[0] as *mut ucd_record) + (_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(((c__goto_703_12) as c_int) / 128)] * 128) + (((c__goto_703_12) as c_int) % 128))] as isize as usize)))
                                     if __goto_pending != 0:
                                         break
-                                    match code__goto_755_16[((1 + 2) + 1)]
+                                    match code__goto_755_16[((1 + 2) + 1)]:
                                         0 =>
                                             (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
                                             (OK__goto_1994_14 = (if ((chartype__goto_1995_13 == ucp_Lu) or (chartype__goto_1995_13 == ucp_Ll)) or (chartype__goto_1995_13 == ucp_Lt): 1 else: 0))
@@ -8681,7 +8681,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
                                             (OK__goto_1994_14 = (if (_pcre2_ucp_gentype_8[chartype__goto_1995_13] == 1) or (_pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3): 1 else: 0))
                                         6 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1994_14 = 1)
                                                 32 =>
@@ -8737,7 +8737,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 _ =>
                                                     (OK__goto_1994_14 = (if _pcre2_ucp_gentype_8[prop__goto_1997_28.chartype] == 6: 1 else: 0))
                                         7 =>
-                                            match c__goto_703_12
+                                            match c__goto_703_12:
                                                 9 =>
                                                     (OK__goto_1994_14 = 1)
                                                 32 =>
@@ -9297,7 +9297,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     ncount__goto_2149_13 = 0
                                     if __goto_pending != 0:
                                         break
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         11 =>
                                             if (mb.bsr_convention == 2):
                                                 break
@@ -9404,7 +9404,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     ncount__goto_2149_13 = 0
                                     if __goto_pending != 0:
                                         break
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         11 =>
                                             if (mb.bsr_convention == 2):
                                                 break
@@ -9511,7 +9511,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     ncount__goto_2149_13 = 0
                                     if __goto_pending != 0:
                                         break
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         11 =>
                                             if (mb.bsr_convention == 2):
                                                 break
@@ -9618,7 +9618,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     ncount__goto_2149_13 = 0
                                     if __goto_pending != 0:
                                         break
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         11 =>
                                             if (mb.bsr_convention == 2):
                                                 break
@@ -9722,7 +9722,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                 (count__goto_759_9 = current_state__goto_753_17.count)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         10 =>
                                             (OK__goto_2195_14 = 1)
                                         11 =>
@@ -9829,7 +9829,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                 (count__goto_759_9 = current_state__goto_753_17.count)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         10 =>
                                             (OK__goto_2195_14 = 1)
                                         11 =>
@@ -9936,7 +9936,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                 (count__goto_759_9 = current_state__goto_753_17.count)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         10 =>
                                             (OK__goto_2195_14 = 1)
                                         11 =>
@@ -10043,7 +10043,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                 (count__goto_759_9 = current_state__goto_753_17.count)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         10 =>
                                             (OK__goto_2195_14 = 1)
                                         11 =>
@@ -10150,7 +10150,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                 (count__goto_759_9 = current_state__goto_753_17.count)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         9 =>
                                             (OK__goto_2231_14 = 1)
                                         32 =>
@@ -10281,7 +10281,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                 (count__goto_759_9 = current_state__goto_753_17.count)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         9 =>
                                             (OK__goto_2231_14 = 1)
                                         32 =>
@@ -10412,7 +10412,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                 (count__goto_759_9 = current_state__goto_753_17.count)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         9 =>
                                             (OK__goto_2231_14 = 1)
                                         32 =>
@@ -10543,7 +10543,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                 (count__goto_759_9 = current_state__goto_753_17.count)
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         9 =>
                                             (OK__goto_2231_14 = 1)
                                         32 =>
@@ -10786,7 +10786,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                             17 =>
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         11 =>
                                             if (mb.bsr_convention == 2):
                                                 break
@@ -10977,7 +10977,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         _ => 0
                             20 =>
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         10 => 0
                                         11 => 0
                                         12 => 0
@@ -11005,7 +11005,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 return (-43)
                             21 =>
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         10 =>
                                             var __ci_cond_if_323: bool = false
                                             var __ci_expr_old_324: c_int = new_count__goto_548_19
@@ -11135,7 +11135,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         _ => 0
                             18 =>
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         9 => 0
                                         32 => 0
                                         160 => 0
@@ -11175,7 +11175,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 return (-43)
                             19 =>
                                 if (clen__goto_702_7 > 0):
-                                    match c__goto_703_12
+                                    match c__goto_703_12:
                                         9 =>
                                             var __ci_cond_if_329: bool = false
                                             var __ci_expr_old_330: c_int = new_count__goto_548_19
@@ -15402,7 +15402,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (next_state_offset__goto_2648_13 = ((((ecode__goto_2649_20 as usize -% start_code__goto_555_12 as usize) / sizeof[u8]())) as c_int))
                                 if __goto_pending != 0:
                                     break
-                                match (unsafe: *ecode__goto_2649_20)
+                                match (unsafe: *ecode__goto_2649_20):
                                     OP_CRSTAR =>
                                         var __ci_cond_if_382: bool = false
                                         var __ci_expr_old_383: c_int = active_count__goto_548_5
@@ -16185,7 +16185,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (next_state_offset__goto_2648_13 = ((((ecode__goto_2649_20 as usize -% start_code__goto_555_12 as usize) / sizeof[u8]())) as c_int))
                                 if __goto_pending != 0:
                                     break
-                                match (unsafe: *ecode__goto_2649_20)
+                                match (unsafe: *ecode__goto_2649_20):
                                     OP_CRSTAR =>
                                         var __ci_cond_if_382: bool = false
                                         var __ci_expr_old_383: c_int = active_count__goto_548_5
@@ -16968,7 +16968,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (next_state_offset__goto_2648_13 = ((((ecode__goto_2649_20 as usize -% start_code__goto_555_12 as usize) / sizeof[u8]())) as c_int))
                                 if __goto_pending != 0:
                                     break
-                                match (unsafe: *ecode__goto_2649_20)
+                                match (unsafe: *ecode__goto_2649_20):
                                     OP_CRSTAR =>
                                         var __ci_cond_if_382: bool = false
                                         var __ci_expr_old_383: c_int = active_count__goto_548_5
@@ -17751,7 +17751,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (next_state_offset__goto_2648_13 = ((((ecode__goto_2649_20 as usize -% start_code__goto_555_12 as usize) / sizeof[u8]())) as c_int))
                                 if __goto_pending != 0:
                                     break
-                                match (unsafe: *ecode__goto_2649_20)
+                                match (unsafe: *ecode__goto_2649_20):
                                     OP_CRSTAR =>
                                         var __ci_cond_if_382: bool = false
                                         var __ci_expr_old_383: c_int = active_count__goto_548_5

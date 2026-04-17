@@ -25,12 +25,12 @@ type ServerConfig = {
 // --- Status helpers ---
 
 fn is_fatal(s: Status) -> bool:
-    match s
+    match s:
         Fatal(_) => true
         _        => false
 
 fn status_label(s: Status) -> i32:
-    match s
+    match s:
         Ok         => 0
         Warning(_) => 1
         Fatal(_)   => 2

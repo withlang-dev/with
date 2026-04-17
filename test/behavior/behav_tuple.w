@@ -29,7 +29,7 @@ fn test_tuple_pass_to_fn:
 
 fn test_tuple_match:
     let p = (0, 5)
-    let label = match p
+    let label = match p:
         (0, 0) => "origin"
         (0, _) => "y-axis"
         (_, 0) => "x-axis"

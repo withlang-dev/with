@@ -441,7 +441,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
     with_memset(captures as *i8, 0, size as i64)
 
     while (1 != 0):
-        match (((unsafe: *pptr) & (4294901760 as c_uint)))
+        match (((unsafe: *pptr) & (4294901760 as c_uint))):
             2148925440 =>
                 var __ci_expr_old_0: *mut c_uint = pptr
                 (pptr = pptr + 1)
@@ -606,7 +606,7 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
     while (1 != 0):
         (pptr = pptr + 1)
         
-        match (((unsafe: *pptr) & (4294901760 as c_uint)))
+        match (((unsafe: *pptr) & (4294901760 as c_uint))):
             2148925440 =>
                 (pptr = pptr + 2)
                 continue
@@ -748,7 +748,7 @@ fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset
     while (1 != 0):
         (pptr = pptr + 1)
         
-        match (((unsafe: *pptr) & (4294901760 as c_uint)))
+        match (((unsafe: *pptr) & (4294901760 as c_uint))):
             2148925440 =>
                 (offset = ((((pptr[1] as c_ulong) << 32)) | (pptr[2] as c_ulong)))
                 

@@ -2,7 +2,7 @@
 use issue56.kinds
 
 fn decode(kind: i32) -> str:
-    match kind
+    match kind:
         TypeKind.TY_STR => "str"
         TypeKind.TY_INT => "int"
         _ => "other"

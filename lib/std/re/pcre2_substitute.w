@@ -195,7 +195,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 goptions__goto_751_10 = 0
@@ -1403,7 +1403,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                     if __goto_pending != 0:
                                         break
                                     if (ptr__goto_763_12 < (repend__goto_764_12 - (1 as isize as usize))):
-                                        match ptr__goto_763_12[1]
+                                        match ptr__goto_763_12[1]:
                                             76 =>
                                                 (new_forcecase__goto_1476_18.to_case = 1)
                                                 (new_forcecase__goto_1476_18.single_char = 0)
@@ -1537,7 +1537,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                         __goto_pending = 1
                                     if __goto_pending != 0:
                                         break
-                                    match rc__goto_748_5
+                                    match rc__goto_748_5:
                                         ESC_E =>
                                             __pc = 4
                                             __goto_pending = 1
@@ -2870,7 +2870,7 @@ fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend:
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 rc__goto_80_5 = 0
@@ -2918,7 +2918,7 @@ fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend:
                                 else:
                                     if ((unsafe: *ptr__goto_83_12) == 92):
                                         if (ptr__goto_83_12 < (ptrend - (1 as isize as usize))):
-                                            match ptr__goto_83_12[1]
+                                            match ptr__goto_83_12[1]:
                                                 76 =>
                                                     (ptr__goto_83_12 = ptr__goto_83_12 + 1)
                                                     continue
@@ -2956,7 +2956,7 @@ fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend:
                                         (ptr__goto_83_12 = ptr__goto_83_12 - 1)
                                         if __goto_pending != 0:
                                             break
-                                        match erc__goto_115_9
+                                        match erc__goto_115_9:
                                             0 => 0
                                             ESC_b => 0
                                             ESC_v => 0
@@ -3004,7 +3004,7 @@ fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 ptr__goto_205_12 = (unsafe: *ptrptr)
@@ -3140,7 +3140,7 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
     if (input_len == 0):
         return 0
 
-    match state.to_case
+    match state.to_case:
         1 =>
             (rest_to_upper = ((if state.to_case == 2: 1 else: 0)))
             (next_to_upper = rest_to_upper)
@@ -3289,7 +3289,7 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
             break
         
 
-    match state.to_case
+    match state.to_case:
         1 =>
             if (state.single_char == 0):
                 (rc = substitute_case_callout(input, input_len, output, output_cap, state.to_case, substitute_case_callout_data))

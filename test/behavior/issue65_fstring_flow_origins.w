@@ -29,12 +29,12 @@ fn main:
     let if_err = if false then E.Empty else E.Bad("if-else")
     assert(f"{if_err}" == "Bad(if-else)")
 
-    let match_err = match false
+    let match_err = match false:
         true => E.Empty
         false => E.Bad("match")
     assert(f"{match_err}" == "Bad(match)")
 
-    let match_empty = match true
+    let match_empty = match true:
         true => E.Empty
         false => E.Bad("unused")
     assert(f"{match_empty}" == "Empty")

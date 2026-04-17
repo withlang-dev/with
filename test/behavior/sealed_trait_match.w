@@ -12,7 +12,7 @@ impl Shape for Rect =
     fn area(self: Rect) -> i32: self.width * self.height
 
 fn describe(s: dyn Shape) -> i32:
-    match s
+    match s:
         c: Circle => c.radius
         r: Rect => r.width + r.height
 

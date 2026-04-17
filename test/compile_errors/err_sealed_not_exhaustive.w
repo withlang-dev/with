@@ -10,5 +10,5 @@ impl Shape for Rect =
     fn area(self: Rect) -> i32: 0
 
 fn describe(s: dyn Shape) -> i32:
-    match s
+    match s:
         c: Circle => c.radius

@@ -10,7 +10,7 @@ fn text2 -> str:
     "short\n"
 
 fn t1:
-    let prog = match parse_text(text1())
+    let prog = match parse_text(text1()):
         Ok(v) => v
         Err(_) =>
             assert(false)
@@ -19,7 +19,7 @@ fn t1:
     assert(program_count(prog) == 2)
 
 fn t2:
-    let prog = match parse_text(text2())
+    let prog = match parse_text(text2()):
         Ok(v) => v
         Err(_) =>
             assert(false)

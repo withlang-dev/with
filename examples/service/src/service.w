@@ -8,7 +8,7 @@ use std.sync.RwLock
 
 // --- Service Configuration ---
 
-type ServiceConfig = {
+type ServiceConfig {
     cache_ttl: Duration = Duration.minutes(5),
     max_batch_size: i32 = 100,
     notify_on_create: bool = true,
@@ -22,7 +22,7 @@ type ServiceConfig = {
 // This is the same pattern as Go interfaces or Java DI,
 // but with zero runtime reflection and full type safety.
 
-type UserService = {
+type UserService {
     repo: Box[dyn UserRepository],
     cache: Box[dyn CacheService],
     notifier: Box[dyn NotificationService],
@@ -31,7 +31,7 @@ type UserService = {
     metrics: RwLock[ServiceMetrics],
 }
 
-type ServiceMetrics = {
+type ServiceMetrics {
     requests: i64 = 0,
     cache_hits: i64 = 0,
     cache_misses: i64 = 0,
@@ -40,7 +40,7 @@ type ServiceMetrics = {
 
 // --- Builder (with block Form 2) ---
 
-type UserServiceBuilder = {
+type UserServiceBuilder {
     repo: Option[Box[dyn UserRepository]],
     cache: Option[Box[dyn CacheService]],
     notifier: Option[Box[dyn NotificationService]],
@@ -101,7 +101,7 @@ extend UserService:
 
         // Check cache first
         let cache_key = "profile:{id}"
-        match cache_get[UserProfile](&*self.cache, &cache_key).await
+        match cache_get[UserProfile](&*self.cache, &cache_key).await:
             Ok(Some(cached)) ->
                 self.bump_cache_hit()
                 return cached
@@ -166,7 +166,7 @@ extend UserService:
         }
 
         let id = self.repo.insert(&user).await?
-        let created_user = { user with id: id }
+        let created_user { user with id: id }
 
         // Post-creation side effects (concurrent, non-blocking)
         async scope s =>
@@ -267,7 +267,7 @@ extend UserService:
 
         // Try cache for first page
         if page == 1 then
-            match cache_get[Vec[User]](&*self.cache, "users:active:page1").await
+            match cache_get[Vec[User]](&*self.cache, "users:active:page1").await:
                 Ok(Some(cached)) ->
                     self.bump_cache_hit()
                     return cached
@@ -307,7 +307,7 @@ extend UserService:
     // --- Internal Helpers ---
 
     async fn send_welcome(self: &UserService, user: &User) -> Result[Unit, NotifyError]:
-        let body = match user.role
+        let body = match user.role:
             .Admin     => "Welcome, administrator. Full access granted."
             .Moderator => "Welcome, moderator. You can manage content."
             .Member    => "Welcome to the platform, {user.name}!"

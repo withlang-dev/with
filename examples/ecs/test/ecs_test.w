@@ -74,7 +74,7 @@ fn clamp[T](val: T, lo: T, hi: T) -> T: min(max(val, lo), hi)
 type InputDir = Idle | Up | Down | Left | Right
 
 fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity:
-    match dir
+    match dir:
         Idle => make_velocity(0.0, 0.0)
         Up => make_velocity(0.0, 0.0 - speed)
         Down => make_velocity(0.0, speed)

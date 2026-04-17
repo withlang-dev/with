@@ -19,7 +19,7 @@ type UserStatus = Active(User) | Suspended(str) | Deleted
 async fn get_dashboard(req: &Request, db: &Pool) -> Result[Response, ApiError]:
     let user_id = req.param("id")? |> parse[UserId]?
 
-    match db.find_user(user_id).await?
+    match db.find_user(user_id).await?:
         .Active(user) ->
             // fetch everything concurrently
             let (posts, notifs) = (
@@ -48,7 +48,7 @@ async fn get_dashboard(req: &Request, db: &Pool) -> Result[Response, ApiError]:
 
 async fn with_retry[T, E](attempts: i32, f: async fn -> Result[T, E]) -> Result[T, E]:
     for i in 0..attempts:
-        match f().await
+        match f().await:
             Ok(val) => return Ok(val)
             Err(e) if i == attempts - 1 => return Err(e)
             Err(_) => sleep(Duration.millis(100 * (2 ** i))).await

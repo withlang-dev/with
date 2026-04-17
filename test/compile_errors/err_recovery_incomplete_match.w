@@ -2,7 +2,7 @@
 
 fn main:
     let x = 42
-    match x
+    match x:
         1 =>
         2 => print("two")
     print("done")

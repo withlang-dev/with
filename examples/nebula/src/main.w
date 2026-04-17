@@ -94,7 +94,7 @@ fn main:
         print("Final stats: {stats.active_count} active, {stats.total_packets} packets")
 
     // Postfix await blocks the main thread until the server completes.
-    match server_task.await
+    match server_task.await:
         Ok()   => print("Clean shutdown complete.")
         Err(e) => eprint("Fatal error: {e}")
 
@@ -115,6 +115,6 @@ fn background_analyzer(db: Arc[Database], pool: SessionPool):
             print("[analyzer] {stats.active_count} sessions, {stats.total_packets} packets ingested")
 
         // Periodic maintenance — blocking is safe on OS threads
-        match db.execute("DELETE FROM telemetry WHERE ts < strftime('%s','now') - 86400")
+        match db.execute("DELETE FROM telemetry WHERE ts < strftime('%s','now') - 86400"):
             Ok()   => ()
             Err(e) => eprint("[analyzer] cleanup error: {e}")

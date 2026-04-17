@@ -1,14 +1,14 @@
 //! expect-stdout: ok
 
 fn choose(ok: bool) -> i32:
-    match ok
+    match ok:
         true => 7
         false =>
             assert(true)
             9
 
 fn classify(n: i32) -> i32:
-    match n
+    match n:
         0 =>
             assert(true)
             1

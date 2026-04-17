@@ -648,7 +648,7 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         let subject = (stmts.get_d0(id)) as CiExprId
         let arms_start = stmts.get_d1(id)
         let arm_count = stmts.get_d2(id)
-        var out = indent ++ "match " ++ ci_print_expr(exprs, types, subject, 0, 0) ++ "\n"
+        var out = indent ++ "match " ++ ci_print_expr(exprs, types, subject, 0, 0) ++ ":\n"
         var cursor: i32 = arms_start
         var ai: i32 = 0
         while ai < arm_count:
@@ -766,7 +766,7 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         out = out ++ ds ++ "var __pc: i32 = 0\n"
         out = out ++ ds ++ "var __goto_pending: i32 = 0\n"
         out = out ++ ds ++ "while true:\n"
-        out = out ++ ds1 ++ "match __pc\n"
+        out = out ++ ds1 ++ "match __pc:\n"
 
         // Each arm: variable-length meta [state, label_str_idx,
         // child_count, child_stmt_0, ..., child_stmt_(K-1)].

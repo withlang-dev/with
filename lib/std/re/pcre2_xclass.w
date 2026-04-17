@@ -235,7 +235,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
             
             var ok: c_int
             
-            match (unsafe: *data)
+            match (unsafe: *data):
                 0 =>
                     (chartype = prop.chartype)
                     if (((if ((chartype == ucp_Lu) or (chartype == ucp_Ll)) or (chartype == ucp_Lt): 1 else: 0)) == isprop):
@@ -258,7 +258,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
                     if (((if (_pcre2_ucp_gentype_8[chartype] == 1) or (_pcre2_ucp_gentype_8[chartype] == 3): 1 else: 0)) == isprop):
                         return not_negated
                 6 =>
-                    match c
+                    match c:
                         9 =>
                             if (isprop != 0):
                                 return not_negated
@@ -341,7 +341,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
                             if (((if _pcre2_ucp_gentype_8[prop.chartype] == 6: 1 else: 0)) == isprop):
                                 return not_negated
                 7 =>
-                    match c
+                    match c:
                         9 =>
                             if (isprop != 0):
                                 return not_negated
@@ -643,7 +643,7 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
         
 
     while (ptr < data_end):
-        match (unsafe: *ptr)
+        match (unsafe: *ptr):
             1 =>
                 (ptr = ptr + 1)
                 (stack = (((stack >> 1)) & ((stack | (0 - 1 - 1)))))

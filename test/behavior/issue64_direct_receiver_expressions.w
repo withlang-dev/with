@@ -12,7 +12,7 @@ fn pick_first(items: &mut Vec[Inner]) -> Inner:
     items.get(0)
 
 fn pick_match(items: &mut Vec[Inner], idx: i32) -> Inner:
-    match idx
+    match idx:
         0 => items.get(0)
         _ => items.get(1)
 

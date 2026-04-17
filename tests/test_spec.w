@@ -204,7 +204,7 @@ fn test_bitwise:
 // ── §9.7 Pattern matching ───────────────────────────────────────
 
 fn classify(x: i32) -> str:
-    match x
+    match x:
         0 => "zero"
         1 => "one"
         _ => "other"
@@ -216,7 +216,7 @@ fn test_match:
 
     // Match with guards
     let v = 42
-    let label = match v
+    let label = match v:
         x if x > 0 => "positive"
         x if x < 0 => "negative"
         _ => "zero"
@@ -224,7 +224,7 @@ fn test_match:
 
     // Tuple pattern matching
     let pair = (10, 20)
-    let sum = match pair
+    let sum = match pair:
         (a, b) => a + b
     assert_eq(sum, 30, "tuple match destructure")
 

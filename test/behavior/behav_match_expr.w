@@ -12,7 +12,7 @@ fn test_match_integer:
     assert(describe_num(-5) == "other")
 
 fn describe_num(x: i32) -> str:
-    match x
+    match x:
         0 => "zero"
         1 => "one"
         2 => "two"
@@ -26,7 +26,7 @@ fn test_match_range:
     assert(classify_age(70) == "senior")
 
 fn classify_age(age: i32) -> str:
-    match age
+    match age:
         0..=2 => "baby"
         3..=12 => "child"
         13..=19 => "teen"
@@ -41,14 +41,14 @@ fn test_match_enum:
     assert(color_name(Color.Blue) == "blue")
 
 fn color_name(c: Color) -> str:
-    match c
+    match c:
         .Red => "red"
         .Green => "green"
         .Blue => "blue"
 
 fn test_match_expression:
     let x = 5
-    let result = match x
+    let result = match x:
         1 => 10
         5 => 50
         _ => 0
@@ -69,7 +69,7 @@ fn sign(x: i32) -> i32:
 fn test_match_wildcard:
     let x = 42
     var matched_wildcard = false
-    match x
+    match x:
         0 => assert(false)
         1 => assert(false)
         _ => matched_wildcard = true
@@ -81,7 +81,7 @@ fn test_match_guard:
     assert(abs_classify(5) == "positive")
 
 fn abs_classify(x: i32) -> str:
-    match x
+    match x:
         n if n < 0 => "negative"
         n if n > 0 => "positive"
         _ => "zero"
@@ -93,7 +93,7 @@ fn test_match_or_pattern:
     assert(not is_weekend(3))
 
 fn is_weekend(day: i32) -> bool:
-    match day
+    match day:
         6 | 7 => true
         _ => false
 
@@ -102,7 +102,7 @@ fn test_match_at_binding:
     assert(double_small(15) == 15)
 
 fn double_small(x: i32) -> i32:
-    match x
+    match x:
         n @ 1..=10 => n * 2
         _ => x
 
@@ -114,7 +114,7 @@ fn test_match_multiple_ranges:
     assert(http_category(100) == "other")
 
 fn http_category(code: i32) -> str:
-    match code
+    match code:
         200..=299 => "success"
         300..=399 => "redirect"
         400..=499 => "client_error"

@@ -2706,18 +2706,30 @@ fn NAME -> TYPE: BODY            // no parameters, has return type
 fn NAME: BODY                    // no parameters, returns Unit
 ```
 
+Function bodies may use either colon form or brace form (§29.13):
+
+```
+fn NAME(PARAMS) -> TYPE { BODY }
+fn NAME(PARAMS) { BODY }
+fn NAME -> TYPE { BODY }
+fn NAME { BODY }
+```
+
 Parentheses are required when a function takes parameters. When a
 function takes no parameters, parentheses may be included or
 omitted — `fn greet:` and `fn greet():` are both legal. The
 idiomatic style omits them. The return type `-> TYPE` is omitted
-when the function returns `Unit` (void). The colon `:` introduces
-the body — either inline on the same line or indented on the next.
+when the function returns `Unit` (void). The body is introduced by
+either `:` (colon form) or `{ }` (brace form) — see §29.13 for
+the full rules.
 
 ```
-fn greet: print("hello")               // no args, no return type
+fn greet: print("hello")               // colon inline
+fn greet { print("hello") }            // brace inline
 fn greet(): print("hello")             // also legal, parens optional
-fn get_pi -> f64: 3.14159                // no args, returns f64
-fn double(x: i32) -> i32: x * 2         // args + return type
+fn get_pi -> f64: 3.14159              // no args, returns f64
+fn double(x: i32) -> i32: x * 2       // args + return type
+fn double(x: i32) -> i32 { x * 2 }    // same, brace form
 fn log(msg: str): print(msg)           // args, returns Unit
 ```
 
@@ -12126,6 +12138,120 @@ The following keywords are reserved and cannot be used as identifiers:
 | E1101 | Orphan rule violation: impl requires a local trait or local type |
 | E1102 | Duplicate implementation of trait for type |
 | E1201 | Overlapping trait implementations |
+
+### 29.13 Block Body Syntax
+
+Block bodies may use either `:` (colon form) or `{ }` (brace form).
+Both forms are semantically identical and interchangeable wherever a
+block body appears: `fn`, `if`, `else`, `while`, `for`, `match`,
+`with`, `type`, `enum`, `impl`, `trait`, closures, and any future
+block-introducer.
+
+**Colon form (`:`):**
+
+- **Inline:** same-line single-expression body.
+  ```
+  fn add(a: i32, b: i32) -> i32: a + b
+  fn is_empty(self: &Vec[T]) -> bool: self.len() == 0
+  ```
+- **Multi-line:** newline after `:`, body indented one level deeper
+  than the header.
+  ```
+  fn main:
+      let x = 5
+      print(x)
+  ```
+- Colon followed by a newline without indentation is a **syntax
+  error**.
+- Colon with a body that mixes same-line content plus subsequent
+  indented lines is a **syntax error**.
+
+**Brace form (`{ }`):**
+
+- Body delimited by `{` and matching `}`.
+- Whitespace inside braces is insignificant.
+- Statements are newline-separated.
+- Single-line:
+  ```
+  fn add(a: i32, b: i32) -> i32 { a + b }
+  fn main { print("hello") }
+  ```
+- Multi-line:
+  ```
+  fn main {
+      let x = 5
+      print(x)
+  }
+  ```
+- Empty brace body `{}` is legal (returns `Unit`).
+- Unindented bodies are legal (generators may emit flat output):
+  ```
+  fn main {
+  let x = 5
+  print(x)
+  }
+  ```
+
+**Illegal combinations:**
+
+- Mixed colon + brace: `fn main: { body }` — syntax error.
+- Brace + colon: `fn main { : body }` — syntax error.
+- Empty colon body: `fn main:` with nothing following — syntax error.
+
+**Applies uniformly to all block-introducers:**
+
+```
+// Functions
+fn greet: print("hello")
+fn greet { print("hello") }
+
+// Conditionals
+if x > 0:
+    handle_positive()
+if x > 0 { handle_positive() }
+
+// Loops
+while running:
+    tick()
+while running { tick() }
+
+for item in list:
+    process(item)
+for item in list { process(item) }
+
+// Match (block form)
+match shape:
+    Circle(r) => pi * r * r
+    _ => 0.0
+match shape {
+    Circle(r) => pi * r * r,
+    _ => 0.0,
+}
+
+// Type definitions
+type Point { x: f64, y: f64 }
+
+// Trait definitions
+trait Drawable:
+    fn draw(self: &Self)
+trait Drawable {
+    fn draw(self: &Self)
+}
+```
+
+**Style guidance:** Hand-written code typically uses colon form.
+Generated code (code generators, derive macros, comptime expansions)
+should use brace form to avoid indentation-sensitivity issues.
+
+**Formatter behavior:**
+
+- `with fmt` (default): preserves the author's chosen form.
+- `with fmt --prefer-curly`: converts inline colon to inline brace.
+  `fn f: expr` becomes `fn f { expr }`. Multi-line colon becomes
+  multi-line brace. Lossless.
+- `with fmt --prefer-colon`: converts inline brace to inline colon
+  when the body is a single expression. Multi-statement braced
+  bodies convert to multi-line colon form. Lossless.
 
 ---
 

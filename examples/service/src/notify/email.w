@@ -21,7 +21,7 @@ impl NotificationService for EmailNotifier:
             msg.to = notif.recipient.clone()
             msg.subject = notif.subject.clone()
             msg.body = notif.body.clone()
-            msg.priority = match notif.priority
+            msg.priority = match notif.priority:
                 .Urgent => 1
                 .Normal => 3
                 .Low    => 5
@@ -33,7 +33,7 @@ impl NotificationService for EmailNotifier:
     async fn send_batch(self: &EmailNotifier, notifs: &[Notification]) -> Result[i32, NotifyError]:
         var sent = 0
         for notif in notifs:
-            match self.send(notif).await
+            match self.send(notif).await:
                 Ok() => sent += 1
                 Err(.RateLimited(d)) => return Err(.RateLimited(d))
                 Err(_) => ()  // skip individual failures

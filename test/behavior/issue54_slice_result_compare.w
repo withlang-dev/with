@@ -21,14 +21,14 @@ fn scan_opt(text: str) -> Option[i32]:
         None
 
 fn test_slice_compare_result:
-    let ok = match scan("[", 0)
+    let ok = match scan("[", 0):
         Ok(v) => v.next == 1
         Err(_) => false
     assert(ok)
 
 fn test_slice_compare_option:
     let r = scan_opt("[")
-    let val = match r
+    let val = match r:
         Some(n) => n
         None => 0
     assert(val == 1)

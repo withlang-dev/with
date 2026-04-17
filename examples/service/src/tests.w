@@ -54,7 +54,7 @@ impl UserRepository for MockUserRepo:
 
     async fn update(self: &MockUserRepo, id: UserId, fields: &UserUpdate) -> Result[Unit, DbError]:
         with self.users.write() as mut users:
-            match users.get_mut(&id)
+            match users.get_mut(&id):
                 Some(user) ->
                     if let Some(name) = &fields.name then user.name = name.clone()
                     if let Some(email) = &fields.email then user.email = email.clone()
@@ -203,7 +203,7 @@ async fn test_duplicate_email_rejected:
     svc.create_user(req.clone(), UserId(0)).await.unwrap()
 
     // Second create with same email fails
-    match svc.create_user(req, UserId(0)).await
+    match svc.create_user(req, UserId(0)).await:
         Err(.Validation(msg)) ->
             assert(msg.contains("already registered"))
         _ => unreachable()

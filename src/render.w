@@ -607,7 +607,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let subject = pool.get_data0(node)
         let extra_start = pool.get_data1(node)
         let arm_count = pool.get_data2(node)
-        var out = prefix ++ "match " ++ render_expr(pool, intern, (subject) as NodeId, 0) ++ "\n"
+        var out = prefix ++ "match " ++ render_expr(pool, intern, (subject) as NodeId, 0) ++ ":\n"
         for ai in 0..arm_count:
             let arm = pool.get_extra(extra_start + ai)
             let pattern = pool.get_data0(arm)

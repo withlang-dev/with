@@ -57,7 +57,7 @@ async fn worker(
     tx: Sender[ProcessedItem],
 ):
     loop:
-        match rx.recv().await
+        match rx.recv().await:
             Some(item) ->
                 // Simulate async processing
                 sleep(Duration.from_millis(10)).await

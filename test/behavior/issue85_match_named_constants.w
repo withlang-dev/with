@@ -6,13 +6,13 @@ let OP_PLUS: i32 = 43
 enum Opcode: i32 { Star = 42 | Plus = 43 | End = 99 }
 
 fn match_named_constant(opcode: i32) -> i32:
-    match opcode
+    match opcode:
         OP_STAR => 1
         OP_PLUS => 2
         _ => 0
 
 fn match_qualified_discriminant(opcode: i32) -> i32:
-    match opcode
+    match opcode:
         Opcode.Star => 10
         Opcode.Plus => 20
         _ => 0

@@ -5,7 +5,7 @@ enum Color: i32 { Red = 1 | Green = 2 | Blue = 4 }
 fn main:
     // Field access construction
     let c = Color.Green
-    let r = match c
+    let r = match c:
         .Red => "red"
         .Green => "green"
         .Blue => "blue"
@@ -14,7 +14,7 @@ fn main:
 
     // Shorthand construction
     let c2: Color = .Blue
-    let r2 = match c2
+    let r2 = match c2:
         .Red => "r"
         .Green => "g"
         .Blue => "b"
@@ -23,7 +23,7 @@ fn main:
 
     // Wildcard catches non-matched
     let c3 = Color.Blue
-    let r3 = match c3
+    let r3 = match c3:
         .Red => "r"
         _ => "other"
     assert(r3 == "other")

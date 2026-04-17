@@ -16,7 +16,7 @@ pub fn imported_if(ok: bool) -> ImportedEntry:
     if ok then ImportedEntry { name: "imported-if", rank: 20 } else ImportedEntry { name: "imported-else", rank: 21 }
 
 pub fn imported_match(ok: bool) -> ImportedEntry:
-    match ok
+    match ok:
         true => ImportedEntry { name: "imported-match-yes", rank: 30 }
         false => ImportedEntry { name: "imported-match-no", rank: 31 }
 

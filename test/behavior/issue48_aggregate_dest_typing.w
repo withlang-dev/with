@@ -22,7 +22,7 @@ fn result_from_if(ok: bool) -> Result[Pair, E]:
     if ok then Ok(helper_pair(10)) else Err(.Bad)
 
 fn pair_from_match(ok: bool) -> Pair:
-    match ok
+    match ok:
         true => Pair { left: 1, right: 2 }
         false => Pair { left: 3, right: 4 }
 
@@ -30,24 +30,24 @@ fn main:
     assert(helper_pair_sum(4) == 9)
 
     let some = option_from_if(true)
-    let some_val = match some
+    let some_val = match some:
         Some(v) => v
         None => 0
     assert(some_val == 7)
 
     let none = option_from_if(false)
-    let none_val = match none
+    let none_val = match none:
         Some(v) => v
         None => -1
     assert(none_val == -1)
 
-    let ok_pair = match result_from_if(true)
+    let ok_pair = match result_from_if(true):
         Ok(v) => v
         Err(_) => Pair { left: 0, right: 0 }
     assert(ok_pair.left == 10)
     assert(ok_pair.right == 11)
 
-    let err_pair = match result_from_if(false)
+    let err_pair = match result_from_if(false):
         Ok(v) => v
         Err(_) => Pair { left: -1, right: -2 }
     assert(err_pair.left == -1)

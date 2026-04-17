@@ -5,7 +5,7 @@ use test.testing
 type JsonTag = Null | Bool | Number | Str
 
 fn classify_char(ch: i32) -> i32:
-    match ch
+    match ch:
         123 => 1   // {
         125 => 2   // }
         91  => 3   // [
@@ -49,7 +49,7 @@ fn fib(n: i32) -> i32:
     else fib(n - 1) + fib(n - 2)
 
 fn tag_to_int(t: JsonTag) -> i32:
-    match t
+    match t:
         Null => 0
         Bool => 1
         Number => 2

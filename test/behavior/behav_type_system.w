@@ -26,7 +26,7 @@ fn test_struct_from_fn:
 
 fn test_enum:
     let c: Color = .Red
-    let result = match c
+    let result = match c:
         .Red => "red"
         .Green => "green"
         .Blue => "blue"

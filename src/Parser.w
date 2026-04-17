@@ -21,6 +21,7 @@ type Parser {
     source: str,
     file_id: i32,
     suppress_as: i32,
+    suppress_brace: i32,
     pending_tailrec: i32,
     pending_inline: i32,
     pending_noinline: i32,
@@ -72,6 +73,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         source,
         file_id,
         suppress_as: 0,
+        suppress_brace: 0,
         pending_tailrec: 0,
         pending_inline: 0,
         pending_noinline: 0,
@@ -3160,6 +3162,8 @@ fn Parser.parse_postfix(self: Parser, lhs_in: i32) -> NodeId:
             self.advance()
             lhs = self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), end, lhs, field, 0)
         else if t == TokenKind.TK_L_BRACE:
+            if self.suppress_brace != 0:
+                return lhs
             // Struct literal only when lhs is an identifier
             if self.pool.kind(lhs) != NodeKind.NK_IDENT:
                 return lhs
@@ -3191,6 +3195,8 @@ fn Parser.maybe_wrap_implicit_it(self: Parser, expr: i32) -> NodeId:
 
 fn Parser.parse_call(self: Parser, callee: i32) -> NodeId:
     self.advance()  // consume (
+    let saved_suppress_brace = self.suppress_brace
+    self.suppress_brace = 0
     self.skip_newlines()
     var args: Vec[i32] = Vec.new()
     var arg_names: Vec[i32] = Vec.new()  // 0 = positional, sym = named
@@ -3234,6 +3240,7 @@ fn Parser.parse_call(self: Parser, callee: i32) -> NodeId:
                 break
     self.skip_newlines()
     self.expect(TokenKind.TK_R_PAREN)
+    self.suppress_brace = saved_suppress_brace
     let arg_count = args.len() as i32
     var placeholder_count = 0
     for ai in 0..arg_count:
@@ -4392,11 +4399,22 @@ fn Parser.parse_match_expr(self: Parser) -> NodeId:
     let start = self.current_start()
     self.advance()
     self.skip_newlines()
+    let saved_suppress_brace = self.suppress_brace
+    self.suppress_brace = 1
     let subject = self.parse_expr()
+    self.suppress_brace = saved_suppress_brace
+    var inline_match = false
     if self.peek() == TokenKind.TK_COLON:
         self.advance()
-    self.skip_newlines()
-    let arm_count = self.parse_match_arms()
+    else if self.peek() == TokenKind.TK_L_BRACE:
+        inline_match = true
+        self.advance()
+    else:
+        self.emit_error("expected ':' or '{' after match subject")
+        return self.poisoned_expr()
+    if not inline_match:
+        self.skip_newlines()
+    let arm_count = if inline_match: self.parse_inline_match_arms() else: self.parse_match_arms()
     let extra_start = if arm_count > 0: self.pool.extra_len() - arm_count else: self.pool.extra_len()
     self.pool.add_node(NodeKind.NK_MATCH, start, self.prev_end(), subject, extra_start, arm_count)
 
@@ -4477,6 +4495,60 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
             self.pos = save
             break
 
+    let arm_count = arms.len() as i32
+    for ai in 0..arm_count:
+        self.pool.add_extra(arms.get(ai as i64))
+    arm_count
+
+fn Parser.parse_inline_match_arms(self: Parser) -> i32:
+    var arms: Vec[i32] = Vec.new()
+    self.skip_newlines()
+    while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
+        let arm_start = self.current_start()
+        var pattern: NodeId = 0 as NodeId
+        var in_guard_expr: NodeId = 0 as NodeId
+        if self.peek() == TokenKind.TK_KW_IN:
+            self.advance()
+            let collection_expr = self.parse_expr()
+            let bind_sym = self.intern.intern("__v")
+            pattern = self.pool.add_node(NodeKind.NK_PAT_IDENT, arm_start, arm_start, bind_sym, 0, 0)
+            let bind_ref = self.pool.add_node(NodeKind.NK_IDENT, arm_start, arm_start, bind_sym, 0, 0)
+            in_guard_expr = self.pool.add_node(NodeKind.NK_BINARY, arm_start, self.prev_end(), BinaryOp.OP_IN, bind_ref, collection_expr)
+        else:
+            pattern = self.parse_pattern()
+        if self.peek() == TokenKind.TK_PIPE:
+            let or_patterns: Vec[i32] = Vec.new()
+            or_patterns.push(pattern as i32)
+            while self.peek() == TokenKind.TK_PIPE:
+                self.advance()
+                self.skip_newlines()
+                let alt = self.parse_pattern()
+                or_patterns.push(alt as i32)
+            let or_start = self.pool.extra_len()
+            let or_count = or_patterns.len() as i32
+            for oi in 0..or_count:
+                self.pool.add_extra(or_patterns.get(oi as i64))
+            pattern = self.pool.add_node(NodeKind.NK_PAT_OR, arm_start, self.prev_end(), or_start, or_count, 0)
+        var guard: NodeId = 0 as NodeId
+        if in_guard_expr != 0:
+            guard = in_guard_expr
+        else if self.peek() == TokenKind.TK_KW_IF:
+            self.advance()
+            guard = self.parse_expr()
+        if self.expect(TokenKind.TK_FAT_ARROW) == 0:
+            break
+        let body = self.parse_expr()
+        let arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, arm_start, self.prev_end(), pattern, body, guard)
+        arms.push(arm as i32)
+        if self.peek() == TokenKind.TK_COMMA:
+            self.advance()
+            self.skip_newlines()
+        else:
+            break
+    if self.peek() == TokenKind.TK_R_BRACE:
+        self.advance()
+    else:
+        self.emit_error("expected '}' to close inline match")
     let arm_count = arms.len() as i32
     for ai in 0..arm_count:
         self.pool.add_extra(arms.get(ai as i64))

@@ -1,19 +1,19 @@
 use issue67.mod
 
 fn filler_0(x: Result[i32, str]) -> i32:
-    let y = match x
+    let y = match x:
         Ok(v) => v
         Err(_) => 0
     y
 
 fn filler_1(x: Result[i32, str]) -> i32:
-    let y = match x
+    let y = match x:
         Ok(v) => v
         Err(_) => 0
     y
 
 fn filler_2(x: Result[i32, str]) -> i32:
-    let y = match x
+    let y = match x:
         Ok(v) => v
         Err(_) => 0
     y

@@ -2,7 +2,7 @@
 enum Color { Red | Green | Blue | Yellow }
 
 fn describe(c: Color) -> str:
-    match c
+    match c:
         .Red => "red"
         .Green => "green"
         _ => "other"

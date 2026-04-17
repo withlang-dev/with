@@ -223,7 +223,7 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
         
         set_bit
         
-        match ptype
+        match ptype:
             0 =>
                 (chartype = prop.chartype)
                 (set_bit = ((if ((chartype == ucp_Lu) or (chartype == ucp_Ll)) or (chartype == ucp_Lt): 1 else: 0)))
@@ -239,7 +239,7 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
                 (gentype = _pcre2_ucp_gentype_8[prop.chartype])
                 (set_bit = ((if (gentype == 1) or (gentype == 3): 1 else: 0)))
             6 =>
-                match c
+                match c:
                     9 =>
                         (set_bit = 1)
                     32 =>
@@ -259,7 +259,7 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
                     _ =>
                         (set_bit = ((if _pcre2_ucp_gentype_8[prop.chartype] == 6: 1 else: 0)))
             7 =>
-                match c
+                match c:
                     9 =>
                         (set_bit = 1)
                     32 =>
@@ -367,7 +367,7 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 pptr__goto_1076_11 = start_ptr
@@ -445,7 +445,7 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                         (unsafe: *(__ci_expr_old_0))
                     if __goto_pending != 0:
                         break
-                    match ((meta__goto_1174_12 & (4294901760 as c_uint)))
+                    match ((meta__goto_1174_12 & (4294901760 as c_uint))):
                         2149580800 =>
                             (local_negate__goto_1175_8 = ((if meta__goto_1174_12 == 2149646336: 1 else: 0)))
                             var __ci_expr_old_2: *mut c_uint = pptr__goto_1076_11
@@ -456,7 +456,7 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                             if ((((options & 8)) != 0) and (posix_class__goto_1176_7 <= 2)):
                                 (posix_class__goto_1176_7 = 0)
                             if ((((options & 131072)) != 0) and (((xoptions & 2048)) == 0)):
-                                match posix_class__goto_1176_7
+                                match posix_class__goto_1176_7:
                                     8 =>
                                         (ptype__goto_1211_16 = (if (posix_class__goto_1176_7 == 8): 14 else: (if (posix_class__goto_1176_7 == 9): 15 else: 16)))
                                         _pcre2_update_classbits_8(ptype__goto_1211_16, 0, local_negate__goto_1175_8, classbits__goto_1082_16)
@@ -610,7 +610,7 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                             if ((((options & 8)) != 0) and (posix_class__goto_1176_7 <= 2)):
                                 (posix_class__goto_1176_7 = 0)
                             if ((((options & 131072)) != 0) and (((xoptions & 2048)) == 0)):
-                                match posix_class__goto_1176_7
+                                match posix_class__goto_1176_7:
                                     8 =>
                                         (ptype__goto_1211_16 = (if (posix_class__goto_1176_7 == 8): 14 else: (if (posix_class__goto_1176_7 == 9): 15 else: 16)))
                                         _pcre2_update_classbits_8(ptype__goto_1211_16, 0, local_negate__goto_1175_8, classbits__goto_1082_16)
@@ -760,7 +760,7 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                             (meta__goto_1174_12 = (unsafe: *(__ci_expr_old_10)))
                         2149318656 =>
                             (escape__goto_1179_12 = ((meta__goto_1174_12 & 65535)))
-                            match escape__goto_1179_12
+                            match escape__goto_1179_12:
                                 7 =>
                                     i__goto_1340_16 = 0
                                     while (i__goto_1340_16 < 32):
@@ -1854,10 +1854,10 @@ fn parse_class(__param_ptr: *mut c_uint, options: c_uint, __param_buffer: *mut c
     var start_char: c_uint
 
     while (1 != 0):
-        match (((unsafe: *ptr) & (4294901760 as c_uint)))
+        match (((unsafe: *ptr) & (4294901760 as c_uint))):
             2149318656 =>
                 (meta_arg = (((unsafe: *ptr) & 65535)))
-                match meta_arg
+                match meta_arg:
                     6 =>
                         (buffer = append_non_ascii_range(options, buffer))
                         (total_size = total_size + 2)
@@ -2488,7 +2488,7 @@ fn fold_negation(pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong, preserv
 
 
 fn fold_binary(op: c_int, lhs_op_info: *mut eclass_op_info, rhs_op_info: *mut eclass_op_info, lengthptr: *mut c_ulong):
-    match op
+    match op:
         1 =>
             var i: c_int = 0
             while (i < 8):
@@ -2561,7 +2561,7 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 ptr__goto_2135_11 = (unsafe: *pptr)
@@ -2569,7 +2569,7 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                 code_start__goto_2138_14 = code__goto_2137_14
                 prev_length__goto_2139_12 = (if (lengthptr != (null as *mut c_ulong)): (unsafe: *lengthptr) else: 0)
                 meta__goto_2141_10 = (((unsafe: *ptr__goto_2135_11) & (4294901760 as c_uint)))
-                match meta__goto_2141_10
+                match meta__goto_2141_10:
                     2148270080 =>
                         (ptr__goto_2135_11 = ptr__goto_2135_11 + 1)
                         (pop_info.length = 1)

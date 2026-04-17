@@ -106,7 +106,7 @@ extend Database:
         body: fn(&Self) -> Result[T, SqliteError],
     ) -> Result[T, SqliteError]:
         self.execute("BEGIN")?
-        match body(self)
+        match body(self):
             Ok(value) ->
                 self.execute("COMMIT")?
                 value
@@ -149,7 +149,7 @@ extend Statement:
 
     fn step(self: &Self) -> Result[bool, SqliteError]:
         let rc = unsafe { sqlite3_step(self.handle) }
-        match rc
+        match rc:
             SQLITE_ROW  => Ok(true)
             SQLITE_DONE => Ok(false)
             _           => Err(.StepFailed(code: rc))
@@ -182,7 +182,7 @@ extend Statement:
 
 gen fn rows(stmt: &Statement) -> &Statement:
     loop:
-        match stmt.step()
+        match stmt.step():
             Ok(true)  => yield stmt
             Ok(false) => break
             Err(_)    => break
@@ -275,7 +275,7 @@ fn main -> Result[Unit, SqliteError]:
 
     // Demonstrate error handling
     print("\n--- Error handling ---")
-    match db.execute("INSERT INTO users (name, email) VALUES ('Duplicate', 'alice@example.com')")
+    match db.execute("INSERT INTO users (name, email) VALUES ('Duplicate', 'alice@example.com')"):
         Ok(_)  => print("  unexpected success")
         Err(e) => print("  expected error: {e}")
 

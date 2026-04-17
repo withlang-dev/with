@@ -124,7 +124,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 has_lookbehind__goto_10285_6 = 0
@@ -371,7 +371,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                                 (skipatstart__goto_10307_10 = skipatstart__goto_10307_10 + (p__goto_10505_18.length + 2))
                                 if __goto_pending != 0:
                                     break
-                                match p__goto_10505_18.type_
+                                match p__goto_10505_18.type_:
                                     PSO_OPT =>
                                         (cb__goto_10288_15.external_options = cb__goto_10288_15.external_options | p__goto_10505_18.value)
                                     PSO_XOPT =>
@@ -500,7 +500,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                                         (skipatstart__goto_10307_10 = pp__goto_10510_21)
                                     PSO_OPTMZ =>
                                         (optim_flags__goto_10320_10 = optim_flags__goto_10320_10 & (0 - (p__goto_10505_18.value) - 1))
-                                        match p__goto_10505_18.value
+                                        match p__goto_10505_18.value:
                                             1 =>
                                                 (cb__goto_10288_15.external_options = cb__goto_10288_15.external_options | 16384)
                                             2 =>
@@ -620,7 +620,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 (cb__goto_10288_15.nltype = 0)
                 if __goto_pending != 0:
                     continue
-                match newline__goto_10312_5
+                match newline__goto_10312_5:
                     1 =>
                         (cb__goto_10288_15.nllen = 1)
                         ((&cb__goto_10288_15.nl[0] as *mut u8)[0] = 13)
@@ -1510,7 +1510,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 utf__goto_1494_6 = (if ((options & 524288)) != 0: 1 else: 0)
@@ -1920,7 +1920,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 branchlength__goto_9587_5 = 0
@@ -1957,7 +1957,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                         if __goto_pending != 0:
                             break
                     else:
-                        match (((unsafe: *pptr__goto_9592_11) & (4294901760 as c_uint)))
+                        match (((unsafe: *pptr__goto_9592_11) & (4294901760 as c_uint))):
                             2149384192 =>
                                 __pc = 5
                                 __goto_pending = 1
@@ -2059,7 +2059,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                                 ((unsafe: *errcodeptr) = check_lookbehinds((pptr__goto_9592_11 + (1 as isize as usize)), (&mut pptr__goto_9592_11 as *mut *mut c_uint), recurses, cb, lcptr))
                                 if ((unsafe: *errcodeptr) != 0):
                                     return -1
-                                match pptr__goto_9592_11[1]
+                                match pptr__goto_9592_11[1]:
                                     2151153664 =>
                                         var __ci_expr_old_4: *mut c_uint = pptr__goto_9592_11
                                         (pptr__goto_9592_11 = pptr__goto_9592_11 + 1)
@@ -2098,7 +2098,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                                 ((unsafe: *errcodeptr) = check_lookbehinds((pptr__goto_9592_11 + (1 as isize as usize)), (&mut pptr__goto_9592_11 as *mut *mut c_uint), recurses, cb, lcptr))
                                 if ((unsafe: *errcodeptr) != 0):
                                     return -1
-                                match pptr__goto_9592_11[1]
+                                match pptr__goto_9592_11[1]:
                                     2151153664 =>
                                         var __ci_expr_old_4: *mut c_uint = pptr__goto_9592_11
                                         (pptr__goto_9592_11 = pptr__goto_9592_11 + 1)
@@ -2137,7 +2137,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                                 ((unsafe: *errcodeptr) = check_lookbehinds((pptr__goto_9592_11 + (1 as isize as usize)), (&mut pptr__goto_9592_11 as *mut *mut c_uint), recurses, cb, lcptr))
                                 if ((unsafe: *errcodeptr) != 0):
                                     return -1
-                                match pptr__goto_9592_11[1]
+                                match pptr__goto_9592_11[1]:
                                     2151153664 =>
                                         var __ci_expr_old_4: *mut c_uint = pptr__goto_9592_11
                                         (pptr__goto_9592_11 = pptr__goto_9592_11 + 1)
@@ -2176,7 +2176,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                                 ((unsafe: *errcodeptr) = check_lookbehinds((pptr__goto_9592_11 + (1 as isize as usize)), (&mut pptr__goto_9592_11 as *mut *mut c_uint), recurses, cb, lcptr))
                                 if ((unsafe: *errcodeptr) != 0):
                                     return -1
-                                match pptr__goto_9592_11[1]
+                                match pptr__goto_9592_11[1]:
                                     2151153664 =>
                                         var __ci_expr_old_4: *mut c_uint = pptr__goto_9592_11
                                         (pptr__goto_9592_11 = pptr__goto_9592_11 + 1)
@@ -2789,7 +2789,7 @@ fn check_lookbehinds(__param_pptr: *mut c_uint, retptr: *mut *mut c_uint, recurs
         if ((unsafe: *pptr) < 2147483648):
             continue
         
-        match (((unsafe: *pptr) & (4294901760 as c_uint)))
+        match (((unsafe: *pptr) & (4294901760 as c_uint))):
             2149318656 =>
                 if ((((unsafe: *pptr) -% (2149318656 as c_uint)) == 15) or (((unsafe: *pptr) -% (2149318656 as c_uint)) == 16)):
                     (pptr = pptr + 1)
@@ -2943,7 +2943,7 @@ fn read_number(ptrptr: *mut *const u8, ptrend: *const u8, allow_sign: c_int, __p
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 sign__goto_1263_5 = 0
@@ -3065,7 +3065,7 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 p__goto_1353_12 = (unsafe: *ptrptr)
@@ -3261,7 +3261,7 @@ fn get_ucp(ptrptr: *mut *const u8, utf: c_int, negptr: *mut c_int, ptypeptr: *mu
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 ptr__goto_2265_12 = (unsafe: *ptrptr)
@@ -3518,7 +3518,7 @@ fn get_ucp(ptrptr: *mut *const u8, utf: c_int, negptr: *mut c_int, ptypeptr: *mu
                                 break
                         if __goto_pending != 0:
                             break
-                        match _pcre2_utt_8[i__goto_2263_11].type_
+                        match _pcre2_utt_8[i__goto_2263_11].type_:
                             3 =>
                                 ((unsafe: *ptypeptr) = 3)
                                 return 1
@@ -3620,7 +3620,7 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 ptr__goto_2597_12 = (unsafe: *ptrptr)
@@ -3889,7 +3889,7 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 ptr__goto_2737_12 = (unsafe: *ptrptr)
@@ -4088,7 +4088,7 @@ fn handle_escdsw(escape: c_int, __param_parsed_pattern: *mut c_uint, options: c_
 
     var prop: c_uint = ESC_p
 
-    match escape
+    match escape:
         ESC_D =>
             (prop = 15)
             (ascii_option = 256)
@@ -4115,7 +4115,7 @@ fn handle_escdsw(escape: c_int, __param_parsed_pattern: *mut c_uint, options: c_
         (parsed_pattern = parsed_pattern + 1)
         ((unsafe: *__ci_expr_old_1) = ((2149318656 as c_uint) +% prop))
         
-        match escape
+        match escape:
             ESC_d =>
                 var __ci_expr_old_2: *mut c_uint = parsed_pattern
                 (parsed_pattern = parsed_pattern + 1)
@@ -4267,7 +4267,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 verblengthptr__goto_3122_11 = ((null as *mut c_uint) as *mut c_uint)
@@ -4541,7 +4541,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                     if __goto_pending != 0:
                         break
                     if ((inverbname__goto_3141_6 != 0) and (((((options & ((128 | 4194304)))) != ((128 | 4194304))) or (((c__goto_3115_10 > 255) and (((c__goto_3115_10 | 1)) != 8207)) and (((c__goto_3115_10 | 1)) != 8233))) or ((((c__goto_3115_10 < 256) and (c__goto_3115_10 != 35)) and (((cb.ctypes[c__goto_3115_10] & 1)) == 0)) and (c__goto_3115_10 != 133)))):
-                        match c__goto_3115_10
+                        match c__goto_3115_10:
                             41 =>
                                 (inverbname__goto_3141_6 = 0)
                                 (verbnamelength__goto_3348_16 = (((((parsed_pattern__goto_3125_11 as usize -% verblengthptr__goto_3122_11 as usize) / sizeof[c_uint]()) - 1)) as c_ulong))
@@ -4579,7 +4579,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         break
                                 else:
                                     (escape__goto_3138_5 = 0)
-                                match escape__goto_3138_5
+                                match escape__goto_3138_5:
                                     0 =>
                                         var __ci_expr_old_17: *mut c_uint = parsed_pattern__goto_3125_11
                                         (parsed_pattern__goto_3125_11 = parsed_pattern__goto_3125_11 + 1)
@@ -4742,7 +4742,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 if __goto_pending != 0:
                                     break
                             else:
-                                match ptr[1]
+                                match ptr[1]:
                                     67 =>
                                         (ok__goto_3519_10 = (if expect_cond_assert__goto_3136_5 == 2: 1 else: 0))
                                     61 => 0
@@ -4799,7 +4799,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             break
                     if __goto_pending != 0:
                         break
-                    match c__goto_3115_10
+                    match c__goto_3115_10:
                         92 =>
                             (tempptr__goto_3235_14 = ptr)
                             (escape__goto_3138_5 = _pcre2_check_escape_8((&mut ptr as *mut *const u8), ptrend__goto_3149_12, (&mut c__goto_3115_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), options, xoptions, cb.bracount, 0, cb))
@@ -4911,7 +4911,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     if __goto_pending != 0:
                                         break
                                 else:
-                                    match escape__goto_3138_5
+                                    match escape__goto_3138_5:
                                         ESC_C =>
                                             if (((options & 1048576)) != 0):
                                                 (errorcode__goto_3137_5 = ERR83)
@@ -6046,7 +6046,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                                     break
                                                             if __goto_pending != 0:
                                                                 break
-                                                            match escape__goto_3138_5
+                                                            match escape__goto_3138_5:
                                                                 0 =>
                                                                     (char_is_literal__goto_3974_12 = 0)
                                                                     __pc = 4
@@ -6530,7 +6530,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     break
                                             if __goto_pending != 0:
                                                 break
-                                            match meta__goto_4760_18
+                                            match meta__goto_4760_18:
                                                 2147614720 =>
                                                     __pc = 10
                                                     __goto_pending = 1
@@ -6786,7 +6786,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             if __ci_cond_if_123:
                                 __pc = 18
                                 __goto_pending = 1
-                            match (unsafe: *ptr)
+                            match (unsafe: *ptr):
                                 80 =>
                                     var __ci_cond_if_145: bool = false
                                     (ptr = ptr + 1)
@@ -7822,7 +7822,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             var __ci_expr_old_129: *const u8 = ptr
                                             (ptr = ptr + 1)
                                             var __ci_expr_switch_130: c_int = (unsafe: *__ci_expr_old_129)
-                                            match __ci_expr_switch_130
+                                            match __ci_expr_switch_130:
                                                 45 =>
                                                     if (not ((hyphenok__goto_5025_14 != 0))):
                                                         (errorcode__goto_3137_5 = ERR94)
@@ -8178,7 +8178,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
 fn first_significant_code(__param_code: *const u8, skipassert: c_int) -> *const u8:
     var code = __param_code
     while true:
-        match ((unsafe: *code) as c_int)
+        match ((unsafe: *code) as c_int):
             OP_ASSERT_NOT =>
                 if (not ((skipassert != 0))):
                     return code
@@ -8389,7 +8389,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 bravalue__goto_6074_5 = 0
@@ -8530,7 +8530,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                     (skipunits__goto_6148_12 = 0)
                     if __goto_pending != 0:
                         break
-                    match meta__goto_6085_10
+                    match meta__goto_6085_10:
                         2147483648 =>
                             ((unsafe: *firstcuptr) = firstcu__goto_6082_10)
                             ((unsafe: *firstcuflagsptr) = firstcuflags__goto_6086_10)
@@ -9220,7 +9220,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if __goto_pending != 0:
                                     break
                             while (1 != 0):
-                                match (((unsafe: *pptr__goto_6084_11) & (4294901760 as c_uint)))
+                                match (((unsafe: *pptr__goto_6084_11) & (4294901760 as c_uint))):
                                     2148925440 =>
                                         var __ci_expr_old_22: *mut c_uint = pptr__goto_6084_11
                                         (pptr__goto_6084_11 = pptr__goto_6084_11 + 1)
@@ -10516,7 +10516,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 (reqcuflags__goto_6086_24 = zeroreqcuflags__goto_6087_10)
                                 if __goto_pending != 0:
                                     break
-                            match meta__goto_6085_10
+                            match meta__goto_6085_10:
                                 2151809024 =>
                                     (repeat_type__goto_6079_10 = 0)
                                     (possessive_quantifier__goto_6145_8 = 1)
@@ -10546,7 +10546,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     (possessive_quantifier__goto_6145_8 = 0)
                             (tempcode__goto_6096_14 = previous__goto_6097_14)
                             (op_previous__goto_6098_13 = (unsafe: *previous__goto_6097_14))
-                            match op_previous__goto_6098_13
+                            match op_previous__goto_6098_13:
                                 OP_CHAR =>
                                     if ((repeat_max__goto_6077_26 == 1) and (repeat_min__goto_6077_10 == 1)):
                                         __pc = 7
@@ -15372,7 +15372,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if __goto_pending != 0:
                                         break
                             if (possessive_quantifier__goto_6145_8 != 0):
-                                match (unsafe: *tempcode__goto_6096_14)
+                                match (unsafe: *tempcode__goto_6096_14):
                                     OP_TYPEEXACT =>
                                         (tempcode__goto_6096_14 = tempcode__goto_6096_14 + (_pcre2_OP_lengths_8[(unsafe: *tempcode__goto_6096_14)] + ((if ((tempcode__goto_6096_14[(1 + 2)] == OP_PROP) or (tempcode__goto_6096_14[(1 + 2)] == OP_NOTPROP)): 2 else: 0))))
                                     OP_CHAR =>
@@ -15486,7 +15486,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 (reqcuflags__goto_6086_24 = zeroreqcuflags__goto_6087_10)
                                 if __goto_pending != 0:
                                     break
-                            match meta__goto_6085_10
+                            match meta__goto_6085_10:
                                 2151809024 =>
                                     (repeat_type__goto_6079_10 = 0)
                                     (possessive_quantifier__goto_6145_8 = 1)
@@ -15516,7 +15516,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     (possessive_quantifier__goto_6145_8 = 0)
                             (tempcode__goto_6096_14 = previous__goto_6097_14)
                             (op_previous__goto_6098_13 = (unsafe: *previous__goto_6097_14))
-                            match op_previous__goto_6098_13
+                            match op_previous__goto_6098_13:
                                 OP_CHAR =>
                                     if ((repeat_max__goto_6077_26 == 1) and (repeat_min__goto_6077_10 == 1)):
                                         __pc = 7
@@ -20342,7 +20342,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if __goto_pending != 0:
                                         break
                             if (possessive_quantifier__goto_6145_8 != 0):
-                                match (unsafe: *tempcode__goto_6096_14)
+                                match (unsafe: *tempcode__goto_6096_14):
                                     OP_TYPEEXACT =>
                                         (tempcode__goto_6096_14 = tempcode__goto_6096_14 + (_pcre2_OP_lengths_8[(unsafe: *tempcode__goto_6096_14)] + ((if ((tempcode__goto_6096_14[(1 + 2)] == OP_PROP) or (tempcode__goto_6096_14[(1 + 2)] == OP_NOTPROP)): 2 else: 0))))
                                     OP_CHAR =>
@@ -20456,7 +20456,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 (reqcuflags__goto_6086_24 = zeroreqcuflags__goto_6087_10)
                                 if __goto_pending != 0:
                                     break
-                            match meta__goto_6085_10
+                            match meta__goto_6085_10:
                                 2151809024 =>
                                     (repeat_type__goto_6079_10 = 0)
                                     (possessive_quantifier__goto_6145_8 = 1)
@@ -20486,7 +20486,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     (possessive_quantifier__goto_6145_8 = 0)
                             (tempcode__goto_6096_14 = previous__goto_6097_14)
                             (op_previous__goto_6098_13 = (unsafe: *previous__goto_6097_14))
-                            match op_previous__goto_6098_13
+                            match op_previous__goto_6098_13:
                                 OP_CHAR =>
                                     if ((repeat_max__goto_6077_26 == 1) and (repeat_min__goto_6077_10 == 1)):
                                         __pc = 7
@@ -25312,7 +25312,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if __goto_pending != 0:
                                         break
                             if (possessive_quantifier__goto_6145_8 != 0):
-                                match (unsafe: *tempcode__goto_6096_14)
+                                match (unsafe: *tempcode__goto_6096_14):
                                     OP_TYPEEXACT =>
                                         (tempcode__goto_6096_14 = tempcode__goto_6096_14 + (_pcre2_OP_lengths_8[(unsafe: *tempcode__goto_6096_14)] + ((if ((tempcode__goto_6096_14[(1 + 2)] == OP_PROP) or (tempcode__goto_6096_14[(1 + 2)] == OP_NOTPROP)): 2 else: 0))))
                                     OP_CHAR =>
@@ -25624,7 +25624,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 return 0
                                 if __goto_pending != 0:
                                     break
-                            match meta_arg__goto_6085_16
+                            match meta_arg__goto_6085_16:
                                 14 =>
                                     (cb.external_flags = cb.external_flags | 4194304)
                                     if (not ((utf__goto_6110_6 != 0))):
@@ -25872,7 +25872,7 @@ fn is_startline(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_b
                 if ((unsafe: *scode) == OP_CALLOUT_STR):
                     scode = scode + ((((((scode)[(1 + (2 * 2))] << 8)) | (scode)[(((1 + (2 * 2))) + 1)])) as c_uint)
             
-            match (unsafe: *scode)
+            match (unsafe: *scode):
                 OP_CREF =>
                     return 0
                 OP_DNCREF =>
@@ -25960,7 +25960,7 @@ fn find_recurse(__param_code: *mut u8, utf: c_int) -> *mut u8:
             if (c == OP_CALLOUT_STR):
                 code = code + ((((((code)[(1 + (2 * 2))] << 8)) | (code)[(((1 + (2 * 2))) + 1)])) as c_uint)
             else:
-                match c
+                match c:
                     OP_TYPESTAR =>
                         if ((code[1] == OP_PROP) or (code[1] == OP_NOTPROP)):
                             (code = code + 2)
@@ -26014,7 +26014,7 @@ fn find_recurse(__param_code: *mut u8, utf: c_int) -> *mut u8:
                 code = code + _pcre2_OP_lengths_8[c]
                 
                 if (utf != 0):
-                    match c
+                    match c:
                         OP_CHAR =>
                             if ((code[-1]) >= 192):
                                 (code = code + (_pcre2_utf8_table4[((code[-1]) & 63)]))
@@ -26206,7 +26206,7 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
         
         var op: u8 = (unsafe: *scode)
         
-        match op
+        match op:
             OP_BRA =>
                 (d = find_firstassertedcu(scode, (&mut dflags as *mut c_uint), (inassert +% ((if ((op == OP_ASSERT) or (op == OP_ASSERT_NA)): 1 else: 0)))))
                 if (dflags >= 4294967294):
@@ -26471,7 +26471,7 @@ fn parsed_skip(__param_pptr: *mut c_uint, skiptype: c_uint) -> *mut c_uint:
     while true:
         var meta: c_uint = (((unsafe: *pptr) & (4294901760 as c_uint)))
         
-        match meta
+        match meta:
             2147483648 =>
                 return (null as *mut c_uint)
             2147680256 =>
@@ -26588,7 +26588,7 @@ fn get_grouplength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, isinline: c_in
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true:
-        match __pc
+        match __pc:
             0 =>
                 (__goto_pending = 0)
                 gi__goto_9513_11 = (cb.groupinfo + ((2 * group) as isize as usize))

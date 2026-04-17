@@ -69,12 +69,12 @@ comptime let _ = derive_sql_record[Telemetry]()
 // --- Status Helpers ---
 
 pub fn is_fatal(s: &Status) -> bool:
-    match s
+    match s:
         .Fatal(_) => true
         _         => false
 
 pub fn status_label(s: &Status) -> str:
-    match s
+    match s:
         .Ok         => "ok"
         .Warning(w) => "warn: {w}"
         .Fatal(c)   => "fatal({c.code})"
@@ -94,7 +94,7 @@ pub type ServerConfig = {
 
 pub fn load_config(env_port: Option[u16]) -> ServerConfig:
     let base = ServerConfig {}  // All defaults
-    match env_port
+    match env_port:
         Some(port) => { base with port }  // Record update + field shorthand
         None       => base
 

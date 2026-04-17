@@ -13,7 +13,7 @@ fn text3 -> str:
     "short\n"
 
 fn verify(text: str):
-    let prog = match parse_text(text)
+    let prog = match parse_text(text):
         Ok(v) => v
         Err(_) =>
             assert(false)

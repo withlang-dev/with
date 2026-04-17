@@ -1,7 +1,7 @@
 //! expect-error: undefined variable
 
 fn main:
-    let _ = match true
+    let _ = match true:
         true =>
             let hidden = 7
             hidden

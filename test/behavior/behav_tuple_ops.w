@@ -42,7 +42,7 @@ fn test_tuple_destructure:
 
 fn test_tuple_match:
     let p = (0, 5)
-    let label = match p
+    let label = match p:
         (0, 0) => "origin"
         (0, _) => "y-axis"
         (_, 0) => "x-axis"
@@ -51,7 +51,7 @@ fn test_tuple_match:
 
 fn test_tuple_match_values:
     let p = (3, 4)
-    let sum = match p
+    let sum = match p:
         (a, b) => a + b
     assert(sum == 7)
 

@@ -62,7 +62,7 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
     var re: *const pcre2_real_code_8 = code
 
     if (where_ == null):
-        match what
+        match what:
             0 =>
                 return 4
             1 =>
@@ -128,7 +128,7 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
     if (((re.flags & ((8 / 8)))) == 0):
         return (-32)
 
-    match what
+    match what:
         0 =>
             ((unsafe: *((where_ as *mut c_uint))) = re.overall_options)
         1 =>
@@ -222,7 +222,7 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
     while (1 != 0):
         var rc: c_int
         
-        match (unsafe: *cc)
+        match (unsafe: *cc):
             OP_END =>
                 return 0
             OP_CHAR =>

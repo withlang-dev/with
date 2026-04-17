@@ -25,7 +25,7 @@ fn test_result_ok_path:
 
 fn test_result_err_path:
     let r = parse_positive("")
-    let is_empty = match r
+    let is_empty = match r:
         Err(.EmptyInput) => true
         _ => false
     assert(is_empty)
@@ -34,7 +34,7 @@ fn test_result_err_path:
 // always matches first Err pattern. Skipping test_result_match_all_errors.
 
 fn unwrap_or_default(r: Result[i32, ParseError], default: i32) -> i32:
-    match r
+    match r:
         Ok(v) => v
         Err(_) => default
 
@@ -44,7 +44,7 @@ fn test_unwrap_or_pattern:
     assert(unwrap_or_default(parse_positive("abc"), 0) == 0)
 
 fn is_ok(r: Result[i32, ParseError]) -> bool:
-    match r
+    match r:
         Ok(_) => true
         Err(_) => false
 
