@@ -520,7 +520,7 @@ fn first(xs: &Vec[i32]) -> Option[&i32]:
 
 fn caller(xs: &Vec[i32]):
     let r = first(xs)        // OK: ephemeral local binding
-    match r
+    match r:
         Some(v) => print(v) // OK: local use
         None    => ()
 
@@ -1120,6 +1120,23 @@ type Config:
 No methods, no constructors, no inheritance. Functions are associated
 with types via extension blocks (Section 9.5).
 
+**Struct literal forms:**
+
+```
+Point { x: 1.0, y: 2.0 }     // named inline
+let p = Point:               // named block
+    x: 1.0
+    y: 2.0
+Point { 1.0, 2.0 }           // positional inline
+```
+
+Named literals require all non-defaulted fields; fields may appear in
+any order. Positional literals require all fields in declaration order.
+Mixing named and positional fields in one literal is a compile error.
+Positional form is inline only. Block form is named only. Field access
+is always by name, regardless of construction form. Inline forms use
+commas between fields; block form uses newlines.
+
 **Record update syntax:**
 
 ```
@@ -1146,7 +1163,8 @@ let entity2 = { entity with
 
 This is the primary mechanism for functional-style immutable updates.
 It replaces the need for lenses or builder patterns. This is Form 4
-of the `with` construct — see §7.4.
+of the `with` construct — see §7.4. Record update supports named
+inline and named block fields only; positional record update is invalid.
 
 **Field shorthand:**
 
@@ -1310,7 +1328,7 @@ type Shape { dims: [usize; 8], rank: i32 }
 **Interaction with pattern matching:**
 
 ```
-match items
+match items:
     []              => "empty"
     [only]          => "single"
     [first, ..rest] => "head: {first}, {rest.len()} more"
@@ -1461,7 +1479,7 @@ fn default_role -> Role: .Member
 
 // Match subject type is known → .Admin, .Member, .Guest work
 fn describe(role: Role) -> str:
-    match role
+    match role:
         .Admin   => "Administrator"
         .Member  => "Member"
         .Guest   => "Guest"
@@ -1491,7 +1509,7 @@ Match patterns may use qualified `Type.Variant` syntax:
 
 ```
 fn describe(c: Color) -> str:
-    match c
+    match c:
         Color.Red   => "red"
         Color.Green => "green"
         _           => "other"
@@ -1501,7 +1519,7 @@ Qualified patterns also work with payloads:
 
 ```
 fn area(s: Shape) -> f64:
-    match s
+    match s:
         Shape.Circle(r)       => 3.14159 * r * r
         Shape.Rectangle(w, h) => w * h
         _                     => 0.0
@@ -1706,7 +1724,7 @@ let slice = data[2..5]         // elements at index 2, 3, 4
 if x in 1..=100:               // membership test (§9.9)
     handle_valid(x)
 
-match code
+match code:
     200..=299 => "success"
     400..=499 => "client error"
     _         => "other"
@@ -2059,7 +2077,7 @@ structs.
 ```
 // OK: local use, pattern matching, passing around
 let tok = next_token(&mut parser)?
-match tok.kind
+match tok.kind:
     .Ident   => handle_ident(tok.text)
     .Number  => handle_number(tok.text)
     .String  => handle_string(tok.text)
@@ -2446,7 +2464,7 @@ inline lambdas or non-escaping closures):
 ```
 fn find_value(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32]:
     with lock.lock() as map:
-        match map.get(key)
+        match map.get(key):
             Some(v) => return Some(v)   // returns from find_value
             None    => ()
     None
@@ -2703,6 +2721,41 @@ fn double(x: i32) -> i32: x * 2         // args + return type
 fn log(msg: str): print(msg)           // args, returns Unit
 ```
 
+**Conditional syntax:**
+
+Block `if` uses `:` plus an indented body. Inline `if` uses `then`
+and may appear in statement or expression position:
+
+```
+if cond:
+    body
+else:
+    body
+
+if cond then body
+if cond then body else body
+let x = if cond then a else b
+
+if x < lo then lo
+else if x > hi then hi
+else x
+
+if x < 0:
+    handle_negative()
+else if x == 0:
+    handle_zero()
+else:
+    handle_positive()
+```
+
+Both forms support arbitrarily long `else if` chains. `else if` is
+parsed as `else` followed by a new `if`. A single chain must use one
+form throughout; mixing inline and block forms in one chain is a
+compile error. Inline-if uses `then`; `else` is required in expression
+position unless the then-branch is `Never`-typed. `then` is reserved
+and valid only in inline-if syntax. Colon-based and brace-based
+inline-if forms are rejected.
+
 ### 9.1a Named Arguments, Default Parameters, and Implicit Parameters
 
 Function parameters may be passed positionally or by name. Parameters
@@ -2790,7 +2843,7 @@ the program.
 ```
 @[tailrec]
 fn factorial(n: Int, acc: Int) -> Int:
-    match n
+    match n:
         0 => acc
         _ => factorial(n - 1, n * acc)
 ```
@@ -3007,11 +3060,12 @@ names |> map(normalize) |> collect[Vec]()
 
 Pattern matching is the primary control flow for algebraic data types.
 It is expression-oriented, exhaustive, and supports deep structural
-matching.
+matching. `match` is always block form and requires `:` after the
+subject. Omitting the colon is a syntax error.
 
 **Basic:**
 ```
-match shape
+match shape:
     Circle(r)         => pi * r * r
     Rectangle(w, h)   => w * h
     Triangle(a, b, c) => herons_formula(a, b, c)
@@ -3019,7 +3073,7 @@ match shape
 
 **Guards:**
 ```
-match value
+match value:
     x if x > 0 => "positive"
     x if x < 0 => "negative"
     _           => "zero"
@@ -3027,7 +3081,7 @@ match value
 
 **Nested / deep patterns:**
 ```
-match expr
+match expr:
     Add(Lit(a), Lit(b))                 => Lit(a + b)
     Add(Lit(0), rhs)                    => rhs
     Mul(Lit(0), _) | Mul(_, Lit(0))     => Lit(0)
@@ -3036,14 +3090,14 @@ match expr
 
 **Or-patterns** share a body:
 ```
-match day
+match day:
     Monday | Tuesday | Wednesday | Thursday | Friday => "weekday"
     Saturday | Sunday => "weekend"
 ```
 
 **`@` binding:**
 ```
-match event
+match event:
     click @ MouseClick { button: Left, pos } =>
         log("click at {pos}")
         handle(click)
@@ -3051,7 +3105,7 @@ match event
 
 **Literal and range patterns:**
 ```
-match status_code
+match status_code:
     200         => "ok"
     301 | 302   => "redirect"
     400..=499   => "client error"
@@ -3065,7 +3119,7 @@ expression. It works with any `Contains` type — arrays, ranges, sets,
 or user types:
 
 ```
-match method
+match method:
     in ["map", "filter", "take", "skip"] => handle_lazy()
     in ["collect", "fold", "sum", "count"] => handle_eager()
     _ => handle_other()
@@ -3074,7 +3128,7 @@ match method
 This is syntactic sugar for a guard:
 
 ```
-match method
+match method:
     m if m in ["map", "filter", "take", "skip"] => handle_lazy()
     m if m in ["collect", "fold", "sum", "count"] => handle_eager()
     _ => handle_other()
@@ -3084,7 +3138,7 @@ The `in` pattern does not introduce a binding. Use `@` if you need
 one:
 
 ```
-match status_code
+match status_code:
     code @ in 200..=299 => log("success: {code}")
     code @ in 400..=499 => log("client error: {code}")
     code @ in 500..=599 => log("server error: {code}")
@@ -3095,7 +3149,7 @@ match status_code
 
 ```
 fn categorize(token: TokenKind) -> Category:
-    match token
+    match token:
         in [Plus, Minus, Star, Slash]  => .Operator
         in [LParen, RParen, LBrace, RBrace] => .Delimiter
         in [If, Else, While, For, Match]    => .Keyword
@@ -3106,14 +3160,21 @@ fn categorize(token: TokenKind) -> Category:
 
 **Struct patterns with `..` rest:**
 ```
-match user
+match user:
     { name, age } if age >= 18 => grant_access(name)
     { name, .. }               => deny_access(name)
 ```
 
+Positional struct patterns match fields in declaration order:
+
+```
+match point:
+    Point(x, y) => plot(x, y)
+```
+
 **Tuple patterns:**
 ```
-match (x, y)
+match (x, y):
     (0, 0) => "origin"
     (x, 0) => "x-axis at {x}"
     _      => "elsewhere"
@@ -3121,7 +3182,7 @@ match (x, y)
 
 **Slice patterns:**
 ```
-match items
+match items:
     []              => "empty"
     [only]          => "single"
     [first, ..rest] => "head: {first}, {rest.len()} more"
@@ -3237,7 +3298,7 @@ an `else`.
 
 **`match` in pipelines:**
 ```
-let result = input |> parse |> match
+let result = input |> parse |> match:
     Ok(ast)  => transform(ast)
     Err(e)   => default_ast()
 ```
@@ -3266,18 +3327,18 @@ Examples:
 
 ```
 // expression-position: exhaustive required
-let label = match status
+let label = match status:
     Ok(v) => "ok"
     Err(e) => "err"
 
 // statement-position: partial allowed (non-must_use enum)
-match event
+match event:
     Click(pos) => handle_click(pos)
     KeyDown(k) => handle_key(k)
 // other variants are ignored
 
 // statement-position on @[must_use] type: catch-all required
-match result
+match result:
     Ok(v) => process(v)
     _ => {}                  // explicit: "I'm intentionally ignoring errors"
 // without the _ arm, this would be a compile error
@@ -3302,7 +3363,7 @@ for &(key, val) in items:
 
 // Works with match on borrowed enums:
 fn describe(opt: &Option[String]) -> &str:
-    match opt
+    match opt:
         Some(s) => s       // s: &String, not String
         None    => "none"
 ```
@@ -3722,7 +3783,7 @@ cases. The desugaring is:
 ```
 // user = find_user(id) ?? return Err(.NotFound)
 // desugars to:
-let user = match find_user(id)
+let user = match find_user(id):
     Some(v) => v
     None => return Err(.NotFound)
 ```
@@ -3753,8 +3814,8 @@ The standard library must provide these methods on `Option[T]`:
 **Examples:**
 ```
 // Without combinators:
-let name = match find_user(id)
-    Some(user) => match user.display_name
+let name = match find_user(id):
+    Some(user) => match user.display_name:
         Some(n) => n
         None    => user.username
     None => "anonymous"
@@ -4255,7 +4316,7 @@ type ParseResult[T] = ParseOk(T, remaining: str)
 
 impl Try[T, ParseError] for ParseResult[T]:
     fn branch(self: Self) -> ControlFlow[ParseError, T]:
-        match self
+        match self:
             ParseOk(v, _) => ControlFlow.Continue(v)
             ParseErr(m, p) => ControlFlow.Break(ParseError { msg: m, pos: p })
 
@@ -5144,8 +5205,10 @@ every function. A function is `may_suspend` if it directly contains
 is a whole-program boolean propagation, not lifetime inference —
 it is cheap to compute.
 
-`may_suspend` is **never written by the programmer.** It is purely
-an internal compiler property used for safety checks:
+This is **restricted coloring**. Callers are not generally restricted
+by callee color: any function can call an async function and receive a
+`Task[T]`. However, specific safety contexts enforce constraints based
+on callee color:
 
 1. **`@[no_await_guard]` enforcement:** Calling any `may_suspend`
    function while a `@[no_await_guard]` guard is live is a compile
@@ -5153,12 +5216,10 @@ an internal compiler property used for safety checks:
 2. **FFI callback safety:** Functions passed as `extern "C"`
    callbacks must not be `may_suspend` (see §14.19).
 
-This is NOT function coloring. There are no separate `async` and
-`sync` function types. No traits split. No closure type changes.
-`.await` works in any closure passed to `map`, `filter`, etc.
-The `may_suspend` property is invisible to the programmer — it
-only manifests as compile errors in unsafe contexts (holding
-non-suspendable guards, or C callbacks).
+Programmers do not declare or annotate `may_suspend`. The compiler
+computes it internally; it may appear in diagnostics when a safety
+violation occurs. There are no separate `async` and `sync` function
+types, no trait split, and no closure type changes.
 
 ```
 fn helper:
@@ -5363,7 +5424,7 @@ tasks. When `cancel()` is called or a non-ephemeral `Task` is dropped:
    on the scope's result:
 
    ```
-   match task.await
+   match task.await:
        Ok(value) => use(value)
        Err(e) if e.is_cancelled() => log("task was cancelled")
        Err(e) => return Err(e)
@@ -5811,7 +5872,7 @@ tx.send(msg).await          // suspends fiber if full
 let msg = rx.recv().await   // suspends fiber if empty
 
 // Non-blocking:
-match rx.try_recv()
+match rx.try_recv():
     Some(msg) => handle(msg)
     None      => ()
 ```
@@ -6145,7 +6206,7 @@ async fn main:
 async fn handle_connection(conn: TcpStream):
     let req = http.parse_request(&conn).await
 
-    let response = match req.path_str()
+    let response = match req.path_str():
         "/users" ->
             let users = db.query("SELECT * FROM users").await
             http.json_response(200, users)
@@ -6344,11 +6405,11 @@ let view: &str = "hello"                     // no allocation, static memory
 ```
 
 **How it works:** A bare string literal produces an owned `str`.
-The compiler is free to optimize this — when it can prove the
-string is never mutated, never stored in a heap structure, and
-never escapes the current scope, it may use a static reference
-internally. But the *type* is always `str` unless you annotate
-`&str`.
+Treat this as an allocation unless a `&str` context is explicit or
+the compiler proves the allocation can be removed. The optimization
+is not a source-level guarantee for bare literals; use an explicit
+`&str` annotation or pass to an `&str` parameter for guaranteed
+zero-cost static storage.
 
 When the type context is `&str` (function parameter, explicit
 annotation), the literal is a zero-cost static reference with no
@@ -7988,7 +8049,7 @@ the message string is not constructed when the condition is true.
 
 ```
 // Before:
-match result
+match result:
     Err(.Db(.NotFound(..))) => assert(true)
     _ => assert(false)
 
@@ -8000,7 +8061,7 @@ assert_matches(result, Err(.Db(.NotFound(..))))
 The return type is `Never`, so it satisfies any type context:
 
 ```
-match direction
+match direction:
     .North => go_north()
     .South => go_south()
     .East  => go_east()
@@ -8831,7 +8892,7 @@ fn first(xs: &Vec[i32]) -> Option[&i32]:
 
 fn test:
     let v = vec![1, 2, 3]
-    match first(&v)
+    match first(&v):
         Some(x) => print(x)
         None    => ()
 
@@ -8957,7 +9018,7 @@ fn test(lock: &Mutex[File]) -> Result[Unit, IoError]:
 // PASS: non-local return from with block
 fn find_val(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32]:
     with lock.lock() as map:
-        match map.get(key)
+        match map.get(key):
             Some(v) => return Some(v)    // returns from find_val
             None    => ()
     None
@@ -9029,7 +9090,7 @@ fn test:
     var map = SlotMap[i32].new()
     let a = map.insert(10)
     let b = map.insert(20)
-    match map.get2_mut(a, b)
+    match map.get2_mut(a, b):
         Some((va, vb)) => { *va += 1; *vb += 1 }
         None => ()
 
@@ -9055,13 +9116,13 @@ fn load(path: &str) -> Result[Ast, AppError]:
 
 // PASS: match converted error
 fn handle(e: AppError):
-    match e
+    match e:
         AppError.Io(io)    => print(f"io: {io}")
         AppError.Parse(pe) => print(f"parse: {pe}")
 
 // FAIL: non-exhaustive
 fn bad(e: AppError):
-    match e
+    match e:
         AppError.Io(_) => ()          // ERROR: missing Parse
 ```
 
@@ -9129,12 +9190,16 @@ fn test:
 // PASS: valid
 @[tailrec]
 fn factorial(n: Int, acc: Int) -> Int:
-    match n { 0 => acc; _ => factorial(n - 1, n * acc) }
+    match n:
+        0 => acc
+        _ => factorial(n - 1, n * acc)
 
 // FAIL: not in tail position
 @[tailrec]
 fn bad(n: Int) -> Int:
-    match n { 0 => 1; _ => n * bad(n - 1) }  // ERROR
+    match n:
+        0 => 1
+        _ => n * bad(n - 1)  // ERROR
 
 // FAIL: defer prevents tail-call guarantee
 @[tailrec]
@@ -9175,14 +9240,14 @@ fn test:
 // PASS: nested
 enum Expr { Lit(i32) | Add(Expr, Expr) | Mul(Expr, Expr) }
 fn simplify(e: Expr) -> Expr:
-    match e
+    match e:
         Add(Lit(0), rhs) => rhs
         Mul(Lit(0), _) | Mul(_, Lit(0)) => Lit(0)
         other => other
 
 // PASS: or-patterns
 fn classify(day: Day) -> str:
-    match day
+    match day:
         Monday | Tuesday | Wednesday | Thursday | Friday => "weekday"
         Saturday | Sunday => "weekend"
 
@@ -9192,19 +9257,19 @@ fn test(opt: Option[i32]):
 
 // PASS: range
 fn category(code: i32) -> str:
-    match code
+    match code:
         200 => "ok"; 400..=499 => "client error"; _ => "unknown"
 
 // PASS: slice
 fn describe(items: &[i32]) -> str:
-    match items
+    match items:
         [] => "empty"
         [x] => "one"
         [first, ..rest] => "{rest.len()} more"
 
 // FAIL: non-exhaustive nested
 fn bad(e: Expr):
-    match e
+    match e:
         Lit(_) => "lit"
         Add(_, _) => "add"       // ERROR: missing Mul
 ```
@@ -9407,17 +9472,17 @@ enum Color { Red | Green | Blue }
 
 // PASS
 fn name(c: Color) -> str:
-    match c
+    match c:
         Red => "red"; Green => "green"; Blue => "blue"
 
 // FAIL
 fn name(c: Color) -> str:
-    match c
+    match c:
         Red => "red"; Green => "green"   // ERROR: missing Blue
 
 // PASS: wildcard
 fn name(c: Color) -> str:
-    match c
+    match c:
         Red => "red"; _ => "other"
 ```
 
@@ -9502,7 +9567,7 @@ fn test:
 
 // PASS: range in pattern
 fn test(code: i32) -> str:
-    match code
+    match code:
         200..=299 => "ok"
         _ => "other"
 ```
@@ -9563,7 +9628,7 @@ enum Color { Red | Green | Blue }
 use Color.{Red, Green, Blue}
 fn test:
     let c = Red                // no prefix needed
-    match c
+    match c:
         Red   => "red"
         Green => "green"
         Blue  => "blue"
@@ -9918,7 +9983,7 @@ fn default_color -> Color: .Blue
 
 // PASS: shorthand in match arms
 fn describe(c: Color) -> str:
-    match c
+    match c:
         .Red   => "red"
         .Green => "green"
         .Blue  => "blue"
@@ -10122,7 +10187,7 @@ fn test:
 
 // PASS: ephemeral struct in pattern matching
 fn describe(tok: Token) -> str:
-    match tok.kind
+    match tok.kind:
         .Ident  => "identifier: {tok.text}"
         .Number => "number: {tok.text}"
         _       => "other"
@@ -10203,7 +10268,7 @@ fn load(path: &str) -> Result[str, ContextError[IoError]]:
     Ok(text)
 
 fn test:
-    match load("/nonexistent")
+    match load("/nonexistent"):
         Err(e) =>
             assert(e.message == "failed to read config")
             assert(e.source.is_not_found())
@@ -10276,7 +10341,7 @@ fn test:
 // PASS: Unit elision in match
 fn test:
     let r: Result[Unit, str] = Ok()
-    match r
+    match r:
         Ok() => assert(true)
         Err(_) => assert(false)
 
@@ -10392,7 +10457,7 @@ fn test_panics:
 // PASS: unreachable() has type Never
 enum Direction { North | South | East | West }
 fn go(d: Direction) -> i32:
-    match d
+    match d:
         .North => 1
         .South => 2
         .East  => 3
@@ -10739,7 +10804,7 @@ fn test:
 
 // PASS: match on borrowed Option
 fn describe(opt: &Option[String]) -> &str:
-    match opt
+    match opt:
         Some(s) => s.as_str()         // s: &String
         None    => "none"
 
@@ -11496,7 +11561,7 @@ fn test:
 fn test:
     enum Command { Reset | Set(u8) | Get }
     let cmd = Command.Set(42)
-    match cmd
+    match cmd:
         .Set(val) => assert(val == 42)
         _ => panic("wrong variant")
 
@@ -11602,7 +11667,7 @@ fn test:
 // PASS: match with in patterns
 fn test:
     let method = "map"
-    let result = match method
+    let result = match method:
         in ["map", "filter", "take"] => "lazy"
         in ["collect", "fold", "sum"] => "eager"
         _ => "other"
@@ -11611,7 +11676,7 @@ fn test:
 // PASS: match with in pattern and @ binding
 fn test:
     let code = 404
-    let msg = match code
+    let msg = match code:
         c @ in 200..=299 => "ok: {c}"
         c @ in 400..=499 => "client error: {c}"
         _ => "other"
@@ -11876,6 +11941,7 @@ Optimization. `c_import` macro translation improvements.
 | Array index disjointness not proven | Conservative rejection of safe code | Use `get2_mut` or `split_at_mut` |
 | Closure escaping analysis conservative | Some valid closures rejected | Pass closure directly as argument |
 | Fiber runtime required for async | `async` unavailable on bare-metal | OS threads always available; `no_runtime` for embedded |
+| Bare string literal allocation not guaranteed away | Performance-sensitive code cannot rely on optimizer proof | Use explicit `&str` annotation for guaranteed zero-cost static reference |
 
 ---
 
@@ -12006,6 +12072,7 @@ The following keywords are reserved and cannot be used as identifiers:
 | `use` | Import |
 | `extern` | External function declaration |
 | `if` | Conditional |
+| `then` | Inline conditional body separator |
 | `else` | Conditional branch |
 | `match` | Pattern matching |
 | `for` | Loop over iterables |
