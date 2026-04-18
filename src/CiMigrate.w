@@ -1065,6 +1065,8 @@ fn ci_cursor_kind_name(kind: i32) -> str:
     if kind == 3: return "UnionDecl"
     if kind == 4: return "ClassDecl"
     if kind == 103: return "CallExpr"
+    if kind == 114: return "BinaryOperator"
+    if kind == 117: return "CStyleCastExpr"
     if kind == 201: return "LabelStmt"
     if kind == 202: return "CompoundStmt"
     if kind == 203: return "CaseStmt"
