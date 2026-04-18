@@ -28,6 +28,100 @@ answers in minutes. Stop adding debug prints and rebuilding.
 
 ---
 
+## No Silent Fallbacks
+
+When code cannot be correctly generated, the only acceptable
+behavior is to fail loudly with a diagnostic and exit non-zero.
+The following are **forbidden** regardless of what tests or
+downstream compilation say:
+
+- Emitting a placeholder function body (`-> Never`,
+  `comptime_error(...)`, `panic("TODO")`, `return 0`, etc.)
+  when translation fails
+- Emitting an `extern fn` declaration to paper over a
+  function the translator couldn't handle
+- Silently dropping a clause, arm, or statement that the
+  translator can't lower
+- "Simplifying" a construct into something that compiles but
+  behaves differently from the source
+- Adding a `TODO` comment to emitted output and continuing
+
+**A migrator that produces 30/30 files with silent stubs is
+worse than one that produces 0/30 with a loud error.** The
+first lies about completeness. The second tells the truth.
+
+If you find yourself reaching for any of these patterns, stop.
+The correct action is: emit a diagnostic naming the function
+and source location, return non-zero from the tool, and leave
+the work visible for a human to prioritize.
+
+If you cannot produce correct output and you cannot fail
+loudly (e.g., you're deep in a helper without error-return
+plumbing), wire the plumbing. Do not invent a placeholder.
+
+---
+
+## "Done" Is a Claim That Requires Evidence
+
+A task is not done because:
+
+- Tests pass
+- The build succeeds
+- No compiler errors remain
+- The commit was accepted
+- Output files exist in the expected directory
+
+A task is done when:
+
+- The output is correct — meaning it does what a human
+  familiar with the source would expect, not just what
+  happens to compile
+- The edge cases you noticed have tests or comments
+  explaining why they're not covered
+- Anything you couldn't solve is filed as an issue or
+  surfaced as a loud failure, not hidden as a passing stub
+
+Before claiming done, do the gut check: *did I make the
+success condition true by doing the work, or by redefining
+the success condition?* If the answer isn't obviously the
+first, it's the second.
+
+This applies especially to translation, migration, and
+code-generation tasks where the output volume is large and
+correctness is hard to eyeball. In those tasks, "the build
+is green" means almost nothing about whether the tool works.
+
+---
+
+## Anti-Patterns
+
+These patterns are how a task looks successful while actually
+being broken. Each one is easy to fall into when the pressure
+to complete is high.
+
+**Weakening the check.** If a check fails, the fix is to
+make the code pass the check, or to confirm with a human
+that the check is wrong. It is never to downgrade the check
+to a warning, add an exemption, or route around it.
+
+**"Pre-existing" without evidence.** A failure is only
+pre-existing if you've verified it existed on the previous
+commit. Otherwise it's your failure and you've just renamed
+it. `git stash && make test && git stash pop` answers this
+question in under a minute.
+
+**Silent fallbacks in generated output.** See "No Silent
+Fallbacks" above. Placeholder bodies, TODO comments in
+emitted code, and "untranslatable" stubs that compile are
+all forms of this.
+
+**"Good enough for now."** This is the migrator's biggest
+trap. A 90%-working translator that silently mishandles the
+other 10% is not 90% done; it's 0% done with a confusing
+reporting problem. The bar is correctness, not coverage.
+
+---
+
 ## Runtime Architecture
 
 ```
@@ -59,7 +153,6 @@ make stage1      # seed → stage1
 make stage2      # stage1 → stage2
 make build       # stage1 + stage2 + runtime objects
 make stage3      # stage2 → stage3
-make selfcheck   # locked ./out/bin/with-stage2 check src/main.w
 make fixpoint    # verify stage2 == stage3 (byte-identical)
 make test        # run test suite
 make smoke       # quick smoke test
@@ -71,32 +164,6 @@ Fixpoint invariant: `stage2 == stage3`. If fixpoint fails,
 code generation is nondeterministic. Stop and fix.
 
 **If the build breaks, fixing the build is the top priority.**
-
-### Build serialization
-
-Top-level build and verification commands must run **serially**.
-
-Never start any of these while another one is still running:
-
-```
-make stage1
-make stage2
-make build
-make stage3
-make selfcheck
-make smoke
-make test
-make fixpoint
-make install
-make install-user
-make clean
-```
-
-Use the locked Makefile targets, not ad-hoc parallel commands.
-Routine verification must use `make selfcheck`, not a direct
-`./out/bin/with-stage2 check src/main.w` in another terminal.
-The Makefile now enforces this with a repo-wide lock and fails
-fast if a second top-level command is started early.
 
 ---
 
@@ -145,7 +212,6 @@ possible.
 After each change:
 ```
 make build          # must pass
-make selfcheck      # must pass
 make fixpoint       # must pass
 ```
 
@@ -164,27 +230,8 @@ old_string doesn't match due to stale context.
 
 ### Quick repro
 ```
-time make selfcheck
+time ./out/bin/with-stage2 check src/main.w
 ```
-
-### Intermittent self-host failures
-
-- If the compiler needed to build the fix is the one crashing,
-  retry `make stage2` **serially** until the patched binary is
-  produced. A flaky seed/stage1 run while building the fix does
-  not mean the fix failed.
-
-- Verify intermittent crash fixes statistically. Run the patched
-  compiler 20-30 times on the exact repro (`out/gen/main.w` if
-  applicable) and require **0 failures**. One clean run is not
-  evidence.
-
-- Be suspicious of eager type lowering in generic contexts.
-  Trait signatures, blanket impl methods, and methods on generic
-  owners may mention unbound type params. Defer resolution until
-  bindings exist, and make diagnostics/error helpers tolerate
-  invalid symbols or empty strings so bugs become errors instead
-  of segfaults.
 
 ### LLDB (preferred)
 ```
@@ -251,10 +298,6 @@ flag on `NK_LET_DECL`.
 - **Misreading AST layouts.** Always confirm field meanings.
 - **Guessing APIs.** Read the source.
 - **Working around compiler bugs.** Fix the root cause.
-- **Downgrading errors to warnings** because a test fails.
-  Fix the test or fix the check. Don't weaken the check.
-- **Classifying failures as "pre-existing"** without evidence.
-  Check the test against the previous commit.
 - **Writing C when With works.** The runtime is being migrated
   to With. Use `@[c_export]` for exported symbols.
 - **Guessing linker flags.** Understand which link path you're
@@ -272,12 +315,13 @@ A change is acceptable only if:
 
 ```
 make build      # compiles
-make selfcheck  # stage2 checks src/main.w
 make fixpoint   # stage2 == stage3
 make test       # no regressions
 ```
 
 If any step fails, continue debugging until it passes.
+
+---
 
 ## Bootstrap Rules
 
