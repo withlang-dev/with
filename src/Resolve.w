@@ -1043,6 +1043,9 @@ fn resolve_find_project_root(start_dir: str) -> str:
         let build_file = resolve_join(cur, "build.zig")
         if resolve_file_exists(build_file):
             return cur
+        let manifest = resolve_join(cur, "with.toml")
+        if resolve_file_exists(manifest):
+            return cur
         let parent = resolve_dirname(cur)
         if parent == cur:
             break
