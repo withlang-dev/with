@@ -51,6 +51,7 @@ type Parser {
     last_where_start: i32,
     last_where_count: i32,
     if_chain_form: i32,
+    suppress_fat_arrow_closure: i32,
 }
 
 type InterpolatedExprParseAttempt {
@@ -104,6 +105,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         last_where_start: 0,
         last_where_count: 0,
         if_chain_form: 0,
+        suppress_fat_arrow_closure: 0,
     }
 
 // ── Token helpers ────────────────────────────────────────────────
@@ -2463,7 +2465,7 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
         // comptime_error("msg") → NodeKind.NK_COMPTIME_ERROR
         if self.is_ident_named("comptime_error"):
             return self.parse_comptime_error_expr()
-        if self.pos + 1 < self.tokens.len():
+        if self.suppress_fat_arrow_closure == 0 and self.pos + 1 < self.tokens.len():
             if self.tokens.get_tag(self.pos + 1) == TokenKind.TK_FAT_ARROW:
                 return self.parse_fat_arrow_single()
         return self.parse_ident_or_call()
@@ -4701,7 +4703,10 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
             guard = in_guard_expr
         else if self.peek() == TokenKind.TK_KW_IF:
             self.advance()
+            let saved_sfa = self.suppress_fat_arrow_closure
+            self.suppress_fat_arrow_closure = 1
             guard = self.parse_expr()
+            self.suppress_fat_arrow_closure = saved_sfa
 
         if self.expect(TokenKind.TK_FAT_ARROW) == 0:
             break
@@ -4764,7 +4769,10 @@ fn Parser.parse_inline_match_arms(self: Parser) -> i32:
             guard = in_guard_expr
         else if self.peek() == TokenKind.TK_KW_IF:
             self.advance()
+            let saved_sfa2 = self.suppress_fat_arrow_closure
+            self.suppress_fat_arrow_closure = 1
             guard = self.parse_expr()
+            self.suppress_fat_arrow_closure = saved_sfa2
         if self.expect(TokenKind.TK_FAT_ARROW) == 0:
             break
         let body = self.parse_expr()
