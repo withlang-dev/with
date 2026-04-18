@@ -366,6 +366,7 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
     g_migrate_file_error = ""
     g_migrate_macro_values = ""
     g_migrate_macro_session = 0
+    ci_migrate_reset_fn_counts()
     g_migrate_preprocessed_source = ""
     g_migrate_current_input_path = ""
 
@@ -538,7 +539,13 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
     // Print stats
     let goto_count = ci_count_substring(output, "__pc =")
     let unsafe_count = ci_count_substring(output, "unsafe")
-    eprint(f"migrate: {input_path} -> {output_path} ({goto_count} gotos, {unsafe_count} unsafe)")
+    let fn_total = g_migrate_fn_translated + g_migrate_fn_untranslatable
+    if g_migrate_fn_untranslatable > 0:
+        eprint(f"migrate: {input_path} -> {output_path} ({g_migrate_fn_translated}/{fn_total} functions, {goto_count} gotos, {unsafe_count} unsafe, {g_migrate_fn_untranslatable} untranslatable)")
+    else:
+        eprint(f"migrate: {input_path} -> {output_path} ({goto_count} gotos, {unsafe_count} unsafe)")
+    g_migrate_fn_translated_total = g_migrate_fn_translated_total + g_migrate_fn_translated
+    g_migrate_fn_untranslatable_total = g_migrate_fn_untranslatable_total + g_migrate_fn_untranslatable
     0
 
 pub fn migrate_c_file(input_path: str, output_path: str) -> i32:
@@ -562,6 +569,8 @@ fn ci_migrate_excludes_contains(excludes: str, basename: str) -> bool:
 
 // Translate a directory of .c files to .w files.
 pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: str) -> i32:
+    g_migrate_fn_translated_total = 0
+    g_migrate_fn_untranslatable_total = 0
     // Create output directory
     with_fs_mkdir_p(output_dir)
 
@@ -634,10 +643,12 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: s
 
     let files_failed = files_scanned - files_migrated
     ci_dump_raw_fallback_stats()
-    if files_failed > 0:
-        eprint(f"migrate: {files_migrated}/{files_scanned} files migrated ({files_failed} failed) from {input_dir} -> {output_dir}")
+    let fn_total = g_migrate_fn_translated_total + g_migrate_fn_untranslatable_total
+    if files_failed > 0 or g_migrate_fn_untranslatable_total > 0:
+        let file_note = if files_failed > 0: f" ({files_failed} file errors)" else: ""
+        eprint(f"migrate: {files_migrated}/{files_scanned} files, {g_migrate_fn_translated_total}/{fn_total} functions translated, {g_migrate_fn_untranslatable_total} untranslatable{file_note}")
         return 1
-    eprint(f"migrate: {files_migrated}/{files_scanned} files migrated from {input_dir} -> {output_dir}")
+    eprint(f"migrate: {files_migrated}/{files_scanned} files, {fn_total} functions translated from {input_dir} -> {output_dir}")
     if files_migrated == 0: 1 else: 0
 
 // Run a shell command and capture stdout (for find, ls, etc.)
@@ -748,38 +759,38 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
 
     with_cimport_mark_name_emitted(name)
 
-    // Unsupported types — emit stub
+    // Unsupported types — report and omit
     if has_unsupported:
-        if migrate_prefer_curly():
-            return "fn " ++ safe_name ++ "() -> Never {\n    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")\n}\n\n"
-        return "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")\n\n"
+        g_migrate_fn_untranslatable = g_migrate_fn_untranslatable + 1
+        eprint(f"migrate: untranslatable function '{name}': unsupported type ({unsupported_reason})")
+        return ""
 
     // @[c_export] for non-static functions (preserves C ABI)
     let export_prefix = if g_migrate_no_c_export != 0 or storage == CX_SC_STATIC: "" else: "@[c_export(\"" ++ name ++ "\")]\n"
 
-    // Try to translate the function body. Each ci_trans_stmt call
-    // inside ci_try_translate_fn_body already flows through the
-    // Phase-B IR detour (B5d), so the body string is the
-    // cumulative output of the statement-level lowering — no
-    // extra function-body-level shim is needed.
+    // Try to translate the function body.
     let body = ci_try_translate_fn_body(session, idx)
     if body.len() > 0:
+        g_migrate_fn_translated = g_migrate_fn_translated + 1
         let ret_suffix = if ret == "void": "" else: " -> " ++ ret
         if migrate_prefer_curly():
             return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ " {\n" ++ body ++ "}\n\n"
         return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body ++ "\n"
 
-    // Body translation failed — emit as extern fn (system header function
-    // or function with an unsupported body shape).
-    // In --no-c-export mode, skip extern fn for locally-defined functions
-    // (they'll be in the same module or don't need C linkage).
+    // Body translation failed.
+    // In --no-c-export mode, locally-defined functions that fail
+    // translation are reported as errors and omitted from output.
     if g_migrate_no_c_export != 0:
         let is_definition = with_ci_cursor_is_definition(session, ci_find_fn_cursor(session, name))
         if is_definition != 0:
-            // Locally defined but untranslatable — emit stub
-            if migrate_prefer_curly():
-                return "fn " ++ safe_name ++ "(" ++ params ++ ") -> Never {\n    comptime_error(\"untranslatable function body\")\n}\n\n"
-            return "fn " ++ safe_name ++ "(" ++ params ++ ") -> Never:\n    comptime_error(\"untranslatable function body\")\n\n"
+            g_migrate_fn_untranslatable = g_migrate_fn_untranslatable + 1
+            let bail_loc = ci_get_bail_location()
+            let bail_k = ci_get_bail_kind()
+            if bail_loc.len() > 0:
+                eprint(f"migrate: untranslatable function '{name}': bailed at {ci_cursor_kind_name(bail_k)} ({bail_loc})")
+            else:
+                eprint(f"migrate: untranslatable function '{name}': body translation failed")
+            return ""
     let cc = with_cimport_fn_calling_conv(session, idx)
     let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
     let rendered = cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
@@ -1033,3 +1044,31 @@ pub fn migrate_set_block_style(val: i32):
 
 pub fn migrate_prefer_curly() -> bool:
     g_migrate_block_style == 2
+
+// Per-file and cumulative counters for translated vs untranslatable functions.
+var g_migrate_fn_translated: i32 = 0
+var g_migrate_fn_untranslatable: i32 = 0
+var g_migrate_fn_translated_total: i32 = 0
+var g_migrate_fn_untranslatable_total: i32 = 0
+
+fn ci_migrate_reset_fn_counts():
+    g_migrate_fn_translated = 0
+    g_migrate_fn_untranslatable = 0
+
+fn ci_cursor_kind_name(kind: i32) -> str:
+    if kind == 201: return "LabelStmt"
+    if kind == 202: return "CompoundStmt"
+    if kind == 203: return "CaseStmt"
+    if kind == 204: return "DefaultStmt"
+    if kind == 205: return "IfStmt"
+    if kind == 206: return "SwitchStmt"
+    if kind == 207: return "WhileStmt"
+    if kind == 208: return "DoStmt"
+    if kind == 209: return "ForStmt"
+    if kind == 210: return "GotoStmt"
+    if kind == 212: return "ContinueStmt"
+    if kind == 213: return "BreakStmt"
+    if kind == 214: return "ReturnStmt"
+    if kind == 230: return "NullStmt"
+    if kind == 231: return "DeclStmt"
+    f"kind={kind}"

@@ -7015,12 +7015,17 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
                     block_scope = decl_ir.updated_scope
                     child_ids.push(decl_ir.stmt_id as i32)
                 else:
+                    g_ci_bail_location = with_ci_cursor_location(session, child)
+                    g_ci_bail_kind = CXK_DECL_STMT
                     bailed = true
             else:
                 let child_id = ci_lower_stmt_ir(session, child, stmts, exprs, types, 0, block_scope)
                 if (child_id as i32) != 0:
                     child_ids.push(child_id as i32)
                 else if with_ci_cursor_kind(session, child) != CXK_NULL_STMT:
+                    if g_ci_bail_location.len() == 0:
+                        g_ci_bail_location = with_ci_cursor_location(session, child)
+                        g_ci_bail_kind = with_ci_cursor_kind(session, child)
                     bailed = true
             ci = ci + 1
 
@@ -7046,6 +7051,9 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
     // Everything else — struct/union decls at statement position or
     // any other unsupported stmt shape — returns 0 so the enclosing
     // structural lowering attempt can bail.
+    if g_ci_bail_location.len() == 0:
+        g_ci_bail_location = with_ci_cursor_location(session, cursor)
+        g_ci_bail_kind = kind
     0 as CiStmtId
 
 fn ci_cursor_kind_is_expression(kind: i32) -> bool:
@@ -7809,6 +7817,7 @@ fn ci_indent_str(level: i32) -> str:
 // Returns "" on failure (caller falls back to comptime_error stub).
 
 fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
+    ci_clear_bail_location()
     // B9: fresh per-function temp counter. This path is called
     // from ci_translate_function's static-inline branch — which
     // already resets — but also from other call sites for header
@@ -9028,6 +9037,22 @@ var g_ci_temp_next: i32 = 0
 // is function-wide and survives those resets.
 var g_ci_fn_var_names: str = ""
 
+// Last bail location from structural lowering. Set when a compound
+// statement, for-loop body, do-while body, or goto hoist bails.
+// Read by the migrator to report which construct caused the failure.
+var g_ci_bail_location: str = ""
+var g_ci_bail_kind: i32 = 0
+
+pub fn ci_get_bail_location() -> str:
+    g_ci_bail_location
+
+pub fn ci_get_bail_kind() -> i32:
+    g_ci_bail_kind
+
+pub fn ci_clear_bail_location():
+    g_ci_bail_location = ""
+    g_ci_bail_kind = 0
+
 fn ci_fn_var_names_contains(name: str) -> bool:
     let needle = "|" ++ name ++ "|"
     ci_str_contains(g_ci_fn_var_names, needle)
@@ -9335,6 +9360,8 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
         let name_idx = stmts.add_string(decl.name)
         let ty_id = ci_named_type_from_text(types, decl.ty)
         if (ty_id as i32) == 0:
+            g_ci_bail_location = with_ci_cursor_location(session, body_cursor)
+            g_ci_bail_kind = CXK_COMPOUND_STMT
             return 0 as CiStmtId
         let init_id = ci_default_expr_from_text(default_val, exprs)
         let decl_id = stmts.var_decl(name_idx, ty_id, init_id, 1)
