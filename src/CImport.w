@@ -6560,7 +6560,7 @@ type CiForParts {
 }
 
 fn ci_extract_for_parts(session: i64, cursor: i32) -> CiForParts:
-    var parts = CiForParts {}
+    var parts = CiForParts { init_cursor: -1, cond_cursor: -1, inc_cursor: -1, body_cursor: -1 }
     let nc = with_ci_num_children(session, cursor)
     if nc < 1:
         return parts
