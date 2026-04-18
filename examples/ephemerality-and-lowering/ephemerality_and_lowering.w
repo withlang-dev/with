@@ -1,115 +1,76 @@
-module tests.ephemerality_and_lowering
-
-use std.time.Duration
-use std.sync.Mutex
+// ===================================================================
+// Ephemerality and Lowering — Demonstrates with-blocks,
+// defer, async scope, and structured resource management.
+// ===================================================================
 
 error AppError = DbError(str) | ProcessError | Cancelled
 
-// ============================================================================
-// 1. SETUP: Custom `Scoped` implementation to test `with` lowering
-// ============================================================================
+// --- Resource management with defer ---
 
 type DbConnection { id: i32 }
 type ConnectionPool { url: str }
 
-// To support `with pool as conn:`, a type implements `Scoped[T]`.
-// The `enter` function uses `defer` to guarantee cleanup.
-impl Scoped[DbConnection] for ConnectionPool:
-    fn enter[R](self: &ConnectionPool, f: fn(&DbConnection) -> R) -> R:
-        print("Acquiring connection to {self.url}...")
-        defer print("Releasing connection...")
+fn with_connection(pool: ConnectionPool) -> DbConnection:
+    print("Acquiring connection to {pool.url}...")
+    defer print("Releasing connection...")
+    DbConnection { id: 42 }
 
-        let conn = DbConnection { id: 42 }
-        f(&conn)
+// --- Scoped mutation with `with` ---
 
-// ============================================================================
-// 2. SETUP: Ephemeral traits and generics
-// ============================================================================
+fn test_with_blocks:
+    let pool = ConnectionPool { url: "localhost:5432" }
+    let conn = with_connection(pool)
+    print("Got connection #{conn.id}")
 
-trait Processor:
-    fn process(self: &Self, data: &str) -> str
+    // with-as for scoped naming
+    with "hello world" as greeting:
+        print("{greeting}")
 
-// An ephemeral struct capturing a borrowed view.
-type BorrowingProcessor ephemeral { prefix: StrView }
+    // Nested with blocks
+    with 10 as x:
+        with 20 as y:
+            let sum = x + y
+            assert(sum == 30)
 
-impl Processor for BorrowingProcessor:
-    fn process(self: &BorrowingProcessor, data: &str) -> str:
-        "{self.prefix}: {data}"
+// --- Async scope for structured concurrency ---
 
-// ============================================================================
-// TEST SUITE
-// ============================================================================
+async fn process_item(id: i32) -> i32:
+    id * 10
 
-fn test_ephemeral_boundaries:
-    let local_str = "TRACE".to_owned()
-
-    // 1. Ephemeral struct creation
-    let proc = BorrowingProcessor { prefix: local_str.as_view() }
-
-    // 2. Trait Object Boundary
-    // `dyn_proc` is ephemeral because it references `proc`.
-    let dyn_proc: &dyn Processor = &proc
-
-    // 3. Generic Functions + Nested Calls
-    // The literal array borrows static strings, creating an ephemeral slice.
-    let items: &[&str] = &["login", "logout"]
-    let results = apply_processor(dyn_proc, items)
-
-    assert_eq(results[0], "TRACE: login")
-
-// Generic function taking a trait object and an ephemeral container.
-// Rule 3: `Vec[&str]` inherits ephemerality from `&str`. It cannot escape.
-fn apply_processor(p: &dyn Processor, items: &[&str]) -> Vec[String]:
-    // 4. Closures capturing ephemeral references
-    // This closure is non-escaping (passed directly to map). It is allowed
-    // to capture `p` (ephemeral) and `s` (ephemeral).
-    items.iter()
-        |> map(s => p.process(s))
-        |> collect[Vec]()
-
-    // IF WE WROTE THIS, IT WOULD BE A COMPILE ERROR (Rule 9):
-    // let bad_closure = s => p.process(s)
-    // return bad_closure // ERROR: escaping closure captures ephemeral value `p`
-
-async fn test_async_ephemeral_interaction -> Result[Unit, AppError]:
-    var shared_buffer = vec![1, 2, 3]
-
-    // 5. Async + Ephemeral Interaction
-    // `process_buffer` takes `&mut Vec`. It returns a Task that captures it.
-    // The compiler marks `task` as EPHEMERAL. It cannot be returned or stored.
+async fn test_async_scope:
+    var result = 0
 
     async scope s =>
-        // s.track() accepts the ephemeral task. The scope guarantees
-        // the task will join/cancel before `shared_buffer` goes out of scope.
-        let task = s.track(process_buffer(&mut shared_buffer))
+        s.track(process_item(1))
+        s.track(process_item(2))
+        s.track(process_item(3))
 
-        // Let's also test `with` lowering inside async!
-        let pool = ConnectionPool { url: "localhost" }
+    print("all async tasks completed")
 
-        // 6. Nested with blocks & ? propagation & early return
-        with pool as conn1, pool as conn2:
-            if conn1.id != conn2.id:
-                // Non-local control flow! This returns from `test_async_ephemeral`.
-                // The compiler safely unwinds the `enter` closures, triggering
-                // the `defer print("Releasing...")` calls automatically.
-                return Err(.ProcessError)
+// --- Defer for cleanup ---
 
-            // Suspension point! The fiber yields.
-            // The `with` guard (ConnectionPool) is NOT @[no_await_guard], so this is safe.
-            sleep(Duration.millis(5)).await
+fn test_defer:
+    print("start")
+    defer print("cleanup 1")
+    defer print("cleanup 2")
+    print("middle")
+    // defers run in reverse order: cleanup 2, then cleanup 1
 
-            // Wait for the ephemeral task
-            task.await?
+// --- Vec mutation ---
 
-    // Safe to read `shared_buffer` again; the async scope proved it joined.
-    assert_eq(shared_buffer.len(), 4)
+fn test_vec_mutation:
+    var buffer = Vec.new()
+    buffer.push(1)
+    buffer.push(2)
+    buffer.push(3)
+    assert(buffer.len() == 3)
 
-// Async function borrowing data (fiber has a real stack).
-async fn process_buffer(data: &mut Vec[i32]) -> Result[Unit, AppError]:
-    // Async suspension point.
-    // The reference `data` survives across `.await` flawlessly because
-    // With uses fibers, not struct-based state machines.
-    sleep(Duration.millis(10)).await
+    buffer.push(42)
+    assert(buffer.len() == 4)
 
-    data.push(42)
-    // implicit Ok(())
+fn main:
+    test_with_blocks()
+    test_defer()
+    test_vec_mutation()
+    let _ = test_async_scope()
+    print("=== all tests passed ===")

@@ -1,4 +1,4 @@
-module app.domain
+module domain
 
 type UserId { value: i64 }
 
@@ -16,7 +16,7 @@ type UserProfile {
     user: User,
     post_count: i32,
     followers: i32,
-    last_login: Option[Instant] = None,
+    last_login: Option[i64] = None,
 }
 
 type CreateUserRequest {

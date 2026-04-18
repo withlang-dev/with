@@ -1,16 +1,30 @@
 module ecs.systems
 
-use ecs.math.{Vec2, AABB}
-use ecs.storage.{DenseStorage, iter, iter_mut}
-use ecs.query.{query2, query3}
-use ecs.components.*
-use ecs.world.{Entity, World}
+use math.Vec2
+use math.AABB
+use components.Entity
+use components.Transform
+use components.Velocity
+use components.Collider
+use components.Sprite
+use components.InputState
+use components.InputEvent
+use components.Key
+use components.CollisionEvent
+use components.TextureId
+use components.texture_name
+use storage.TransformStorage
+use storage.VelocityStorage
+use storage.ColliderStorage
+use storage.SpriteStorage
+use storage.InputStateStorage
+use world.World
 
 // ===================================================================
 // Systems are plain functions that take references to specific
 // component storages. Because each storage is a separate field
 // on World, the borrow checker permits disjoint simultaneous
-// access — the foundation for safe parallel execution.
+// access -- the foundation for safe parallel execution.
 // ===================================================================
 
 // --- Input System ---
@@ -19,22 +33,23 @@ use ecs.world.{Entity, World}
 // Writes: input_states
 
 fn run_input_events(
-    input_states: &mut DenseStorage[InputState],
-    events: &[InputEvent],
+    input_states: &mut InputStateStorage,
+    events: &Vec[InputEvent],
 ):
-    for (_, state) in iter_mut(input_states):
-        for event in events:
+    for si in 0..input_states.len():
+        for ei in 0..events.len():
+            let event = events[ei]
             match event:
-                .KeyDown(.Up)    => state.up = true
-                .KeyUp(.Up)      => state.up = false
-                .KeyDown(.Down)  => state.down = true
-                .KeyUp(.Down)    => state.down = false
-                .KeyDown(.Left)  => state.left = true
-                .KeyUp(.Left)    => state.left = false
-                .KeyDown(.Right) => state.right = true
-                .KeyUp(.Right)   => state.right = false
-                .KeyDown(.Space) => state.fire = true
-                .KeyUp(.Space)   => state.fire = false
+                .KeyDown(.Up)    => input_states.dense_data[si].up = true
+                .KeyUp(.Up)      => input_states.dense_data[si].up = false
+                .KeyDown(.Down)  => input_states.dense_data[si].down = true
+                .KeyUp(.Down)    => input_states.dense_data[si].down = false
+                .KeyDown(.Left)  => input_states.dense_data[si].left = true
+                .KeyUp(.Left)    => input_states.dense_data[si].left = false
+                .KeyDown(.Right) => input_states.dense_data[si].right = true
+                .KeyUp(.Right)   => input_states.dense_data[si].right = false
+                .KeyDown(.Space) => input_states.dense_data[si].fire = true
+                .KeyUp(.Space)   => input_states.dense_data[si].fire = false
                 _ => ()
 
 // --- Player Controller ---
@@ -43,71 +58,76 @@ fn run_input_events(
 // Reads: input_states   Writes: velocities
 
 fn run_player_controller(
-    input_states: &DenseStorage[InputState],
-    velocities: &mut DenseStorage[Velocity],
+    input_states: &InputStateStorage,
+    velocities: &mut VelocityStorage,
     speed: f32,
 ):
     for i in 0..input_states.len():
-        let entity = input_states.dense_entities[i]
-        let input = &input_states.dense_data[i]
+        let eid = input_states.dense_entities[i]
+        let entity = Entity.new(eid)
+        let input = input_states.dense_data[i]
 
-        if let Some(vel) = velocities.get_mut(entity):
+        if velocities.contains(entity):
             var dx: f32 = 0.0
             var dy: f32 = 0.0
             if input.up: dy -= speed
             if input.down: dy += speed
             if input.left: dx -= speed
             if input.right: dx += speed
-            vel.linear = Vec2.new(dx, dy)
+            velocities.insert(entity, Velocity {
+                linear: Vec2.new(dx, dy),
+                angular: 0.0,
+            })
 
 // --- Movement System ---
 //
 // Applies velocity to transform for all entities with both.
 // Data-oriented: iterates the dense transform array directly,
-// probing the velocity storage for each entity. Cache-friendly —
+// probing the velocity storage for each entity. Cache-friendly --
 // transforms are contiguous in memory.
 //
 // Reads: velocities   Writes: transforms
 
 fn run_movement(
-    transforms: &mut DenseStorage[Transform],
-    velocities: &DenseStorage[Velocity],
+    transforms: &mut TransformStorage,
+    velocities: &VelocityStorage,
     dt: f32,
 ):
     for i in 0..transforms.len():
-        let entity = transforms.dense_entities[i]
+        let eid = transforms.dense_entities[i]
+        let entity = Entity.new(eid)
         if let Some(vel) = velocities.get(entity):
-            let tf = &mut transforms.dense_data[i]
-            tf.position = tf.position + vel.linear.scale(dt)
-            tf.rotation += vel.angular * dt
+            let tf = transforms.dense_data[i]
+            transforms.dense_data[i] = Transform {
+                position: tf.position + vel.linear.scale(dt),
+                rotation: tf.rotation + vel.angular * dt,
+                scale: tf.scale,
+            }
 
 // --- Collision System ---
 //
 // Broad-phase AABB overlap detection. Writes collision events.
-// Uses frame arena for temporary work buffers.
 //
 // Reads: transforms, colliders   Writes: collision_events
 
 fn run_collision(
-    transforms: &DenseStorage[Transform],
-    colliders: &DenseStorage[Collider],
+    transforms: &TransformStorage,
+    colliders: &ColliderStorage,
     events: &mut Vec[CollisionEvent],
-    arena: &FrameArena,
 ):
     events.clear()
 
     // Gather entities that have both Transform and Collider.
-    // Allocate the work buffer from the frame arena (freed at frame end).
-    var candidates = Vec.new_in(arena)
+    var candidates = Vec.new()
     for i in 0..colliders.len():
-        let entity = colliders.dense_entities[i]
+        let eid = colliders.dense_entities[i]
+        let entity = Entity.new(eid)
         if transforms.contains(entity):
-            candidates.push(entity)
+            candidates.push(eid)
 
-    // O(n^2) broad phase — sufficient for small entity counts.
-    // A spatial hash or BVH would replace this for large worlds.
+    // O(n^2) broad phase -- sufficient for small entity counts.
     for i in 0..candidates.len():
-        let a = candidates[i]
+        let a = Entity.new(candidates[i])
         let tf_a = transforms.get(a).unwrap()
         let col_a = colliders.get(a).unwrap()
 
@@ -115,11 +135,11 @@ fn run_collision(
         let bounds_a = AABB.from_center(tf_a.position, half_a)
 
         for j in (i + 1)..candidates.len():
-            let b = candidates[j]
+            let b = Entity.new(candidates[j])
             let col_b = colliders.get(b).unwrap()
 
             // Layer filtering: only collide if masks overlap
-            if (col_a.mask & col_b.layer) == 0 and (col_b.mask & col_a.layer) == 0 then
+            if (col_a.mask & col_b.layer) == 0 and (col_b.mask & col_a.layer) == 0:
                 continue
 
             let tf_b = transforms.get(b).unwrap()
@@ -136,17 +156,15 @@ fn run_collision(
                         overlap: min_dist - dist,
                     })
 
-    // candidates freed when frame_arena.reset() is called
-
 // --- Render System ---
 //
-// Builds a sorted draw list and renders (mock). Demonstrates
-// query generators, pipeline operators, and frame arena.
+// Builds a draw list and renders (mock). Demonstrates
+// data-oriented iteration patterns.
 //
-// Reads: transforms, sprites   Uses: frame_arena
+// Reads: transforms, sprites
 
 type RenderEntry {
-    entity: Entity,
+    entity_id: i32,
     position: Vec2,
     rotation: f32,
     scale: f32,
@@ -157,57 +175,61 @@ type RenderEntry {
 }
 
 fn run_render(
-    transforms: &DenseStorage[Transform],
-    sprites: &DenseStorage[Sprite],
-    arena: &FrameArena,
+    transforms: &TransformStorage,
+    sprites: &SpriteStorage,
 ):
-    // Build render list using query generator + pipeline
-    var entries = Vec.new_in(arena)
-    query2(sprites, transforms)
-        |> filter(|(_, sprite, _)| sprite.visible)
-        |> for_each(|(entity, sprite, tf)|
-            entries.push(RenderEntry {
-                entity,
-                position: tf.position,
-                rotation: tf.rotation,
-                scale: tf.scale,
-                texture: sprite.texture,
-                width: sprite.width,
-                height: sprite.height,
-                layer: sprite.layer,
-            })
-        )
+    // Build render list by iterating sprites and probing transforms
+    var entries = Vec.new()
+    for i in 0..sprites.len():
+        let eid = sprites.dense_entities[i]
+        let entity = Entity.new(eid)
+        let sprite = sprites.dense_data[i]
+        if sprite.visible:
+            if let Some(tf) = transforms.get(entity):
+                entries.push(RenderEntry {
+                    entity_id: eid,
+                    position: tf.position,
+                    rotation: tf.rotation,
+                    scale: tf.scale,
+                    texture: sprite.texture,
+                    width: sprite.width,
+                    height: sprite.height,
+                    layer: sprite.layer,
+                })
 
-    // Sort by layer for correct draw order (painter's algorithm)
-    entries.sort_by((a, b) => a.layer.cmp(&b.layer))
-
-    // Draw (mock — print to stdout for this demo)
+    // Draw (mock -- print to stdout for this demo)
     print("  Render: {entries.len()} sprites")
-    for entry in entries:
-        print("    [{entry.layer}] {texture_name(entry.texture)} at ({entry.position.x:.1}, {entry.position.y:.1})")
+    for i in 0..entries.len():
+        let entry = entries[i]
+        print("    [{entry.layer}] {texture_name(entry.texture)} at ({entry.position.x}, {entry.position.y})")
 
 // --- Collision Response ---
 //
-// Processes collision events. Demonstrates with-binding and
-// entity name lookup.
+// Processes collision events. Demonstrates entity name lookup.
 
-fn run_collision_response(world: &mut World):
-    for event in world.collision_events:
-        with world.entity_name(event.entity_a) as name_a:
-            with world.entity_name(event.entity_b) as name_b:
-                let a_str = name_a.unwrap_or("?")
-                let b_str = name_b.unwrap_or("?")
-                print("  Collision: {a_str} <-> {b_str} (overlap: {event.overlap:.1})")
+fn run_collision_response(world: &World):
+    for i in 0..world.collision_events.len():
+        let event = world.collision_events[i]
+        let name_a = world.entity_name(event.entity_a)
+        let name_b = world.entity_name(event.entity_b)
+        match name_a:
+            Some(a_str) =>
+                match name_b:
+                    Some(b_str) =>
+                        print("  Collision: {a_str} <-> {b_str} (overlap: {event.overlap})")
+                    None =>
+                        print("  Collision: {a_str} <-> ? (overlap: {event.overlap})")
+            None =>
+                print("  Collision: ? <-> ? (overlap: {event.overlap})")
 
 // ===================================================================
-// Frame orchestration — this is where parallel execution happens.
+// Frame orchestration
 //
 // Systems declare what they read/write via their parameter types.
-// The schedule groups non-conflicting systems into parallel phases
-// using scope (OS thread parallelism, spec S14.12).
+// Non-conflicting systems could be parallelized using scope.
 // ===================================================================
 
-fn run_frame(world: &mut World, input_events: &[InputEvent]):
+fn run_frame(world: &mut World, input_events: &Vec[InputEvent]):
     // Phase 1: Input (writes input_states, velocities)
     run_input_events(&mut world.input_states, input_events)
     run_player_controller(&world.input_states, &mut world.velocities, 200.0)
@@ -215,39 +237,20 @@ fn run_frame(world: &mut World, input_events: &[InputEvent]):
     // Phase 2: Movement (reads velocities, writes transforms)
     run_movement(&mut world.transforms, &world.velocities, world.dt)
 
-    // Phase 3: Collision + Render (PARALLEL)
-    //
-    // These access disjoint fields of World:
-    //   run_collision: reads transforms, colliders -> writes collision_events
-    //   run_render:    reads transforms, sprites   -> uses frame_arena
-    //
-    // The borrow checker permits this because:
-    //   - world.transforms: shared borrow (&) in both — OK
-    //   - world.colliders: shared borrow in collision only
-    //   - world.collision_events: exclusive borrow (&mut) in collision only
-    //   - world.sprites: shared borrow in render only
-    //   - world.frame_arena: shared borrow in render only
-    //
-    // All paths are disjoint or shared-compatible. Safe parallelism
-    // with zero runtime checks, enforced at compile time.
-    scope s =>
-        s.spawn(() => run_collision(
-            &world.transforms,
-            &world.colliders,
-            &mut world.collision_events,
-            &world.frame_arena,
-        ))
-        s.spawn(() => run_render(
-            &world.transforms,
-            &world.sprites,
-            &world.frame_arena,
-        ))
+    // Phase 3: Collision detection
+    run_collision(
+        &world.transforms,
+        &world.colliders,
+        &mut world.collision_events,
+    )
 
-    // Phase 4: Collision response + cleanup (sequential)
+    // Phase 4: Render
+    run_render(&world.transforms, &world.sprites)
+
+    // Phase 5: Collision response + cleanup
     run_collision_response(world)
     world.flush_despawns()
 
     // End of frame
-    world.frame_arena.reset()
     world.time += world.dt
     world.frame += 1

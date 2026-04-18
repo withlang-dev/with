@@ -1,78 +1,80 @@
-module app.http
+module http
 
-use app.service.UserService
-use app.domain.*
-use app.errors.ServiceError
-use std.sync.Arc
+use service.UserService
+use domain.*
 
-type AppState {
-    service: Arc[UserService],
+// --- HTTP Types ---
+//
+// Simplified HTTP types for demonstrating routing and
+// request handling patterns.
+
+type HttpRequest {
+    method: str,
+    path: str,
+    body: str,
 }
 
-async fn handle_request(state: &AppState, req: HttpRequest) -> HttpResponse:
-    match (req.method(), req.path_str()):
-        ("GET",    "/users")      => handle_list(state, &req).await
-        ("GET",    "/users/{id}") => handle_get_profile(state, req.param("id")).await
-        ("POST",   "/users")      => handle_create(state, &req).await
-        ("PUT",    "/users/{id}") => handle_update(state, &req, req.param("id")).await
-        ("DELETE", "/users/{id}") => handle_delete(state, &req, req.param("id")).await
-        _ => HttpResponse.not_found()
+type HttpResponse {
+    status: i32,
+    body: str,
+}
 
-async fn handle_get_profile(state: &AppState, id_str: &str) -> HttpResponse:
-    let id = match id_str.parse_int():
-        Ok(n)  => UserId(n)
-        Err(_) => return HttpResponse.bad_request("invalid user id")
+extend HttpResponse:
+    fn ok(body: str) -> HttpResponse:
+        HttpResponse { status: 200, body }
 
-    match state.service.get_profile(id).await:
-        Ok(profile)                    => HttpResponse.json(200, &profile)
-        Err(.Db(.NotFound(..))) => HttpResponse.not_found()
-        Err(.Validation(msg))          => HttpResponse.bad_request(&msg)
-        Err(e)                         => HttpResponse.internal_error(&e.to_string())
+    fn created(body: str) -> HttpResponse:
+        HttpResponse { status: 201, body }
 
-async fn handle_list(state: &AppState, req: &HttpRequest) -> HttpResponse:
-    let page = req.query_param("page")?.parse_int().ok() ?? 1
-    let per_page = req.query_param("per_page")?.parse_int().ok() ?? 20
+    fn bad_request(msg: str) -> HttpResponse:
+        HttpResponse { status: 400, body: msg }
 
-    match state.service.list_active(page, per_page).await:
-        Ok(users) => HttpResponse.json(200, &users)
-        Err(e)    => HttpResponse.internal_error(&e.to_string())
+    fn not_found -> HttpResponse:
+        HttpResponse { status: 404, body: "not found" }
 
-async fn handle_create(state: &AppState, req: &HttpRequest) -> HttpResponse:
-    let Ok(body) = req.json[CreateUserRequest]() else
-        return HttpResponse.bad_request("invalid request body")
+    fn no_content -> HttpResponse:
+        HttpResponse { status: 204, body: "" }
 
-    // Actor ID from auth middleware (stored in request extensions)
-    let actor = req.extension[UserId]() ?? UserId(0)
+    fn internal_error(msg: str) -> HttpResponse:
+        HttpResponse { status: 500, body: msg }
 
-    match state.service.create_user(body, actor).await:
-        Ok(user) => HttpResponse.json(201, &user)
-        Err(.Validation(msg)) => HttpResponse.bad_request(&msg)
-        Err(e) => HttpResponse.internal_error(&e.to_string())
+// --- Application State ---
 
-async fn handle_update(state: &AppState, req: &HttpRequest, id_str: &str) -> HttpResponse:
-    let id = match id_str.parse_int():
-        Ok(n)  => UserId(n)
-        Err(_) => return HttpResponse.bad_request("invalid user id")
+type AppState {
+    service: UserService,
+}
 
-    let Ok(update) = req.json[UserUpdate]() else
-        return HttpResponse.bad_request("invalid request body")
+// --- Router ---
+//
+// Demonstrates pattern matching on (method, path) tuples
+// for request routing.
 
-    let actor = req.extension[UserId]() ?? UserId(0)
+fn handle_request(state: &mut AppState, req: HttpRequest) -> HttpResponse:
+    match (req.method, req.path):
+        ("GET",    "/users")  => handle_list(state)
+        ("POST",   "/users")  => handle_create(state, req)
+        _                     => HttpResponse.not_found()
 
-    match state.service.update_user(id, update, actor).await:
-        Ok(user)                       => HttpResponse.json(200, &user)
-        Err(.Db(.NotFound(..))) => HttpResponse.not_found()
-        Err(.Validation(msg))          => HttpResponse.bad_request(&msg)
-        Err(e)                         => HttpResponse.internal_error(&e.to_string())
+// --- Handlers ---
 
-async fn handle_delete(state: &AppState, req: &HttpRequest, id_str: &str) -> HttpResponse:
-    let id = match id_str.parse_int():
-        Ok(n)  => UserId(n)
-        Err(_) => return HttpResponse.bad_request("invalid user id")
+fn handle_list(state: &AppState) -> HttpResponse:
+    let size = state.service.clamp_page_size(20)
+    HttpResponse.ok("listing users, page_size={size}")
 
-    let actor = req.extension[UserId]() ?? UserId(0)
+fn handle_create(state: &mut AppState, req: HttpRequest) -> HttpResponse:
+    let user_req = CreateUserRequest {
+        name: req.body,
+        email: "user@example.com",
+        role: .Member,
+    }
 
-    match state.service.delete_user(id, actor).await:
-        Ok()                         => HttpResponse.no_content()
-        Err(.Db(.NotFound(..))) => HttpResponse.not_found()
-        Err(e)                         => HttpResponse.internal_error(&e.to_string())
+    let actor = UserId { value: 0 }
+
+    // Validate
+    match state.service.validate_create(user_req):
+        Some(err) => return HttpResponse.bad_request(err)
+        None => ()
+
+    // Create
+    let user = state.service.create_user(user_req, actor)
+    HttpResponse.created("created user: {user.name}")

@@ -4,46 +4,46 @@ module nebula.main
 // Nebula — Concurrent Telemetry Ingestion Daemon
 //
 // Demonstrates:
-//   - OS threads vs lightweight fibers (thread.spawn_os vs async)
-//   - Channels for cross-thread communication
+//   - Channels for cross-fiber communication
 //   - select await for racing futures
 //   - async scope for structured concurrency
-//   - Signal handling (SIGINT graceful shutdown)
-//   - Error composition with `error ... from`
-//   - Arc for thread-safe shared ownership
+//   - Error composition with `error` types
 //   - Postfix await on task handles
-//   - String interpolation in println
+//   - String interpolation
 //   - defer for cleanup
 //   - Channel ownership: dropping sender closes receiver
+//   - with-blocks for scoped mutation
 // ===================================================================
 
-use std.net.TcpListener
-use std.signal.{on_signal, Signal}
-use std.sync.Arc
-use std.time.Duration
-use nebula.session.{handle_client, SessionPool, compute_stats}
-use nebula.db.Database
-use nebula.schema.{load_config, ServerConfig}
+use std.channel
+use session.Session
+use session.SessionError
+use session.SessionStats
+use session.handle_session
+use session.compute_stats
+use db.Database
+use db.DbError
+use schema.load_config
+use schema.ServerConfig
+use schema.build_test_batch
 
 // --- Error Composition ---
 //
-// `error ... from` generates wrapper variants + From impls automatically.
-// `IoError` becomes variant `Io(IoError)`, etc. The `?` operator uses
-// the generated `From` impls for automatic conversion across boundaries.
+// Wrapper variants allow ? to automatically convert sub-errors
+// into AppError. Each sub-error type gets its own variant.
 
 error AppError =
-    Io(IoError)
-    | Db(nebula.db.DbError)
-    | Session(nebula.session.SessionError)
+    | Db(DbError)
+    | Session(SessionError)
+    | Config(str)
 
 // --- Entry Point ---
 
-fn main:
-    let config = load_config(std.process.env("PORT")?.parse_u16().ok())
+async fn main:
+    let config = load_config(None)
 
-    // Thread-safe generational arena for concurrent sessions
-    let pool = SessionPool.new(SlotMap.new())
-    let db = Arc.new(Database.open(&config.db_path).expect("failed to open database"))
+    // Open the database (Result auto-unwrapped with .expect)
+    let db = Database.open(config.db_path).expect("failed to open database")
 
     // Initialize the database schema
     db.init_schema().expect("failed to initialize schema")
@@ -53,71 +53,68 @@ fn main:
 
     // Channel for shutdown coordination.
     // Dropping the sender automatically closes the receiver.
-    let (shutdown_tx, shutdown_rx) = chan[Unit](1)
+    let (shutdown_tx, shutdown_rx) = chan[i32](1)
 
-    // Register SIGINT handler — dropping the sender signals shutdown
-    on_signal(.SIGINT, () => drop(shutdown_tx))
+    // Channel for telemetry data flowing from sessions to the analyzer
+    let (data_tx, data_rx) = chan[str](32)
 
-    // --- OS Thread: Background Analyzer ---
+    // --- Simulate Client Sessions ---
     //
-    // CPU-bound work runs on a dedicated OS thread, not a fiber.
-    // Fibers should never block on CPU work. The compiler prevents
-    // calling .await inside non-async functions.
+    // In production, these would be spawned per TCP connection.
+    // Here we demonstrate structured concurrency with async scope.
 
-    let _worker = thread.spawn_os(() => background_analyzer(db.clone(), pool.clone()))
+    let (session_tx1, session_rx1) = chan[str](8)
+    let (session_tx2, session_rx2) = chan[str](8)
 
-    // --- Fiber Runtime: Async Server ---
+    // Feed test data to sessions
+    session_tx1.send("sensor-alpha")
+    session_tx1.send("sensor-beta")
+    session_tx1.send("")  // signals end-of-session
+
+    session_tx2.send("sensor-gamma")
+    session_tx2.send("sensor-delta")
+    session_tx2.send("")  // signals end-of-session
+
+    // Structured concurrency: async scope guarantees all tracked
+    // fibers complete or are cancelled before the scope exits.
+    async scope s =>
+        s.track(handle_session(1, session_rx1))
+        s.track(handle_session(2, session_rx2))
+
+    print("\nAll sessions completed.")
+
+    // --- Test Batch Processing ---
     //
-    // Enter the async world. The `async:` block creates an inline future.
+    // Build a test batch of telemetry records and insert them.
 
-    let server_task = async:
-        let listener = TcpListener.bind("{config.host}:{config.port}").await?
-        print("Listening on {config.host}:{config.port}")
+    let batch = build_test_batch(5)
+    print("\nBatch of {batch.len()} telemetry records built.")
 
-        // Structured concurrency: async scope guarantees all tracked
-        // fibers complete or are cancelled before the scope exits.
-        async scope s =>
-            loop:
-                // Fair select await: races new connections vs shutdown.
-                select await
-                    conn_res = listener.accept() =>
-                        let Ok(stream) = conn_res else continue
+    // --- Select Await Demo ---
+    //
+    // Race a "data ready" signal against a "shutdown" signal.
+    // Whichever completes first wins.
 
-                        // Track the new fiber — it inherits cancellation
-                        // from the enclosing scope.
-                        s.track(handle_client(stream, pool.clone(), db.clone()))
+    // Send shutdown signal after a brief moment
+    shutdown_tx.send(1)
 
-                    _ = shutdown_rx.recv() =>
-                        print("\nSIGINT received. Draining connections...")
-                        break
+    let data_task = async:
+        data_rx.recv()
+    let shutdown_task = async:
+        shutdown_rx.recv()
 
-        // Scope guarantees: all spawned fibers have completed or
-        // been cancelled. Destructors have run. Resources are freed.
-        let stats = compute_stats(&pool)
-        print("Final stats: {stats.active_count} active, {stats.total_packets} packets")
+    select await:
+        _ = data_task =>
+            print("\nData received before shutdown.")
+        _ = shutdown_task =>
+            print("\nShutdown signal received. Draining...")
 
-    // Postfix await blocks the main thread until the server completes.
-    match server_task.await:
-        Ok()   => print("Clean shutdown complete.")
-        Err(e) => eprint("Fatal error: {e}")
+    // --- Compute Final Stats ---
 
-// --- Background Analyzer ---
-//
-// Runs on a raw OS thread. Cannot use `.await` — the compiler
-// enforces this because the function is not marked `async`.
-// If we tried to .await inside insert_bulk's lock, the compiler
-// would catch the @[no_await_guard] violation.
+    with Vec.new() as mut sessions:
+        sessions.push(Session { id: 1, addr: "127.0.0.1", packets_received: 5 })
+        sessions.push(Session { id: 2, addr: "127.0.0.2", packets_received: 3 })
+        let stats = compute_stats(&sessions)
+        print("\nFinal stats: {stats.active_count} active, {stats.total_packets} packets")
 
-fn background_analyzer(db: Arc[Database], pool: SessionPool):
-    loop:
-        thread.sleep(Duration.seconds(60))
-
-        // Snapshot session stats from the arena
-        let stats = compute_stats(&pool)
-        if stats.total_packets > 0:
-            print("[analyzer] {stats.active_count} sessions, {stats.total_packets} packets ingested")
-
-        // Periodic maintenance — blocking is safe on OS threads
-        match db.execute("DELETE FROM telemetry WHERE ts < strftime('%s','now') - 86400"):
-            Ok()   => ()
-            Err(e) => eprint("[analyzer] cleanup error: {e}")
+    print("\n=== Clean shutdown complete ===")

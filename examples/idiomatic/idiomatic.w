@@ -1,66 +1,81 @@
-// A small API service that fetches a user's dashboard data.
-// This would be ~120 lines in Rust, ~90 in Go, ~80 in TypeScript.
-// In With, it's ~60 lines with full error handling and concurrency.
+// Idiomatic With — demonstrates concise error handling,
+// pattern matching, pipeline operators, and async.
 
-use std.http
-use std.json
-use std.time
+type User { id: i32, name: str, active: bool }
 
-type Dashboard {
-    user: User,
-    posts: Vec[Post],
-    notifications: Vec[Notification],
-    unread: i32,
-    generated_at: Timestamp,
+enum LookupResult {
+    Found(User)
+    | Suspended(str)
+    | NotFound
 }
 
-enum UserStatus { Active(User) | Suspended(str) | Deleted }
+fn find_user(id: i32) -> LookupResult:
+    if id == 1:
+        .Found(User { id: 1, name: "Alice", active: true })
+    else if id == 2:
+        .Suspended("policy violation")
+    else:
+        .NotFound
 
-async fn get_dashboard(req: &Request, db: &Pool) -> Result[Response, ApiError]:
-    let user_id = req.param("id")? |> parse[UserId]?
+fn format_user(user: User) -> str:
+    "{user.name} (#{user.id})"
 
-    match db.find_user(user_id).await?:
-        .Active(user) =>
-            // fetch everything concurrently
-            let (posts, notifs) = (
-                db.recent_posts(user_id, limit: 20),
-                db.notifications(user_id, unread: true),
-            ).await
-
-            let dashboard = Dashboard {
-                user,
-                posts: posts?,
-                notifications: notifs?,
-                unread: notifs?.iter() |> filter(n => n.unread) |> count,
-                generated_at: Timestamp.now(),
-            }
-
-            Response.ok() |> json(dashboard)
+fn get_dashboard(user_id: i32) -> str:
+    match find_user(user_id):
+        .Found(user) =>
+            let display = user |> format_user
+            "Dashboard for {display}"
 
         .Suspended(reason) =>
-            Response.forbidden() |> json({ message: "Account suspended: {reason}" })
+            "Account suspended: {reason}"
 
-        .Deleted =>
-            Response.not_found() |> json({ message: "User not found" })
+        .NotFound =>
+            "User not found"
 
+// --- Pipeline composition ---
 
-// --- Middleware: retry with exponential backoff ---
+fn double(x: i32) -> i32: x * 2
+fn add_one(x: i32) -> i32: x + 1
+fn to_str(x: i32) -> str: "{x}"
 
-async fn with_retry[T, E](attempts: i32, f: async fn -> Result[T, E]) -> Result[T, E]:
-    for i in 0..attempts:
-        match f().await:
-            Ok(val) => return Ok(val)
-            Err(e) if i == attempts - 1 => return Err(e)
-            Err(_) => sleep(Duration.millis(100 * (2 ** i))).await
+fn pipeline_demo:
+    let result = 5 |> double |> add_one |> to_str
+    print("pipeline: {result}")
+    assert(result == "11")
 
+// --- Error handling with Result ---
 
-// --- Route setup ---
+error FetchError = NotFound(i32) | Timeout
+
+fn fetch_data(id: i32) -> Result[str, FetchError]:
+    if id > 0:
+        Ok("data-{id}")
+    else:
+        Err(.NotFound(id))
+
+fn process_with_errors:
+    match fetch_data(1):
+        Ok(data) => print("got: {data}")
+        Err(e) => print("error: {e}")
+
+    match fetch_data(-1):
+        Ok(data) => print("unexpected: {data}")
+        Err(.NotFound(id)) => print("not found: {id}")
+        Err(.Timeout) => print("timeout")
+
+// --- Main ---
 
 fn main:
-    let db = Pool.connect(env("DATABASE_URL") ?? "postgres://localhost/app")
+    print("=== Idiomatic With Demo ===\n")
 
-    let app = with Router.new() as mut r:
-        r.get("/dashboard/:id", req => get_dashboard(req, &db))
-        r.get("/health", _ => Response.ok() |> text("ok"))
+    print(get_dashboard(1))
+    print(get_dashboard(2))
+    print(get_dashboard(3))
 
-    serve(app, port: 8080)
+    print("")
+    pipeline_demo()
+
+    print("")
+    process_with_errors()
+
+    print("\n=== Done ===")

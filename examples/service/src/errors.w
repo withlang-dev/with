@@ -1,6 +1,6 @@
-module app.errors
+module errors
 
-use std.time.Duration
+// --- Database Errors ---
 
 error DbError =
     | ConnectionFailed(host: str, port: u16)
@@ -8,34 +8,31 @@ error DbError =
     | NotFound(table: str, id: str)
     | Timeout
 
+// --- Cache Errors ---
+
 error CacheError =
     | ConnectionLost
     | KeyTooLarge(size: usize, max: usize)
     | Timeout
 
+// --- Notification Errors ---
+
 error NotifyError =
     | ProviderDown(provider: str)
-    | RateLimited(retry_after: Duration)
+    | RateLimited(retry_seconds: i64)
     | InvalidRecipient(addr: str)
 
-// Unified service error — all subsystem errors convert into this
-// via From impls, so ? propagation works across boundaries.
+// Unified service error — all subsystem errors convert into this.
+// Use explicit conversion functions instead of From trait.
 error ServiceError =
     | Db(DbError)
     | Cache(CacheError)
     | Notify(NotifyError)
     | Validation(msg: str)
-    | Timeout(operation: str, limit: Duration)
+    | TimedOut(operation: str, limit_secs: i64)
     | Cancelled
 
-impl From[DbError] for ServiceError:
-    fn from(e: DbError) -> ServiceError: .Db(e)
-
-impl From[CacheError] for ServiceError:
-    fn from(e: CacheError) -> ServiceError: .Cache(e)
-
-impl From[NotifyError] for ServiceError:
-    fn from(e: NotifyError) -> ServiceError: .Notify(e)
-
-impl From[TaskCancelled] for ServiceError:
-    fn from(_: TaskCancelled) -> ServiceError: .Cancelled
+// Explicit conversion functions (From trait not yet available)
+fn service_error_from_db(e: DbError) -> ServiceError: .Db(e)
+fn service_error_from_cache(e: CacheError) -> ServiceError: .Cache(e)
+fn service_error_from_notify(e: NotifyError) -> ServiceError: .Notify(e)

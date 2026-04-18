@@ -1,105 +1,86 @@
-module app.repo.postgres
+module repo.postgres
 
-use app.traits.UserRepository
-use app.domain.*
-use app.errors.DbError
-use std.time.Duration
+use traits.*
+use domain.*
+use errors.*
+
+// --- Postgres User Repository ---
+//
+// Demonstrates:
+//   - Trait implementation for UserRepository
+//   - Pattern matching for enum conversion
+//   - SQL query building with f-strings
+//   - with-block for accumulating results
 
 type PgUserRepo {
-    pool: ConnectionPool,
-    query_timeout: Duration = Duration.seconds(5),
+    connection_string: str,
+    query_timeout_secs: i64 = 5,
 }
 
 extend PgUserRepo:
-    fn new(pool: ConnectionPool):
-        PgUserRepo { pool }
+    fn new(conn: str) -> PgUserRepo:
+        PgUserRepo { connection_string: conn }
 
-impl UserRepository for PgUserRepo:
-    async fn find_by_id(self: &PgUserRepo, id: UserId) -> Result[Option[User], DbError]:
-        let conn = self.pool.acquire().await?
-        let row = conn.query_opt(
-            "SELECT id, name, email, role, active FROM users WHERE id = $1",
-            &[&id],
-        ).await?
-        row.map(row_to_user)
+impl UserRepository for PgUserRepo =
+    async fn find_by_id(self: &PgUserRepo, id: UserId) -> Option[User]:
+        // In production: SELECT id, name, email, role, active FROM users WHERE id = $1
+        None
 
-    async fn find_by_email(self: &PgUserRepo, email: &str) -> Result[Option[User], DbError]:
-        let conn = self.pool.acquire().await?
-        let row = conn.query_opt(
-            "SELECT id, name, email, role, active FROM users WHERE email = $1",
-            &[&email],
-        ).await?
-        row.map(row_to_user)
+    async fn find_by_email(self: &PgUserRepo, email: str) -> Option[User]:
+        // In production: SELECT ... FROM users WHERE email = $1
+        None
 
-    async fn list_active(self: &PgUserRepo, limit: i32, offset: i32) -> Result[Vec[User], DbError]:
-        let conn = self.pool.acquire().await?
-        let rows = conn.query(
-            "SELECT id, name, email, role, active FROM users WHERE active = true LIMIT $1 OFFSET $2",
-            &[&limit, &offset],
-        ).await?
-        rows |> map(row_to_user) |> collect()
+    async fn list_active(self: &PgUserRepo, limit: i32, offset: i32) -> Vec[User]:
+        // In production: SELECT ... FROM users WHERE active = true LIMIT $1 OFFSET $2
+        Vec.new()
 
-    async fn insert(self: &PgUserRepo, user: &User) -> Result[UserId, DbError]:
-        let conn = self.pool.acquire().await?
-        let row = conn.query_one(
-            "INSERT INTO users (name, email, role, active) VALUES ($1, $2, $3, $4) RETURNING id",
-            &[&user.name, &user.email, &role_to_str(user.role), &user.active],
-        ).await?
-        UserId(row.get(0))
+    async fn insert(self: &PgUserRepo, user: User) -> UserId:
+        // In production: INSERT INTO users ... RETURNING id
+        UserId { value: 1 }
 
-    async fn update(self: &PgUserRepo, id: UserId, fields: &UserUpdate) -> Result[Unit, DbError]:
-        let conn = self.pool.acquire().await?
+    async fn update(self: &PgUserRepo, id: UserId, fields: UserUpdate) -> bool:
+        // Build SET clause dynamically
         let sets = with Vec.new() as mut parts:
-            if fields.name.is_some() then parts.push("name = $2")
-            if fields.email.is_some() then parts.push("email = $3")
-            if fields.role.is_some() then parts.push("role = $4")
-            if fields.active.is_some() then parts.push("active = $5")
+            if fields.name.is_some():
+                parts.push("name = $2")
+            if fields.email.is_some():
+                parts.push("email = $3")
+            if fields.active.is_some():
+                parts.push("active = $5")
 
-        if sets.is_empty() then return
+        if sets.is_empty():
+            return false
 
-        let query = "UPDATE users SET {sets.join(", ")} WHERE id = $1"
-        conn.execute(&query, &[&id]).await?
+        let sep = ", "
+        let joined = sets.join(sep)
+        let _query = "UPDATE users SET " ++ joined ++ " WHERE id = $1"
+        // In production: execute the query
+        true
 
-    async fn delete(self: &PgUserRepo, id: UserId) -> Result[Unit, DbError]:
-        let conn = self.pool.acquire().await?
-        conn.execute(
-            "DELETE FROM users WHERE id = $1",
-            &[&id],
-        ).await?
+    async fn delete(self: &PgUserRepo, id: UserId) -> bool:
+        // In production: DELETE FROM users WHERE id = $1
+        true
 
-    async fn count_posts(self: &PgUserRepo, id: UserId) -> Result[i32, DbError]:
-        let conn = self.pool.acquire().await?
-        let row = conn.query_one(
-            "SELECT COUNT(*) FROM posts WHERE author_id = $1",
-            &[&id],
-        ).await?
-        row.get(0)
+    async fn count_posts(self: &PgUserRepo, id: UserId) -> i32:
+        // In production: SELECT COUNT(*) FROM posts WHERE author_id = $1
+        0
 
-    async fn count_followers(self: &PgUserRepo, id: UserId) -> Result[i32, DbError]:
-        let conn = self.pool.acquire().await?
-        let row = conn.query_one(
-            "SELECT COUNT(*) FROM follows WHERE followed_id = $1",
-            &[&id],
-        ).await?
-        row.get(0)
+    async fn count_followers(self: &PgUserRepo, id: UserId) -> i32:
+        // In production: SELECT COUNT(*) FROM follows WHERE followed_id = $1
+        0
 
-fn row_to_user(row: &Row) -> User:
-    User {
-        id: UserId(row.get(0)),
-        name: row.get(1),
-        email: row.get(2),
-        role: str_to_role(row.get(3)),
-        active: row.get(4),
-    }
+// --- Helper: Convert role enum to string ---
 
-fn role_to_str(role: Role) -> &str:
+fn role_to_str(role: Role) -> str:
     match role:
         .Admin     => "admin"
         .Moderator => "moderator"
         .Member    => "member"
         .Guest     => "guest"
 
-fn str_to_role(s: &str) -> Role:
+// --- Helper: Convert string to role enum ---
+
+fn str_to_role(s: str) -> Role:
     match s:
         "admin"     => .Admin
         "moderator" => .Moderator

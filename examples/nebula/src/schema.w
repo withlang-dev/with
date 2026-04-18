@@ -1,15 +1,13 @@
 module nebula.schema
 
 // ===================================================================
-// Schema — Metaprogramming & Domain Types
+// Schema — Domain Types & Traits
 //
 // Demonstrates:
 //   - Algebraic data types with named variant fields
 //   - Enum variant shorthand (.Ok)
 //   - @[derive] for automatic trait generation
-//   - comptime metaprogramming (compile-time reflection)
 //   - Trait definitions and implementations
-//   - Collection comprehensions
 //   - Record update syntax ({ base with field })
 //   - Default field values
 //   - Field shorthand in struct literals
@@ -20,7 +18,7 @@ module nebula.schema
 // --- Domain Types ---
 
 pub enum Status {
-    Ok
+    Active
     | Warning(str)
     | Fatal(code: i32)
 }
@@ -29,56 +27,41 @@ pub enum Status {
 pub type Telemetry {
     device_id: str,
     temp: f64 = 0.0,
-    status: Status = .Ok,
+    status: Status = .Active,
 }
 
 // --- SQL Record Trait ---
 //
-// The trait we want to implement automatically via comptime.
 // Any type implementing SqlRecord can be serialized to a SQL INSERT.
 
 pub trait SqlRecord:
     fn table_name(self: &Self) -> str
     fn to_insert_query(self: &Self) -> str
 
-// --- Comptime Metaprogramming ---
+// --- Manual SqlRecord Implementation for Telemetry ---
 //
-// This function executes at compile time, inspecting T's fields
-// to stamp out an `impl SqlRecord` block. The compiler evaluates
-// T.name(), T.fields(), and the comprehension at compile time,
-// then emits the impl with the computed strings baked in.
+// In a full implementation, comptime metaprogramming would generate
+// this automatically by inspecting T's fields at compile time.
 
-pub comptime fn derive_sql_record[T: type] -> impl SqlRecord for T:
-    let table = T.name().to_lower()
-    let fields = T.fields()
+impl SqlRecord for Telemetry:
+    fn table_name(self: &Telemetry) -> str:
+        "telemetry"
 
-    // Comptime comprehension: builds the column name list at compile time
-    let col_names = [f.name for f in fields].join(", ")
-
-    // The generated implementation — body runs at runtime
-    impl SqlRecord for T:
-        fn table_name(self: &T) -> str: table
-
-        fn to_insert_query(self: &T) -> str:
-            // Runtime comprehension: evaluates field values dynamically
-            let vals = [self.{f.name}.to_string() for f in fields]
-            "INSERT INTO {table} ({col_names}) VALUES ({vals.join(", ")})"
-
-// Trigger the comptime generation for Telemetry
-comptime let _ = derive_sql_record[Telemetry]()
+    fn to_insert_query(self: &Telemetry) -> str:
+        "INSERT INTO telemetry (device_id, temp) VALUES ('{self.device_id}', {self.temp})"
 
 // --- Status Helpers ---
 
-pub fn is_fatal(s: &Status) -> bool:
+pub fn is_fatal(s: Status) -> bool:
     match s:
         .Fatal(_) => true
         _         => false
 
-pub fn status_label(s: &Status) -> str:
+pub fn status_label(s: Status) -> str:
     match s:
-        .Ok         => "ok"
+        .Active     => "ok"
         .Warning(w) => "warn: {w}"
-        .Fatal(c)   => "fatal({c.code})"
+        .Fatal(c)   => "fatal({c})"
 
 // --- Server Configuration ---
 //
@@ -123,7 +106,7 @@ pub fn build_test_batch(count: usize) -> Vec[Telemetry]:
         for i in 0..count:
             let status = if i % 5 == 0 then .Warning("periodic check")
                          else if i % 10 == 0 then .Fatal(code: 99)
-                         else .Ok
+                         else .Active
             batch.push(Telemetry {
                 device_id: "dev-{i}",
                 temp: 20.0 + (i as f64) * 0.5,
