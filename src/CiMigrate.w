@@ -750,6 +750,8 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
 
     // Unsupported types — emit stub
     if has_unsupported:
+        if migrate_prefer_curly():
+            return "fn " ++ safe_name ++ "() -> Never {\n    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")\n}\n\n"
         return "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")\n\n"
 
     // @[c_export] for non-static functions (preserves C ABI)
@@ -763,6 +765,8 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     let body = ci_try_translate_fn_body(session, idx)
     if body.len() > 0:
         let ret_suffix = if ret == "void": "" else: " -> " ++ ret
+        if migrate_prefer_curly():
+            return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ " {\n" ++ body ++ "}\n\n"
         return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body ++ "\n"
 
     // Body translation failed — emit as extern fn (system header function
@@ -773,6 +777,8 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
         let is_definition = with_ci_cursor_is_definition(session, ci_find_fn_cursor(session, name))
         if is_definition != 0:
             // Locally defined but untranslatable — emit stub
+            if migrate_prefer_curly():
+                return "fn " ++ safe_name ++ "(" ++ params ++ ") -> Never {\n    comptime_error(\"untranslatable function body\")\n}\n\n"
             return "fn " ++ safe_name ++ "(" ++ params ++ ") -> Never:\n    comptime_error(\"untranslatable function body\")\n\n"
     let cc = with_cimport_fn_calling_conv(session, idx)
     let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
@@ -1017,3 +1023,13 @@ var g_migrate_no_c_export: i32 = 0
 
 pub fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val
+
+// Block style preference for migrated output.
+// 0 = colon-form (default), 2 = brace-form (--prefer-curly).
+var g_migrate_block_style: i32 = 0
+
+pub fn migrate_set_block_style(val: i32):
+    g_migrate_block_style = val
+
+pub fn migrate_prefer_curly() -> bool:
+    g_migrate_block_style == 2

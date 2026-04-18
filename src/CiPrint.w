@@ -14,6 +14,7 @@
 // observable during development. Subsequent B-phase commits replace
 // the placeholders one kind at a time.
 use CiIR
+use CiMigrate
 
 extern fn with_write(s: str) -> void
 extern fn with_eprint(s: str) -> void
@@ -221,30 +222,36 @@ fn ci_print_compact_stmt_local(stmts: &CiStmtPool, exprs: &CiExprPool, types: &C
         let cond = (stmts.get_d0(id)) as CiExprId
         let then_b = (stmts.get_d1(id)) as CiStmtId
         let else_b = (stmts.get_d2(id)) as CiStmtId
-        var out = indent ++ "if " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
+        let curly = migrate_prefer_curly()
+        var out = indent ++ "if " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ (if curly: " {\n" else: ":\n")
         let then_text = ci_print_compact_stmt_local(stmts, exprs, types, then_b, depth + 4)
         if then_text.len() > 0:
             out = out ++ then_text
         else:
             out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         if (else_b as i32) != 0:
-            out = out ++ indent ++ "else:\n"
+            out = out ++ indent ++ (if curly: "} else {\n" else: "else:\n")
             let else_text = ci_print_compact_stmt_local(stmts, exprs, types, else_b, depth + 4)
             if else_text.len() > 0:
                 out = out ++ else_text
             else:
                 out = out ++ ci_make_indent(depth + 4) ++ "0\n"
+        if curly:
+            out = out ++ indent ++ "}\n"
         return out
 
     if kind == CiStmtKind.CIS_WHILE:
         let cond = (stmts.get_d0(id)) as CiExprId
         let body = (stmts.get_d1(id)) as CiStmtId
-        var out = indent ++ "while " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
+        let curly = migrate_prefer_curly()
+        var out = indent ++ "while " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ (if curly: " {\n" else: ":\n")
         let body_text = ci_print_compact_stmt_local(stmts, exprs, types, body, depth + 4)
         if body_text.len() > 0:
             out = out ++ body_text
         else:
             out = out ++ ci_make_indent(depth + 4) ++ "0\n"
+        if curly:
+            out = out ++ indent ++ "}\n"
         return out
 
     if kind == CiStmtKind.CIS_VAR_DECL:

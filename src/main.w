@@ -964,6 +964,14 @@ fn run_migrate_command(argc: i32) -> i32:
             migrate_set_no_c_export(1)
             ai = ai + 1
             continue
+        if arg == "--prefer-curly":
+            migrate_set_block_style(2)
+            ai = ai + 1
+            continue
+        if arg == "--prefer-colon":
+            migrate_set_block_style(0)
+            ai = ai + 1
+            continue
         if arg == "--width-slice" and ai + 1 < argc:
             migrate_set_width_slice(cli_parse_small_int(with_arg_at(ai + 1)))
             ai = ai + 2
