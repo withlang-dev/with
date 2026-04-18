@@ -195,7 +195,12 @@ fn migrate_host_compat_preamble() -> str:
     // Provide a minimal host parse environment before the original source.
     "#if !defined(_POSIX_C_SOURCE)\n#define _POSIX_C_SOURCE 200809L\n#endif\n" ++
     "#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)\n#define _DARWIN_C_SOURCE 1\n#endif\n" ++
-    "#if !defined(HAVE_UNISTD_H)\n#ifdef __has_include\n#if __has_include(<unistd.h>)\n#define HAVE_UNISTD_H 1\n#endif\n#endif\n#endif\n"
+    "#if !defined(HAVE_UNISTD_H)\n#ifdef __has_include\n#if __has_include(<unistd.h>)\n#define HAVE_UNISTD_H 1\n#endif\n#endif\n#endif\n" ++
+    "#include <string.h>\n#include <stdio.h>\n" ++
+    "#undef memcpy\n#undef memmove\n#undef memset\n" ++
+    "#undef strcpy\n#undef strncpy\n#undef strcat\n#undef strncat\n" ++
+    "#undef snprintf\n#undef sprintf\n#undef vsnprintf\n#undef vsprintf\n" ++
+    "#undef stpcpy\n#undef stpncpy\n"
 
 fn ci_capture_macro_values(session: i64):
     g_migrate_macro_values = ""
