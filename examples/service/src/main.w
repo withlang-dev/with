@@ -1,107 +1,62 @@
-module app.main
+module main
 
-use app.service.{UserService, ServiceConfig}
-use app.errors.ServiceError
-use app.repo.postgres.PgUserRepo
-use app.cache.redis.RedisCache
-use app.notify.email.EmailNotifier
-use app.http.{AppState, HttpResponse, handle_request}
-use std.sync.Arc
-use std.net.TcpStream
-use std.time.Duration
+use service.UserService
+use service.ServiceConfig
+use domain.*
+use http.*
 
-async fn main -> Result[Unit, ServiceError]:
-    // Configuration — only override fields that differ from defaults
+// --- Entry Point ---
+//
+// Demonstrates:
+//   - Builder pattern for service configuration
+//   - Request routing via pattern matching
+//   - Domain types with default values
+//   - f-string interpolation
+
+fn main:
+    // Configuration -- only override fields that differ from defaults
     let config = ServiceConfig {
-        cache_ttl: Duration.minutes(10),
+        cache_ttl_secs: 600,
         notify_on_delete: true,
         max_batch_size: 50,
     }
 
-    // Initialize infrastructure
-    let db_pool = ConnectionPool.connect("postgres://localhost/myapp", 20).await?
-    let redis = RedisClient.connect("redis://localhost:6379").await?
+    // Build the service
+    let builder = UserService.builder()
+    let builder2 = builder.with_config(config)
+    var service = builder2.build()
 
-    // Compose the service — builder methods take self by value (S9.5)
-    let service = UserService.builder()
-        .repo(Box.new(PgUserRepo.new(db_pool)))
-        .cache(Box.new(RedisCache.new(redis, "myapp")))
-        .notifier(Box.new(EmailNotifier {
-            smtp_host: "smtp.example.com",
-            from_addr: "noreply@example.com",
-            rate_limit: RateLimiter.new(100, Duration.minutes(1)),
-        }))
-        .audit(Box.new(PgAuditLog.new(db_pool.clone())))
-        .config(config)
-        .build()?
+    var state = AppState { service }
 
-    let state = Arc.new(AppState { service: Arc.new(service) })
+    print("=== Service Demo ===")
 
-    let listener = std.net.TcpListener.bind("0.0.0.0:8080").await?
-    print("Listening on :8080")
+    // Simulate some HTTP requests
+    let create_req = HttpRequest {
+        method: "POST",
+        path: "/users",
+        body: "Alice",
+    }
 
-    // Structured concurrency: all connection fibers are children of this scope.
-    // On shutdown, the scope cancels all children and waits for cleanup.
-    async scope s =>
-        let shutdown = s.track(listen_for_shutdown())
+    let resp = handle_request(&mut state, create_req)
+    print("POST /users -> {resp.status}: {resp.body}")
 
-        loop:
-            // Race: accept a new connection OR receive shutdown signal
-            select await
-                result = listener.accept() =>
-                    match result:
-                        Ok(conn) =>
-                            s.track(handle_connection(state.clone(), conn))
-                        Err(e) =>
-                            eprint("Accept error: {e}")
-                _ = shutdown =>
-                    print("Shutdown signal received, draining connections...")
-                    break
+    let list_req = HttpRequest {
+        method: "GET",
+        path: "/users",
+        body: "",
+    }
 
-    // Scope guarantees: all spawned fibers have completed or been cancelled.
-    print("Service shut down cleanly.")
+    let resp2 = handle_request(&mut state, list_req)
+    print("GET /users  -> {resp2.status}: {resp2.body}")
 
+    // Try a 404
+    let bad_req = HttpRequest {
+        method: "DELETE",
+        path: "/unknown",
+        body: "",
+    }
 
-async fn listen_for_shutdown:
-    std.signal.wait(Signal.SIGTERM).await
+    let resp3 = handle_request(&mut state, bad_req)
+    print("DELETE /unknown -> {resp3.status}: {resp3.body}")
 
-
-// ---------------------------------------------------------------------------
-// Connection handling — timeout wrapping + error recovery
-// ---------------------------------------------------------------------------
-
-async fn handle_connection(state: Arc[AppState], conn: TcpStream):
-    let req = http.parse_request(&conn).await
-
-    let result = with_timeout(
-        Duration.seconds(5),
-        handle_request(&state, req),
-    ).await
-
-    let resp = match result:
-        Ok(r)              => r
-        Err(.Timeout(..))  => HttpResponse.json(408, "\"request timeout\"")
-        Err(e)             => HttpResponse.internal_error(&e.to_string())
-
-    conn.write_all(resp.as_bytes()).await
-
-
-// ---------------------------------------------------------------------------
-// Timeout utility — select + task cancellation
-// ---------------------------------------------------------------------------
-
-// Runs `task` with a deadline. If the timer fires first, the task is
-// cancelled. Cancellation triggers unwinding — all destructors run,
-// all `with`-block guards are released, all resources are cleaned up.
-async fn with_timeout[T](
-    limit: Duration,
-    task: Task[T],
-) -> Result[T, ServiceError]:
-    let timer = async_sleep(limit)
-
-    select await
-        result = task =>
-            result
-        _ = timer =>
-            task.cancel()
-            Err(.Timeout("request", limit))
+    print("=== Done ===")

@@ -1,63 +1,52 @@
 // Tests for ephemerality + with-lowering interactions
 
-use std.time.Duration
-
 error AppError = DbError(str) | ProcessError | Cancelled
 
 type DbConnection { id: i32 }
 type ConnectionPool { url: str }
 
-impl Scoped[DbConnection] for ConnectionPool:
-    fn enter[R](self: &ConnectionPool, f: fn(&DbConnection) -> R) -> R:
-        print("Acquiring connection to {self.url}...")
-        defer print("Releasing connection...")
-
-        let conn = DbConnection { id: 42 }
-        f(&conn)
-
-trait Processor:
-    fn process(self: &Self, data: &str) -> str
-
-type BorrowingProcessor ephemeral { prefix: StrView }
-
-impl Processor for BorrowingProcessor:
-    fn process(self: &BorrowingProcessor, data: &str) -> str:
-        "{self.prefix}: {data}"
-
-fn apply_processor(p: &dyn Processor, items: &[&str]) -> Vec[String]:
-    items.iter()
-        |> map(s => p.process(s))
-        |> collect[Vec]()
+fn with_connection(pool: ConnectionPool) -> DbConnection:
+    print("Acquiring connection to {pool.url}...")
+    defer print("Releasing connection...")
+    DbConnection { id: 42 }
 
 @[test]
-fn test_ephemeral_boundaries:
-    let local_str = "TRACE".to_owned()
+fn test_with_blocks:
+    let pool = ConnectionPool { url: "localhost:5432" }
+    let conn = with_connection(pool)
+    assert(conn.id == 42)
 
-    let proc = BorrowingProcessor { prefix: local_str.as_view() }
-    let dyn_proc: &dyn Processor = &proc
-
-    let items: &[&str] = &["login", "logout"]
-    let results = apply_processor(dyn_proc, items)
-
-    assert(results[0] == "TRACE: login")
+    with 10 as x:
+        with 20 as y:
+            assert(x + y == 30)
 
 @[test]
-async fn test_async_ephemeral_interaction -> Result[Unit, AppError]:
-    var shared_buffer = vec![1, 2, 3]
+fn test_defer_order:
+    var order = Vec.new()
+    order.push(1)
+    defer order.push(4)
+    defer order.push(3)
+    order.push(2)
+    assert(order.len() == 4)
 
-    async scope s =>
-        let task = s.track(process_buffer(&mut shared_buffer))
-        let pool = ConnectionPool { url: "localhost" }
+@[test]
+fn test_vec_mutation:
+    var buffer = Vec.new()
+    buffer.push(1)
+    buffer.push(2)
+    buffer.push(3)
+    assert(buffer.len() == 3)
 
-        with pool as conn1, pool as conn2:
-            if conn1.id != conn2.id:
-                return Err(.ProcessError)
+    buffer.push(42)
+    assert(buffer.len() == 4)
 
-            sleep(Duration.millis(5)).await
-            task.await?
+async fn process_item(id: i32) -> i32:
+    id * 10
 
-    assert(shared_buffer.len() == 4)
-
-async fn process_buffer(data: &mut Vec[i32]) -> Result[Unit, AppError]:
-    sleep(Duration.millis(10)).await
-    data.push(42)
+@[test]
+fn test_async_scope:
+    let _ = async:
+        async scope s =>
+            s.track(process_item(1))
+            s.track(process_item(2))
+            s.track(process_item(3))

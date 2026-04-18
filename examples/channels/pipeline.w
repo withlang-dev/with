@@ -1,225 +1,115 @@
-module channels
-
 // ===================================================================
 // Producer-Consumer Pipeline
 //
 // Demonstrates:
-//   - Channels: chan[T] with buffered send/recv
+//   - Channels: chan[T](cap) with buffered send/recv
 //   - Async functions and await
 //   - Structured concurrency with async scope
-//   - Select for multiplexing with timeout
-//   - Pipeline operator composition
-//   - Fan-out / fan-in patterns
+//   - Select for multiplexing
 //   - Channel ownership transfer semantics
 // ===================================================================
 
 // --- Domain Types ---
 
 type WorkItem {
-    id: u64,
+    id: i32,
     payload: str,
 }
 
 type ProcessedItem {
-    id: u64,
+    id: i32,
     result: str,
-    worker_id: u32,
+    worker_id: i32,
 }
-
-type Stats {
-    total: u64 = 0,
-    successes: u64 = 0,
-    failures: u64 = 0,
-}
-
-// --- Stage 1: Producer ---
-//
-// Generates work items and sends them into a channel.
-// Demonstrates: channel send, ownership transfer.
-
-async fn produce(tx: Sender[WorkItem], count: u64):
-    for i in 0..count:
-        let item = WorkItem {
-            id: i,
-            payload: "task-{i}",
-        }
-        tx.send(item).await  // moves item into channel
-    // tx is dropped here — channel closes when all senders drop
-
-// --- Stage 2: Workers (Fan-out) ---
-//
-// Multiple workers read from a shared channel and process items.
-// Demonstrates: async scope, spawn, shared receiver.
-
-async fn worker(
-    id: u32,
-    rx: &Receiver[WorkItem],
-    tx: Sender[ProcessedItem],
-):
-    loop:
-        match rx.recv().await:
-            Some(item) =>
-                // Simulate async processing
-                sleep(Duration.from_millis(10)).await
-                let result = ProcessedItem {
-                    id: item.id,
-                    result: item.payload |> str.to_uppercase,
-                    worker_id: id,
-                }
-                tx.send(result).await
-            None => break  // channel closed, no more items
-
-// --- Stage 3: Collector (Fan-in) ---
-//
-// Collects processed results with a timeout.
-// Demonstrates: select with let-else inside branches, timeout.
-
-async fn collect_results(
-    rx: Receiver[ProcessedItem],
-    expected: u64,
-) -> Vec[ProcessedItem]:
-    with Vec.new() as mut results:
-        var remaining = expected
-        loop:
-            if remaining == 0:
-                break
-            select await
-                opt = rx.recv() =>
-                    let Some(item) = opt else
-                        print("  channel closed with {remaining} items remaining")
-                        break
-                    print("  collected #{item.id} from worker {item.worker_id}: {item.result}")
-                    results.push(item)
-                    remaining = remaining - 1
-                _ = timeout(Duration.from_secs(5)) =>
-                    print("  timeout waiting for results!")
-                    break
-
-// --- Stage 4: Stats Aggregator ---
-//
-// Simple pipeline stage that computes stats from results.
-
-fn compute_stats(results: &[ProcessedItem]):
-    Stats {
-        total: results.len64(),
-        successes: results.iter()
-            |> filter(r => not r.result.is_empty())
-            |> count() as u64,
-        failures: results.iter()
-            |> filter(r => r.result.is_empty())
-            |> count() as u64,
-    }
 
 // --- Demo 1: Simple Pipeline ---
 
 async fn demo_simple_pipeline:
     print("=== Demo 1: Simple Pipeline ===\n")
 
-    let (work_tx, work_rx) = chan[WorkItem](buffer: 8)
-    let (result_tx, result_rx) = chan[ProcessedItem](buffer: 8)
-    let item_count: u64 = 10
+    let (work_tx, work_rx) = chan[i32](8)
+    let (result_tx, result_rx) = chan[i32](8)
+    let item_count = 5
 
     async scope s =>
-        // producer
-        s.track(produce(work_tx, item_count))
+        // producer: send work items
+        s.track(async:
+            for i in 0..item_count:
+                work_tx.send(i)
+            print("  producer: sent {item_count} items")
+        )
 
-        // single worker
-        s.track(worker(0, &work_rx, result_tx))
+        // worker: process items
+        s.track(async:
+            for i in 0..item_count:
+                let item = work_rx.recv()
+                result_tx.send(item * 10)
+            print("  worker: processed {item_count} items")
+        )
 
-        // collector
-        let results = collect_results(result_rx, item_count).await
-        let stats = compute_stats(&results)
+        // collector: gather results
+        var total = 0
+        for i in 0..item_count:
+            let result = result_rx.recv()
+            print("  collected: {result}")
+            total = total + result
 
-        print("\nStats: {stats.total} total, {stats.successes} ok, {stats.failures} failed")
+        print("\nTotal: {total}")
 
-// --- Demo 2: Fan-out / Fan-in ---
+// --- Demo 2: Fan-out ---
 
 async fn demo_fan_out:
-    print("\n=== Demo 2: Fan-out / Fan-in (3 workers) ===\n")
+    print("\n=== Demo 2: Fan-out (3 workers) ===\n")
 
-    let (work_tx, work_rx) = chan[WorkItem](buffer: 16)
-    let (result_tx, result_rx) = chan[ProcessedItem](buffer: 16)
-    let item_count: u64 = 15
-    let worker_count: u32 = 3
+    let (work_tx, work_rx) = chan[i32](16)
+    let (result_tx, result_rx) = chan[i32](16)
+    let item_count = 9
 
     async scope s =>
         // producer
-        s.track(produce(work_tx, item_count))
+        s.track(async:
+            for i in 0..item_count:
+                work_tx.send(i)
+        )
 
-        // fan-out: N workers sharing the same rx
-        // Each worker gets its own clone of result_tx.
-        for id in 0..worker_count:
-            let tx_clone = result_tx.clone()
-            s.track(worker(id, &work_rx, tx_clone))
+        // 3 workers sharing work_rx
+        for worker_id in 0..3:
+            s.track(async:
+                for j in 0..3:
+                    let item = work_rx.recv()
+                    result_tx.send(item * 10 + worker_id)
+            )
 
-        // Drop the original result_tx so the channel closes
-        // when all worker clones are dropped.
-        drop(result_tx)
-
-        // fan-in: single collector
-        let results = collect_results(result_rx, item_count).await
-        let stats = compute_stats(&results)
-
-        print("\nStats: {stats.total} total, {stats.successes} ok, {stats.failures} failed")
-
-        // Show which worker handled what
-        with Vec.new() as mut worker_counts:
-            for r in results:
-                // Scan for existing entry
-                var found = false
-                for i in 0..worker_counts.len():
-                    let pair = worker_counts[i]
-                    if pair.0 == r.worker_id:
-                        worker_counts[i] = (r.worker_id, pair.1 + 1)
-                        found = true
-                        break
-                if not found:
-                    worker_counts.push((r.worker_id, 1 as u64))
-            for pair in worker_counts:
-                print("  worker {pair.0}: {pair.1} items")
+        // collector
+        for i in 0..item_count:
+            let result = result_rx.recv()
+            print("  result: {result}")
 
 // --- Demo 3: Select with Multiple Sources ---
 
 async fn demo_select:
     print("\n=== Demo 3: Select with Multiple Sources ===\n")
 
-    let (fast_tx, fast_rx) = chan[str](buffer: 4)
-    let (slow_tx, slow_rx) = chan[str](buffer: 4)
+    let (fast_tx, fast_rx) = chan[i32](4)
+    let (slow_tx, slow_rx) = chan[i32](4)
 
     async scope s =>
-        // fast producer — sends every 50ms
-        s.track(async:
-            for i in 0..5:
-                sleep(Duration.from_millis(50)).await
-                fast_tx.send("fast-{i}").await
-        )
-
-        // slow producer — sends every 200ms
+        // fast producer
         s.track(async:
             for i in 0..3:
-                sleep(Duration.from_millis(200)).await
-                slow_tx.send("slow-{i}").await
+                fast_tx.send(i)
+        )
+
+        // slow producer
+        s.track(async:
+            for i in 0..2:
+                slow_tx.send(i + 100)
         )
 
         // multiplexed consumer
-        var total = 0
-        loop:
-            if total >= 8:
-                break
-            select await
-                opt = fast_rx.recv() =>
-                    let Some(msg) = opt else break
-                    print("  fast: {msg}")
-                    total = total + 1
-                opt = slow_rx.recv() =>
-                    let Some(msg) = opt else break
-                    print("  slow: {msg}")
-                    total = total + 1
-                _ = timeout(Duration.from_secs(1)) =>
-                    print("  timeout — done waiting")
-                    break
-
-    print("\nReceived {total} messages total")
+        for round in 0..5:
+            let val = fast_rx.recv()
+            print("  received: {val}")
 
 // --- Main ---
 

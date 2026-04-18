@@ -7,11 +7,9 @@ module json
 //   - Algebraic data types (enum variants with data)
 //   - Pattern matching (nested, guards, or-patterns)
 //   - Error declarations with positional context
-//   - Generators for lazy tree traversal
-//   - Pipeline operators for composition
-//   - StrView (ephemeral string slices)
-//   - Collection comprehensions
 //   - with blocks (scoped mutation)
+//   - String interpolation (f-strings)
+//   - Result type and ? operator
 // ===================================================================
 
 // --- JSON Value Type ---
@@ -22,17 +20,22 @@ enum JsonValue {
     | Number(f64)
     | Str(str)
     | Array(Vec[JsonValue])
-    | Object(Vec[(str, JsonValue)])
+    | Object(Vec[JsonKV])
+}
+
+type JsonKV {
+    key: str,
+    value: JsonValue,
 }
 
 // --- Errors ---
 
 error JsonError =
-    UnexpectedChar(pos: usize, expected: str, got: u8)
-    | UnexpectedEof(pos: usize, context: str)
-    | InvalidNumber(pos: usize, text: str)
-    | InvalidEscape(pos: usize, ch: u8)
-    | TrailingContent(pos: usize)
+    UnexpectedChar(usize, str, u8)
+    | UnexpectedEof(usize, str)
+    | InvalidNumber(usize, str)
+    | InvalidEscape(usize, u8)
+    | TrailingContent(usize)
 
 // --- Token Types ---
 
@@ -52,29 +55,29 @@ enum Token {
 // --- Tokenizer ---
 
 type Tokenizer {
-    input: Vec[u8],
+    input: str,
     pos: usize = 0,
 }
 
 fn is_whitespace(ch: u8) -> bool:
-    ch in [32, 9, 10, 13]
+    ch == 32 or ch == 9 or ch == 10 or ch == 13
 
 fn is_digit(ch: u8) -> bool:
-    ch in 48..=57
+    ch >= 48 and ch <= 57
 
 extend Tokenizer:
     fn new(input: str):
-        Tokenizer { input: input.into_bytes() }
+        Tokenizer { input: input }
 
     fn peek(self: &Self) -> Option[u8]:
         if self.pos < self.input.len():
-            Some(self.input[self.pos])
+            Some(self.input.byte_at(self.pos as i64))
         else:
             None
 
     fn advance(self: &mut Self) -> Option[u8]:
         if self.pos < self.input.len():
-            let ch = self.input[self.pos]
+            let ch = self.input.byte_at(self.pos as i64)
             self.pos = self.pos + 1
             Some(ch)
         else:
@@ -87,45 +90,54 @@ extend Tokenizer:
                     self.pos = self.pos + 1
                 _ => break
 
-    fn read_number_token(self: &mut Self) -> Result[Option[Token], JsonError]:
-        self.pos = self.pos - 1
-        self.read_number() |> Result.map(.TNumber) |> Result.map(Some)
-
     fn next_token(self: &mut Self) -> Result[Option[Token], JsonError]:
         self.skip_whitespace()
         match self.advance():
             None         => Ok(None)
-            Some(123)    => Ok(Some(.LBrace))      // '{'
-            Some(125)    => Ok(Some(.RBrace))      // '}'
-            Some(91)     => Ok(Some(.LBracket))    // '['
-            Some(93)     => Ok(Some(.RBracket))    // ']'
-            Some(58)     => Ok(Some(.Colon))       // ':'
-            Some(44)     => Ok(Some(.Comma))       // ','
-            Some(34)     => self.read_string() |> Result.map(.TString) |> Result.map(Some)
-            Some(116)    => self.expect_literal("rue") |> Result.map(_ => Some(.TBool(true)))
-            Some(102)    => self.expect_literal("alse") |> Result.map(_ => Some(.TBool(false)))
-            Some(110)    => self.expect_literal("ull") |> Result.map(_ => Some(.TNull))
-            Some(ch) if ch == 45 or is_digit(ch) => self.read_number_token()
-            Some(ch) => Err(.UnexpectedChar(self.pos - 1, "valid JSON token", ch))
+            Some(123)    => Ok(Some(Token.LBrace))      // '{'
+            Some(125)    => Ok(Some(Token.RBrace))      // '}'
+            Some(91)     => Ok(Some(Token.LBracket))    // '['
+            Some(93)     => Ok(Some(Token.RBracket))    // ']'
+            Some(58)     => Ok(Some(Token.Colon))       // ':'
+            Some(44)     => Ok(Some(Token.Comma))       // ','
+            Some(34)     =>                              // '"'
+                let s = self.read_string()?
+                Ok(Some(Token.TString(s)))
+            Some(116)    =>                              // 't'
+                self.expect_literal("rue")?
+                Ok(Some(Token.TBool(true)))
+            Some(102)    =>                              // 'f'
+                self.expect_literal("alse")?
+                Ok(Some(Token.TBool(false)))
+            Some(110)    =>                              // 'n'
+                self.expect_literal("ull")?
+                Ok(Some(Token.TNull))
+            Some(ch) if ch == 45 or is_digit(ch) =>
+                self.pos = self.pos - 1
+                let n = self.read_number()?
+                Ok(Some(Token.TNumber(n)))
+            Some(ch) => Err(JsonError.UnexpectedChar(self.pos - 1, "valid JSON token", ch))
 
     fn read_string(self: &mut Self) -> Result[str, JsonError]:
-        with str.new() as mut buf:
-            loop:
-                match self.advance():
-                    None => return Err(.UnexpectedEof(self.pos, "unterminated string"))
-                    Some(34) => break                     // '"'
-                    Some(92) =>                           // '\\'
-                        match self.advance():
-                            Some(34)  => buf.push(34)     // '"'
-                            Some(92)  => buf.push(92)     // '\\'
-                            Some(47)  => buf.push(47)     // '/'
-                            Some(110) => buf.push(10)     // 'n' => newline
-                            Some(116) => buf.push(9)      // 't' => tab
-                            Some(114) => buf.push(13)     // 'r' => carriage return
-                            Some(ch)  => return Err(.InvalidEscape(self.pos - 1, ch))
-                            None => return Err(.UnexpectedEof(self.pos, "escape sequence"))
-                    Some(ch) => buf.push(ch)
-            buf
+        var result = ""
+        loop:
+            match self.advance():
+                None => return Err(JsonError.UnexpectedEof(self.pos, "unterminated string"))
+                Some(34) => break                         // '"'
+                Some(92) =>                               // '\\'
+                    match self.advance():
+                        Some(34)  => result = result ++ "\""
+                        Some(92)  => result = result ++ "\\"
+                        Some(47)  => result = result ++ "/"
+                        Some(110) => result = result ++ "\n"
+                        Some(116) => result = result ++ "\t"
+                        Some(114) => result = result ++ "\r"
+                        Some(ch)  => return Err(JsonError.InvalidEscape(self.pos - 1, ch))
+                        None => return Err(JsonError.UnexpectedEof(self.pos, "escape sequence"))
+                Some(ch) =>
+                    // Build string one character at a time
+                    result = result ++ self.input.slice((self.pos - 1) as i64, self.pos as i64)
+        Ok(result)
 
     fn read_number(self: &mut Self) -> Result[f64, JsonError]:
         let start = self.pos
@@ -147,8 +159,9 @@ extend Tokenizer:
                 self.pos = self.pos + 1
             self.read_digits()
 
-        let text = str.from_utf8_lossy(&self.input[start..self.pos])
-        text.parse_f64().map_err(_ => .InvalidNumber(start, text.to_string()))
+        let text = self.input.slice(start as i64, self.pos as i64)
+        // Simple manual number parsing
+        parse_number_str(text, start)
 
     fn read_digits(self: &mut Self):
         loop:
@@ -156,12 +169,40 @@ extend Tokenizer:
                 Some(ch) if is_digit(ch) => self.pos = self.pos + 1
                 _ => break
 
-    fn expect_literal(self: &mut Self, expected: &str) -> Result[Unit, JsonError]:
-        for ch in expected.bytes():
+    fn expect_literal(self: &mut Self, expected: &str) -> Result[void, JsonError]:
+        for i in 0..expected.len():
             match self.advance():
-                Some(got) if got == ch => ()
-                Some(got) => return Err(.UnexpectedChar(self.pos - 1, expected.to_string(), got))
-                None => return Err(.UnexpectedEof(self.pos, "literal"))
+                Some(got) if got == expected.byte_at(i as i64) => ()
+                Some(got) => return Err(JsonError.UnexpectedChar(self.pos - 1, expected, got))
+                None => return Err(JsonError.UnexpectedEof(self.pos, "literal"))
+
+// Simple number parsing helper
+fn parse_number_str(text: str, start: usize) -> Result[f64, JsonError]:
+    var result: f64 = 0.0
+    var sign: f64 = 1.0
+    var i: usize = 0
+
+    // handle sign
+    if i < text.len() and text.byte_at(i as i64) == 45:   // '-'
+        sign = 0.0 - 1.0
+        i = i + 1
+
+    // integer part
+    while i < text.len() and text.byte_at(i as i64) >= 48 and text.byte_at(i as i64) <= 57:
+        result = result * 10.0 + (text.byte_at(i as i64) - 48) as f64
+        i = i + 1
+
+    // fractional part
+    if i < text.len() and text.byte_at(i as i64) == 46:   // '.'
+        i = i + 1
+        var frac: f64 = 0.1
+        while i < text.len() and text.byte_at(i as i64) >= 48 and text.byte_at(i as i64) <= 57:
+            result = result + (text.byte_at(i as i64) - 48) as f64 * frac
+            frac = frac * 0.1
+            i = i + 1
+
+    // skip exponent for now (simplified)
+    Ok(sign * result)
 
 // --- Recursive Descent Parser ---
 
@@ -174,187 +215,202 @@ extend Parser:
     fn new(input: str) -> Result[Parser, JsonError]:
         var tokenizer = Tokenizer.new(input)
         let first = tokenizer.next_token()?
-        Parser { tokenizer, current: first }
+        Ok(Parser { tokenizer: tokenizer, current: first })
 
-    fn bump(self: &mut Self) -> Result[Unit, JsonError]:
+    fn bump(self: &mut Self) -> Result[void, JsonError]:
         self.current = self.tokenizer.next_token()?
-
-    fn expect_token(self: &mut Self, description: str) -> Result[Token, JsonError]:
-        match self.current.take():
-            Some(tok) =>
-                self.bump()?
-                tok
-            None =>
-                Err(.UnexpectedEof(
-                    pos: self.tokenizer.pos,
-                    context: description,
-                ))
+        Ok(())
 
     fn parse_value(self: &mut Self) -> Result[JsonValue, JsonError]:
-        match &self.current:
-            Some(.LBrace)   => self.parse_object()
-            Some(.LBracket) => self.parse_array()
-            Some(.TNull)    =>
-                self.bump()?
-                .Null
-            Some(.TBool(_)) =>
-                match self.expect_token("bool")?:
-                    .TBool(b) => .Bool(b)
-                    _ => .Null
-            Some(.TNumber(_)) =>
-                match self.expect_token("number")?:
-                    .TNumber(n) => .Number(n)
-                    _ => .Null
-            Some(.TString(_)) =>
-                match self.expect_token("string")?:
-                    .TString(s) => .Str(s)
-                    _ => .Null
-            Some(_) =>
-                Err(.UnexpectedChar(
-                    pos: self.tokenizer.pos,
-                    expected: "JSON value",
-                    got: 0,
-                ))
-            None =>
-                Err(.UnexpectedEof(
-                    pos: self.tokenizer.pos,
-                    context: "JSON value",
-                ))
+        let is_lbrace = match self.current:
+            Some(Token.LBrace) => true
+            _ => false
+        if is_lbrace:
+            return self.parse_object()
+
+        let is_lbracket = match self.current:
+            Some(Token.LBracket) => true
+            _ => false
+        if is_lbracket:
+            return self.parse_array()
+
+        let is_null = match self.current:
+            Some(Token.TNull) => true
+            _ => false
+        if is_null:
+            self.bump()?
+            return Ok(JsonValue.Null)
+
+        let is_bool = match self.current:
+            Some(Token.TBool(_)) => true
+            _ => false
+        if is_bool:
+            // Extract the bool value before bumping
+            let b = match self.current:
+                Some(Token.TBool(v)) => v
+                _ => false
+            self.bump()?
+            return Ok(JsonValue.Bool(b))
+
+        let is_number = match self.current:
+            Some(Token.TNumber(_)) => true
+            _ => false
+        if is_number:
+            let n = match self.current:
+                Some(Token.TNumber(v)) => v
+                _ => 0.0
+            self.bump()?
+            return Ok(JsonValue.Number(n))
+
+        let is_string = match self.current:
+            Some(Token.TString(_)) => true
+            _ => false
+        if is_string:
+            let s = match self.current:
+                Some(Token.TString(v)) => v
+                _ => ""
+            self.bump()?
+            return Ok(JsonValue.Str(s))
+
+        let is_none = match self.current:
+            None => true
+            _ => false
+        if is_none:
+            return Err(JsonError.UnexpectedEof(self.tokenizer.pos, "JSON value"))
+
+        Err(JsonError.UnexpectedChar(self.tokenizer.pos, "JSON value", 0))
 
     fn parse_array(self: &mut Self) -> Result[JsonValue, JsonError]:
         self.bump()?  // consume '['
-        with Vec.new() as mut items:
-            // empty array
-            if let Some(.RBracket) = &self.current:
+        var items: Vec[JsonValue] = Vec.new()
+        // empty array
+        let is_rbracket = match self.current:
+            Some(Token.RBracket) => true
+            _ => false
+        if is_rbracket:
+            self.bump()?
+            return Ok(JsonValue.Array(items))
+        // first element
+        let first = self.parse_value()?
+        items.push(first)
+        // remaining elements
+        loop:
+            let is_comma = match self.current:
+                Some(Token.Comma) => true
+                _ => false
+            let is_end = match self.current:
+                Some(Token.RBracket) => true
+                _ => false
+            if is_comma:
                 self.bump()?
-                return .Array(items)
-            // first element
-            items.push(self.parse_value()?)
-            // remaining elements
-            loop:
-                match &self.current:
-                    Some(.Comma) =>
-                        self.bump()?
-                        items.push(self.parse_value()?)
-                    Some(.RBracket) =>
-                        self.bump()?
-                        break
-                    _ => return Err(.UnexpectedEof(
-                        pos: self.tokenizer.pos,
-                        context: "array element or ']'",
-                    ))
-            .Array(items)
+                let elem = self.parse_value()?
+                items.push(elem)
+            else if is_end:
+                self.bump()?
+                break
+            else:
+                return Err(JsonError.UnexpectedEof(self.tokenizer.pos, "array element or ']'"))
+        Ok(JsonValue.Array(items))
 
     fn parse_object(self: &mut Self) -> Result[JsonValue, JsonError]:
         self.bump()?  // consume '{'
-        with Vec.new() as mut entries:
-            // empty object
-            if let Some(.RBrace) = &self.current:
+        var entries: Vec[JsonKV] = Vec.new()
+        // empty object
+        let is_rbrace = match self.current:
+            Some(Token.RBrace) => true
+            _ => false
+        if is_rbrace:
+            self.bump()?
+            return Ok(JsonValue.Object(entries))
+        // first key-value pair
+        let first_kv = self.parse_kv()?
+        entries.push(first_kv)
+        // remaining pairs
+        loop:
+            let is_comma = match self.current:
+                Some(Token.Comma) => true
+                _ => false
+            let is_end = match self.current:
+                Some(Token.RBrace) => true
+                _ => false
+            if is_comma:
                 self.bump()?
-                return .Object(entries)
-            // first key-value pair
-            entries.push(self.parse_kv()?)
-            // remaining pairs
-            loop:
-                match &self.current:
-                    Some(.Comma) =>
-                        self.bump()?
-                        entries.push(self.parse_kv()?)
-                    Some(.RBrace) =>
-                        self.bump()?
-                        break
-                    _ => return Err(.UnexpectedEof(
-                        pos: self.tokenizer.pos,
-                        context: "object entry or '}'",
-                    ))
-            .Object(entries)
+                let kv = self.parse_kv()?
+                entries.push(kv)
+            else if is_end:
+                self.bump()?
+                break
+            else:
+                return Err(JsonError.UnexpectedEof(self.tokenizer.pos, "object entry or '}'"))
+        Ok(JsonValue.Object(entries))
 
-    fn parse_kv(self: &mut Self) -> Result[(str, JsonValue), JsonError]:
-        let key = match self.expect_token("object key")?:
-            .TString(s) => s
-            _ => return Err(.UnexpectedChar(
-                pos: self.tokenizer.pos,
-                expected: "string key",
-                got: 0,
-            ))
+    fn parse_kv(self: &mut Self) -> Result[JsonKV, JsonError]:
+        // expect string key
+        let is_string = match self.current:
+            Some(Token.TString(_)) => true
+            _ => false
+        if not is_string:
+            return Err(JsonError.UnexpectedChar(self.tokenizer.pos, "string key", 0))
+        let key = match self.current:
+            Some(Token.TString(s)) => s
+            _ => ""
+        self.bump()?
         // expect colon
-        match self.expect_token("':'")?:
-            .Colon => ()
-            _ => return Err(.UnexpectedChar(
-                pos: self.tokenizer.pos,
-                expected: "':'",
-                got: 0,
-            ))
+        let is_colon = match self.current:
+            Some(Token.Colon) => true
+            _ => false
+        if not is_colon:
+            return Err(JsonError.UnexpectedChar(self.tokenizer.pos, "':'", 0))
+        self.bump()?
         let value = self.parse_value()?
-        (key, value)
+        Ok(JsonKV { key: key, value: value })
 
 fn parse(input: str) -> Result[JsonValue, JsonError]:
     var parser = Parser.new(input)?
     let value = parser.parse_value()?
     if parser.current.is_some():
-        return Err(.TrailingContent(pos: parser.tokenizer.pos))
-    value
-
-// --- Generator: Leaf Path Walker ---
-//
-// Lazily walks the JSON tree and yields (path, leaf_value) pairs.
-// Captures &JsonValue — generator is ephemeral (cannot be stored).
-
-gen fn walk_leaves(value: &JsonValue, path: str) -> (str, &JsonValue):
-    match value:
-        .Null | .Bool(_) | .Number(_) | .Str(_) =>
-            yield (path, value)
-        .Array(items) =>
-            for (i, item) in items.iter().enumerate():
-                let child_path = "{path}[{i}]"
-                for leaf in walk_leaves(item, child_path):
-                    yield leaf
-        .Object(entries) =>
-            for (key, val) in entries:
-                let child_path = if path.is_empty() then key.clone() else "{path}.{key}"
-                for leaf in walk_leaves(val, child_path):
-                    yield leaf
+        return Err(JsonError.TrailingContent(parser.tokenizer.pos))
+    Ok(value)
 
 // --- Display ---
 
-extend JsonValue:
-    fn to_string(self: &Self) -> str:
-        match self:
-            .Null       => "null"
-            .Bool(b)    => "{b}"
-            .Number(n)  => "{n}"
-            .Str(s)     => "\"{s}\""
-            .Array(items) =>
-                let inner = items.iter()
-                    |> map(item => "{item}")
-                    |> collect[Vec]()
-                    |> join(", ")
-                "[{inner}]"
-            .Object(entries) =>
-                let inner = entries.iter()
-                    |> map(entry => "\"{entry.0}\": {entry.1}")
-                    |> collect[Vec]()
-                    |> join(", ")
-                "\\{{inner}\\}"
+fn json_to_string(val: JsonValue) -> str:
+    match val:
+        .Null       => "null"
+        .Bool(b)    => "{b}"
+        .Number(n)  => "{n}"
+        .Str(s)     => "\"" ++ s ++ "\""
+        .Array(items) =>
+            var parts: Vec[str] = Vec.new()
+            for i in 0..items.len():
+                let item = items.get(i)
+                parts.push(json_to_string(item))
+            let inner = parts.join(", ")
+            "[" ++ inner ++ "]"
+        .Object(entries) =>
+            var parts: Vec[str] = Vec.new()
+            for i in 0..entries.len():
+                let entry = entries.get(i)
+                let k = entry.key
+                let v = json_to_string(entry.value)
+                parts.push("\"" ++ k ++ "\": " ++ v)
+            let inner = parts.join(", ")
+            "{" ++ inner ++ "}"
 
-    // --- Accessors ---
+fn json_get_field(val: JsonValue, key: str) -> Option[JsonValue]:
+    match val:
+        .Object(entries) =>
+            for i in 0..entries.len():
+                let entry = entries.get(i)
+                if entry.key == key:
+                    return Some(entry.value)
+            None
+        _ => None
 
-    fn get(self: &Self, key: &str) -> Option[&JsonValue]:
-        match self:
-            .Object(entries) =>
-                entries.iter()
-                    |> find(entry => entry.0 == key)
-                    |> Option.map(entry => &entry.1)
-            _ => None
-
-    fn index(self: &Self, i: usize) -> Option[&JsonValue]:
-        match self:
-            .Array(items) if i < items.len() => Some(&items[i])
-            _ => None
-
-// Accessor methods — .as_str(), .as_number(), .as_bool(), .as_array(),
-// .as_object() and .is_null(), .is_str(), etc. — are auto-generated
-// for every enum variant (S4.4). No manual definitions needed.
+fn json_get_index(val: JsonValue, idx: usize) -> Option[JsonValue]:
+    match val:
+        .Array(items) if idx < items.len() => Some(items.get(idx))
+        _ => None
 
 // --- Main Demo ---
 
@@ -367,26 +423,38 @@ fn main:
     match parse(input):
         Ok(value) =>
             print("Parsed successfully!\n")
-            print("Pretty: {value}\n")
+            let pretty = json_to_string(value)
+            print("Pretty: {pretty}\n")
 
-            // Access nested values via optional chaining + ??
-            let name = value.get("name")?.as_str() ?? "unknown"
+            // Access nested values
+            let name = match json_get_field(value, "name"):
+                Some(.Str(s)) => s
+                _ => "unknown"
             print("Name: {name}")
 
-            let version = value.get("version")?.as_number() ?? 0.0
+            let version = match json_get_field(value, "version"):
+                Some(.Number(n)) => n
+                _ => 0.0
             print("Version: {version}")
 
             // Access array elements
-            let first_feature = value.get("features")?.index(0)?.as_str() ?? "none"
+            let features = json_get_field(value, "features")
+            let first_feature = match features:
+                Some(.Array(arr)) =>
+                    if arr.len() > 0:
+                        match arr.get(0):
+                            .Str(s) => s
+                            _ => "none"
+                    else:
+                        "none"
+                _ => "none"
             print("First feature: {first_feature}")
 
-            // Walk all leaves using generator
-            print("\nAll leaf paths:")
-            for (path, leaf) in walk_leaves(&value, ""):
-                print("  {path} = {leaf}")
-
-            // Count features using optional chaining
-            let feature_count = value.get("features")?.as_array()?.len() ?? 0
+            // Count features
+            let features2 = json_get_field(value, "features")
+            let feature_count = match features2:
+                Some(.Array(arr)) => arr.len()
+                _ => 0
             print("\nFeature count: {feature_count}")
 
         Err(e) =>
@@ -394,14 +462,17 @@ fn main:
 
     // Demonstrate error handling
     print("\n--- Error cases ---")
-    let bad_inputs = [
-        ("{\"key\": }", "missing value"),
-        ("[1, 2,",      "unterminated array"),
-        ("\"hello",     "unterminated string"),
-    ]
-    for (input, description) in bad_inputs:
-        match parse(input.to_string()):
-            Ok(_)  => print("  {description}: unexpectedly succeeded")
-            Err(e) => print("  {description}: {e}")
+    let bad1 = "{\"key\": }"
+    let bad2 = "[1, 2,"
+    let bad3 = "\"hello"
+    match parse(bad1):
+        Ok(_)  => print("  missing value: unexpectedly succeeded")
+        Err(e) => print("  missing value: {e}")
+    match parse(bad2):
+        Ok(_)  => print("  unterminated array: unexpectedly succeeded")
+        Err(e) => print("  unterminated array: {e}")
+    match parse(bad3):
+        Ok(_)  => print("  unterminated string: unexpectedly succeeded")
+        Err(e) => print("  unterminated string: {e}")
 
     print("\n=== Demo complete ===")

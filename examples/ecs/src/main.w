@@ -1,11 +1,11 @@
 module ecs.main
 
-use ecs.math.Vec2
-use ecs.storage.{DenseStorage, iter}
-use ecs.query.{query1, query2}
-use ecs.components.*
-use ecs.world.{Entity, World}
-use ecs.systems.run_frame
+use math.*
+use storage.*
+use query.*
+use components.*
+use world.*
+use systems.*
 
 // ===================================================================
 // ECS Demo — A small game engine core
@@ -41,48 +41,61 @@ fn main:
 
     // Frame 0: player presses Right
     print("--- Frame {world.frame} (t={world.time:.2}s) ---")
-    run_frame(&mut world, &[.KeyDown(.Right)])
+    var ev0 = Vec.new()
+    ev0.push(InputEvent.KeyDown(.Right))
+    run_frame(&mut world, &ev0)
 
     // Frame 1: key held (no new events)
     print("--- Frame {world.frame} (t={world.time:.2}s) ---")
-    run_frame(&mut world, &[])
+    let ev1 = Vec.new()
+    run_frame(&mut world, &ev1)
 
     // Frame 2: player also presses Up (diagonal movement)
     print("--- Frame {world.frame} (t={world.time:.2}s) ---")
-    run_frame(&mut world, &[.KeyDown(.Up)])
+    var ev2 = Vec.new()
+    ev2.push(InputEvent.KeyDown(.Up))
+    run_frame(&mut world, &ev2)
 
     // Frame 3: release Right, keep Up
     print("--- Frame {world.frame} (t={world.time:.2}s) ---")
-    run_frame(&mut world, &[.KeyUp(.Right)])
+    var ev3 = Vec.new()
+    ev3.push(InputEvent.KeyUp(.Right))
+    run_frame(&mut world, &ev3)
 
     // Frame 4: release everything
     print("--- Frame {world.frame} (t={world.time:.2}s) ---")
-    run_frame(&mut world, &[.KeyUp(.Up)])
+    var ev4 = Vec.new()
+    ev4.push(InputEvent.KeyUp(.Up))
+    run_frame(&mut world, &ev4)
 
     // --- Final State ---
 
     print("\n=== After 5 frames ===")
     world.print_stats()
 
-    // Print entity positions using query pipeline
+    // Print entity positions by iterating transforms and probing sprites
     print("\nEntity positions:")
-    for (entity, tf, sprite) in query2(&world.transforms, &world.sprites):
-        with world.entity_name(entity) as name:
+    for i in 0..world.transforms.len():
+        let eid = world.transforms.dense_entities[i]
+        let entity = Entity.new(eid)
+        if let Some(sprite) = world.sprites.get(entity):
+            let tf = world.transforms.dense_data[i]
+            let name = world.entity_name(entity)
             let label = name.unwrap_or("?")
             print("  {label} -> ({tf.position.x:.1}, {tf.position.y:.1}) tex={texture_name(sprite.texture)}")
 
     // --- Demonstrate despawning ---
 
     print("\nDespawning first enemy...")
-    if let Some(first_enemy) = enemies.first():
-        world.despawn(*first_enemy)
+    if enemies.len() > 0:
+        let first_enemy = enemies[0]
+        world.despawn(first_enemy)
 
-    print("Entities after despawn: {world.entity_count()}")
+        print("Entities after despawn: {world.entity_count()}")
 
-    // Verify the handle is invalidated
-    if let Some(first_enemy) = enemies.first():
-        assert(not world.is_alive(*first_enemy))
-        assert(world.transforms.get(*first_enemy).is_none())
+        // Verify the handle is invalidated
+        assert(not world.is_alive(first_enemy))
+        assert(world.transforms.get(first_enemy).is_none())
         print("Handle correctly invalidated (generation mismatch)")
 
     print("\n=== Demo complete ===")

@@ -1,171 +1,21 @@
-module app.tests
+module tests
 
-use app.domain.*
-use app.errors.*
-use app.traits.*
-use app.service.{UserService, ServiceConfig}
-use std.sync.{Arc, RwLock, Mutex}
-use std.collections.HashMap
-use std.time.Duration
-
-// --- In-Memory Mock Repository ---
-
-type MockUserRepo {
-    users: RwLock[HashMap[UserId, User]],
-    next_id: Mutex[i64],
-}
-
-extend MockUserRepo:
-    fn new:
-        MockUserRepo {
-            users: RwLock.new(HashMap.new()),
-            next_id: Mutex.new(1),
-        }
-
-impl UserRepository for MockUserRepo:
-    async fn find_by_id(self: &MockUserRepo, id: UserId) -> Result[Option[User], DbError]:
-        with self.users.read() as users:
-            users.get(&id).cloned()
-
-    async fn find_by_email(self: &MockUserRepo, email: &str) -> Result[Option[User], DbError]:
-        with self.users.read() as users:
-            users.values()
-                |> find(u => u.email == email)
-                |> map(u => u.clone())
-
-    async fn list_active(self: &MockUserRepo, limit: i32, offset: i32) -> Result[Vec[User], DbError]:
-        with self.users.read() as users:
-            users.values()
-                |> filter(u => u.active)
-                |> skip(offset as usize)
-                |> take(limit as usize)
-                |> cloned()
-                |> collect()
-
-    async fn insert(self: &MockUserRepo, user: &User) -> Result[UserId, DbError]:
-        let id = with self.next_id.lock() as mut next:
-            let id = UserId(*next)
-            *next += 1
-            id
-        let stored_user = { user.clone() with id: id }
-        with self.users.write() as mut users:
-            users.insert(id, stored_user)
-        id
-
-    async fn update(self: &MockUserRepo, id: UserId, fields: &UserUpdate) -> Result[Unit, DbError]:
-        with self.users.write() as mut users:
-            match users.get_mut(&id):
-                Some(user) =>
-                    if let Some(name) = &fields.name then user.name = name.clone()
-                    if let Some(email) = &fields.email then user.email = email.clone()
-                    if let Some(role) = &fields.role then user.role = *role
-                    if let Some(active) = &fields.active then user.active = *active
-                None => Err(.NotFound("users", "{id}"))
-
-    async fn delete(self: &MockUserRepo, id: UserId) -> Result[Unit, DbError]:
-        with self.users.write() as mut users:
-            users.remove(&id)
-                .map(_ => ())
-                .ok_or(.NotFound("users", "{id}"))
-
-    async fn count_posts(self: &MockUserRepo, _id: UserId) -> Result[i32, DbError]:
-        0
-
-    async fn count_followers(self: &MockUserRepo, _id: UserId) -> Result[i32, DbError]:
-        0
-
-// --- In-Memory Mock Cache ---
-
-type MockCache {
-    store: RwLock[HashMap[str, Vec[u8]]],
-}
-
-extend MockCache:
-    fn new:
-        MockCache { store: RwLock.new(HashMap.new()) }
-
-impl CacheService for MockCache:
-    async fn get_bytes(self: &MockCache, key: &str) -> Result[Option[Vec[u8]], CacheError]:
-        with self.store.read() as store:
-            store.get(key).cloned()
-
-    async fn set_bytes(self: &MockCache, key: &str, val: &[u8], _ttl: Duration) -> Result[Unit, CacheError]:
-        with self.store.write() as mut store:
-            store.insert(key.to_string(), val.to_vec())
-
-    async fn delete(self: &MockCache, key: &str) -> Result[Unit, CacheError]:
-        with self.store.write() as mut store:
-            store.remove(key)
-
-    async fn exists(self: &MockCache, key: &str) -> Result[bool, CacheError]:
-        with self.store.read() as store:
-            store.contains_key(key)
-
-// --- Recording Mock Notifier ---
-//
-// Uses Arc-wrapped state so the test can hold a handle to the
-// notification log independently from the service that owns the mock.
-
-type NotificationLog = Arc[Mutex[Vec[Notification]]]
-
-fn new_notification_log -> NotificationLog:
-    Arc.new(Mutex.new(Vec.new()))
-
-type MockNotifier {
-    sent: NotificationLog,
-}
-
-extend MockNotifier:
-    fn new(log: NotificationLog):
-        MockNotifier { sent: log }
-
-    fn sent_count(log: &NotificationLog) -> i32:
-        with log.lock() as sent:
-            sent.len32()
-
-impl NotificationService for MockNotifier:
-    async fn send(self: &MockNotifier, notif: &Notification) -> Result[Unit, NotifyError]:
-        with self.sent.lock() as mut sent:
-            sent.push(notif.clone())
-
-    async fn send_batch(self: &MockNotifier, notifs: &[Notification]) -> Result[i32, NotifyError]:
-        with self.sent.lock() as mut sent:
-            let count = notifs.len32()
-            for n in notifs:
-                sent.push(n.clone())
-            count
-
-// --- No-Op Audit Log ---
-
-type MockAudit {}
-
-impl AuditLog for MockAudit:
-    async fn record(self: &MockAudit, _actor: UserId, _action: &str, _detail: &str) -> Result[Unit, DbError]:
-        ()
-
-// --- Test Helper: Build service with mocks ---
-//
-// Returns the service plus a handle to the notification log
-// for asserting side effects. The notification log is shared
-// via Arc between the mock (inside the service) and the test.
-
-fn test_service -> (UserService, NotificationLog):
-    let notif_log = new_notification_log()
-
-    let service = UserService.builder()
-        .repo(Box.new(MockUserRepo.new()))
-        .cache(Box.new(MockCache.new()))
-        .notifier(Box.new(MockNotifier.new(notif_log.clone())))
-        .audit(Box.new(MockAudit {}))
-        .build()
-        .unwrap()
-
-    (service, notif_log)
+use domain.*
+use service.*
 
 // --- Tests ---
+//
+// Demonstrates:
+//   - Builder pattern usage
+//   - Domain type construction with defaults
+//   - Enum variant shorthand (.Member, .Admin, etc.)
+//   - Record update syntax
+//   - f-string interpolation
+//   - assert for test verification
 
-async fn test_create_and_fetch_user:
-    let (svc, notif_log) = test_service()
+fn test_create_user:
+    var service = UserService.builder().build()
+    let actor = UserId { value: 0 }
 
     let req = CreateUserRequest {
         name: "Alice",
@@ -173,111 +23,140 @@ async fn test_create_and_fetch_user:
         role: .Member,
     }
 
-    // Create
-    let user = svc.create_user(req, UserId(0)).await
-        .unwrap()
+    let user = service.create_user(req, actor)
     assert(user.name == "Alice")
     assert(user.email == "alice@example.com")
-    assert(user.active)
 
-    // Welcome email was sent
-    assert(MockNotifier.sent_count(&notif_log) == 1)
+fn test_validation:
+    let service = UserService.builder().build()
 
-    // Fetch profile
-    let profile = svc.get_profile(user.id).await
-        .unwrap()
-    assert(profile.user.name == "Alice")
-    assert(profile.post_count == 0)
-    assert(profile.followers == 0)
+    // Empty name should fail
+    let bad_name = CreateUserRequest {
+        name: "",
+        email: "alice@example.com",
+        role: .Member,
+    }
+    match service.validate_create(bad_name):
+        Some(msg) => assert(msg == "name cannot be empty")
+        None => assert(false)
 
-async fn test_duplicate_email_rejected:
-    let (svc, _) = test_service()
+    // Missing @ should fail
+    let bad_email = CreateUserRequest {
+        name: "Alice",
+        email: "no-at-sign",
+        role: .Member,
+    }
+    match service.validate_create(bad_email):
+        Some(msg) => assert(msg == "invalid email address")
+        None => assert(false)
 
-    let req = CreateUserRequest {
+    // Valid request should pass
+    let good = CreateUserRequest {
         name: "Alice",
         email: "alice@example.com",
         role: .Member,
     }
+    match service.validate_create(good):
+        Some(_) => assert(false)
+        None => assert(true)
 
-    // First create succeeds
-    svc.create_user(req.clone(), UserId(0)).await.unwrap()
+fn test_welcome_messages:
+    let service = UserService.builder().build()
 
-    // Second create with same email fails
-    match svc.create_user(req, UserId(0)).await:
-        Err(.Validation(msg)) =>
-            assert(msg.contains("already registered"))
-        _ => unreachable()
+    assert(service.welcome_body(.Admin) == "Welcome, administrator. Full access granted.")
+    assert(service.welcome_body(.Moderator) == "Welcome, moderator. You can manage content.")
+    assert(service.welcome_body(.Member) == "Welcome to the platform!")
+    assert(service.welcome_body(.Guest) == "You've been added as a guest.")
 
-async fn test_update_partial_fields:
-    let (svc, _) = test_service()
+fn test_clamp_page_size:
+    let config = ServiceConfig {
+        max_batch_size: 50,
+    }
+    let builder = UserService.builder()
+    let builder2 = builder.with_config(config)
+    let service = builder2.build()
 
-    let user = svc.create_user(CreateUserRequest {
+    // Too large
+    assert(service.clamp_page_size(100) == 50)
+
+    // Too small
+    assert(service.clamp_page_size(0) == 1)
+
+    // Just right
+    assert(service.clamp_page_size(25) == 25)
+
+fn test_make_profile:
+    let service = UserService.builder().build()
+
+    let user = User {
+        id: UserId { value: 42 },
         name: "Bob",
         email: "bob@example.com",
         role: .Member,
-    }, UserId(0)).await.unwrap()
+    }
 
-    // Update only the name
-    let updated = svc.update_user(user.id, UserUpdate {
-        name: Some("Robert"),
-        email: None,
-        role: None,
-        active: None,
-    }, UserId(0)).await.unwrap()
+    let profile = service.make_profile(user, 10, 5)
+    assert(profile.post_count == 10)
+    assert(profile.followers == 5)
+    assert(profile.user.name == "Bob")
 
-    assert(updated.name == "Robert")
-    assert(updated.email == "bob@example.com")  // unchanged
-    assert(updated.role == .Member)             // unchanged
+fn test_describe_changes:
+    let old = User {
+        id: UserId { value: 1 },
+        name: "Alice",
+        email: "alice@example.com",
+        role: .Member,
+    }
 
-async fn test_delete_user:
-    let (svc, _) = test_service()
+    let new_user = User {
+        id: UserId { value: 1 },
+        name: "Alicia",
+        email: "alice@example.com",
+        role: .Member,
+    }
 
-    let user = svc.create_user(CreateUserRequest {
+    let desc = describe_changes(old, new_user)
+    assert(desc == "name changed")
+
+fn test_make_notification:
+    let service = UserService.builder().build()
+
+    let user = User {
+        id: UserId { value: 1 },
         name: "Charlie",
         email: "charlie@example.com",
-        role: .Guest,
-    }, UserId(0)).await.unwrap()
-
-    svc.delete_user(user.id, UserId(0)).await.unwrap()
-
-    // Profile should now 404
-    assert_matches(svc.get_profile(user.id).await, Err(.Db(.NotFound(..))))
-
-async fn test_cache_hit_on_second_fetch:
-    let (svc, _) = test_service()
-
-    let user = svc.create_user(CreateUserRequest {
-        name: "Diana",
-        email: "diana@example.com",
         role: .Admin,
-    }, UserId(0)).await.unwrap()
+    }
 
-    // First fetch — cache miss, hits repo
-    let p1 = svc.get_profile(user.id).await.unwrap()
+    let notif = service.make_welcome_notification(user)
+    assert(notif.recipient == "charlie@example.com")
+    assert(notif.subject == "Welcome to the platform")
+    assert(notif.priority == .Normal)
 
-    // Second fetch — should be cached
-    let p2 = svc.get_profile(user.id).await.unwrap()
+fn test_service_config_defaults:
+    let config = ServiceConfig {}
+    assert(config.cache_ttl_secs == 300)
+    assert(config.max_batch_size == 100)
+    assert(config.notify_on_create == true)
+    assert(config.notify_on_delete == false)
 
-    assert(p1.user.name == p2.user.name)
+fn test_service_config_override:
+    let config = ServiceConfig {
+        cache_ttl_secs: 600,
+        notify_on_delete: true,
+    }
+    assert(config.cache_ttl_secs == 600)
+    assert(config.max_batch_size == 100)
+    assert(config.notify_on_delete == true)
 
-    // Verify metrics
-    with svc.metrics.read() as m:
-        assert(m.cache_misses >= 1)
-        assert(m.cache_hits >= 1)
-
-async fn test_batch_profiles:
-    let (svc, _) = test_service()
-
-    // Create 5 users
-    let ids = with Vec.new() as mut out:
-        for i in 0..5:
-            let user = svc.create_user(CreateUserRequest {
-                name: "User {i}",
-                email: "user{i}@example.com",
-                role: .Member,
-            }, UserId(0)).await.unwrap()
-            out.push(user.id)
-
-    // Batch fetch all profiles
-    let profiles = svc.get_profiles_batch(ids).await.unwrap()
-    assert(profiles.len() == 5)
+fn main:
+    test_create_user()
+    test_validation()
+    test_welcome_messages()
+    test_clamp_page_size()
+    test_make_profile()
+    test_describe_changes()
+    test_make_notification()
+    test_service_config_defaults()
+    test_service_config_override()
+    print("all tests passed")

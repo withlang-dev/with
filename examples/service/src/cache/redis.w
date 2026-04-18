@@ -1,37 +1,43 @@
-module app.cache.redis
+module cache.redis
 
-use app.traits.CacheService
-use app.errors.CacheError
-use std.time.Duration
+use traits.*
+
+// --- Redis Cache Implementation ---
+//
+// Demonstrates:
+//   - Trait implementation for CacheService
+//   - Key prefixing pattern
+//   - f-string interpolation for key building
+//   - Async trait methods
 
 type RedisCache {
-    client: RedisClient,
     prefix: str,
 }
 
 extend RedisCache:
-    fn new(client: RedisClient, prefix: str):
-        RedisCache { client, prefix }
+    fn new(prefix: str) -> RedisCache:
+        RedisCache { prefix }
 
-    fn prefixed_key(self: &RedisCache, key: &str) -> str:
+    fn prefixed_key(self: &RedisCache, key: str) -> str:
         "{self.prefix}:{key}"
 
-impl CacheService for RedisCache:
-    async fn get_bytes(self: &RedisCache, key: &str) -> Result[Option[Vec[u8]], CacheError]:
-        let full_key = self.prefixed_key(key)
-        match self.client.get(&full_key).await:
-            Ok(Some(bytes)) => Ok(Some(bytes))
-            Ok(None)        => Ok(None)
-            Err(_)          => Err(.ConnectionLost)
+impl CacheService for RedisCache =
+    async fn get_str(self: &RedisCache, key: str) -> Option[str]:
+        let _full_key = self.prefixed_key(key)
+        // In production: query Redis for the key
+        None
 
-    async fn set_bytes(self: &RedisCache, key: &str, val: &[u8], ttl: Duration) -> Result[Unit, CacheError]:
-        let full_key = self.prefixed_key(key)
-        self.client.set_ex(&full_key, val, ttl.as_secs()).await?
+    async fn set_str(self: &RedisCache, key: str, val: str, ttl_secs: i64) -> bool:
+        let _full_key = self.prefixed_key(key)
+        // In production: SET key val EX ttl_secs
+        true
 
-    async fn delete(self: &RedisCache, key: &str) -> Result[Unit, CacheError]:
-        let full_key = self.prefixed_key(key)
-        self.client.del(&full_key).await?
+    async fn del(self: &RedisCache, key: str) -> bool:
+        let _full_key = self.prefixed_key(key)
+        // In production: DEL key
+        true
 
-    async fn exists(self: &RedisCache, key: &str) -> Result[bool, CacheError]:
-        let full_key = self.prefixed_key(key)
-        self.client.exists(&full_key).await
+    async fn exists(self: &RedisCache, key: str) -> bool:
+        let _full_key = self.prefixed_key(key)
+        // In production: EXISTS key
+        false

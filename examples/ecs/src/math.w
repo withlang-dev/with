@@ -19,18 +19,13 @@ extend Vec2:
     fn scale(self: &Vec2, s: f32) -> Vec2:
         Vec2 { x: self.x * s, y: self.y * s }
 
+    fn add(self: Vec2, other: Vec2) -> Vec2: Vec2 { x: self.x + other.x, y: self.y + other.y }
+    fn sub(self: Vec2, other: Vec2) -> Vec2: Vec2 { x: self.x - other.x, y: self.y - other.y }
+    fn neg(self: Vec2) -> Vec2: Vec2 { x: -self.x, y: -self.y }
+
     fn dot(a: Vec2, b: Vec2) -> f32: a.x * b.x + a.y * b.y
     fn distance_sq(a: Vec2, b: Vec2) -> f32: (a - b).length_sq()
     fn distance(a: Vec2, b: Vec2) -> f32: Vec2.distance_sq(a, b).sqrt()
-
-impl Add for Vec2:
-    fn add(self: Vec2, other: Vec2): Vec2 { x: self.x + other.x, y: self.y + other.y }
-
-impl Sub for Vec2:
-    fn sub(self: Vec2, other: Vec2): Vec2 { x: self.x - other.x, y: self.y - other.y }
-
-impl Neg for Vec2:
-    fn neg(self: Vec2): Vec2 { x: -self.x, y: -self.y }
 
 // --- AABB: axis-aligned bounding box ---
 
