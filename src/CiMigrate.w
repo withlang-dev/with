@@ -1056,6 +1056,7 @@ fn ci_migrate_reset_fn_counts():
     g_migrate_fn_untranslatable = 0
 
 fn ci_cursor_kind_name(kind: i32) -> str:
+    if kind == 103: return "CallExpr"
     if kind == 201: return "LabelStmt"
     if kind == 202: return "CompoundStmt"
     if kind == 203: return "CaseStmt"
