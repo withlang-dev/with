@@ -6781,6 +6781,46 @@ fn ci_strip_trailing_break_ir(stmts: &mut CiStmtPool, stmt_id: CiStmtId) -> CiSt
         i = i + 1
     stmts.block(new_start, new_count)
 
+fn ci_lower_switch_prong_forward_ir(session: i64, body_cursor: i32, start_idx: i32, total: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+    var part_ids: Vec[i32] = Vec.new()
+    let start_child = with_ci_child(session, body_cursor, start_idx)
+    let start_kind = with_ci_cursor_kind(session, start_child)
+    if start_kind == CXK_CASE_STMT or start_kind == CXK_DEFAULT_STMT:
+        let inner = ci_drill_innermost_case_substmt(session, start_child)
+        if inner >= 0:
+            let bk = with_ci_cursor_kind(session, inner)
+            if bk == CXK_BREAK_STMT:
+                return 0 as CiStmtId
+            if bk != CXK_BREAK_STMT and not ci_is_null_like_stmt(session, inner):
+                let inner_id = ci_lower_stmt_ir(session, inner, stmts, exprs, types, 0, scope)
+                if (inner_id as i32) == 0:
+                    return 0 as CiStmtId
+                part_ids.push(inner_id as i32)
+            if bk == CXK_RETURN_STMT or bk == CXK_GOTO_STMT or bk == CXK_CONTINUE_STMT:
+                return ci_stmt_from_flat_ids(stmts, &part_ids)
+    var j = start_idx + 1
+    while j < total:
+        let next_child = with_ci_child(session, body_cursor, j)
+        let next_kind = with_ci_cursor_kind(session, next_child)
+        if next_kind == CXK_BREAK_STMT:
+            return ci_stmt_from_flat_ids(stmts, &part_ids)
+        if next_kind == CXK_RETURN_STMT or next_kind == CXK_GOTO_STMT or next_kind == CXK_CONTINUE_STMT:
+            let next_id = ci_lower_stmt_ir(session, next_child, stmts, exprs, types, 0, scope)
+            if (next_id as i32) != 0:
+                part_ids.push(next_id as i32)
+            return ci_stmt_from_flat_ids(stmts, &part_ids)
+        if next_kind == CXK_CASE_STMT or next_kind == CXK_DEFAULT_STMT:
+            let dup_id = ci_lower_switch_prong_forward_ir(session, body_cursor, j, total, stmts, exprs, types, scope)
+            if (dup_id as i32) != 0:
+                part_ids.push(dup_id as i32)
+            return ci_stmt_from_flat_ids(stmts, &part_ids)
+        if not ci_is_null_like_stmt(session, next_child):
+            let next_id = ci_lower_stmt_ir(session, next_child, stmts, exprs, types, 0, scope)
+            if (next_id as i32) != 0:
+                part_ids.push(next_id as i32)
+        j = j + 1
+    ci_stmt_from_flat_ids(stmts, &part_ids)
+
 // Structural lowering for CXK_SWITCH_STMT. Builds a CIS_MATCH
 // with structural subject and arm bodies. Mirrors the branching
 // structure of the old switch lowering: simple per-case arms when
@@ -6813,18 +6853,6 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
     let body_cursor = with_ci_child(session, cursor, 1)
     let body_nc = with_ci_num_children(session, body_cursor)
 
-    var ii = 0
-    while ii < body_nc:
-        let child = with_ci_child(session, body_cursor, ii)
-        let ck = with_ci_cursor_kind(session, child)
-        if ck == CXK_CASE_STMT or ck == CXK_DEFAULT_STMT:
-            if not ci_switch_case_is_terminated(session, body_cursor, ii):
-                if g_ci_bail_location.len() == 0:
-                    g_ci_bail_location = with_ci_cursor_location(session, child)
-                    g_ci_bail_kind = ck
-                return 0 as CiStmtId
-        ii = ii + 1
-
     let prepared_subject = ci_prepare_stmt_subject_ir(session, cond_cursor, stmts, exprs, types, scope, "switch")
     if not ci_value_ir_valid(prepared_subject):
         if g_ci_bail_location.len() == 0:
@@ -6855,11 +6883,12 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
                 chain = with_ci_child(session, chain, 1)
             var body_ids: Vec[i32] = Vec.new()
             let inner_kind = with_ci_cursor_kind(session, chain)
-            if inner_kind != CXK_BREAK_STMT and inner_kind != CXK_NULL_STMT:
+            if inner_kind != CXK_BREAK_STMT and not ci_is_null_like_stmt(session, chain):
                 let inner_id = ci_lower_stmt_ir(session, chain, stmts, exprs, types, 0, scope)
                 if (inner_id as i32) == 0:
                     return 0 as CiStmtId
                 body_ids.push(inner_id as i32)
+            var hit_break = false
             var j = i + 1
             while j < body_nc:
                 let sib = with_ci_child(session, body_cursor, j)
@@ -6867,14 +6896,23 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
                 if sk == CXK_CASE_STMT or sk == CXK_DEFAULT_STMT:
                     break
                 if sk == CXK_BREAK_STMT:
+                    hit_break = true
                     j = j + 1
                     break
-                if sk != CXK_NULL_STMT:
+                if not ci_is_null_like_stmt(session, sib):
                     let sib_id = ci_lower_stmt_ir(session, sib, stmts, exprs, types, 0, scope)
                     if (sib_id as i32) == 0:
                         return 0 as CiStmtId
                     body_ids.push(sib_id as i32)
                 j = j + 1
+            if not hit_break and j < body_nc:
+                let probe_kind = with_ci_cursor_kind(session, with_ci_child(session, body_cursor, j))
+                if probe_kind == CXK_CASE_STMT or probe_kind == CXK_DEFAULT_STMT:
+                    let fwd_id = ci_lower_switch_prong_forward_ir(session, body_cursor, j, body_nc, stmts, exprs, types, scope)
+                    if (fwd_id as i32) == 0 and g_ci_bail_location.len() > 0:
+                        return 0 as CiStmtId
+                    if (fwd_id as i32) != 0:
+                        body_ids.push(fwd_id as i32)
             let raw_body = ci_stmt_from_flat_ids(stmts, &body_ids)
             let body_id = ci_strip_trailing_break_ir(stmts, raw_body)
             if (body_id as i32) == 0 and body_ids.len() > 0:
@@ -6894,11 +6932,12 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
             var body_ids: Vec[i32] = Vec.new()
             if inner >= 0:
                 let inner_kind = with_ci_cursor_kind(session, inner)
-                if inner_kind != CXK_BREAK_STMT and inner_kind != CXK_NULL_STMT:
+                if inner_kind != CXK_BREAK_STMT and not ci_is_null_like_stmt(session, inner):
                     let inner_id = ci_lower_stmt_ir(session, inner, stmts, exprs, types, 0, scope)
                     if (inner_id as i32) == 0:
                         return 0 as CiStmtId
                     body_ids.push(inner_id as i32)
+            var hit_break = false
             var j = i + 1
             while j < body_nc:
                 let sib = with_ci_child(session, body_cursor, j)
@@ -6906,14 +6945,23 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
                 if sk == CXK_CASE_STMT or sk == CXK_DEFAULT_STMT:
                     break
                 if sk == CXK_BREAK_STMT:
+                    hit_break = true
                     j = j + 1
                     break
-                if sk != CXK_NULL_STMT:
+                if not ci_is_null_like_stmt(session, sib):
                     let sib_id = ci_lower_stmt_ir(session, sib, stmts, exprs, types, 0, scope)
                     if (sib_id as i32) == 0:
                         return 0 as CiStmtId
                     body_ids.push(sib_id as i32)
                 j = j + 1
+            if not hit_break and j < body_nc:
+                let probe_kind = with_ci_cursor_kind(session, with_ci_child(session, body_cursor, j))
+                if probe_kind == CXK_CASE_STMT or probe_kind == CXK_DEFAULT_STMT:
+                    let fwd_id = ci_lower_switch_prong_forward_ir(session, body_cursor, j, body_nc, stmts, exprs, types, scope)
+                    if (fwd_id as i32) == 0 and g_ci_bail_location.len() > 0:
+                        return 0 as CiStmtId
+                    if (fwd_id as i32) != 0:
+                        body_ids.push(fwd_id as i32)
             let raw_body = ci_stmt_from_flat_ids(stmts, &body_ids)
             let body_id = ci_strip_trailing_break_ir(stmts, raw_body)
             if (body_id as i32) != 0:
@@ -7096,7 +7144,7 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
                 let child_id = ci_lower_stmt_ir(session, child, stmts, exprs, types, 0, block_scope)
                 if (child_id as i32) != 0:
                     child_ids.push(child_id as i32)
-                else if with_ci_cursor_kind(session, child) != CXK_NULL_STMT:
+                else if not ci_is_null_like_stmt(session, child):
                     if g_ci_bail_location.len() == 0:
                         g_ci_bail_location = with_ci_cursor_location(session, child)
                         g_ci_bail_kind = with_ci_cursor_kind(session, child)
@@ -7266,6 +7314,15 @@ fn ci_get_decl_location(session: i64, name: str) -> str:
             return with_ci_cursor_location(session, child)
         i = i + 1
     ""
+
+fn ci_is_null_like_stmt(session: i64, cursor: i32) -> bool:
+    let kind = with_ci_cursor_kind(session, cursor)
+    if kind == CXK_NULL_STMT: return true
+    if kind == CXK_UNEXPOSED_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return with_ci_cursor_kind(session, with_ci_child(session, cursor, nc - 1)) == CXK_NULL_STMT
+    false
 
 // Drill through nested CaseStmt/DefaultStmt sub-statements to find the
 // innermost non-case statement. Given a CaseStmt whose sub-stmt is another
