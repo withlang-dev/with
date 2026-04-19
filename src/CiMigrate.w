@@ -778,7 +778,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     if body.len() > 0:
         g_migrate_fn_translated = g_migrate_fn_translated + 1
         let ret_suffix = if ret == "void": "" else: " -> " ++ ret
-        if migrate_prefer_curly():
+        if migrate_prefer_brace():
             return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ " {\n" ++ body ++ "}\n\n"
         return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body ++ "\n"
 
@@ -1041,13 +1041,13 @@ pub fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val
 
 // Block style preference for migrated output.
-// 0 = colon-form (default), 2 = brace-form (--prefer-curly).
+// 0 = colon-form (default), 2 = brace-form (--prefer-brace).
 var g_migrate_block_style: i32 = 0
 
 pub fn migrate_set_block_style(val: i32):
     g_migrate_block_style = val
 
-pub fn migrate_prefer_curly() -> bool:
+pub fn migrate_prefer_brace() -> bool:
     g_migrate_block_style == 2
 
 // Per-file and cumulative counters for translated vs untranslatable functions.

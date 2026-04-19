@@ -21,6 +21,7 @@ extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
+extern fn with_read_bytes_stdin(count: i32) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_str_len(s: str) -> i64
 extern fn with_str_byte_at(s: str, index: i64) -> i32
@@ -965,6 +966,9 @@ fn run_migrate_command(argc: i32) -> i32:
             ai = ai + 1
             continue
         if arg == "--prefer-curly":
+            eprint("error: --prefer-curly was renamed to --prefer-brace")
+            return 1
+        if arg == "--prefer-brace":
             migrate_set_block_style(2)
             ai = ai + 1
             continue
@@ -1014,20 +1018,34 @@ fn run_migrate_command(argc: i32) -> i32:
 
     migrate_c_file(source_path, output_path)
 
+fn cli_read_all_stdin() -> str:
+    var out = ""
+    while true:
+        let chunk = with_read_bytes_stdin(4096)
+        if chunk.len() == 0:
+            return out
+        out = out ++ chunk
+        if chunk.len() < 4096:
+            return out
+    out
+
 fn run_fmt_command(argc: i32) -> i32:
     let write_mode = cli_has_flag(argc, "-w")
     let list_mode = cli_has_flag(argc, "-l")
     let check_mode = cli_has_flag(argc, "--check")
-    let prefer_curly = cli_has_flag(argc, "--prefer-curly")
+    if cli_has_flag(argc, "--prefer-curly"):
+        eprint("error: --prefer-curly was renamed to --prefer-brace")
+        return 1
+    let prefer_brace = cli_has_flag(argc, "--prefer-brace")
     let prefer_colon = cli_has_flag(argc, "--prefer-colon")
     var fmt_style = 0
-    if prefer_curly: fmt_style = 2
+    if prefer_brace: fmt_style = 2
     if prefer_colon: fmt_style = 1
     var files: Vec[str] = Vec.new()
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
-        if arg == "-w" or arg == "-l" or arg == "--check" or arg == "--prefer-curly" or arg == "--prefer-colon":
+        if arg == "-w" or arg == "-l" or arg == "--check" or arg == "--prefer-brace" or arg == "--prefer-colon":
             i = i + 1
             continue
         if with_str_starts_with(arg, "-") != 0:
@@ -1036,7 +1054,7 @@ fn run_fmt_command(argc: i32) -> i32:
         files.push(arg)
         i = i + 1
     if files.len() == 0:
-        let source = with_fs_read_file("/dev/stdin")
+        let source = cli_read_all_stdin()
         let formatted = format_source_styled(source, fmt_style)
         with_write(formatted)
         return 0
@@ -1075,7 +1093,7 @@ fn print_usage:
     with_write("  run [file.w]      Build + run a source file\n")
     with_write("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed/--dump-mir/--dump-async-mir)\n")
     with_write("  test <file.w|dir> Run tests from a source file or directory\n")
-    with_write("  fmt <files>       Format source files (-w write, --check, --prefer-curly, --prefer-colon)\n")
+    with_write("  fmt <files>       Format source files (-w write, --check, --prefer-brace, --prefer-colon)\n")
     with_write("  clean             Delete out/ and legacy .with/ artifacts\n")
     with_write("  ir <file.w>       Dump LLVM IR (debug)\n")
     with_write("  ast <file.w>      Parse and dump the AST (debug)\n")
