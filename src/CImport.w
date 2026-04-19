@@ -4720,6 +4720,10 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
                     let factor_idx = exprs.add_string(factor_text)
                     let factor_id = exprs.int_lit(factor_idx, 0 as CiTypeId)
                     return exprs.binary(CiBinOp.CIBO_MUL, factor_id, sizeof_id, 0 as CiTypeId)
+            else:
+                if with_ci_eval_int_valid(session, cursor) != 0:
+                    let text_idx = exprs.add_string(i64_to_string(with_ci_eval_int_value(session, cursor)))
+                    return exprs.int_lit(text_idx, 0 as CiTypeId)
         return 0 as CiExprId
 
     // C-style cast.
