@@ -12274,7 +12274,7 @@ should use brace form to avoid indentation-sensitivity issues.
 **Formatter behavior:**
 
 - `with fmt` (default): preserves the author's chosen form.
-- `with fmt --prefer-curly`: converts inline colon to inline brace.
+- `with fmt --prefer-brace`: converts inline colon to inline brace.
   `fn f: expr` becomes `fn f { expr }`. Multi-line colon becomes
   multi-line brace. Lossless.
 - `with fmt --prefer-colon`: converts inline brace to inline colon

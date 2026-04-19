@@ -109,7 +109,7 @@ fn emit_indent(indent: i32) -> str:
 
 // ── Core formatter ──────────────────────────────────────────────
 
-// style: 0=preserve, 1=prefer-colon, 2=prefer-curly
+// style: 0=preserve, 1=prefer-colon, 2=prefer-brace
 fn format_source_styled(source: str, style: i32) -> str:
     var lexer = Lexer.init(source, 0)
     let tokens = lexer.tokenize_with_comments()
@@ -159,7 +159,7 @@ fn format_source_styled(source: str, style: i32) -> str:
             else:
                 line_indent = column_of(source, start)
 
-            // prefer-curly: close blocks when indent drops
+            // prefer-brace: close blocks when indent drops
             if style == 2:
                 while close_stack.len() > 0:
                     let top = close_stack.get(close_stack.len() - 1)
@@ -224,7 +224,7 @@ fn format_source_styled(source: str, style: i32) -> str:
             if space:
                 out = out ++ " "
 
-        // prefer-curly: convert block-introducing : to {
+        // prefer-brace: convert block-introducing : to {
         if style == 2 and tag == TokenKind.TK_COLON and block_kw_active:
             if next_is_newline_or_eof(tokens, i, count):
                 out = out ++ " {"
@@ -258,7 +258,7 @@ fn format_source_styled(source: str, style: i32) -> str:
         prev_tag = tag
         i = i + 1
 
-    // prefer-curly: close any remaining open blocks
+    // prefer-brace: close any remaining open blocks
     if style == 2:
         while close_stack.len() > 0:
             let top = close_stack.pop()
