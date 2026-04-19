@@ -98,7 +98,7 @@ fn next_is_newline_or_eof(tokens: TokenList, pos: i32, count: i32) -> bool:
         if t == TokenKind.TK_COMMENT:
             j = j + 1
             continue
-        return t == TokenKind.TK_NEWLINE or t == TokenKind.TK_EOF
+        return t == TokenKind.TK_NEWLINE or t == TokenKind.TK_SEMICOLON or t == TokenKind.TK_EOF
     true
 
 fn emit_indent(indent: i32) -> str:
@@ -124,6 +124,7 @@ fn format_source_styled(source: str, style: i32) -> str:
     var close_stack: Vec[i32] = Vec.new()
     var suppress_stack: Vec[i32] = Vec.new()
     var brace_depth = 0
+    var semi_indent = -1
 
     var i = 0
     while i < count:
@@ -134,13 +135,17 @@ fn format_source_styled(source: str, style: i32) -> str:
         if tag == TokenKind.TK_EOF:
             break
 
-        if tag == TokenKind.TK_NEWLINE:
+        if tag == TokenKind.TK_NEWLINE or tag == TokenKind.TK_SEMICOLON:
             if not at_line_start:
+                if tag == TokenKind.TK_SEMICOLON and semi_indent < 0:
+                    semi_indent = line_indent
                 out = out ++ "\n"
                 at_line_start = true
                 prev_was_newline = true
             else:
-                blank_lines = blank_lines + 1
+                if tag == TokenKind.TK_NEWLINE:
+                    blank_lines = blank_lines + 1
+                    semi_indent = -1
             i = i + 1
             continue
 
@@ -148,7 +153,11 @@ fn format_source_styled(source: str, style: i32) -> str:
             block_kw_active = true
 
         if at_line_start:
-            line_indent = column_of(source, start)
+            if semi_indent >= 0:
+                line_indent = semi_indent
+                semi_indent = -1
+            else:
+                line_indent = column_of(source, start)
 
             // prefer-curly: close blocks when indent drops
             if style == 2:
@@ -177,7 +186,7 @@ fn format_source_styled(source: str, style: i32) -> str:
                     let _ = suppress_stack.pop()
                     brace_depth = after_brace
                     var j = i + 1
-                    while j < count and tokens.get_tag(j) == TokenKind.TK_NEWLINE:
+                    while j < count and (tokens.get_tag(j) == TokenKind.TK_NEWLINE or tokens.get_tag(j) == TokenKind.TK_SEMICOLON):
                         j = j + 1
                     if j < count and tokens.get_tag(j) == TokenKind.TK_KW_ELSE:
                         if blank_lines > 0 and prev_tag != 0:
@@ -193,7 +202,7 @@ fn format_source_styled(source: str, style: i32) -> str:
                         continue
                     blank_lines = 0
                     i = i + 1
-                    if i < count and tokens.get_tag(i) == TokenKind.TK_NEWLINE:
+                    if i < count and (tokens.get_tag(i) == TokenKind.TK_NEWLINE or tokens.get_tag(i) == TokenKind.TK_SEMICOLON):
                         i = i + 1
                     continue
 
