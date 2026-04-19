@@ -6975,17 +6975,24 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
             if ci_value_ir_valid(prepared_cond):
                 ci_trace_port("STRUCTURAL[b11.1.if_stmt_ir]")
                 let then_id = ci_lower_stmt_ir(session, then_child, stmts, exprs, types, 0, scope)
-                var then_empty = (then_id as i32) == 0
-                if not then_empty and stmts.kind(then_id) == CiStmtKind.CIS_BLOCK:
-                    if stmts.get_d1(then_id) == 0:
-                        then_empty = true
-                if not then_empty:
+                if (then_id as i32) == 0:
+                    ci_trace_port("STRUCTURAL[b11.1.if_stmt_ir] then lowering failed")
+                else:
+                    var then_empty = false
+                    if stmts.kind(then_id) == CiStmtKind.CIS_BLOCK:
+                        if stmts.get_d1(then_id) == 0:
+                            then_empty = true
                     var else_id: CiStmtId = 0 as CiStmtId
                     if ifnc > 2:
                         let else_child = with_ci_child(session, cursor, 2)
                         else_id = ci_lower_stmt_ir(session, else_child, stmts, exprs, types, 0, scope)
-                    let if_id = stmts.if_stmt(prepared_cond.value_expr, then_id, else_id)
-                    return ci_stmt_merge_ir(stmts, prepared_cond.setup_stmt, if_id)
+                    if then_empty and (else_id as i32) != 0:
+                        let neg_cond = exprs.unary(CiUnaryOp.CIUO_LOGICAL_NOT, prepared_cond.value_expr, 0 as CiTypeId)
+                        let if_id = stmts.if_stmt(neg_cond, else_id, 0 as CiStmtId)
+                        return ci_stmt_merge_ir(stmts, prepared_cond.setup_stmt, if_id)
+                    if not then_empty:
+                        let if_id = stmts.if_stmt(prepared_cond.value_expr, then_id, else_id)
+                        return ci_stmt_merge_ir(stmts, prepared_cond.setup_stmt, if_id)
 
     // Structural while statement. Sequenced conditions are
     // desugared to `while true: <setup>; if not cond: break; body`.
