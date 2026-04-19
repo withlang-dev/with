@@ -38,6 +38,7 @@ EXCLUDES=(
     --exclude pcre2grep.c
     --exclude pcre2_ucptables_inc.h
     --exclude pcre2_printint.c
+    --exclude pcre2posix_test.c
 )
 
 # --- Preflight checks ----------------------------------------------------
