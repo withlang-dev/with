@@ -6213,6 +6213,9 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                     setup_stmt: ci_stmt_merge_ir(stmts, lhs.setup_stmt, rhs.setup_stmt),
                     value_expr: expr_id,
                 }
+        if with_ci_eval_int_valid(session, cursor) != 0:
+            let text_idx = exprs.add_string(i64_to_string(with_ci_eval_int_value(session, cursor)))
+            return ci_value_ir_plain(exprs.int_lit(text_idx, 0 as CiTypeId))
         return ci_value_ir_invalid()
 
     if kind == CXK_COMPOUND_ASSIGN_OP and nc >= 2:
@@ -6314,6 +6317,9 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                 setup_stmt: ci_stmt_merge3_ir(stmts, decl_id, cond.setup_stmt, if_stmt),
                 value_expr: exprs.ident(result_expr_name, result_ty),
             }
+        if with_ci_eval_int_valid(session, cursor) != 0:
+            let text_idx = exprs.add_string(i64_to_string(with_ci_eval_int_value(session, cursor)))
+            return ci_value_ir_plain(exprs.int_lit(text_idx, 0 as CiTypeId))
         return ci_value_ir_invalid()
 
     if kind == CXK_CSTYLE_CAST:
