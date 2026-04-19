@@ -2765,8 +2765,15 @@ fn ci_is_large_decimal(s: str) -> bool:
         i = i + 1
     false  // equal = not large
 
-fn ci_binary_op_allows_uint_literal_cast(op: i32) -> bool:
-    op == BO_SHL or op == BO_SHR or op == BO_AND or op == BO_OR or op == BO_XOR
+fn ci_binary_op_allows_uint_literal_cast(op: i32, operand_unsigned: bool) -> bool:
+    op == BO_SHL or op == BO_SHR or op == BO_AND or op == BO_OR or op == BO_XOR or
+    (operand_unsigned and (op == BO_ADD or op == BO_SUB))
+
+fn ci_non_literal_operand_is_unsigned(session: i64, lhs_cursor: i32, rhs_cursor: i32, lhs_large: bool, rhs_large: bool) -> bool:
+    if lhs_large and rhs_large: return true
+    if rhs_large: return with_ci_type_is_unsigned(session, lhs_cursor) != 0
+    if lhs_large: return with_ci_type_is_unsigned(session, rhs_cursor) != 0
+    false
 
 // Pure decimal literal (no operators, no idents). Used by the
 // unsigned-arithmetic emit logic to decide whether to wrap an
@@ -4840,7 +4847,8 @@ fn ci_lower_binary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, typ
         let rhs_str = ci_print_expr(exprs, types, rhs_id, 0, 0)
         let lhs_large = ci_is_large_decimal(lhs_str)
         let rhs_large = ci_is_large_decimal(rhs_str)
-        if (lhs_large or rhs_large) and not ci_binary_op_allows_uint_literal_cast(op):
+        let operand_unsigned = ci_non_literal_operand_is_unsigned(session, lhs_cursor, rhs_cursor, lhs_large, rhs_large)
+        if (lhs_large or rhs_large) and not ci_binary_op_allows_uint_literal_cast(op, operand_unsigned):
             return 0 as CiExprId
         let c_uint_ty = ci_named_type_from_text(types, "c_uint")
         if lhs_large:
@@ -5709,12 +5717,13 @@ fn ci_build_binary_value_expr_from_ids(session: i64, cursor: i32, lhs_cursor: i3
     let rhs_text = ci_print_expr(exprs, types, rhs_id, 0, 0)
     let lhs_large = ci_is_large_decimal(lhs_text)
     let rhs_large = ci_is_large_decimal(rhs_text)
-    if (lhs_large or rhs_large) and not ci_binary_op_allows_uint_literal_cast(op):
+    let operand_unsigned = ci_non_literal_operand_is_unsigned(session, lhs_cursor, rhs_cursor, lhs_large, rhs_large)
+    if (lhs_large or rhs_large) and not ci_binary_op_allows_uint_literal_cast(op, operand_unsigned):
         return 0 as CiExprId
 
     var lhs_value = lhs_id
     var rhs_value = rhs_id
-    if op == BO_SHL or op == BO_SHR or op == BO_AND or op == BO_OR or op == BO_XOR:
+    if (lhs_large or rhs_large) and ci_binary_op_allows_uint_literal_cast(op, operand_unsigned):
         let c_uint_ty = ci_named_type_from_text(types, "c_uint")
         if (c_uint_ty as i32) == 0:
             return 0 as CiExprId
