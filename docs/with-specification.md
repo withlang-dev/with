@@ -12172,7 +12172,7 @@ block-introducer.
 
 - Body delimited by `{` and matching `}`.
 - Whitespace inside braces is insignificant.
-- Statements are newline-separated.
+- Statements are separated by newlines or semicolons (`;`).
 - Single-line:
   ```
   fn add(a: i32, b: i32) -> i32 { a + b }
@@ -12240,6 +12240,32 @@ trait Drawable {
     fn draw(self: &Self)
 }
 ```
+
+**Semicolons as statement separators:**
+
+The semicolon (`;`) is a statement separator, not a terminator.
+It may be used anywhere a newline separates statements:
+
+```
+let x = 1; let y = 2; print(x + y)
+fn add(a: i32, b: i32) -> i32 { a + b; }   // trailing ; is legal (ignored)
+```
+
+Consecutive semicolons and mixed semicolons/newlines collapse to a
+single separator, just as consecutive newlines do:
+
+```
+let x = 1;; let y = 2      // same as: let x = 1; let y = 2
+let a = 1;
+let b = 2                   // semicolon + newline = one separator
+```
+
+`with fmt` normalizes semicolons to newlines — semicolons never
+appear in formatted output.
+
+Semicolons inside `[…]` retain their existing meaning (array fill
+and for-comprehension monadic chaining) and are not affected by
+this rule.
 
 **Style guidance:** Hand-written code typically uses colon form.
 Generated code (code generators, derive macros, comptime expansions)

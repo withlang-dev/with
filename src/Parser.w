@@ -212,9 +212,21 @@ fn Parser.skip_newlines(self: Parser):
     while self.peek() == TokenKind.TK_NEWLINE:
         self.advance()
 
+fn Parser.skip_separators(self: Parser):
+    while self.peek() == TokenKind.TK_NEWLINE or self.peek() == TokenKind.TK_SEMICOLON:
+        self.advance()
+
 fn Parser.peek_past_newlines(self: Parser) -> i32:
     var p = self.pos
     while p < self.tokens.len() and self.tokens.get_tag(p) == TokenKind.TK_NEWLINE:
+        p = p + 1
+    if p < self.tokens.len():
+        return self.tokens.get_tag(p)
+    TokenKind.TK_EOF
+
+fn Parser.peek_past_separators(self: Parser) -> i32:
+    var p = self.pos
+    while p < self.tokens.len() and (self.tokens.get_tag(p) == TokenKind.TK_NEWLINE or self.tokens.get_tag(p) == TokenKind.TK_SEMICOLON):
         p = p + 1
     if p < self.tokens.len():
         return self.tokens.get_tag(p)
@@ -447,7 +459,7 @@ fn Parser.skip_attributes(self: Parser):
 // ── Module parsing ───────────────────────────────────────────────
 
 fn Parser.parse_module(self: Parser) -> AstPool:
-    self.skip_newlines()
+    self.skip_separators()
 
     // Skip optional module declaration
     if self.peek() == TokenKind.TK_KW_MODULE:
@@ -466,12 +478,12 @@ fn Parser.parse_module(self: Parser) -> AstPool:
                 self.advance()
             else:
                 break
-        self.skip_newlines()
+        self.skip_separators()
 
     while self.peek() != TokenKind.TK_EOF:
-        self.skip_newlines()
+        self.skip_separators()
         self.skip_attributes()
-        self.skip_newlines()
+        self.skip_separators()
         if self.peek() == TokenKind.TK_EOF:
             break
 
@@ -480,25 +492,25 @@ fn Parser.parse_module(self: Parser) -> AstPool:
             self.advance()
             if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
                 self.parse_impl_block(Visibility.Public)
-                self.skip_newlines()
+                self.skip_separators()
                 continue
             if self.peek() == TokenKind.TK_KW_TRAIT:
                 self.parse_trait_decl(Visibility.Public)
-                self.skip_newlines()
+                self.skip_separators()
                 continue
             self.pos = saved_pos
         else if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
             self.parse_impl_block(Visibility.Private)
-            self.skip_newlines()
+            self.skip_separators()
             continue
         else if self.peek() == TokenKind.TK_KW_TRAIT:
             self.parse_trait_decl(Visibility.Private)
-            self.skip_newlines()
+            self.skip_separators()
             continue
         else if self.peek() == TokenKind.TK_KW_COMPTIME:
             if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_COLON:
                 self.parse_comptime_decl_block()
-                self.skip_newlines()
+                self.skip_separators()
                 continue
 
         let decl = self.parse_decl()
@@ -506,7 +518,7 @@ fn Parser.parse_module(self: Parser) -> AstPool:
             self.pool.add_decl(decl)
         else:
             self.recover_to_top_level()
-        self.skip_newlines()
+        self.skip_separators()
 
     self.pool
 
@@ -4053,7 +4065,7 @@ fn Parser.parse_return(self: Parser) -> NodeId:
     self.advance()
     var value: NodeId = 0 as NodeId
     let t = self.peek()
-    if t != TokenKind.TK_NEWLINE and t != TokenKind.TK_EOF and t != TokenKind.TK_R_PAREN and t != TokenKind.TK_R_BRACE:
+    if t != TokenKind.TK_NEWLINE and t != TokenKind.TK_SEMICOLON and t != TokenKind.TK_EOF and t != TokenKind.TK_R_PAREN and t != TokenKind.TK_R_BRACE:
         value = self.parse_expr()
     self.pool.add_node(NodeKind.NK_RETURN, start, self.prev_end(), value, 0, 0)
 
@@ -4610,7 +4622,7 @@ fn Parser.parse_break(self: Parser) -> NodeId:
         self.advance()
     var value: NodeId = 0 as NodeId
     let t = self.peek()
-    if t != TokenKind.TK_NEWLINE and t != TokenKind.TK_EOF and t != TokenKind.TK_R_BRACE and t != TokenKind.TK_R_PAREN and t != TokenKind.TK_R_BRACKET:
+    if t != TokenKind.TK_NEWLINE and t != TokenKind.TK_SEMICOLON and t != TokenKind.TK_EOF and t != TokenKind.TK_R_BRACE and t != TokenKind.TK_R_PAREN and t != TokenKind.TK_R_BRACKET:
         value = self.parse_expr()
     self.pool.add_node(NodeKind.NK_BREAK, start, self.prev_end(), value, label, 0)
 
@@ -5600,7 +5612,7 @@ fn Parser.parse_block_or_expr(self: Parser) -> NodeId:
             break
         // After error recovery, the current token may be a statement keyword
         // (not a newline). Check column to decide if it's still in this block.
-        if cur != TokenKind.TK_NEWLINE:
+        if cur != TokenKind.TK_NEWLINE and cur != TokenKind.TK_SEMICOLON:
             let cur_col = column_of(self.source, self.current_start())
             if cur_col >= block_col and (cur == TokenKind.TK_KW_LET or cur == TokenKind.TK_KW_VAR or cur == TokenKind.TK_KW_RETURN or cur == TokenKind.TK_KW_IF or cur == TokenKind.TK_KW_FOR or cur == TokenKind.TK_KW_WHILE or cur == TokenKind.TK_KW_MATCH or cur == TokenKind.TK_KW_DEFER):
                 stmts.push(last_expr as i32)
@@ -5609,7 +5621,7 @@ fn Parser.parse_block_or_expr(self: Parser) -> NodeId:
             break
 
         let save = self.pos
-        self.skip_newlines()
+        self.skip_separators()
         if self.peek() == TokenKind.TK_EOF:
             break
         let next_col = column_of(self.source, self.current_start())
@@ -5633,7 +5645,7 @@ fn Parser.parse_block_or_expr(self: Parser) -> NodeId:
 
 fn Parser.parse_braced_body(self: Parser) -> NodeId:
     let brace_start = self.prev_end()
-    self.skip_newlines()
+    self.skip_separators()
     if self.peek() == TokenKind.TK_R_BRACE:
         let end = self.current_end()
         self.advance()
