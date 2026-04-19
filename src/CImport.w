@@ -4628,6 +4628,9 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         let ptr_asgn_id = ci_lower_binary_ptr_assign(session, cursor, exprs, types, scope)
         if (ptr_asgn_id as i32) != 0:
             return ptr_asgn_id
+        if with_ci_eval_int_valid(session, cursor) != 0:
+            let text_idx = exprs.add_string(i64_to_string(with_ci_eval_int_value(session, cursor)))
+            return exprs.int_lit(text_idx, 0 as CiTypeId)
         return 0 as CiExprId
 
     // Unary operator.
@@ -4687,6 +4690,9 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
                     let else_id = ci_lower_expr_ir(session, else_cursor, exprs, types, scope)
                     if (else_id as i32) != 0:
                         return exprs.add(CiExprKind.CIE_TERNARY, cond_id as i32, then_id as i32, else_id as i32, 0 as CiTypeId)
+        if with_ci_eval_int_valid(session, cursor) != 0:
+            let text_idx = exprs.add_string(i64_to_string(with_ci_eval_int_value(session, cursor)))
+            return exprs.int_lit(text_idx, 0 as CiTypeId)
         return 0 as CiExprId
 
     // Compound literal.
