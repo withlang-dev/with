@@ -922,24 +922,8 @@ fn Codegen.mir_eval_operand(self: Codegen, body: MirBody, operand_id: i32, expec
 fn Codegen.mir_operand_is_unsigned(self: Codegen, body: MirBody, operand_id: i32) -> bool:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return false
-    let ok = body.operand_kinds.get(operand_id as i64)
-    let od = body.operand_d0.get(operand_id as i64)
-    if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
-        if od >= 0 and od < body.place_locals.len() as i32:
-            let local_id = body.place_locals.get(od as i64)
-            if local_id >= 0 and local_id < body.local_type_ids.len() as i32:
-                let sema_ty = body.local_type_ids.get(local_id as i64)
-                if sema_ty > 0:
-                    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
-                    if self.mir_input.mir_get_type_kind(resolved) == TypeKind.TY_INT:
-                        return self.mir_input.mir_get_type_d1(resolved) == 0
-    if ok == OperandKind.OK_CONSTANT:
-        let const_ty = body.const_types.get(od as i64)
-        if const_ty > 0:
-            let resolved = self.mir_input.mir_resolve_alias(const_ty)
-            if self.mir_input.mir_get_type_kind(resolved) == TypeKind.TY_INT:
-                return self.mir_input.mir_get_type_d1(resolved) == 0
-    false
+    let sema_ty = self.mir_operand_sema_type(body, operand_id)
+    self.mir_sema_type_is_unsigned(sema_ty)
 
 fn Codegen.mir_sema_type_is_unsigned(self: Codegen, sema_ty: i32) -> bool:
     if sema_ty <= 0: return false
