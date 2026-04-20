@@ -19,7 +19,7 @@ extend RedisCache:
         RedisCache { prefix }
 
     fn prefixed_key(self: &RedisCache, key: str) -> str:
-        "{self.prefix}:{key}"
+        f"{self.prefix}:{key}"
 
 impl CacheService for RedisCache =
     async fn get_str(self: &RedisCache, key: str) -> Option[str]:

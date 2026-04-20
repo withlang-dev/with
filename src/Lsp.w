@@ -1229,7 +1229,7 @@ fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col:
             items = items ++ jobj_start() ++ jkv_str("label", label) ++ "," ++ jkv_int("kind", ck) ++ jobj_end()
 
     // Prelude builtins (always available without explicit import)
-    let prelude_fns = "print,println,assert,int_to_string,str_from_byte"
+    let prelude_fns = "print,eprint,write,ewrite,print_i32,print_i64,print_bool,assert,require,check,int_to_string"
     let prelude_types = "Vec,HashMap,HashSet,Option,Result,Some,None,Ok,Err"
     items = lsp_append_csv_items(items, prelude_fns, 3, first)
     if prelude_fns.len() > 0:

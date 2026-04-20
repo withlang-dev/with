@@ -11,7 +11,7 @@ type DbConnection { id: i32 }
 type ConnectionPool { url: str }
 
 fn with_connection(pool: ConnectionPool) -> DbConnection:
-    print("Acquiring connection to {pool.url}...")
+    print(f"Acquiring connection to {pool.url}...")
     defer print("Releasing connection...")
     DbConnection { id: 42 }
 
@@ -20,11 +20,11 @@ fn with_connection(pool: ConnectionPool) -> DbConnection:
 fn test_with_blocks:
     let pool = ConnectionPool { url: "localhost:5432" }
     let conn = with_connection(pool)
-    print("Got connection #{conn.id}")
+    print(f"Got connection #{conn.id}")
 
     // with-as for scoped naming
     with "hello world" as greeting:
-        print("{greeting}")
+        print(greeting)
 
     // Nested with blocks
     with 10 as x:

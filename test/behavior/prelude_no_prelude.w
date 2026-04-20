@@ -2,7 +2,7 @@
 //! args: --no-prelude
 
 // Test: --no-prelude removes ambient prelude names.
-// println should not be available without the prelude.
+// print should not be available without the prelude.
 
 fn main:
     print("should fail")

@@ -59,7 +59,7 @@ fn handle_request(state: &mut AppState, req: HttpRequest) -> HttpResponse:
 
 fn handle_list(state: &AppState) -> HttpResponse:
     let size = state.service.clamp_page_size(20)
-    HttpResponse.ok("listing users, page_size={size}")
+    HttpResponse.ok(f"listing users, page_size={size}")
 
 fn handle_create(state: &mut AppState, req: HttpRequest) -> HttpResponse:
     let user_req = CreateUserRequest {
@@ -77,4 +77,4 @@ fn handle_create(state: &mut AppState, req: HttpRequest) -> HttpResponse:
 
     // Create
     let user = state.service.create_user(user_req, actor)
-    HttpResponse.created("created user: {user.name}")
+    HttpResponse.created(f"created user: {user.name}")

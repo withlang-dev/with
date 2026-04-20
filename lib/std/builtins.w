@@ -21,9 +21,9 @@ extern fn with_i32_to_str(n: i32) -> str
 extern fn with_i64_to_str(n: i64) -> str
 extern fn with_bool_to_str(b: bool) -> str
 
-/// Print a string to stdout without a trailing newline.
+/// Print a string to stdout followed by a newline.
 pub fn print(s: str) -> void:
-    with_print_str(s)
+    with_println_str(s)
 
 /// Print a string to stderr followed by a newline.
 pub fn eprint(s: str) -> void:

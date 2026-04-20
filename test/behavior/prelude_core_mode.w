@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 //! args: --prelude=core
 
-// Test: --prelude=core provides core types (Vec, assert, println)
+// Test: --prelude=core provides core types (Vec, assert, print)
 // but does not provide std.iter functions (map, filter, sum).
 
 fn main:

@@ -6,7 +6,7 @@ async fn fetch_posts -> i32:
 
 async fn async_main:
     let _pair = (fetch_user(), fetch_posts()).await
-    print("user={_pair.0} posts={_pair.1}")
+    print(f"user={_pair.0} posts={_pair.1}")
 
 fn main:
     async_main()

@@ -39,7 +39,7 @@ pub type Database {
 impl Drop for Database:
     fn drop(self: Self):
         if self.open:
-            print("[db] closing database: {self.path}")
+            print(f"[db] closing database: {self.path}")
 
 extend Database:
     // Implicit Ok(...) wrapping: the happy path returns Database,
@@ -59,7 +59,7 @@ extend Database:
     pub fn init_schema(self: &Database) -> Result[bool, DbError]:
         if not self.open:
             return Err(.Init("database not open"))
-        print("[db] schema initialized for {self.path}")
+        print(f"[db] schema initialized for {self.path}")
         true
         // implicit Ok(true)
 
@@ -67,7 +67,7 @@ extend Database:
     pub fn execute(self: &Database, sql: str) -> Result[bool, DbError]:
         if not self.open:
             return Err(.Query("database not open"))
-        print("[db] execute: {sql}")
+        print(f"[db] execute: {sql}")
         true
         // implicit Ok(true)
 
@@ -80,7 +80,7 @@ extend Database:
 
         for rec in records:
             let query = rec.to_insert_query()
-            print("[db] {query}")
+            print(f"[db] {query}")
 
         true
         // implicit Ok(true)
