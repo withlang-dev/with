@@ -3,7 +3,6 @@
 
 const std = @import("std");
 const print = std.debug.print;
-const Timer = std.time.Timer;
 
 const MAX_ENTITIES: usize = 1_048_576;
 
@@ -16,6 +15,18 @@ const HAS_POS: u8 = 1;
 const HAS_VEL: u8 = 2;
 const HAS_HP: u8 = 4;
 const HAS_DMG: u8 = 8;
+
+fn nowNs() u64 {
+    if (@hasDecl(std.time, "nanoTimestamp")) {
+        return @intCast(std.time.nanoTimestamp());
+    }
+
+    var ts: std.c.timespec = undefined;
+    if (std.c.clock_gettime(.MONOTONIC, &ts) != 0) {
+        @panic("clock_gettime failed");
+    }
+    return @as(u64, @intCast(ts.sec)) * std.time.ns_per_s + @as(u64, @intCast(ts.nsec));
+}
 
 const World = struct {
     mask: []u8,
@@ -110,9 +121,7 @@ const World = struct {
 };
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    const allocator = std.heap.page_allocator;
 
     var world = try World.init(allocator);
     defer world.deinit();
@@ -137,7 +146,7 @@ pub fn main() !void {
     print("Entities: {d}\n", .{world.count});
     print("Alive: {d}\n", .{world.countAlive()});
 
-    var timer = try Timer.start();
+    const start = nowNs();
 
     const dt: f32 = 1.0 / 60.0;
     for (0..1000) |_| {
@@ -146,7 +155,7 @@ pub fn main() !void {
         world.systemCleanup();
     }
 
-    const elapsed = timer.read();
+    const elapsed = nowNs() - start;
     const secs = @as(f64, @floatFromInt(elapsed)) / 1_000_000_000.0;
     print("1000 ticks: {d:.3}s\n", .{secs});
     print("Alive after: {d}\n", .{world.countAlive()});

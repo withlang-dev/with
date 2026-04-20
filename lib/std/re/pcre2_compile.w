@@ -1,5 +1,15 @@
 // Migrated from PCRE2
 use std.re.defs
+use std.re.pcre2_auto_possess
+use std.re.pcre2_chkdint
+use std.re.pcre2_compile_cgroup
+use std.re.pcre2_compile_class
+use std.re.pcre2_find_bracket
+use std.re.pcre2_newline
+use std.re.pcre2_ord2utf
+use std.re.pcre2_string_utils
+use std.re.pcre2_study
+use std.re.pcre2_valid_utf
 
 fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_options: c_uint, errorptr: *mut c_int, erroroffset: *mut c_ulong, __param_ccontext: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_code_8 {
     var pattern = __param_pattern
@@ -52773,4 +52783,3 @@ fn get_grouplength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, isinline: c_in
             _ => break
     }
 }
-

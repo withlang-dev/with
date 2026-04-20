@@ -7,4 +7,4 @@ fn main:
     items.push(4)
     let evens = items.filter(it % 2 == 0)
     for v in evens:
-        print(int_to_string(v))
+        write(int_to_string(v))

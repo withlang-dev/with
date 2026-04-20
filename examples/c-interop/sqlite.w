@@ -139,7 +139,7 @@ fn main:
             // Create table
             match db.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, score INTEGER)"):
                 Ok(_) => print("Created users table")
-                Err(e) => print("Error creating table: {e}")
+                Err(e) => print(f"Error creating table: {e}")
 
             // Insert data with prepared statement
             match db.prepare("INSERT INTO users (name, score) VALUES (?, ?)"):
@@ -153,7 +153,7 @@ fn main:
                         stmt.step()
                     stmt.finalize()
                     print("Inserted 3 users")
-                Err(e) => print("Prepare error: {e}")
+                Err(e) => print(f"Prepare error: {e}")
 
             // Query data
             print("\n--- All users ---")
@@ -165,14 +165,14 @@ fn main:
                                 let id = query.column_int(0)
                                 let name = query.column_text(1)
                                 let score = query.column_int(2)
-                                print("  #{id} {name} score={score}")
+                                print(f"  #{id} {name} score={score}")
                             Ok(false) => break
                             Err(_) => break
                     query.finalize()
-                Err(e) => print("Query error: {e}")
+                Err(e) => print(f"Query error: {e}")
 
             db.close()
             print("\n=== Demo complete ===")
 
         Err(e) =>
-            print("Failed to open database: {e}")
+            print(f"Failed to open database: {e}")

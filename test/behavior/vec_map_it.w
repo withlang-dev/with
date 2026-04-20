@@ -6,4 +6,4 @@ fn main:
     items.push(3)
     let tripled = items.map(it * 3)
     for v in tripled:
-        print(int_to_string(v))
+        write(int_to_string(v))

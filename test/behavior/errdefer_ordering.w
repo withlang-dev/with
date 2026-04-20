@@ -6,13 +6,13 @@ fn fail() -> MyResult:
     .Err("oops")
 
 fn test_ordering() -> MyResult:
-    defer print("defer-1")
-    errdefer print("errdefer-1")
-    defer print("defer-2")
-    errdefer print("errdefer-2")
+    defer write("defer-1")
+    errdefer write("errdefer-1")
+    defer write("defer-2")
+    errdefer write("errdefer-2")
     let val = fail()?
     .Ok(val)
 
 fn main:
     let r = test_ordering()
-    print("done")
+    write("done")

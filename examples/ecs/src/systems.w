@@ -198,10 +198,10 @@ fn run_render(
                 })
 
     // Draw (mock -- print to stdout for this demo)
-    print("  Render: {entries.len()} sprites")
+    print(f"  Render: {entries.len()} sprites")
     for i in 0..entries.len():
         let entry = entries[i]
-        print("    [{entry.layer}] {texture_name(entry.texture)} at ({entry.position.x}, {entry.position.y})")
+        print(f"    [{entry.layer}] {texture_name(entry.texture)} at ({entry.position.x}, {entry.position.y})")
 
 // --- Collision Response ---
 //
@@ -216,11 +216,11 @@ fn run_collision_response(world: &World):
             Some(a_str) =>
                 match name_b:
                     Some(b_str) =>
-                        print("  Collision: {a_str} <-> {b_str} (overlap: {event.overlap})")
+                        print(f"  Collision: {a_str} <-> {b_str} (overlap: {event.overlap})")
                     None =>
-                        print("  Collision: {a_str} <-> ? (overlap: {event.overlap})")
+                        print(f"  Collision: {a_str} <-> ? (overlap: {event.overlap})")
             None =>
-                print("  Collision: ? <-> ? (overlap: {event.overlap})")
+                print(f"  Collision: ? <-> ? (overlap: {event.overlap})")
 
 // ===================================================================
 // Frame orchestration

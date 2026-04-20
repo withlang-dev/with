@@ -1,15 +1,15 @@
 // ecs_bench.w — ECS benchmark: SoA storage, bitset queries, 1M entities
-use c_import("<time.h>")
+use std.time
 
 type Position { x: f32, y: f32 }
 type Velocity { x: f32, y: f32 }
 type Health { hp: f32 }
 type Damage { dps: f32 }
 
-let HAS_POS: u8 = 1u8
-let HAS_VEL: u8 = 2u8
-let HAS_HP: u8 = 4u8
-let HAS_DMG: u8 = 8u8
+let HAS_POS = 1u8
+let HAS_VEL = 2u8
+let HAS_HP = 4u8
+let HAS_DMG = 8u8
 let MAX_ENTITIES = 1048576
 
 type World {
@@ -82,10 +82,6 @@ fn World.count_alive(self: &World) -> i32:
             n = n + 1
     n
 
-extern fn with_eprintln(s: str) -> void
-extern fn int_to_string(n: i32) -> str
-extern fn i64_to_string(n: i64) -> str
-
 fn main:
     var world = World.new()
 
@@ -104,24 +100,23 @@ fn main:
         if i % 10 < 3:
             world.add_damage(id, Damage { dps: 0.5f32 + (fi % 10.0f32) * 0.1f32 })
 
-    with_eprintln(f"Entities: {world.count}")
-    with_eprintln(f"Alive: {world.count_alive()}")
+    eprint(f"Entities: {world.count}")
+    eprint(f"Alive: {world.count_alive()}")
 
-    let start = clock()
+    let start = now_ns()
     let dt: f32 = 1.0f32 / 60.0f32
     for _ in 0..1000:
         world.system_movement(dt)
         world.system_damage(dt)
         world.system_cleanup()
 
-    let elapsed = clock() - start
-    let cps: i64 = 1000000  // CLOCKS_PER_SEC on macOS
-    let secs: f64 = elapsed as f64 / cps as f64
-    with_eprintln(f"1000 ticks: {secs:.3}s")
-    with_eprintln(f"Alive after: {world.count_alive()}")
+    let elapsed = now_ns() - start
+    let secs: f64 = elapsed as f64 / 1000000000.0
+    eprint(f"1000 ticks: {secs:.3}s")
+    eprint(f"Alive after: {world.count_alive()}")
 
     var sum: f64 = 0.0
     for i in 0..world.count:
         if world.mask[i] & HAS_POS != 0u8:
             sum = sum + world.pos[i].x as f64
-    with_eprintln(f"Checksum: {sum:.2}")
+    eprint(f"Checksum: {sum:.2}")

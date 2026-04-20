@@ -12,7 +12,7 @@ fn step3() -> MyResult:
     .Ok(30)
 
 fn multi_step() -> MyResult:
-    errdefer print("cleanup")
+    errdefer write("cleanup")
     let a = step1()?
     let b = step2()?
     let c = step3()?
@@ -20,4 +20,4 @@ fn multi_step() -> MyResult:
 
 fn main:
     let r = multi_step()
-    print("done")
+    write("done")
