@@ -156,6 +156,8 @@ extern fn clang_disposeTokens(tu: *mut u8, tokens: *mut CXToken, count: u32)
 // Evaluation
 extern fn clang_EvalResult_getKind(result: *mut u8) -> i32
 extern fn clang_EvalResult_getAsLongLong(result: *mut u8) -> i64
+extern fn clang_EvalResult_isUnsignedInt(result: *mut u8) -> i32
+extern fn clang_EvalResult_getAsUnsigned(result: *mut u8) -> u64
 extern fn clang_EvalResult_getAsDouble(result: *mut u8) -> f64
 extern fn clang_EvalResult_getAsStr(result: *mut u8) -> *const u8
 extern fn clang_EvalResult_dispose(result: *mut u8)
@@ -711,7 +713,7 @@ fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32,
             return session_strdup(s, &buf as *const [64]u8 as *const u8)
         // General pointer
         let inner = translate_type_recursive_mode(s, pointee, depth + 1, 0, preserve_incomplete_arrays)
-        if inner as i64 == 0 or c_strncmp(inner as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0 or c_strcmp(inner as *const u8, "opaque\0" as *const u8) == 0:
+        if inner as i64 == 0 or c_strncmp(inner as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
             return session_strdup(s, "*const i8\0" as *const u8)
         var buf: [2048]u8 = [0 as u8; 2048]
         var pos: i64 = 0
@@ -725,8 +727,8 @@ fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32,
         let size = clang_getArraySize(canonical)
         let elem = clang_getArrayElementType(canonical)
         let elem_str = translate_type_recursive_mode(s, elem, depth + 1, 0, preserve_incomplete_arrays)
-        if elem_str as i64 == 0 or c_strcmp(elem_str as *const u8, "opaque\0" as *const u8) == 0:
-            return session_strdup(s, "opaque\0" as *const u8)
+        if elem_str as i64 == 0 or c_strcmp(elem_str as *const u8, "c_void\0" as *const u8) == 0:
+            return session_strdup(s, "c_void\0" as *const u8)
         if c_strncmp(elem_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
             return elem_str
         var buf: [2048]u8 = [0 as u8; 2048]
@@ -769,7 +771,7 @@ fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32,
             bare = (bare as i64 + 6) as *const u8
         if bare as i64 == 0 or *bare == 0 or *bare == 95 or c_strstr(name_str, "(anonymous\0" as *const u8) as i64 != 0:
             clang_disposeString(spelling)
-            return session_strdup(s, "opaque\0" as *const u8)
+            return session_strdup(s, "c_void\0" as *const u8)
         let result = session_strdup(s, bare)
         clang_disposeString(spelling)
         return result
@@ -813,8 +815,8 @@ fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32,
             return translate_type_recursive_mode(s, inner2, depth + 1, is_last_struct_field, preserve_incomplete_arrays)
         return session_strdup(s, "c_int\0" as *const u8)
 
-    // Default: unsupported
-    session_strdup(s, "opaque\0" as *const u8)
+    // Default: unsupported — must produce a loud compile error
+    session_strdup(s, "__UNSUPPORTED:unknown_type_kind\0" as *const u8)
 
 fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32) -> *mut u8:
     translate_type_recursive_mode(s, ty, depth, is_last_struct_field, 0)
@@ -1751,6 +1753,18 @@ pub fn cimport_hex_float_to_decimal(hex_str: str) -> str:
     buf_append_str(&mut buf as *mut [64]u8 as *mut u8, &mut pos, 64, ".0\0" as *const u8)
     make_str(&buf as *const [64]u8 as *const u8)
 
+// ── Path utilities ──────────────────────────────────────────
+
+@[c_export("with_cimport_realpath")]
+pub fn cimport_realpath(path: str) -> str:
+    let cpath = str_to_cstr(path)
+    if cpath as i64 == 0: return ""
+    var buf: [1024]u8 = [0 as u8; 1024]
+    let r = realpath(cpath, &mut buf as *mut [1024]u8 as *mut u8)
+    with_free(cpath)
+    if r as i64 == 0: return ""
+    make_str(r)
+
 // ── Macro extraction ────────────────────────────────────────
 
 @[c_export("with_cimport_parse_macros")]
@@ -1798,7 +1812,7 @@ pub fn cimport_parse_macros(header_code: str) -> i64:
         ip = ip + 1
     buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, " -E -dM '\0" as *const u8)
     buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, &c_path as *const [64]u8 as *const u8)
-    buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "' 2>/dev/null\0" as *const u8)
+    buf_append_str(&mut cmd as *mut [1024]u8 as *mut u8, &mut cpos, 1024, "'\0" as *const u8)
 
     let p = popen(&cmd as *const [1024]u8 as *const u8, "r\0" as *const u8)
     if p as i64 == 0:
@@ -2621,6 +2635,17 @@ pub fn ci_eval_int_value(session: i64, cursor_idx: i32) -> i64:
     let val = clang_EvalResult_getAsLongLong(result)
     clang_EvalResult_dispose(result)
     val
+
+@[c_export("with_ci_eval_int_is_unsigned")]
+pub fn ci_eval_int_is_unsigned(session: i64, cursor_idx: i32) -> i32:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
+    let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+    let result = clang_Cursor_Evaluate(cursor)
+    if result as i64 == 0: return 0
+    let is_unsigned = clang_EvalResult_isUnsignedInt(result)
+    clang_EvalResult_dispose(result)
+    is_unsigned
 
 @[c_export("with_ci_eval_as_int")]
 pub fn ci_eval_as_int(session: i64, cursor_idx: i32, out: *mut i64) -> i32:

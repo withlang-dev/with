@@ -147,6 +147,7 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ "extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void\n"
     p = p ++ "fn string_len(s: *const i8) -> i64: strlen(s)\n"
     p = p ++ "fn string_cmp(a: *const i8, b: *const i8) -> i32: strcmp(a, b)\n"
+    p = p ++ "fn string_find_char(s: *const i8, c: i32) -> *const i8: (memchr((s as *const c_void), c, strlen(s)) as *const i8)\n"
     p = p ++ "\ntype c_void = opaque\n"
     p = p ++ "type c_char = i8\n"
     p = p ++ "type c_short = i16\n"
@@ -405,7 +406,11 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
         with_cimport_dispose(session)
         return 1
 
-    let macro_include = source_prefix ++ "#include \"" ++ input_path ++ "\"\n"
+    let abs_input = with_cimport_realpath(input_path)
+    if abs_input.len() == 0:
+        eprint("migrate: fatal: realpath failed for '" ++ input_path ++ "' — cannot collect macros with relative path")
+        return 1
+    let macro_include = source_prefix ++ "#include \"" ++ abs_input ++ "\"\n"
     let macro_session = with_cimport_parse_macros(macro_include)
     if macro_session != 0:
         g_migrate_macro_session = macro_session
