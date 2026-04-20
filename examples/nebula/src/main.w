@@ -49,7 +49,7 @@ async fn main:
     db.init_schema().expect("failed to initialize schema")
 
     print("=== Nebula Telemetry Daemon ===")
-    print("Config: {config.host}:{config.port}, max_clients={config.max_clients}")
+    print(f"Config: {config.host}:{config.port}, max_clients={config.max_clients}")
 
     // Channel for shutdown coordination.
     // Dropping the sender automatically closes the receiver.
@@ -88,7 +88,7 @@ async fn main:
     // Build a test batch of telemetry records and insert them.
 
     let batch = build_test_batch(5)
-    print("\nBatch of {batch.len()} telemetry records built.")
+    print(f"\nBatch of {batch.len()} telemetry records built.")
 
     // --- Select Await Demo ---
     //
@@ -115,6 +115,6 @@ async fn main:
         sessions.push(Session { id: 1, addr: "127.0.0.1", packets_received: 5 })
         sessions.push(Session { id: 2, addr: "127.0.0.2", packets_received: 3 })
         let stats = compute_stats(&sessions)
-        print("\nFinal stats: {stats.active_count} active, {stats.total_packets} packets")
+        print(f"\nFinal stats: {stats.active_count} active, {stats.total_packets} packets")
 
     print("\n=== Clean shutdown complete ===")

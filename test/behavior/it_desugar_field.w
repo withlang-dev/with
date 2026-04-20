@@ -6,4 +6,4 @@ fn main:
     items.push(3)
     let doubled = items.map(it * 2)
     for v in doubled:
-        print(int_to_string(v))
+        write(int_to_string(v))

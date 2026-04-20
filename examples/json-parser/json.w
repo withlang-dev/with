@@ -377,8 +377,8 @@ fn parse(input: str) -> Result[JsonValue, JsonError]:
 fn json_to_string(val: JsonValue) -> str:
     match val:
         .Null       => "null"
-        .Bool(b)    => "{b}"
-        .Number(n)  => "{n}"
+        .Bool(b)    => f"{b}"
+        .Number(n)  => f"{n}"
         .Str(s)     => "\"" ++ s ++ "\""
         .Array(items) =>
             var parts: Vec[str] = Vec.new()
@@ -418,24 +418,24 @@ fn main:
     let input = "{\"name\": \"With Language\", \"version\": 3.2, \"features\": [\"handles\", \"fibers\", \"comptime\"], \"meta\": {\"stable\": false, \"authors\": [\"core-team\"], \"stats\": {\"stars\": 0, \"forks\": null}}}"
 
     print("=== JSON Parser Demo ===\n")
-    print("Input ({input.len()} bytes):\n{input}\n")
+    print(f"Input ({input.len()} bytes):\n{input}\n")
 
     match parse(input):
         Ok(value) =>
             print("Parsed successfully!\n")
             let pretty = json_to_string(value)
-            print("Pretty: {pretty}\n")
+            print(f"Pretty: {pretty}\n")
 
             // Access nested values
             let name = match json_get_field(value, "name"):
                 Some(.Str(s)) => s
                 _ => "unknown"
-            print("Name: {name}")
+            print(f"Name: {name}")
 
             let version = match json_get_field(value, "version"):
                 Some(.Number(n)) => n
                 _ => 0.0
-            print("Version: {version}")
+            print(f"Version: {version}")
 
             // Access array elements
             let features = json_get_field(value, "features")
@@ -448,17 +448,17 @@ fn main:
                     else:
                         "none"
                 _ => "none"
-            print("First feature: {first_feature}")
+            print(f"First feature: {first_feature}")
 
             // Count features
             let features2 = json_get_field(value, "features")
             let feature_count = match features2:
                 Some(.Array(arr)) => arr.len()
                 _ => 0
-            print("\nFeature count: {feature_count}")
+            print(f"\nFeature count: {feature_count}")
 
         Err(e) =>
-            print("Parse error: {e}")
+            print(f"Parse error: {e}")
 
     // Demonstrate error handling
     print("\n--- Error cases ---")
@@ -467,12 +467,12 @@ fn main:
     let bad3 = "\"hello"
     match parse(bad1):
         Ok(_)  => print("  missing value: unexpectedly succeeded")
-        Err(e) => print("  missing value: {e}")
+        Err(e) => print(f"  missing value: {e}")
     match parse(bad2):
         Ok(_)  => print("  unterminated array: unexpectedly succeeded")
-        Err(e) => print("  unterminated array: {e}")
+        Err(e) => print(f"  unterminated array: {e}")
     match parse(bad3):
         Ok(_)  => print("  unterminated string: unexpectedly succeeded")
-        Err(e) => print("  unterminated string: {e}")
+        Err(e) => print(f"  unterminated string: {e}")
 
     print("\n=== Demo complete ===")

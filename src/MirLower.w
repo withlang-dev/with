@@ -3398,27 +3398,10 @@ fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method
             let method_fn = self.sema.lookup_method_fn(type_name_sym, sema_method_sym)
             if method_fn != 0 and self.sema.lookup_method_sig(type_name_sym, sema_method_sym) >= 0:
                 return method_fn
-        // For builtin types (i32, str, bool, etc.), try the type kind name
-        let tk = self.sema.get_type_kind(resolved)
-        if tk == TypeKind.TY_INT:
-            let int_sym = self.sema.pool_lookup_symbol("i32")
-            let method_fn = self.sema.lookup_method_fn(int_sym, sema_method_sym)
-            if method_fn != 0 and self.sema.lookup_method_sig(int_sym, sema_method_sym) >= 0:
-                return method_fn
-        if tk == TypeKind.TY_STR:
-            let str_sym = self.sema.pool_lookup_symbol("str")
-            let method_fn = self.sema.lookup_method_fn(str_sym, sema_method_sym)
-            if method_fn != 0 and self.sema.lookup_method_sig(str_sym, sema_method_sym) >= 0:
-                return method_fn
-        if tk == TypeKind.TY_BOOL:
-            let bool_sym = self.sema.pool_lookup_symbol("bool")
-            let method_fn = self.sema.lookup_method_fn(bool_sym, sema_method_sym)
-            if method_fn != 0 and self.sema.lookup_method_sig(bool_sym, sema_method_sym) >= 0:
-                return method_fn
-        if tk == TypeKind.TY_FLOAT:
-            let float_sym = self.sema.pool_lookup_symbol("f64")
-            let method_fn = self.sema.lookup_method_fn(float_sym, sema_method_sym)
-            if method_fn != 0 and self.sema.lookup_method_sig(float_sym, sema_method_sym) >= 0:
+        let concrete_type_sym = self.sema.dyn_arg_concrete_type_symbol(resolved as i32)
+        if concrete_type_sym != 0:
+            let method_fn = self.sema.lookup_method_fn(concrete_type_sym, sema_method_sym)
+            if method_fn != 0 and self.sema.lookup_method_sig(concrete_type_sym, sema_method_sym) >= 0:
                 return method_fn
 
     if self.ast.kind(self_expr) == NodeKind.NK_IDENT:

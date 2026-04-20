@@ -1,8 +1,6 @@
 // Tests for the service example
 
 
-extern fn puts(s: *const i8) -> i32
-
 type User {
     id: i32,
     name: str,
@@ -69,7 +67,7 @@ fn identity[T](x: T) -> T: x
 
 fn first_of[T](a: T, b: T) -> T: a
 
-fn display_user(user: User): print("User #{user.id}: {user.name}")
+fn display_user(user: User): print(f"User #{user.id}: {user.name}")
 
 @[test]
 fn test_service_example:
