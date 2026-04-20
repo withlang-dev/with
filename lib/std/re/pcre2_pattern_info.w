@@ -1,201 +1,175 @@
 // Migrated from PCRE2
 use std.re.defs
 
-type BOOL = c_int
-type PCRE2_UCHAR8 = u8
-type PCRE2_SPTR8 = *const u8
-type pcre2_general_context_8 = pcre2_real_general_context_8
-type pcre2_compile_context_8 = pcre2_real_compile_context_8
-type pcre2_match_context_8 = pcre2_real_match_context_8
-type pcre2_convert_context_8 = pcre2_real_convert_context_8
-type pcre2_code_8 = pcre2_real_code_8
-type pcre2_match_data_8 = pcre2_real_match_data_8
-type pcre2_jit_stack_8 = pcre2_real_jit_stack_8
-type pcre2_jit_callback_8 = *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8
-type pcre2_callout_block_8 { version: c_uint = 0, callout_number: c_uint = 0, capture_top: c_uint = 0, capture_last: c_uint = 0, offset_vector: *mut c_ulong = null, mark: *const u8 = null, subject: *const u8 = null, subject_length: c_ulong = 0, start_match: c_ulong = 0, current_position: c_ulong = 0, pattern_position: c_ulong = 0, next_item_length: c_ulong = 0, callout_string_offset: c_ulong = 0, callout_string_length: c_ulong = 0, callout_string: *const u8 = null, callout_flags: c_uint = 0 }
-type struct_pcre2_callout_block_8 = pcre2_callout_block_8
-type pcre2_callout_enumerate_block_8 { version: c_uint = 0, pattern_position: c_ulong = 0, next_item_length: c_ulong = 0, callout_number: c_uint = 0, callout_string_offset: c_ulong = 0, callout_string_length: c_ulong = 0, callout_string: *const u8 = null }
-type struct_pcre2_callout_enumerate_block_8 = pcre2_callout_enumerate_block_8
-type pcre2_substitute_callout_block_8 { version: c_uint = 0, input: *const u8 = null, output: *const u8 = null, output_offsets: [2]c_ulong = [0 as c_ulong; 2], ovector: *mut c_ulong = null, oveccount: c_uint = 0, subscount: c_uint = 0 }
-type struct_pcre2_substitute_callout_block_8 = pcre2_substitute_callout_block_8
-extern fn pcre2_config_8(p0: c_uint, p1: *mut c_void) -> c_int
-extern fn pcre2_general_context_copy_8(p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_general_context_8
-extern fn pcre2_general_context_create_8(p0: *const fn(c_ulong, *mut c_void) -> *mut c_void, p1: *const fn(*mut c_void, *mut c_void) -> void, p2: *mut c_void) -> *mut pcre2_real_general_context_8
-extern fn pcre2_general_context_free_8(p0: *mut pcre2_real_general_context_8) -> void
-extern fn pcre2_compile_context_copy_8(p0: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_compile_context_8
-extern fn pcre2_compile_context_create_8(p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_compile_context_8
-extern fn pcre2_compile_context_free_8(p0: *mut pcre2_real_compile_context_8) -> void
-extern fn pcre2_set_bsr_8(p0: *mut pcre2_real_compile_context_8, p1: c_uint) -> c_int
-extern fn pcre2_set_character_tables_8(p0: *mut pcre2_real_compile_context_8, p1: *const u8) -> c_int
-extern fn pcre2_set_compile_extra_options_8(p0: *mut pcre2_real_compile_context_8, p1: c_uint) -> c_int
-extern fn pcre2_set_max_pattern_length_8(p0: *mut pcre2_real_compile_context_8, p1: c_ulong) -> c_int
-extern fn pcre2_set_max_pattern_compiled_length_8(p0: *mut pcre2_real_compile_context_8, p1: c_ulong) -> c_int
-extern fn pcre2_set_max_varlookbehind_8(p0: *mut pcre2_real_compile_context_8, p1: c_uint) -> c_int
-extern fn pcre2_set_newline_8(p0: *mut pcre2_real_compile_context_8, p1: c_uint) -> c_int
-extern fn pcre2_set_parens_nest_limit_8(p0: *mut pcre2_real_compile_context_8, p1: c_uint) -> c_int
-extern fn pcre2_set_compile_recursion_guard_8(p0: *mut pcre2_real_compile_context_8, p1: *const fn(c_uint, *mut c_void) -> c_int, p2: *mut c_void) -> c_int
-extern fn pcre2_set_optimize_8(p0: *mut pcre2_real_compile_context_8, p1: c_uint) -> c_int
-extern fn pcre2_convert_context_copy_8(p0: *mut pcre2_real_convert_context_8) -> *mut pcre2_real_convert_context_8
-extern fn pcre2_convert_context_create_8(p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_convert_context_8
-extern fn pcre2_convert_context_free_8(p0: *mut pcre2_real_convert_context_8) -> void
-extern fn pcre2_set_glob_escape_8(p0: *mut pcre2_real_convert_context_8, p1: c_uint) -> c_int
-extern fn pcre2_set_glob_separator_8(p0: *mut pcre2_real_convert_context_8, p1: c_uint) -> c_int
-extern fn pcre2_pattern_convert_8(p0: *const u8, p1: c_ulong, p2: c_uint, p3: *mut *mut u8, p4: *mut c_ulong, p5: *mut pcre2_real_convert_context_8) -> c_int
-extern fn pcre2_converted_pattern_free_8(p0: *mut u8) -> void
-extern fn pcre2_match_context_copy_8(p0: *mut pcre2_real_match_context_8) -> *mut pcre2_real_match_context_8
-extern fn pcre2_match_context_create_8(p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_context_8
-extern fn pcre2_match_context_free_8(p0: *mut pcre2_real_match_context_8) -> void
-extern fn pcre2_set_callout_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int, p2: *mut c_void) -> c_int
-extern fn pcre2_set_substitute_callout_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(*mut pcre2_substitute_callout_block_8, *mut c_void) -> c_int, p2: *mut c_void) -> c_int
-extern fn pcre2_set_substitute_case_callout_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong, p2: *mut c_void) -> c_int
-extern fn pcre2_set_depth_limit_8(p0: *mut pcre2_real_match_context_8, p1: c_uint) -> c_int
-extern fn pcre2_set_heap_limit_8(p0: *mut pcre2_real_match_context_8, p1: c_uint) -> c_int
-extern fn pcre2_set_match_limit_8(p0: *mut pcre2_real_match_context_8, p1: c_uint) -> c_int
-extern fn pcre2_set_offset_limit_8(p0: *mut pcre2_real_match_context_8, p1: c_ulong) -> c_int
-extern fn pcre2_set_recursion_limit_8(p0: *mut pcre2_real_match_context_8, p1: c_uint) -> c_int
-extern fn pcre2_set_recursion_memory_management_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(c_ulong, *mut c_void) -> *mut c_void, p2: *const fn(*mut c_void, *mut c_void) -> void, p3: *mut c_void) -> c_int
-extern fn pcre2_compile_8(p0: *const u8, p1: c_ulong, p2: c_uint, p3: *mut c_int, p4: *mut c_ulong, p5: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_code_8
-extern fn pcre2_code_free_8(p0: *mut pcre2_real_code_8) -> void
-extern fn pcre2_code_copy_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8
-extern fn pcre2_code_copy_with_tables_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8
-fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *mut c_void) -> c_int:
+fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *mut c_void) -> c_int {
     var re: *const pcre2_real_code_8 = code
 
-    if (where_ == null):
+    if ((if where_ == null: 1 else: 0) != 0) {
         match what:
-            0 =>
+            0 | 1 | 2 | 3 | 4 | 21 | 26 | 6 | 5 | 23 | 8 | 25 | 9 | 12 | 11 | 13 | 14 | 15 | 16 | 18 | 17 | 20 =>
                 return 4
-            1 =>
-                return 4
-            2 =>
-                return 4
-            3 =>
-                return 4
-            4 =>
-                return 4
-            21 =>
-                return 4
-            26 =>
-                return 4
-            6 =>
-                return 4
-            5 =>
-                return 4
-            23 =>
-                return 4
-            8 =>
-                return 4
-            25 =>
-                return 4
-            9 =>
-                return 4
-            12 =>
-                return 4
-            11 =>
-                return 4
-            13 =>
-                return 4
-            14 =>
-                return 4
-            15 =>
-                return 4
-            16 =>
-                return 4
-            18 =>
-                return 4
-            17 =>
-                return 4
-            20 =>
-                return 4
+                
+                return 8
+                
             7 =>
                 return 8
-            10 =>
+                
                 return 8
-            22 =>
+                
+            10 | 22 | 24 =>
                 return 8
-            24 =>
+                
                 return 8
+                
             19 =>
                 return 8
         
+    }
 
-    if (re == null):
-        return (-51)
+    if ((if re == null: 1 else: 0) != 0) {
+        return -51
+    }
 
-    if (re.magic_number != 1346589253):
-        return (-31)
+    if ((if re.magic_number != 1346589253: 1 else: 0) != 0) {
+        return -31
+    }
 
-    if (((re.flags & ((8 / 8)))) == 0):
-        return (-32)
+    if ((if (re.flags & 1) == 0: 1 else: 0) != 0) {
+        return -32
+    }
 
     match what:
         0 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.overall_options)
+            ((unsafe: *(where_ as *mut c_uint)) = re.overall_options)
         1 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.compile_options)
+            ((unsafe: *(where_ as *mut c_uint)) = re.compile_options)
         2 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.top_backref)
+            ((unsafe: *(where_ as *mut c_uint)) = re.top_backref)
         3 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.bsr_convention)
+            ((unsafe: *(where_ as *mut c_uint)) = re.bsr_convention)
         4 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.top_bracket)
+            ((unsafe: *(where_ as *mut c_uint)) = re.top_bracket)
         21 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.limit_depth)
-            if (re.limit_depth == 4294967295):
-                return (-55)
+            ((unsafe: *(where_ as *mut c_uint)) = re.limit_depth)
+            
+            if ((if re.limit_depth == 4294967295: 1 else: 0) != 0) {
+                return -55
+            }
+            
         26 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.extra_options)
+            ((unsafe: *(where_ as *mut c_uint)) = re.extra_options)
         6 =>
-            ((unsafe: *((where_ as *mut c_uint))) = (if (((re.flags & 16)) != 0): 1 else: (if (((re.flags & 512)) != 0): 2 else: 0)))
+            var __ci_expr_ternary_1: c_int = 0
+            
+            if ((if (re.flags & 16) != 0: 1 else: 0) != 0) {
+                (__ci_expr_ternary_1 = 1)
+            } else {
+                var __ci_expr_ternary_0: c_int = 0
+                
+                if ((if (re.flags & 512) != 0: 1 else: 0) != 0) {
+                    (__ci_expr_ternary_0 = 2)
+                } else {
+                    (__ci_expr_ternary_0 = 0)
+                }
+                
+                (__ci_expr_ternary_1 = __ci_expr_ternary_0)
+                
+            }
+            
+            ((unsafe: *(where_ as *mut c_uint)) = __ci_expr_ternary_1)
+            
         5 =>
-            ((unsafe: *((where_ as *mut c_uint))) = (if (((re.flags & 16)) != 0): re.first_codeunit else: 0))
+            var __ci_expr_ternary_2: c_uint = 0
+            
+            if ((if (re.flags & 16) != 0: 1 else: 0) != 0) {
+                (__ci_expr_ternary_2 = re.first_codeunit)
+            } else {
+                (__ci_expr_ternary_2 = 0)
+            }
+            
+            ((unsafe: *(where_ as *mut c_uint)) = __ci_expr_ternary_2)
+            
         7 =>
-            ((unsafe: *((where_ as *mut *const u8))) = (if (((re.flags & 64)) != 0): (&((&re.start_bitmap[0] as *mut u8)[0]) as *const u8) else: (null as *const u8)))
+            var __ci_expr_ternary_3: *const u8 = null
+            
+            if ((if (re.flags & 64) != 0: 1 else: 0) != 0) {
+                (__ci_expr_ternary_3 = ((&re.start_bitmap[0] as *const u8)))
+            } else {
+                (__ci_expr_ternary_3 = ((null as *const u8)))
+            }
+            
+            ((unsafe: *(where_ as *mut *const u8)) = __ci_expr_ternary_3)
+            
         24 =>
-            ((unsafe: *((where_ as *mut c_ulong))) = (120 +% ((re.top_bracket * 2) *% sizeof[c_ulong]())))
+            ((unsafe: *(where_ as *mut c_ulong)) = (120 +% ((re.top_bracket * 2) *% sizeof[c_ulong]())))
         23 =>
-            ((unsafe: *((where_ as *mut c_uint))) = (if ((re.flags & 4194304)) != 0: 1 else: 0))
+            ((unsafe: *(where_ as *mut c_uint)) = (if (re.flags & 4194304) != 0: 1 else: 0))
         8 =>
-            ((unsafe: *((where_ as *mut c_uint))) = (if ((re.flags & 2048)) != 0: 1 else: 0))
+            ((unsafe: *(where_ as *mut c_uint)) = (if (re.flags & 2048) != 0: 1 else: 0))
         25 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.limit_heap)
-            if (re.limit_heap == 4294967295):
-                return (-55)
+            ((unsafe: *(where_ as *mut c_uint)) = re.limit_heap)
+            
+            if ((if re.limit_heap == 4294967295: 1 else: 0) != 0) {
+                return -55
+            }
+            
         9 =>
-            ((unsafe: *((where_ as *mut c_uint))) = (if ((re.flags & 1024)) != 0: 1 else: 0))
+            ((unsafe: *(where_ as *mut c_uint)) = (if (re.flags & 1024) != 0: 1 else: 0))
         10 =>
-            ((unsafe: *((where_ as *mut c_ulong))) = 0)
+            ((unsafe: *(where_ as *mut c_ulong)) = 0)
         12 =>
-            ((unsafe: *((where_ as *mut c_uint))) = (if (((re.flags & 128)) != 0): 1 else: 0))
+            var __ci_expr_ternary_4: c_int = 0
+            
+            if ((if (re.flags & 128) != 0: 1 else: 0) != 0) {
+                (__ci_expr_ternary_4 = 1)
+            } else {
+                (__ci_expr_ternary_4 = 0)
+            }
+            
+            ((unsafe: *(where_ as *mut c_uint)) = __ci_expr_ternary_4)
+            
         11 =>
-            ((unsafe: *((where_ as *mut c_uint))) = (if (((re.flags & 128)) != 0): re.last_codeunit else: 0))
+            var __ci_expr_ternary_5: c_uint = 0
+            
+            if ((if (re.flags & 128) != 0: 1 else: 0) != 0) {
+                (__ci_expr_ternary_5 = re.last_codeunit)
+            } else {
+                (__ci_expr_ternary_5 = 0)
+            }
+            
+            ((unsafe: *(where_ as *mut c_uint)) = __ci_expr_ternary_5)
+            
         13 =>
-            ((unsafe: *((where_ as *mut c_uint))) = (if ((re.flags & 8192)) != 0: 1 else: 0))
+            ((unsafe: *(where_ as *mut c_uint)) = (if (re.flags & 8192) != 0: 1 else: 0))
         14 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.limit_match)
-            if (re.limit_match == 4294967295):
-                return (-55)
+            ((unsafe: *(where_ as *mut c_uint)) = re.limit_match)
+            
+            if ((if re.limit_match == 4294967295: 1 else: 0) != 0) {
+                return -55
+            }
+            
         15 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.max_lookbehind)
+            ((unsafe: *(where_ as *mut c_uint)) = re.max_lookbehind)
         16 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.minlength)
+            ((unsafe: *(where_ as *mut c_uint)) = re.minlength)
         18 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.name_entry_size)
+            ((unsafe: *(where_ as *mut c_uint)) = re.name_entry_size)
         17 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.name_count)
+            ((unsafe: *(where_ as *mut c_uint)) = re.name_count)
         19 =>
-            ((unsafe: *((where_ as *mut *const u8))) = ((((re as *const i8) + sizeof[pcre2_real_code_8]())) as *const u8))
+            ((unsafe: *(where_ as *mut *const u8)) = ((((re as *const c_char) + sizeof[pcre2_real_code_8]()) as *const u8)))
         20 =>
-            ((unsafe: *((where_ as *mut c_uint))) = re.newline_convention)
+            ((unsafe: *(where_ as *mut c_uint)) = re.newline_convention)
         22 =>
-            ((unsafe: *((where_ as *mut c_ulong))) = re.blocksize)
+            ((unsafe: *(where_ as *mut c_ulong)) = re.blocksize)
         _ =>
-            return (-34)
+            return -34
 
     return 0
 
+}
 
-fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn(*mut pcre2_callout_enumerate_block_8, *mut c_void) -> c_int, callout_data: *mut c_void) -> c_int:
+fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn(*mut pcre2_callout_enumerate_block_8, *mut c_void) -> c_int, callout_data: *mut c_void) -> c_int {
     var re: *const pcre2_real_code_8 = code
 
     var cb: pcre2_callout_enumerate_block_8
@@ -204,837 +178,125 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
 
     var utf: c_int
 
-    if (re == null):
-        return (-51)
+    if ((if re == null: 1 else: 0) != 0) {
+        return -51
+    }
 
-    (utf = (if ((re.overall_options & 524288)) != 0: 1 else: 0))
+    (utf = (if (re.overall_options & 524288) != 0: 1 else: 0))
 
-    if (re.magic_number != 1346589253):
-        return (-31)
+    if ((if re.magic_number != 1346589253: 1 else: 0) != 0) {
+        return -31
+    }
 
-    if (((re.flags & ((8 / 8)))) == 0):
-        return (-32)
+    if ((if (re.flags & 1) == 0: 1 else: 0) != 0) {
+        return -32
+    }
 
     (cb.version = 0)
 
-    (cc = ((((re as *mut u8) + re.code_start)) as *const u8))
+    (cc = ((((re as *mut u8) + re.code_start) as *const u8)))
 
-    while (1 != 0):
+    while (1 != 0) {
         var rc: c_int
         
         match (unsafe: *cc):
             OP_END =>
                 return 0
-            OP_CHAR =>
+                
                 (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_CHARI =>
+                
+                var __ci_expr_logic_0: c_int = 0
+                
+                if (utf != 0) {
+                    (__ci_expr_logic_0 = (if (if cc[-1] >= 192: 1 else: 0) != 0: 1 else: 0))
+                }
+                
+                if (__ci_expr_logic_0 != 0) {
+                    (cc = cc + _pcre2_utf8_table4[(cc[-1] & 63)])
+                }
+                
+                
+                
+            OP_CHAR | OP_CHARI | OP_NOT | OP_NOTI | OP_STAR | OP_MINSTAR | OP_PLUS | OP_MINPLUS | OP_QUERY | OP_MINQUERY | OP_UPTO | OP_MINUPTO | OP_EXACT | OP_POSSTAR | OP_POSPLUS | OP_POSQUERY | OP_POSUPTO | OP_STARI | OP_MINSTARI | OP_PLUSI | OP_MINPLUSI | OP_QUERYI | OP_MINQUERYI | OP_UPTOI | OP_MINUPTOI | OP_EXACTI | OP_POSSTARI | OP_POSPLUSI | OP_POSQUERYI | OP_POSUPTOI | OP_NOTSTAR | OP_NOTMINSTAR | OP_NOTPLUS | OP_NOTMINPLUS | OP_NOTQUERY | OP_NOTMINQUERY | OP_NOTUPTO | OP_NOTMINUPTO | OP_NOTEXACT | OP_NOTPOSSTAR | OP_NOTPOSPLUS | OP_NOTPOSQUERY | OP_NOTPOSUPTO | OP_NOTSTARI | OP_NOTMINSTARI | OP_NOTPLUSI | OP_NOTMINPLUSI | OP_NOTQUERYI | OP_NOTMINQUERYI | OP_NOTUPTOI | OP_NOTMINUPTOI | OP_NOTEXACTI | OP_NOTPOSSTARI | OP_NOTPOSPLUSI | OP_NOTPOSQUERYI | OP_NOTPOSUPTOI =>
                 (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOT =>
+                
+                var __ci_expr_logic_0: c_int = 0
+                
+                if (utf != 0) {
+                    (__ci_expr_logic_0 = (if (if cc[-1] >= 192: 1 else: 0) != 0: 1 else: 0))
+                }
+                
+                if (__ci_expr_logic_0 != 0) {
+                    (cc = cc + _pcre2_utf8_table4[(cc[-1] & 63)])
+                }
+                
+                
+            OP_TYPESTAR | OP_TYPEMINSTAR | OP_TYPEPLUS | OP_TYPEMINPLUS | OP_TYPEQUERY | OP_TYPEMINQUERY | OP_TYPEUPTO | OP_TYPEMINUPTO | OP_TYPEEXACT | OP_TYPEPOSSTAR | OP_TYPEPOSPLUS | OP_TYPEPOSQUERY | OP_TYPEPOSUPTO =>
                 (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_STAR =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_MINSTAR =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_PLUS =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_MINPLUS =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_QUERY =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_MINQUERY =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_UPTO =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_MINUPTO =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_EXACT =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_POSSTAR =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_POSPLUS =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_POSQUERY =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_POSUPTO =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_STARI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_MINSTARI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_PLUSI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_MINPLUSI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_QUERYI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_MINQUERYI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_UPTOI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_MINUPTOI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_EXACTI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_POSSTARI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_POSPLUSI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_POSQUERYI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_POSUPTOI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTSTAR =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTMINSTAR =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTPLUS =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTMINPLUS =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTQUERY =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTMINQUERY =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTUPTO =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTMINUPTO =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTEXACT =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTPOSSTAR =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTPOSPLUS =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTPOSQUERY =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTPOSUPTO =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTSTARI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTMINSTARI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTPLUSI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTMINPLUSI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTQUERYI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTMINQUERYI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTUPTOI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTMINUPTOI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTEXACTI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTPOSSTARI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTPOSPLUSI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTPOSQUERYI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_NOTPOSUPTOI =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((utf != 0) and ((cc[-1]) >= 192)):
-                    (cc = cc + (_pcre2_utf8_table4[((cc[-1]) & 63)]))
-            OP_TYPESTAR =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
+                
+                var __ci_expr_logic_1: c_int
+                
+                if ((if cc[-1] == OP_PROP: 1 else: 0) != 0) {
+                    (__ci_expr_logic_1 = (if true: 1 else: 0))
+                } else {
+                    (__ci_expr_logic_1 = (if (if cc[-1] == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                }
+                
+                if (__ci_expr_logic_1 != 0) {
                     (cc = cc + 2)
-            OP_TYPEMINSTAR =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
-                    (cc = cc + 2)
-            OP_TYPEPLUS =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
-                    (cc = cc + 2)
-            OP_TYPEMINPLUS =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
-                    (cc = cc + 2)
-            OP_TYPEQUERY =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
-                    (cc = cc + 2)
-            OP_TYPEMINQUERY =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
-                    (cc = cc + 2)
-            OP_TYPEUPTO =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
-                    (cc = cc + 2)
-            OP_TYPEMINUPTO =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
-                    (cc = cc + 2)
-            OP_TYPEEXACT =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
-                    (cc = cc + 2)
-            OP_TYPEPOSSTAR =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
-                    (cc = cc + 2)
-            OP_TYPEPOSPLUS =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
-                    (cc = cc + 2)
-            OP_TYPEPOSQUERY =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
-                    (cc = cc + 2)
-            OP_TYPEPOSUPTO =>
-                (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
-                if ((cc[-1] == OP_PROP) or (cc[-1] == OP_NOTPROP)):
-                    (cc = cc + 2)
-            OP_XCLASS =>
-                (cc = cc + ((((((cc)[1] << 8)) | (cc)[((1) + 1)])) as c_uint))
-            OP_ECLASS =>
-                (cc = cc + ((((((cc)[1] << 8)) | (cc)[((1) + 1)])) as c_uint))
-            OP_MARK =>
-                (cc = cc + (_pcre2_OP_lengths_8[(unsafe: *cc)] + cc[1]))
-            OP_COMMIT_ARG =>
-                (cc = cc + (_pcre2_OP_lengths_8[(unsafe: *cc)] + cc[1]))
-            OP_PRUNE_ARG =>
-                (cc = cc + (_pcre2_OP_lengths_8[(unsafe: *cc)] + cc[1]))
-            OP_SKIP_ARG =>
-                (cc = cc + (_pcre2_OP_lengths_8[(unsafe: *cc)] + cc[1]))
-            OP_THEN_ARG =>
+                }
+                
+                
+            OP_XCLASS | OP_ECLASS =>
+                (cc = cc + (((cc[1] << 8) | cc[(1 + 1)]) as c_uint))
+            OP_MARK | OP_COMMIT_ARG | OP_PRUNE_ARG | OP_SKIP_ARG | OP_THEN_ARG =>
                 (cc = cc + (_pcre2_OP_lengths_8[(unsafe: *cc)] + cc[1]))
             OP_CALLOUT =>
-                (cb.pattern_position = ((((((cc)[1] << 8)) | (cc)[((1) + 1)])) as c_uint))
-                (cb.next_item_length = ((((((cc)[(1 + 2)] << 8)) | (cc)[(((1 + 2)) + 1)])) as c_uint))
+                (cb.pattern_position = ((((cc[1] << 8) | cc[(1 + 1)]) as c_uint)))
+                
+                (cb.next_item_length = ((((cc[(1 + 2)] << 8) | cc[((1 + 2) + 1)]) as c_uint)))
+                
                 (cb.callout_number = cc[(1 + (2 * 2))])
+                
                 (cb.callout_string_offset = 0)
+                
                 (cb.callout_string_length = 0)
-                (cb.callout_string = (null as *const u8))
+                
+                (cb.callout_string = null)
+                
                 (rc = callback((&mut cb as *mut pcre2_callout_enumerate_block_8), callout_data))
-                if (rc != 0):
+                
+                if ((if rc != 0: 1 else: 0) != 0) {
                     return rc
+                }
+                
                 (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                
             OP_CALLOUT_STR =>
-                (cb.pattern_position = ((((((cc)[1] << 8)) | (cc)[((1) + 1)])) as c_uint))
-                (cb.next_item_length = ((((((cc)[(1 + 2)] << 8)) | (cc)[(((1 + 2)) + 1)])) as c_uint))
+                (cb.pattern_position = ((((cc[1] << 8) | cc[(1 + 1)]) as c_uint)))
+                
+                (cb.next_item_length = ((((cc[(1 + 2)] << 8) | cc[((1 + 2) + 1)]) as c_uint)))
+                
                 (cb.callout_number = 0)
-                (cb.callout_string_offset = ((((((cc)[(1 + (3 * 2))] << 8)) | (cc)[(((1 + (3 * 2))) + 1)])) as c_uint))
-                (cb.callout_string_length = ((((((((cc)[(1 + (2 * 2))] << 8)) | (cc)[(((1 + (2 * 2))) + 1)])) as c_uint) -% 9) -% 2))
-                (cb.callout_string = ((cc + (((1 + (4 * 2))) as isize as usize)) + (1 as isize as usize)))
+                
+                (cb.callout_string_offset = ((((cc[(1 + (3 * 2))] << 8) | cc[((1 + (3 * 2)) + 1)]) as c_uint)))
+                
+                (cb.callout_string_length = (((((cc[(1 + (2 * 2))] << 8) | cc[((1 + (2 * 2)) + 1)]) as c_uint) -% 9) -% 2))
+                
+                (cb.callout_string = (cc + (((1 + (4 * 2)) as isize) as usize)) + ((1 as isize) as usize))
+                
                 (rc = callback((&mut cb as *mut pcre2_callout_enumerate_block_8), callout_data))
-                if (rc != 0):
+                
+                if ((if rc != 0: 1 else: 0) != 0) {
                     return rc
-                (cc = cc + ((((((cc)[(1 + (2 * 2))] << 8)) | (cc)[(((1 + (2 * 2))) + 1)])) as c_uint))
+                }
+                
+                (cc = cc + (((cc[(1 + (2 * 2))] << 8) | cc[((1 + (2 * 2)) + 1)]) as c_uint))
+                
             _ =>
                 (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
         
+    }
 
+}
 
-extern fn pcre2_match_data_create_8(p0: c_uint, p1: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8
-extern fn pcre2_match_data_create_from_pattern_8(p0: *const pcre2_real_code_8, p1: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8
-extern fn pcre2_match_data_free_8(p0: *mut pcre2_real_match_data_8) -> void
-extern fn pcre2_dfa_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8, p7: *mut c_int, p8: c_ulong) -> c_int
-extern fn pcre2_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8) -> c_int
-extern fn pcre2_get_mark_8(p0: *mut pcre2_real_match_data_8) -> *const u8
-extern fn pcre2_get_match_data_size_8(p0: *mut pcre2_real_match_data_8) -> c_ulong
-extern fn pcre2_get_match_data_heapframes_size_8(p0: *mut pcre2_real_match_data_8) -> c_ulong
-extern fn pcre2_get_ovector_count_8(p0: *mut pcre2_real_match_data_8) -> c_uint
-extern fn pcre2_get_ovector_pointer_8(p0: *mut pcre2_real_match_data_8) -> *mut c_ulong
-extern fn pcre2_get_startchar_8(p0: *mut pcre2_real_match_data_8) -> c_ulong
-extern fn pcre2_next_match_8(p0: *mut pcre2_real_match_data_8, p1: *mut c_ulong, p2: *mut c_uint) -> c_int
-extern fn pcre2_substring_copy_byname_8(p0: *mut pcre2_real_match_data_8, p1: *const u8, p2: *mut u8, p3: *mut c_ulong) -> c_int
-extern fn pcre2_substring_copy_bynumber_8(p0: *mut pcre2_real_match_data_8, p1: c_uint, p2: *mut u8, p3: *mut c_ulong) -> c_int
-extern fn pcre2_substring_free_8(p0: *mut u8) -> void
-extern fn pcre2_substring_get_byname_8(p0: *mut pcre2_real_match_data_8, p1: *const u8, p2: *mut *mut u8, p3: *mut c_ulong) -> c_int
-extern fn pcre2_substring_get_bynumber_8(p0: *mut pcre2_real_match_data_8, p1: c_uint, p2: *mut *mut u8, p3: *mut c_ulong) -> c_int
-extern fn pcre2_substring_length_byname_8(p0: *mut pcre2_real_match_data_8, p1: *const u8, p2: *mut c_ulong) -> c_int
-extern fn pcre2_substring_length_bynumber_8(p0: *mut pcre2_real_match_data_8, p1: c_uint, p2: *mut c_ulong) -> c_int
-extern fn pcre2_substring_nametable_scan_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: *mut *const u8, p3: *mut *const u8) -> c_int
-extern fn pcre2_substring_number_from_name_8(p0: *const pcre2_real_code_8, p1: *const u8) -> c_int
-extern fn pcre2_substring_list_free_8(p0: *mut *mut u8) -> void
-extern fn pcre2_substring_list_get_8(p0: *mut pcre2_real_match_data_8, p1: *mut *mut *mut u8, p2: *mut *mut c_ulong) -> c_int
-extern fn pcre2_serialize_encode_8(p0: *mut *const pcre2_real_code_8, p1: c_int, p2: *mut *mut u8, p3: *mut c_ulong, p4: *mut pcre2_real_general_context_8) -> c_int
-extern fn pcre2_serialize_decode_8(p0: *mut *mut pcre2_real_code_8, p1: c_int, p2: *const u8, p3: *mut pcre2_real_general_context_8) -> c_int
-extern fn pcre2_serialize_get_number_of_codes_8(p0: *const u8) -> c_int
-extern fn pcre2_serialize_free_8(p0: *mut u8) -> void
-extern fn pcre2_substitute_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8, p7: *const u8, p8: c_ulong, p9: *mut u8, p10: *mut c_ulong) -> c_int
-extern fn pcre2_jit_compile_8(p0: *mut pcre2_real_code_8, p1: c_uint) -> c_int
-extern fn pcre2_jit_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8) -> c_int
-extern fn pcre2_jit_free_unused_memory_8(p0: *mut pcre2_real_general_context_8) -> void
-extern fn pcre2_jit_stack_create_8(p0: c_ulong, p1: c_ulong, p2: *mut pcre2_real_general_context_8) -> *mut pcre2_real_jit_stack_8
-extern fn pcre2_jit_stack_assign_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, p2: *mut c_void) -> void
-extern fn pcre2_jit_stack_free_8(p0: *mut pcre2_real_jit_stack_8) -> void
-extern fn pcre2_get_error_message_8(p0: c_int, p1: *mut u8, p2: c_ulong) -> c_int
-extern fn pcre2_maketables_8(p0: *mut pcre2_real_general_context_8) -> *const u8
-extern fn pcre2_maketables_free_8(p0: *mut pcre2_real_general_context_8, p1: *const u8) -> void
-type pcre2_memctl { malloc: *const fn(c_ulong, *mut c_void) -> *mut c_void = null, free: *const fn(*mut c_void, *mut c_void) -> void = null, memory_data: *mut c_void = null }
-type struct_pcre2_memctl = pcre2_memctl
-type open_capitem { next: *mut open_capitem = null, number: c_ushort = 0, assert_depth: c_ushort = 0 }
-type struct_open_capitem = open_capitem
-type ucp_type_table { name_offset: c_ushort = 0, type_: c_ushort = 0, value: c_ushort = 0 }
-type struct_ucp_type_table = ucp_type_table
-type ucd_record { script: u8 = 0, chartype: u8 = 0, gbprop: u8 = 0, caseset: u8 = 0, other_case: c_int = 0, scriptx_bidiclass: c_ushort = 0, bprops: c_ushort = 0 }
-type struct_ucd_record = ucd_record
-type pcre2_serialized_data { magic: c_uint = 0, version: c_uint = 0, config: c_uint = 0, number_of_codes: c_int = 0 }
-type struct_pcre2_serialized_data = pcre2_serialized_data
-type pcre2_real_general_context_8 { memctl: pcre2_memctl }
-type struct_pcre2_real_general_context_8 = pcre2_real_general_context_8
-type pcre2_real_compile_context_8 { memctl: pcre2_memctl, stack_guard: *const fn(c_uint, *mut c_void) -> c_int = null, stack_guard_data: *mut c_void = null, tables: *const u8 = null, max_pattern_length: c_ulong = 0, max_pattern_compiled_length: c_ulong = 0, bsr_convention: c_ushort = 0, newline_convention: c_ushort = 0, parens_nest_limit: c_uint = 0, extra_options: c_uint = 0, max_varlookbehind: c_uint = 0, optimization_flags: c_uint = 0 }
-type struct_pcre2_real_compile_context_8 = pcre2_real_compile_context_8
-type pcre2_real_match_context_8 { memctl: pcre2_memctl, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null, callout_data: *mut c_void = null, substitute_callout: *const fn(*mut pcre2_substitute_callout_block_8, *mut c_void) -> c_int = null, substitute_callout_data: *mut c_void = null, substitute_case_callout: *const fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong = null, substitute_case_callout_data: *mut c_void = null, offset_limit: c_ulong = 0, heap_limit: c_uint = 0, match_limit: c_uint = 0, depth_limit: c_uint = 0 }
-type struct_pcre2_real_match_context_8 = pcre2_real_match_context_8
-type pcre2_real_convert_context_8 { memctl: pcre2_memctl, glob_separator: c_uint = 0, glob_escape: c_uint = 0 }
-type struct_pcre2_real_convert_context_8 = pcre2_real_convert_context_8
-type pcre2_real_code_8 { memctl: pcre2_memctl, tables: *const u8 = null, executable_jit: *mut c_void = null, start_bitmap: [32]u8 = [0 as u8; 32], blocksize: c_ulong = 0, code_start: c_ulong = 0, magic_number: c_uint = 0, compile_options: c_uint = 0, overall_options: c_uint = 0, extra_options: c_uint = 0, flags: c_uint = 0, limit_heap: c_uint = 0, limit_match: c_uint = 0, limit_depth: c_uint = 0, first_codeunit: c_uint = 0, last_codeunit: c_uint = 0, bsr_convention: c_ushort = 0, newline_convention: c_ushort = 0, max_lookbehind: c_ushort = 0, minlength: c_ushort = 0, top_bracket: c_ushort = 0, top_backref: c_ushort = 0, name_entry_size: c_ushort = 0, name_count: c_ushort = 0, optimization_flags: c_uint = 0 }
-type struct_pcre2_real_code_8 = pcre2_real_code_8
-type pcre2_real_match_data_8 { memctl: pcre2_memctl, code: *const pcre2_real_code_8 = null, subject: *const u8 = null, mark: *const u8 = null, heapframes: *mut heapframe = null, heapframes_size: c_ulong = 0, subject_length: c_ulong = 0, start_offset: c_ulong = 0, leftchar: c_ulong = 0, rightchar: c_ulong = 0, startchar: c_ulong = 0, matchedby: u8 = 0, flags: u8 = 0, oveccount: c_ushort = 0, options: c_uint = 0, rc: c_int = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
-type struct_pcre2_real_match_data_8 = pcre2_real_match_data_8
-type recurse_check { prev: *mut recurse_check = null, group: *const u8 = null }
-type struct_recurse_check = recurse_check
-type parsed_recurse_check { prev: *mut parsed_recurse_check = null, groupptr: *mut c_uint = null }
-type struct_parsed_recurse_check = parsed_recurse_check
-type recurse_cache { group: *const u8 = null, groupnumber: c_int = 0 }
-type struct_recurse_cache = recurse_cache
-type branch_chain_8 { outer: *mut branch_chain_8 = null, current_branch: *mut u8 = null }
-type struct_branch_chain_8 = branch_chain_8
-type named_group_8 { name: *const u8 = null, number: c_uint = 0, length: c_ushort = 0, hash_dup: c_ushort = 0 }
-type struct_named_group_8 = named_group_8
-type compile_data { next: *mut compile_data = null }
-type struct_compile_data = compile_data
-type class_ranges { header: compile_data, char_lists_size: c_ulong = 0, char_lists_start: c_ulong = 0, range_list_size: c_ushort = 0, char_lists_types: c_ushort = 0 }
-type struct_class_ranges = class_ranges
-type recurse_arguments { header: compile_data, size: c_ulong = 0, skip_size: c_ulong = 0 }
-type struct_recurse_arguments = recurse_arguments
-// union
-type class_bits_storage { classbits: [32]u8 = [0 as u8; 32], classwords: [8]c_uint = [0 as c_uint; 8] }
-type struct_class_bits_storage = class_bits_storage
-type compile_block_8 { cx: *mut pcre2_real_compile_context_8 = null, lcc: *const u8 = null, fcc: *const u8 = null, cbits: *const u8 = null, ctypes: *const u8 = null, start_workspace: *mut u8 = null, start_code: *mut u8 = null, start_pattern: *const u8 = null, end_pattern: *const u8 = null, name_table: *mut u8 = null, workspace_size: c_ulong = 0, small_ref_offset: [10]c_ulong = [0 as c_ulong; 10], erroroffset: c_ulong = 0, classbits: class_bits_storage, names_found: c_ushort = 0, name_entry_size: c_ushort = 0, parens_depth: c_ushort = 0, assert_depth: c_ushort = 0, named_groups: *mut named_group_8 = null, named_group_list_size: c_uint = 0, external_options: c_uint = 0, external_flags: c_uint = 0, bracount: c_uint = 0, lastcapture: c_uint = 0, parsed_pattern: *mut c_uint = null, parsed_pattern_end: *mut c_uint = null, groupinfo: *mut c_uint = null, top_backref: c_uint = 0, backref_map: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], class_op_used: [15]u8 = [0 as u8; 15], req_varyopt: c_uint = 0, max_varlookbehind: c_uint = 0, max_lookbehind: c_int = 0, had_accept: c_int = 0, had_pruneorskip: c_int = 0, had_recurse: c_int = 0, dupnames: c_int = 0, first_data: *mut compile_data = null, last_data: *mut compile_data = null, char_lists_size: c_ulong = 0 }
-type struct_compile_block_8 = compile_block_8
-type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
-type struct_pcre2_real_jit_stack_8 = pcre2_real_jit_stack_8
-type dfa_recursion_info { prevrec: *mut dfa_recursion_info = null, subject_position: *const u8 = null, last_used_ptr: *const u8 = null, group_num: c_uint = 0 }
-type struct_dfa_recursion_info = dfa_recursion_info
-// union
-type heapframe_fields_char_repeat_oc { oc: c_uint = 0, occu: [4]u8 = [0 as u8; 4] }
-type heapframe_fields_char_repeat { start_eptr: *const u8 = null, charptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: heapframe_fields_char_repeat_oc }
-type heapframe_fields_charnot_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: c_uint = 0 }
-type heapframe_fields_class_repeat { start_eptr: *const u8 = null, byte_map_address: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
-type heapframe_fields_xclass_repeat { start_eptr: *const u8 = null, xclass_data: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
-type heapframe_fields_eclass_repeat { start_eptr: *const u8 = null, eclass_data: *const u8 = null, eclass_len: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
-type heapframe_fields_type_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, ctype: c_uint = 0, propvalue: c_uint = 0 }
-type heapframe_fields_ref_repeat { start: *const u8 = null, offset: c_ulong = 0, length: c_ulong = 0, min: c_uint = 0, max: c_uint = 0 }
-type heapframe_fields_op_bra { frame_type: c_uint = 0 }
-type heapframe_fields_op_brapos { start_eptr: *const u8 = null, start_group: *const u8 = null, frame_type: c_uint = 0 }
-type heapframe_fields_op_recurse { start_branch: *const u8 = null, frame_type: c_uint = 0 }
-type heapframe_fields_op_assert_scs { saved_end_subject: *const u8 = null, saved_eptr: *const u8 = null, true_end_extra: c_ulong = 0, saved_moptions: c_uint = 0 }
-type heapframe_fields_op_cond { start_branch: *const u8 = null, length: c_ulong = 0 }
-type heapframe_fields_op_vreverse { min: c_uint = 0, max: c_uint = 0 }
-// union
-type heapframe_fields { char_repeat: heapframe_fields_char_repeat, charnot_repeat: heapframe_fields_charnot_repeat, class_repeat: heapframe_fields_class_repeat, xclass_repeat: heapframe_fields_xclass_repeat, eclass_repeat: heapframe_fields_eclass_repeat, type_repeat: heapframe_fields_type_repeat, ref_repeat: heapframe_fields_ref_repeat, op_bra: heapframe_fields_op_bra, op_brapos: heapframe_fields_op_brapos, op_recurse: heapframe_fields_op_recurse, op_assert_scs: heapframe_fields_op_assert_scs, op_cond: heapframe_fields_op_cond, op_vreverse: heapframe_fields_op_vreverse }
-type heapframe { ecode: *const u8 = null, back_frame: c_ulong = 0, rdepth: c_uint = 0, group_frame_type: c_uint = 0, return_id: u8 = 0, op: u8 = 0, byte1: u8 = 0, byte2: u8 = 0, fields: heapframe_fields, eptr: *const u8 = null, start_match: *const u8 = null, mark: *const u8 = null, recurse_last_used: *const u8 = null, current_recurse: c_uint = 0, capture_last: c_uint = 0, last_group_offset: c_ulong = 0, offset_top: c_ulong = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
-type struct_heapframe = heapframe
-type static_assertion_heapframe_size = [1]c_int
-type heapframe_align { unalign: c_char = 0, frame: heapframe }
-type struct_heapframe_align = heapframe_align
-type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, hitend: c_int = 0, hasthen: c_int = 0, hasbsk: c_int = 0, allowemptypartial: c_int = 0, allowlookaroundbsk: c_int = 0, lcc: *const u8 = null, fcc: *const u8 = null, ctypes: *const u8 = null, start_offset: c_ulong = 0, end_offset_top: c_ulong = 0, partial: c_ushort = 0, bsr_convention: c_ushort = 0, name_count: c_ushort = 0, name_entry_size: c_ushort = 0, name_table: *const u8 = null, start_code: *const u8 = null, start_subject: *const u8 = null, check_subject: *const u8 = null, end_subject: *const u8 = null, true_end_subject: *const u8 = null, end_match_ptr: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, mark: *const u8 = null, nomatch_mark: *const u8 = null, verb_ecode_ptr: *const u8 = null, verb_skip_ptr: *const u8 = null, verb_current_recurse: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, skip_arg_count: c_uint = 0, ignore_skip_arg: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null }
-type struct_match_block_8 = match_block_8
-type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, start_subject: *const u8 = null, end_subject: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, tables: *const u8 = null, start_offset: c_ulong = 0, heap_limit: c_uint = 0, heap_used: c_ulong = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, allowemptypartial: c_int = 0, nl: [4]u8 = [0 as u8; 4], bsr_convention: c_ushort = 0, cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int = null, recursive: *mut dfa_recursion_info = null }
-type struct_dfa_match_block_8 = dfa_match_block_8
-extern fn _pcre2_auto_possessify_8(p0: *mut u8, p1: *const compile_block_8) -> c_int
-extern fn _pcre2_check_escape_8(p0: *mut *const u8, p1: *const u8, p2: *mut c_uint, p3: *mut c_int, p4: c_uint, p5: c_uint, p6: c_uint, p7: c_int, p8: *mut compile_block_8) -> c_int
-extern fn _pcre2_ckd_smul_8(p0: *mut c_ulong, p1: c_int, p2: c_int) -> c_int
-extern fn _pcre2_extuni_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int, p5: *mut c_int) -> *const u8
-extern fn _pcre2_find_bracket_8(p0: *const u8, p1: c_int, p2: c_int) -> *const u8
-extern fn _pcre2_is_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
-extern fn _pcre2_jit_free_rodata_8(p0: *mut c_void, p1: *mut c_void) -> void
-extern fn _pcre2_jit_free_8(p0: *mut c_void, p1: *mut pcre2_memctl) -> void
-extern fn _pcre2_jit_get_size_8(p0: *mut c_void) -> c_ulong
-extern fn _pcre2_jit_get_target_8() -> *const i8
-extern fn _pcre2_memctl_malloc_8(p0: c_ulong, p1: *mut pcre2_memctl) -> *mut c_void
-extern fn _pcre2_ord2utf_8(p0: c_uint, p1: *mut u8) -> c_uint
-extern fn _pcre2_script_run_8(p0: *const u8, p1: *const u8, p2: c_int) -> c_int
-extern fn _pcre2_strcmp_8(p0: *const u8, p1: *const u8) -> c_int
-extern fn _pcre2_strcmp_c8_8(p0: *const u8, p1: *const i8) -> c_int
-extern fn _pcre2_strcpy_c8_8(p0: *mut u8, p1: *const i8) -> c_ulong
-extern fn _pcre2_strlen_8(p0: *const u8) -> c_ulong
-extern fn _pcre2_strncmp_8(p0: *const u8, p1: *const u8, p2: c_ulong) -> c_int
-extern fn _pcre2_strncmp_c8_8(p0: *const u8, p1: *const i8, p2: c_ulong) -> c_int
-extern fn _pcre2_study_8(p0: *mut pcre2_real_code_8) -> c_int
-extern fn _pcre2_valid_utf_8(p0: *const u8, p1: c_ulong, p2: *mut c_ulong) -> c_int
-extern fn _pcre2_was_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
-extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -> c_int
-extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
-extern let _pcre2_utf8_table1: [6]c_int
-extern let _pcre2_utf8_table1_size: c_uint
-extern let _pcre2_utf8_table2: [6]c_int
-extern let _pcre2_utf8_table3: [6]c_int
-extern let _pcre2_utf8_table4: [64]u8
-extern let _pcre2_OP_lengths_8: [173]u8
-extern let _pcre2_callout_end_delims_8: [9]c_uint
-extern let _pcre2_callout_start_delims_8: [9]c_uint
-extern var _pcre2_default_compile_context_8: pcre2_real_compile_context_8
-extern var _pcre2_default_convert_context_8: pcre2_real_convert_context_8
-extern var _pcre2_default_match_context_8: pcre2_real_match_context_8
-extern let _pcre2_default_tables_8: [1088]u8
-extern let _pcre2_hspace_list_8: [20]c_uint
-extern let _pcre2_vspace_list_8: [8]c_uint
-extern let _pcre2_ucd_boolprop_sets_8: [382]c_uint
-extern let _pcre2_ucd_caseless_sets_8: [118]c_uint
-extern let _pcre2_ucd_turkish_dotted_i_caseset_8: c_uint
-extern let _pcre2_ucd_nocase_ranges_8: [84]c_uint
-extern let _pcre2_ucd_nocase_ranges_size_8: c_uint
-extern let _pcre2_ucd_digit_sets_8: [78]c_uint
-extern let _pcre2_ucd_script_sets_8: [476]c_uint
-extern let _pcre2_ucd_records_8: [1563]ucd_record
-extern let _pcre2_ucd_stage1_8: [8704]c_ushort
-extern let _pcre2_ucd_stage2_8: [40192]c_ushort
-extern let _pcre2_ucp_gbtable_8: [15]c_uint
-extern let _pcre2_ucp_gentype_8: [30]c_uint
-extern var _pcre2_unicode_version_8: *const i8
-extern let _pcre2_utt_8: *ucp_type_table
-extern let _pcre2_utt_names_8: *c_char
-extern let _pcre2_utt_size_8: c_ulong
-extern let _pcre2_ebcdic_1047_to_ascii_8: *u8
-extern let _pcre2_ascii_to_ebcdic_1047_8: *u8
-// untranslatable fn-like macro
-fn ACROSSCHAR() -> Never:
-    comptime_error("untranslatable C macro: ACROSSCHAR")
-// untranslatable fn-like macro
-fn BACKCHAR() -> Never:
-    comptime_error("untranslatable C macro: BACKCHAR")
-// untranslatable fn-like macro
-fn BYTES2CU() -> Never:
-    comptime_error("untranslatable C macro: BYTES2CU")
-// untranslatable fn-like macro
-fn CAST_USER_ADDR_T() -> Never:
-    comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
-fn CHMAX_255[T](c: T) -> T:
-    (c <= 255)
-// untranslatable fn-like macro
-fn CU2BYTES() -> Never:
-    comptime_error("untranslatable C macro: CU2BYTES")
-// untranslatable fn-like macro
-fn FORWARDCHAR() -> Never:
-    comptime_error("untranslatable C macro: FORWARDCHAR")
-// untranslatable fn-like macro
-fn FORWARDCHARTEST() -> Never:
-    comptime_error("untranslatable C macro: FORWARDCHARTEST")
-// untranslatable fn-like macro
-fn GET() -> Never:
-    comptime_error("untranslatable C macro: GET")
-// untranslatable fn-like macro
-fn GET2() -> Never:
-    comptime_error("untranslatable C macro: GET2")
-// untranslatable fn-like macro
-fn GETCHAR() -> Never:
-    comptime_error("untranslatable C macro: GETCHAR")
-// untranslatable fn-like macro
-fn GETCHARINC() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINC")
-// untranslatable fn-like macro
-fn GETCHARINCTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARINCTEST")
-// untranslatable fn-like macro
-fn GETCHARLEN() -> Never:
-    comptime_error("untranslatable C macro: GETCHARLEN")
-// untranslatable fn-like macro
-fn GETCHARLENTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARLENTEST")
-// untranslatable fn-like macro
-fn GETCHARTEST() -> Never:
-    comptime_error("untranslatable C macro: GETCHARTEST")
-// untranslatable fn-like macro
-fn GETUTF8() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8")
-// untranslatable fn-like macro
-fn GETUTF8INC() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8INC")
-// untranslatable fn-like macro
-fn GETUTF8LEN() -> Never:
-    comptime_error("untranslatable C macro: GETUTF8LEN")
-// untranslatable fn-like macro
-fn GET_EXTRALEN() -> Never:
-    comptime_error("untranslatable C macro: GET_EXTRALEN")
-// untranslatable fn-like macro
-fn GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: GET_UCD")
-fn HASUTF8EXTRALEN[T](c: T) -> T:
-    (c >= 0xc0)
-fn HAS_EXTRALEN[T](c: T) -> T:
-    HASUTF8EXTRALEN(c)
-// untranslatable fn-like macro
-fn HTONL() -> Never:
-    comptime_error("untranslatable C macro: HTONL")
-// untranslatable fn-like macro
-fn HTONLL() -> Never:
-    comptime_error("untranslatable C macro: HTONLL")
-// untranslatable fn-like macro
-fn HTONS() -> Never:
-    comptime_error("untranslatable C macro: HTONS")
-fn INT16_C[T](v: T) -> T:
-    v
-fn INT32_C[T](v: T) -> T:
-    v
-fn INT64_C[T](v: T) -> i64:
-    (v as i64)
-fn INT8_C[T](v: T) -> T:
-    v
-fn INTMAX_C[T](v: T) -> i64:
-    (v as i64)
-// untranslatable fn-like macro
-fn IS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: IS_NEWLINE")
-// untranslatable fn-like macro
-fn MAPBIT() -> Never:
-    comptime_error("untranslatable C macro: MAPBIT")
-// untranslatable fn-like macro
-fn MAPSET() -> Never:
-    comptime_error("untranslatable C macro: MAPSET")
-// untranslatable fn-like macro
-fn MAX_255() -> Never:
-    comptime_error("untranslatable C macro: MAX_255")
-// untranslatable fn-like macro
-fn NOT_FIRSTCU() -> Never:
-    comptime_error("untranslatable C macro: NOT_FIRSTCU")
-// untranslatable fn-like macro
-fn NTOHL() -> Never:
-    comptime_error("untranslatable C macro: NTOHL")
-// untranslatable fn-like macro
-fn NTOHLL() -> Never:
-    comptime_error("untranslatable C macro: NTOHLL")
-// untranslatable fn-like macro
-fn NTOHS() -> Never:
-    comptime_error("untranslatable C macro: NTOHS")
-// untranslatable fn-like macro
-fn PCRE2_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_ASSERT")
-// untranslatable fn-like macro
-fn PCRE2_DEBUG_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
-// untranslatable fn-like macro
-fn PCRE2_GLUE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_GLUE")
-// untranslatable fn-like macro
-fn PCRE2_JOIN() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_JOIN")
-fn PCRE2_SUFFIX[T](a: T) -> T:
-    PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
-// untranslatable fn-like macro
-fn PCRE2_UNREACHABLE() -> Never:
-    comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
-// untranslatable fn-like macro
-fn PRIV() -> Never:
-    comptime_error("untranslatable C macro: PRIV")
-// untranslatable fn-like macro
-fn PUT() -> Never:
-    comptime_error("untranslatable C macro: PUT")
-// untranslatable fn-like macro
-fn PUT2() -> Never:
-    comptime_error("untranslatable C macro: PUT2")
-// untranslatable fn-like macro
-fn PUT2INC() -> Never:
-    comptime_error("untranslatable C macro: PUT2INC")
-// untranslatable fn-like macro
-fn PUTCHAR() -> Never:
-    comptime_error("untranslatable C macro: PUTCHAR")
-// untranslatable fn-like macro
-fn PUTINC() -> Never:
-    comptime_error("untranslatable C macro: PUTINC")
-// untranslatable fn-like macro
-fn REAL_GET_UCD() -> Never:
-    comptime_error("untranslatable C macro: REAL_GET_UCD")
-// untranslatable fn-like macro
-fn STATIC_ASSERT() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT")
-// untranslatable fn-like macro
-fn STATIC_ASSERT_JOIN() -> Never:
-    comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
-// untranslatable fn-like macro
-fn TABLE_GET() -> Never:
-    comptime_error("untranslatable C macro: TABLE_GET")
-// untranslatable fn-like macro
-fn UCD_ANY_I() -> Never:
-    comptime_error("untranslatable C macro: UCD_ANY_I")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS")
-// untranslatable fn-like macro
-fn UCD_BIDICLASS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
-// untranslatable fn-like macro
-fn UCD_BPROPS() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS")
-// untranslatable fn-like macro
-fn UCD_BPROPS_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
-// untranslatable fn-like macro
-fn UCD_CASESET() -> Never:
-    comptime_error("untranslatable C macro: UCD_CASESET")
-// untranslatable fn-like macro
-fn UCD_CATEGORY() -> Never:
-    comptime_error("untranslatable C macro: UCD_CATEGORY")
-// untranslatable fn-like macro
-fn UCD_CHARTYPE() -> Never:
-    comptime_error("untranslatable C macro: UCD_CHARTYPE")
-fn UCD_DOTTED_I[T](ch: T) -> T:
-    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
-fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
-    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
-// untranslatable fn-like macro
-fn UCD_GRAPHBREAK() -> Never:
-    comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
-// untranslatable fn-like macro
-fn UCD_OTHERCASE() -> Never:
-    comptime_error("untranslatable C macro: UCD_OTHERCASE")
-// untranslatable fn-like macro
-fn UCD_SCRIPT() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPT")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX")
-// untranslatable fn-like macro
-fn UCD_SCRIPTX_PROP() -> Never:
-    comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
-fn UINT16_C[T](v: T) -> T:
-    v
-fn UINT32_C[T](v: T) -> u32:
-    (v as u32)
-fn UINT64_C[T](v: T) -> u64:
-    (v as u64)
-fn UINT8_C[T](v: T) -> T:
-    v
-fn UINTMAX_C[T](v: T) -> u64:
-    (v as u64)
-// untranslatable fn-like macro
-fn WAS_NEWLINE() -> Never:
-    comptime_error("untranslatable C macro: WAS_NEWLINE")
-// untranslatable fn-like macro
-fn WCOREDUMP() -> Never:
-    comptime_error("untranslatable C macro: WCOREDUMP")
-// untranslatable fn-like macro
-fn WEXITSTATUS() -> Never:
-    comptime_error("untranslatable C macro: WEXITSTATUS")
-// untranslatable fn-like macro
-fn WIFCONTINUED() -> Never:
-    comptime_error("untranslatable C macro: WIFCONTINUED")
-// untranslatable fn-like macro
-fn WIFEXITED() -> Never:
-    comptime_error("untranslatable C macro: WIFEXITED")
-// untranslatable fn-like macro
-fn WIFSIGNALED() -> Never:
-    comptime_error("untranslatable C macro: WIFSIGNALED")
-// untranslatable fn-like macro
-fn WIFSTOPPED() -> Never:
-    comptime_error("untranslatable C macro: WIFSTOPPED")
-// untranslatable fn-like macro
-fn WSTOPSIG() -> Never:
-    comptime_error("untranslatable C macro: WSTOPSIG")
-// untranslatable fn-like macro
-fn WTERMSIG() -> Never:
-    comptime_error("untranslatable C macro: WTERMSIG")
-fn W_EXITCODE[T](ret: T, sig: T) -> T:
-    ((ret << 8) | sig)
-// untranslatable fn-like macro
-fn W_STOPCODE() -> Never:
-    comptime_error("untranslatable C macro: W_STOPCODE")
-// untranslatable fn-like macro
-fn alloca() -> Never:
-    comptime_error("untranslatable C macro: alloca")
-// untranslatable fn-like macro
-fn clearerr_unlocked() -> Never:
-    comptime_error("untranslatable C macro: clearerr_unlocked")
-// untranslatable fn-like macro
-fn feof_unlocked() -> Never:
-    comptime_error("untranslatable C macro: feof_unlocked")
-// untranslatable fn-like macro
-fn ferror_unlocked() -> Never:
-    comptime_error("untranslatable C macro: ferror_unlocked")
-// untranslatable fn-like macro
-fn fileno_unlocked() -> Never:
-    comptime_error("untranslatable C macro: fileno_unlocked")
-// untranslatable fn-like macro
-fn fropen() -> Never:
-    comptime_error("untranslatable C macro: fropen")
-// untranslatable fn-like macro
-fn fwopen() -> Never:
-    comptime_error("untranslatable C macro: fwopen")
-// untranslatable fn-like macro
-fn getc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getc_unlocked")
-// untranslatable fn-like macro
-fn getchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: getchar_unlocked")
-// untranslatable fn-like macro
-fn htonl() -> Never:
-    comptime_error("untranslatable C macro: htonl")
-// untranslatable fn-like macro
-fn htonll() -> Never:
-    comptime_error("untranslatable C macro: htonll")
-// untranslatable fn-like macro
-fn htons() -> Never:
-    comptime_error("untranslatable C macro: htons")
-fn memccpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memmove() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn memset() -> Never:
-    comptime_error("variadic macro — use direct call")
-// untranslatable fn-like macro
-fn ntohl() -> Never:
-    comptime_error("untranslatable C macro: ntohl")
-// untranslatable fn-like macro
-fn ntohll() -> Never:
-    comptime_error("untranslatable C macro: ntohll")
-// untranslatable fn-like macro
-fn ntohs() -> Never:
-    comptime_error("untranslatable C macro: ntohs")
-// untranslatable fn-like macro
-fn offsetof() -> Never:
-    comptime_error("untranslatable C macro: offsetof")
-// untranslatable fn-like macro
-fn putc_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putc_unlocked")
-// untranslatable fn-like macro
-fn putchar_unlocked() -> Never:
-    comptime_error("untranslatable C macro: putchar_unlocked")
-// untranslatable fn-like macro
-fn sigmask() -> Never:
-    comptime_error("untranslatable C macro: sigmask")
-fn snprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn sprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn stpncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strlcpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncat() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn strncpy() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsnprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
-fn vsprintf() -> Never:
-    comptime_error("variadic macro — use direct call")
