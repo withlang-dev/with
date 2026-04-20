@@ -39,6 +39,7 @@ extern fn with_cimport_enum_const_value(session: i64, idx: i32, ci: i32) -> i64
 extern fn with_cimport_enum_int_type(session: i64, idx: i32) -> str
 extern fn with_cimport_typedef_underlying(session: i64, idx: i32) -> str
 extern fn with_cimport_parse_macros(header_code: str) -> i64
+extern fn with_cimport_realpath(path: str) -> str
 extern fn with_cimport_collect_object_macro_types(header_code: str, macro_names: str) -> str
 extern fn with_cimport_preprocess_text(header_code: str) -> str
 extern fn with_cimport_macro_count(session: i64) -> i32
@@ -106,6 +107,7 @@ extern fn with_ci_binary_op(session: i64, cursor: i32) -> i32
 extern fn with_ci_unary_op(session: i64, cursor: i32) -> i32
 extern fn with_ci_eval_int_value(session: i64, cursor: i32) -> i64
 extern fn with_ci_eval_int_valid(session: i64, cursor: i32) -> i32
+extern fn with_ci_eval_int_is_unsigned(session: i64, cursor: i32) -> i32
 extern fn with_ci_member_field_name(session: i64, cursor: i32) -> str
 extern fn with_getenv_str(name: str) -> str
 extern fn with_ci_implicit_cast_kind(session: i64, cursor: i32) -> i32
@@ -615,7 +617,7 @@ fn ci_record_decl_directly_demoted_cursor(session: i64, decl_cursor: i32) -> boo
                     return true
             else:
                 let field_ty = with_ci_type_translated(session, with_ci_cursor_type(session, child))
-                if ci_starts_with(field_ty, "__UNSUPPORTED:") or field_ty == "opaque":
+                if ci_starts_with(field_ty, "__UNSUPPORTED:") or field_ty == "c_void":
                     return true
         i = i + 1
     false
@@ -668,7 +670,7 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: s
                 field_ty = ci_escape_reserved(nested_name)
                 actual_name = if raw_name.len() > 0: raw_name else: f"anon_{anon_idx}"
                 anon_idx = anon_idx + 1
-            else if ci_starts_with(field_ty, "__UNSUPPORTED:") or field_ty == "opaque":
+            else if ci_starts_with(field_ty, "__UNSUPPORTED:") or field_ty == "c_void":
                 return "type " ++ ci_escape_reserved(synth_name) ++ " = opaque\n"
 
             if field_count > 0:
@@ -755,7 +757,7 @@ fn ci_is_directly_demoted(session: i64, idx: i32) -> bool:
         let ft = with_cimport_struct_field_type_translated(session, idx, fi)
         if ci_starts_with(ft, "__UNSUPPORTED:"):
             return true
-        if ft == "opaque":
+        if ft == "c_void":
             return true
         fi = fi + 1
     false
@@ -1576,7 +1578,7 @@ fn ci_translate_typedef(session: i64, idx: i32) -> str:
             if with_cimport_typedef_anon_field_is_bitfield(session, idx, afi) != 0:
                 anon_has_bitfield = true
             let ft = with_cimport_typedef_anon_field_type(session, idx, afi)
-            if ci_starts_with(ft, "__UNSUPPORTED:") or ft == "opaque":
+            if ci_starts_with(ft, "__UNSUPPORTED:") or ft == "c_void":
                 anon_has_unsupported = true
             afi = afi + 1
         if anon_has_bitfield or anon_has_unsupported:
@@ -1839,17 +1841,11 @@ fn ci_translate_macros(session: i64, extern_vars: str, macro_source: str) -> str
             let let_line = "let " ++ safe_name ++ ": " ++ float_ty ++ " = " ++ clean_value
             if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                 output = output ++ let_line ++ "\n"
-        else if ci_is_concatenated_string(stripped):
+        else if ci_is_concatenated_string(stripped) or ci_is_string_literal(stripped):
             let safe_name = ci_escape_reserved(name)
             let concat_value = ci_concat_strings(stripped)
             with_cimport_mark_name_emitted(name)
             let let_line = "let " ++ safe_name ++ " = " ++ concat_value
-            if not ci_migrate_shared_decl_add("let", safe_name, let_line):
-                output = output ++ let_line ++ "\n"
-        else if ci_is_string_literal(stripped):
-            let safe_name = ci_escape_reserved(name)
-            with_cimport_mark_name_emitted(name)
-            let let_line = "let " ++ safe_name ++ " = " ++ stripped
             if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                 output = output ++ let_line ++ "\n"
         else:
@@ -4629,7 +4625,7 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
         if (ptr_asgn_id as i32) != 0:
             return ptr_asgn_id
         if with_ci_eval_int_valid(session, cursor) != 0:
-            let text_idx = exprs.add_string(i64_to_string(with_ci_eval_int_value(session, cursor)))
+            let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
             return exprs.int_lit(text_idx, 0 as CiTypeId)
         return 0 as CiExprId
 
@@ -4691,7 +4687,7 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
                     if (else_id as i32) != 0:
                         return exprs.add(CiExprKind.CIE_TERNARY, cond_id as i32, then_id as i32, else_id as i32, 0 as CiTypeId)
         if with_ci_eval_int_valid(session, cursor) != 0:
-            let text_idx = exprs.add_string(i64_to_string(with_ci_eval_int_value(session, cursor)))
+            let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
             return exprs.int_lit(text_idx, 0 as CiTypeId)
         return 0 as CiExprId
 
@@ -4735,7 +4731,7 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
                     return exprs.binary(CiBinOp.CIBO_MUL, factor_id, sizeof_id, 0 as CiTypeId)
             else:
                 if with_ci_eval_int_valid(session, cursor) != 0:
-                    let text_idx = exprs.add_string(i64_to_string(with_ci_eval_int_value(session, cursor)))
+                    let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
                     return exprs.int_lit(text_idx, 0 as CiTypeId)
         return 0 as CiExprId
 
@@ -5396,7 +5392,7 @@ fn ci_lower_literal_or_ref(session: i64, cursor: i32, kind: i32, exprs: &mut CiE
     if kind == CXK_INT_LITERAL:
         var text: str = ""
         if with_ci_eval_int_valid(session, cursor) != 0:
-            text = i64_to_string(with_ci_eval_int_value(session, cursor))
+            text = ci_eval_int_text(session, cursor)
         else:
             text = with_ci_cursor_source_text(session, cursor)
         let s = exprs.add_string(text)
@@ -5414,20 +5410,19 @@ fn ci_lower_literal_or_ref(session: i64, cursor: i32, kind: i32, exprs: &mut CiE
     if kind == CXK_STRING_LITERAL:
         let literal_src = ci_literal_token_text(session, cursor)
         var text = literal_src
-        if ci_is_concatenated_string(literal_src):
+        if literal_src.len() > 0 and literal_src.byte_at(0) == 34:
             text = ci_concat_strings(literal_src)
-        else:
-            if literal_src.len() > 0 and literal_src.byte_at(0) != 34:
-                let stringify_val = ci_try_expand_stringify_call(session, literal_src)
-                if stringify_val.len() > 0:
-                    text = stringify_val
+        else if literal_src.len() > 0:
+            let stringify_val = ci_try_expand_stringify_call(session, literal_src)
+            if stringify_val.len() > 0:
+                text = stringify_val
         let s = exprs.add_string(text)
         return exprs.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
 
     if kind == CXK_CHAR_LITERAL:
         var text: str = ""
         if with_ci_eval_int_valid(session, cursor) != 0:
-            text = i64_to_string(with_ci_eval_int_value(session, cursor))
+            text = ci_eval_int_text(session, cursor)
         else:
             text = with_ci_cursor_source_text(session, cursor)
         let s = exprs.add_string(text)
@@ -5953,6 +5948,21 @@ fn ci_build_libc_call_value_expr(session: i64, cursor: i32, callee_text: str, ar
         cast_args.push((exprs.cast(i8_ptr_ty, (arg_ids.get(1)) as CiExprId)) as i32)
         cast_args.push((exprs.cast(i64_ty, (arg_ids.get(2)) as CiExprId)) as i32)
         return ci_build_named_call_expr(exprs, "with_memcmp", &cast_args)
+    if callee_text == "memchr":
+        if arg_ids.len() != 3:
+            return 0 as CiExprId
+        let c_void_ty = ci_named_type_from_text(types, "c_void")
+        if (c_void_ty as i32) == 0:
+            return 0 as CiExprId
+        let cvoid_ptr = types.ty_pointer(c_void_ty, 0)
+        let cast_args: Vec[i32] = Vec.new()
+        cast_args.push((exprs.cast(cvoid_ptr, (arg_ids.get(0)) as CiExprId)) as i32)
+        cast_args.push(arg_ids.get(1))
+        cast_args.push(arg_ids.get(2))
+        let call_id = ci_build_named_call_expr(exprs, "memchr", &cast_args)
+        let u8_ty = ci_named_type_from_text(types, "u8")
+        let u8_ptr = types.ty_pointer(u8_ty, 1)
+        return exprs.cast(u8_ptr, call_id)
     if callee_text == "isgraph":
         if arg_ids.len() != 1:
             return 0 as CiExprId
@@ -6081,7 +6091,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
 
     if kind == 100:
         if with_ci_eval_int_valid(session, cursor) != 0:
-            let text_idx = exprs.add_string(i64_to_string(with_ci_eval_int_value(session, cursor)))
+            let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
             return ci_value_ir_plain(exprs.int_lit(text_idx, 0 as CiTypeId))
         if nc == 1:
             return ci_lower_value_expr_ir(session, with_ci_child(session, cursor, 0), stmts, exprs, types, scope)
@@ -6214,7 +6224,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                     value_expr: expr_id,
                 }
         if with_ci_eval_int_valid(session, cursor) != 0:
-            let text_idx = exprs.add_string(i64_to_string(with_ci_eval_int_value(session, cursor)))
+            let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
             return ci_value_ir_plain(exprs.int_lit(text_idx, 0 as CiTypeId))
         return ci_value_ir_invalid()
 
@@ -6318,7 +6328,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                 value_expr: exprs.ident(result_expr_name, result_ty),
             }
         if with_ci_eval_int_valid(session, cursor) != 0:
-            let text_idx = exprs.add_string(i64_to_string(with_ci_eval_int_value(session, cursor)))
+            let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
             return ci_value_ir_plain(exprs.int_lit(text_idx, 0 as CiTypeId))
         return ci_value_ir_invalid()
 
@@ -7290,7 +7300,7 @@ fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: str) -> st
                 if from_decl_source.len() > 0:
                     return from_decl_source
             if with_ci_eval_int_valid(session, init_cursor) != 0:
-                return f"{with_ci_eval_int_value(session, init_cursor)}"
+                return ci_eval_int_text(session, init_cursor)
         let expr = ci_var_init_expr_for_type(session, var_cursor, "", init_type)
         if expr.len() > 0:
             return expr
@@ -8178,6 +8188,12 @@ fn ci_is_blank_macro_ref(value: str, blank_macros: str) -> bool:
         found_any = true
     found_any
 
+fn ci_eval_int_text(session: i64, cursor: i32) -> str:
+    let val = with_ci_eval_int_value(session, cursor)
+    if val < 0 and with_ci_eval_int_is_unsigned(session, cursor) != 0:
+        return "(0 -% " ++ i64_to_string(0 - val) ++ ")"
+    i64_to_string(val)
+
 fn ci_is_int_literal(s: str) -> bool:
     if s.len() == 0:
         return false
@@ -8501,6 +8517,12 @@ fn ci_is_concatenated_string(s: str) -> bool:
         i = i + 1
     false
 
+fn ci_byte_to_hex_escape(value: i32) -> str:
+    let hex = "0123456789abcdef"
+    let hi = (value >> 4) & 15
+    let lo = value & 15
+    "\\x" ++ hex.slice(hi as i64, (hi + 1) as i64) ++ hex.slice(lo as i64, (lo + 1) as i64)
+
 fn ci_concat_strings(s: str) -> str:
     // Concatenate adjacent string literals "foo" "bar" -> "foobar"
     var result = "\""
@@ -8514,7 +8536,61 @@ fn ci_concat_strings(s: str) -> str:
             while i < slen:
                 let cc = s.byte_at(i as i64)
                 if cc == 92:
-                    // Escape sequence — copy both chars
+                    if i + 1 >= slen:
+                        result = result ++ "\\"
+                        i = i + 1
+                        continue
+                    let next = s.byte_at((i + 1) as i64)
+                    if next >= 48 and next <= 55:
+                        var value = 0
+                        var j = i + 1
+                        var digits = 0
+                        while j < slen and digits < 3:
+                            let d = s.byte_at(j as i64)
+                            if d < 48 or d > 55:
+                                break
+                            value = value * 8 + (d as i32 - 48)
+                            digits = digits + 1
+                            j = j + 1
+                        if value == 0 and digits == 1:
+                            result = result ++ "\\0"
+                        else:
+                            result = result ++ ci_byte_to_hex_escape(value & 255)
+                        i = j
+                        continue
+                    if next == 120 or next == 88:
+                        var value = 0
+                        var j = i + 2
+                        while j < slen:
+                            let d = s.byte_at(j as i64)
+                            if d >= 48 and d <= 57:
+                                value = value * 16 + (d as i32 - 48)
+                            else if d >= 65 and d <= 70:
+                                value = value * 16 + (d as i32 - 55)
+                            else if d >= 97 and d <= 102:
+                                value = value * 16 + (d as i32 - 87)
+                            else:
+                                break
+                            j = j + 1
+                        result = result ++ ci_byte_to_hex_escape(value & 255)
+                        i = j
+                        continue
+                    if next == 97:
+                        result = result ++ "\\x07"
+                        i = i + 2
+                        continue
+                    if next == 98:
+                        result = result ++ "\\x08"
+                        i = i + 2
+                        continue
+                    if next == 102:
+                        result = result ++ "\\x0c"
+                        i = i + 2
+                        continue
+                    if next == 118:
+                        result = result ++ "\\x0b"
+                        i = i + 2
+                        continue
                     result = result ++ s.slice(i as i64, (i + 2) as i64)
                     i = i + 2
                     continue
@@ -10114,6 +10190,13 @@ fn ci_map_libc_call(callee: str, args: str) -> str:
         return "with_memset(" ++ ci_cast_memset_args(args) ++ ")"
     if callee == "memcmp":
         return "with_memcmp(" ++ ci_cast_memcmp_args(args) ++ ")"
+    if callee == "memchr":
+        let first = ci_extract_first_arg(args)
+        let rest_start = first.len() as i32 + 1
+        if rest_start < args.len() as i32:
+            let rest = ci_trim(args.slice(rest_start as i64, args.len()))
+            return "(memchr((" ++ first ++ " as *const c_void), " ++ rest ++ ") as *const u8)"
+        return "(memchr((" ++ first ++ " as *const c_void)) as *const u8)"
 
     // String operations
     if callee == "strlen":
