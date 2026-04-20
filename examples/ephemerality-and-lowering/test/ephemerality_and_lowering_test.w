@@ -6,7 +6,7 @@ type DbConnection { id: i32 }
 type ConnectionPool { url: str }
 
 fn with_connection(pool: ConnectionPool) -> DbConnection:
-    print("Acquiring connection to {pool.url}...")
+    print(f"Acquiring connection to {pool.url}...")
     defer print("Releasing connection...")
     DbConnection { id: 42 }
 

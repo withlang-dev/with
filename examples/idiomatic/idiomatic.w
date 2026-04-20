@@ -18,16 +18,16 @@ fn find_user(id: i32) -> LookupResult:
         .NotFound
 
 fn format_user(user: User) -> str:
-    "{user.name} (#{user.id})"
+    f"{user.name} (#{user.id})"
 
 fn get_dashboard(user_id: i32) -> str:
     match find_user(user_id):
         .Found(user) =>
             let display = user |> format_user
-            "Dashboard for {display}"
+            f"Dashboard for {display}"
 
         .Suspended(reason) =>
-            "Account suspended: {reason}"
+            f"Account suspended: {reason}"
 
         .NotFound =>
             "User not found"
@@ -36,11 +36,11 @@ fn get_dashboard(user_id: i32) -> str:
 
 fn double(x: i32) -> i32: x * 2
 fn add_one(x: i32) -> i32: x + 1
-fn to_str(x: i32) -> str: "{x}"
+fn to_str(x: i32) -> str: f"{x}"
 
 fn pipeline_demo:
     let result = 5 |> double |> add_one |> to_str
-    print("pipeline: {result}")
+    print(f"pipeline: {result}")
     assert(result == "11")
 
 // --- Error handling with Result ---
@@ -49,18 +49,18 @@ error FetchError = NotFound(i32) | Timeout
 
 fn fetch_data(id: i32) -> Result[str, FetchError]:
     if id > 0:
-        Ok("data-{id}")
+        Ok(f"data-{id}")
     else:
         Err(.NotFound(id))
 
 fn process_with_errors:
     match fetch_data(1):
-        Ok(data) => print("got: {data}")
-        Err(e) => print("error: {e}")
+        Ok(data) => print(f"got: {data}")
+        Err(e) => print(f"error: {e}")
 
     match fetch_data(-1):
-        Ok(data) => print("unexpected: {data}")
-        Err(.NotFound(id)) => print("not found: {id}")
+        Ok(data) => print(f"unexpected: {data}")
+        Err(.NotFound(id)) => print(f"not found: {id}")
         Err(.Timeout) => print("timeout")
 
 // --- Main ---

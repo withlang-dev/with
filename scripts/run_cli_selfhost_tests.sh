@@ -30,25 +30,25 @@ run_cli() {
 file_has_literal() {
   local path="$1"
   local needle="$2"
-  grep -Fq "$needle" "$path"
+  grep -Fq -- "$needle" "$path"
 }
 
 file_has_regex() {
   local path="$1"
   local pattern="$2"
-  grep -Eq "$pattern" "$path"
+  grep -Eq -- "$pattern" "$path"
 }
 
 file_forbid_literal() {
   local path="$1"
   local needle="$2"
-  ! grep -Fq "$needle" "$path"
+  ! grep -Fq -- "$needle" "$path"
 }
 
 file_forbid_regex() {
   local path="$1"
   local pattern="$2"
-  ! grep -Eq "$pattern" "$path"
+  ! grep -Eq -- "$pattern" "$path"
 }
 
 # Module-object symbol contract:
@@ -1574,6 +1574,56 @@ EOF
   echo "PASS(cli-selfhost-build) pcre2_compile_builds"
 }
 
+expect_prelude_output_functions_contract() {
+  local case_dir="$tmpdir/prelude_output_functions_case"
+  local src="$case_dir/prelude_output_functions.w"
+  local expected_out="$case_dir/expected.out"
+  local expected_err="$case_dir/expected.err"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+fn main:
+    write("A")
+    print("B")
+    write("C")
+    ewrite("D")
+    eprint("E")
+    ewrite("F")
+EOF
+
+  printf 'AB\nC' >"$expected_out"
+  printf 'DE\nF' >"$expected_err"
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$src"; then
+    echo "FAIL(cli-selfhost-run) prelude_output_functions"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! cmp -s "$expected_out" "$tmpdir/out"; then
+    echo "FAIL(cli-selfhost-stdout) prelude_output_functions"
+    echo "expected stdout bytes:"
+    od -An -t x1 "$expected_out"
+    echo "actual stdout bytes:"
+    od -An -t x1 "$tmpdir/out"
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! cmp -s "$expected_err" "$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-stderr) prelude_output_functions"
+    echo "expected stderr bytes:"
+    od -An -t x1 "$expected_err"
+    echo "actual stderr bytes:"
+    od -An -t x1 "$tmpdir/err"
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-run) prelude_output_functions"
+}
+
 expect_init_in_cwd() {
   local case_dir="$tmpdir/init_in_cwd_case"
   local expected_name
@@ -1711,9 +1761,50 @@ EOF
   echo "PASS(cli-selfhost-invalid-index) pointer_index_rejected"
 }
 
+expect_top_level_help_lists_cli_commands() {
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" --help; then
+    echo "FAIL(cli-selfhost-help-run) top_level_help"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" "Usage: with [command] [options]"; then
+    echo "FAIL(cli-selfhost-help-usage) top_level_help"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" "  lsp              Start the language server"; then
+    echo "FAIL(cli-selfhost-help-lsp) top_level_help"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if file_has_literal "$tmpdir/out" "Language quick reference:" || file_has_literal "$tmpdir/out" "with help use"; then
+    echo "FAIL(cli-selfhost-help-language-reference) top_level_help"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if file_has_literal "$tmpdir/out" "--prefer-curly"; then
+    echo "FAIL(cli-selfhost-help-prefer-curly) top_level_help"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-help) top_level_help"
+}
+
 expect_init_in_cwd
 expect_init_named_dir
 expect_pointer_index_is_rejected
+expect_top_level_help_lists_cli_commands
+expect_prelude_output_functions_contract
 expect_emit_obj_global_symbols
 expect_emit_obj_imported_symbols
 expect_whole_program_extern_var_redecl

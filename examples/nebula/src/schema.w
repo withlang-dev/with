@@ -48,7 +48,7 @@ impl SqlRecord for Telemetry:
         "telemetry"
 
     fn to_insert_query(self: &Telemetry) -> str:
-        "INSERT INTO telemetry (device_id, temp) VALUES ('{self.device_id}', {self.temp})"
+        f"INSERT INTO telemetry (device_id, temp) VALUES ('{self.device_id}', {self.temp})"
 
 // --- Status Helpers ---
 
@@ -60,8 +60,8 @@ pub fn is_fatal(s: Status) -> bool:
 pub fn status_label(s: Status) -> str:
     match s:
         .Active     => "ok"
-        .Warning(w) => "warn: {w}"
-        .Fatal(c)   => "fatal({c})"
+        .Warning(w) => f"warn: {w}"
+        .Fatal(c)   => f"fatal({c})"
 
 // --- Server Configuration ---
 //
@@ -108,7 +108,7 @@ pub fn build_test_batch(count: usize) -> Vec[Telemetry]:
                          else if i % 10 == 0 then .Fatal(code: 99)
                          else .Active
             batch.push(Telemetry {
-                device_id: "dev-{i}",
+                device_id: f"dev-{i}",
                 temp: 20.0 + (i as f64) * 0.5,
                 status,
             })

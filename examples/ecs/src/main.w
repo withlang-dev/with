@@ -33,37 +33,37 @@ fn main:
     let enemies = spawn_enemies(&mut world, 5)
     let walls = spawn_walls(&mut world)
 
-    print("=== ECS Demo: {world.entity_count()} entities spawned ===\n")
+    print(f"=== ECS Demo: {world.entity_count()} entities spawned ===\n")
     world.print_stats()
     print("")
 
     // --- Simulate 5 frames ---
 
     // Frame 0: player presses Right
-    print("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
     var ev0 = Vec.new()
     ev0.push(InputEvent.KeyDown(.Right))
     run_frame(&mut world, &ev0)
 
     // Frame 1: key held (no new events)
-    print("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
     let ev1 = Vec.new()
     run_frame(&mut world, &ev1)
 
     // Frame 2: player also presses Up (diagonal movement)
-    print("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
     var ev2 = Vec.new()
     ev2.push(InputEvent.KeyDown(.Up))
     run_frame(&mut world, &ev2)
 
     // Frame 3: release Right, keep Up
-    print("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
     var ev3 = Vec.new()
     ev3.push(InputEvent.KeyUp(.Right))
     run_frame(&mut world, &ev3)
 
     // Frame 4: release everything
-    print("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
     var ev4 = Vec.new()
     ev4.push(InputEvent.KeyUp(.Up))
     run_frame(&mut world, &ev4)
@@ -82,7 +82,7 @@ fn main:
             let tf = world.transforms.dense_data[i]
             let name = world.entity_name(entity)
             let label = name.unwrap_or("?")
-            print("  {label} -> ({tf.position.x:.1}, {tf.position.y:.1}) tex={texture_name(sprite.texture)}")
+            print(f"  {label} -> ({tf.position.x:.1}, {tf.position.y:.1}) tex={texture_name(sprite.texture)}")
 
     // --- Demonstrate despawning ---
 
@@ -91,7 +91,7 @@ fn main:
         let first_enemy = enemies[0]
         world.despawn(first_enemy)
 
-        print("Entities after despawn: {world.entity_count()}")
+        print(f"Entities after despawn: {world.entity_count()}")
 
         // Verify the handle is invalidated
         assert(not world.is_alive(first_enemy))
@@ -131,7 +131,7 @@ fn spawn_player(world: &mut World) -> Entity:
 fn spawn_enemies(world: &mut World, count: i32) -> Vec[Entity]:
     with Vec.new() as mut enemies:
         for i in 0..count:
-            let enemy = world.spawn("enemy_{i}")
+            let enemy = world.spawn(f"enemy_{i}")
             world.add(enemy, Transform {
                 position: Vec2.new(200.0 + (i as f32) * 80.0, 300.0),
                 rotation: 0.0,

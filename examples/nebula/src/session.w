@@ -44,7 +44,7 @@ pub error SessionError =
 gen fn extract_packets(count: i32) -> Telemetry:
     for i in 0..count:
         yield Telemetry {
-            device_id: "dev-{i}",
+            device_id: f"dev-{i}",
             temp: 20.0 + (i as f64) * 0.5,
         }
 
@@ -95,7 +95,7 @@ fn parse_batch(lines: Vec[str]) -> Result[Vec[Telemetry], SessionError]:
 
 async fn handle_session(id: i32, rx: Receiver[str]) -> Result[i32, SessionError]:
     var session = Session { id, addr: "127.0.0.1" }
-    defer print("[session {id}] cleanup")
+    defer print(f"[session {id}] cleanup")
 
     loop:
         let msg = rx.recv()
@@ -103,8 +103,8 @@ async fn handle_session(id: i32, rx: Receiver[str]) -> Result[i32, SessionError]
             break
         session.packets_received = session.packets_received + 1
         match parse_telemetry(msg):
-            Some(t) => print("[session {id}] got: {t.device_id} temp={t.temp}")
-            None    => print("[session {id}] parse failed")
+            Some(t) => print(f"[session {id}] got: {t.device_id} temp={t.temp}")
+            None    => print(f"[session {id}] parse failed")
     session.packets_received
 
 // --- Multi-Session Handler with Select ---
@@ -123,9 +123,9 @@ async fn handle_priority(
 
     select await:
         msg = primary_task =>
-            "primary: {msg}"
+            f"primary: {msg}"
         msg = secondary_task =>
-            "secondary: {msg}"
+            f"secondary: {msg}"
 
 // --- Session Stats ---
 //
