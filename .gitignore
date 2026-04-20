@@ -1,4 +1,5 @@
 .claude/
+.demo/
 
 # Reference repos (large external clones)
 .reference/
