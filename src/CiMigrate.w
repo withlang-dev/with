@@ -101,6 +101,46 @@ fn ci_replace_sparse(text: str, needle: str, replacement: str) -> str:
         start = abs_idx + nlen
     result
 
+fn ci_comment_prefix_lines(text: str) -> str:
+    var result = ""
+    var start: i64 = 0
+    let tlen = text.len()
+    while start < tlen:
+        var end = start
+        while end < tlen and text.byte_at(end) != 10:
+            end = end + 1
+        let line = text.slice(start, end)
+        if line.len() > 0:
+            result = result ++ "// " ++ line ++ "\n"
+        else:
+            result = result ++ "//\n"
+        if end < tlen:
+            end = end + 1
+        start = end
+    result
+
+fn ci_migrate_render_stub(name: str, safe_name: str, params: str, ret: str, source_file: str, fn_cursor: i32, session: i64, bail_loc: str, bail_kind_name: str) -> str:
+    let ret_suffix = if ret == "void" or ret.len() == 0: "" else: " -> " ++ ret
+    var comment = "// [MIGRATOR_UNTRANSLATED]\n"
+    if source_file.len() > 0 and fn_cursor >= 0:
+        let fn_loc = with_ci_cursor_location(session, fn_cursor)
+        if fn_loc.len() > 0:
+            comment = comment ++ "// Source: " ++ fn_loc ++ "\n"
+    if bail_loc.len() > 0:
+        comment = comment ++ "// Bail: " ++ bail_kind_name ++ " at " ++ bail_loc ++ "\n"
+    else if bail_kind_name.len() > 0 and bail_kind_name != "unknown":
+        comment = comment ++ "// Reason: " ++ bail_kind_name ++ "\n"
+    if fn_cursor >= 0:
+        let c_source = with_ci_cursor_source_text(session, fn_cursor)
+        if c_source.len() > 0:
+            comment = comment ++ "//\n// Original C:\n"
+            comment = comment ++ ci_comment_prefix_lines(c_source)
+    let body_line = "    comptime_error(\"migrator: untranslatable function '" ++ name ++ "'\")\n"
+    if migrate_prefer_brace():
+        comment ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ " {\n" ++ body_line ++ "}\n\n"
+    else:
+        comment ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body_line ++ "\n"
+
 // Write the shared defs module (defs.w) to output_dir.
 // Contains: preamble + hardcoded extras + shared declarations.
 fn ci_migrate_write_shared_defs(output_dir: str):
@@ -536,6 +576,16 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
         output = ci_replace_sparse(output, "= (-1", "= ((0 -% 1)")
         output = ci_replace_sparse(output, "else: (-1", "else: ((0 -% 1)")
 
+    // File-level summary for untranslated functions
+    if g_migrate_fn_untranslatable > 0:
+        let summary = f"// [MIGRATOR STATUS] This file contains {g_migrate_fn_untranslatable} untranslated functions.\n// Search for [MIGRATOR_UNTRANSLATED] to find each one.\n// The original C is included in comments.\n\n"
+        let header_end = ci_find_str(output, "\n\n")
+        if header_end >= 0:
+            let insert_pos = header_end as i64 + 2
+            output = output.slice(0, insert_pos) ++ summary ++ output.slice(insert_pos, output.len())
+        else:
+            output = summary ++ output
+
     // Write output
     let write_result = with_fs_write_file(output_path, output)
     if write_result != 0:
@@ -769,11 +819,11 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
 
     with_cimport_mark_name_emitted(name)
 
-    // Unsupported types — report and omit
+    // Unsupported types — emit stub with original C
     if has_unsupported:
         g_migrate_fn_untranslatable = g_migrate_fn_untranslatable + 1
         eprint(f"migrate: untranslatable function '{name}': unsupported type ({unsupported_reason})")
-        return ""
+        return ci_migrate_render_stub(name, safe_name, "", "Never", g_migrate_current_input_path, fn_cursor, session, "", "unsupported type: " ++ unsupported_reason)
 
     // @[c_export] for non-static functions (preserves C ABI)
     let export_prefix = if g_migrate_no_c_export != 0 or storage == CX_SC_STATIC: "" else: "@[c_export(\"" ++ name ++ "\")]\n"
@@ -787,20 +837,19 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
             return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ " {\n" ++ body ++ "}\n\n"
         return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body ++ "\n"
 
-    // Body translation failed.
-    // In --no-c-export mode, locally-defined functions that fail
-    // translation are reported as errors and omitted from output.
+    // Body translation failed — emit stub with original C
     if g_migrate_no_c_export != 0:
         let is_definition = with_ci_cursor_is_definition(session, ci_find_fn_cursor(session, name))
         if is_definition != 0:
             g_migrate_fn_untranslatable = g_migrate_fn_untranslatable + 1
             let bail_loc = ci_get_bail_location()
             let bail_k = ci_get_bail_kind()
+            let bail_kind_name = if bail_loc.len() > 0: ci_cursor_kind_name(bail_k) else: "unknown"
             if bail_loc.len() > 0:
-                eprint(f"migrate: untranslatable function '{name}': bailed at {ci_cursor_kind_name(bail_k)} ({bail_loc})")
+                eprint(f"migrate: untranslatable function '{name}': bailed at {bail_kind_name} ({bail_loc})")
             else:
                 eprint(f"migrate: untranslatable function '{name}': body translation failed")
-            return ""
+            return ci_migrate_render_stub(name, safe_name, params, ret, g_migrate_current_input_path, fn_cursor, session, bail_loc, bail_kind_name)
     let cc = with_cimport_fn_calling_conv(session, idx)
     let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
     let rendered = cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
