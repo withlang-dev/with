@@ -878,10 +878,6 @@ extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -
 
 extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
 
-extern let _pcre2_ebcdic_1047_to_ascii_8: *u8
-
-extern let _pcre2_ascii_to_ebcdic_1047_8: *u8
-
 // untranslatable fn-like macro
 fn ACROSSCHAR() -> Never:
     comptime_error("untranslatable C macro: ACROSSCHAR")
