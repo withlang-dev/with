@@ -844,6 +844,59 @@ EOF
   echo "PASS(cli-selfhost-migrate) cross_file_global_owner_arrays"
 }
 
+expect_migrate_shared_defs_prunes_unused_ownerless_externs() {
+  local case_dir="$tmpdir/migrate_shared_defs_ownerless_extern_case"
+  local generated_dir="$case_dir/generated"
+  local header="$case_dir/tables.h"
+  local owner_c="$case_dir/owner.c"
+  mkdir -p "$case_dir"
+
+  cat >"$header" <<'EOF'
+extern const unsigned char issue140_unused_external[];
+extern const unsigned char issue140_owned_table[];
+int issue140_read_owned(void);
+EOF
+
+  cat >"$owner_c" <<'EOF'
+#include "tables.h"
+
+const unsigned char issue140_owned_table[] = {3, 5, 8};
+
+int issue140_read_owned(void) {
+  return issue140_owned_table[1];
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$case_dir" --no-c-export --shared-defs defs -I "$case_dir" -o "$generated_dir"; then
+    echo "FAIL(cli-selfhost-migrate) shared_defs_ownerless_extern"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'let issue140_owned_table:' "$generated_dir/defs.w" \
+    || grep -Fq 'issue140_unused_external' "$generated_dir/defs.w"; then
+    echo "FAIL(cli-selfhost-migrate-output) shared_defs_ownerless_extern"
+    echo "--- defs.w"
+    sed -n '1,200p' "$generated_dir/defs.w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) shared_defs_ownerless_extern"
+}
+
+expect_pcre2_defs_prune_ebcdic_tables() {
+  if grep -Eq '_pcre2_(ebcdic_1047_to_ascii|ascii_to_ebcdic_1047)_8' lib/std/re/defs.w; then
+    echo "FAIL(cli-selfhost-regex-output) ebcdic_table_externs"
+    rg -n '_pcre2_(ebcdic_1047_to_ascii|ascii_to_ebcdic_1047)_8' lib/std/re/defs.w || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-regex) ebcdic_table_externs"
+}
+
 expect_pcre2_prepare_shared_externs() {
   # Var ownership is now handled by C1 at migration time. The raw output
   # already has correct var/extern var distinctions. This test verifies
@@ -1900,6 +1953,8 @@ expect_migrate_pcre2_config_template
 expect_migrate_assignment_compat
 expect_migrate_rvalue_sequencing
 expect_migrate_cross_file_global_owner_arrays
+expect_migrate_shared_defs_prunes_unused_ownerless_externs
+expect_pcre2_defs_prune_ebcdic_tables
 expect_pcre2_prepare_shared_externs
 expect_pcre2_prepare_width_prunes_whole_decls
 expect_pcre2_prepare_shared_lets

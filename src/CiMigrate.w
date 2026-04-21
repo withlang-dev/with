@@ -56,11 +56,29 @@ var g_migrate_shared_defs_prefix: str = ""
 var g_migrate_shared_decl_buf: str = ""
 var g_migrate_shared_decl_keys: str = ""
 
+type CiMigratePendingSharedExternVar {
+    kind: str = "",
+    name: str = "",
+    rendered: str = "",
+}
+
+var g_migrate_shared_pending_extern_vars: Vec[CiMigratePendingSharedExternVar] = Vec.new()
+var g_migrate_shared_usage_text: str = ""
+
 pub fn migrate_set_shared_defs(prefix: str):
     g_migrate_shared_defs_prefix = prefix
 
 fn ci_migrate_shared_defs_active() -> bool:
     g_migrate_shared_defs_prefix.len() > 0
+
+fn ci_migrate_shared_defs_reset:
+    g_migrate_shared_decl_buf = ""
+    g_migrate_shared_decl_keys = ""
+    g_migrate_shared_pending_extern_vars = Vec.new()
+    g_migrate_shared_usage_text = ""
+
+fn ci_migrate_shared_decl_key(kind: str, name: str) -> str:
+    "|" ++ kind ++ ":" ++ name ++ "|"
 
 // Single dedup entry point for every declaration kind that the migrator
 // emits into a shared buffer. `kind` is a short disambiguating prefix
@@ -73,12 +91,46 @@ fn ci_migrate_shared_defs_active() -> bool:
 fn ci_migrate_shared_decl_add(kind: str, name: str, rendered: str) -> bool:
     if not ci_migrate_shared_defs_active():
         return false
-    let key = "|" ++ kind ++ ":" ++ name ++ "|"
+    let key = ci_migrate_shared_decl_key(kind, name)
     if ci_find_str(g_migrate_shared_decl_keys, key) >= 0:
         return true
     g_migrate_shared_decl_keys = g_migrate_shared_decl_keys ++ key
     g_migrate_shared_decl_buf = g_migrate_shared_decl_buf ++ rendered ++ "\n"
     true
+
+fn ci_migrate_shared_ownerless_extern_add(kind: str, name: str, rendered: str) -> bool:
+    if not ci_migrate_shared_defs_active():
+        return false
+    let key = ci_migrate_shared_decl_key(kind, name)
+    if ci_find_str(g_migrate_shared_decl_keys, key) >= 0:
+        return true
+    g_migrate_shared_decl_keys = g_migrate_shared_decl_keys ++ key
+    g_migrate_shared_pending_extern_vars.push(CiMigratePendingSharedExternVar { kind: kind, name: name, rendered: rendered })
+    true
+
+fn ci_migrate_text_mentions_ident(text: str, name: str) -> bool:
+    if name.len() == 0 or name.len() > text.len():
+        return false
+    let tlen = text.len()
+    let nlen = name.len()
+    var start: i64 = 0
+    while start <= tlen - nlen:
+        let rel = ci_find_str(text.slice(start, tlen), name)
+        if rel < 0:
+            return false
+        let pos = start + rel as i64
+        let before_ok = pos == 0 or not ci_is_ident_char(text.byte_at(pos - 1))
+        let after_pos = pos + nlen
+        let after_ok = after_pos >= tlen or not ci_is_ident_char(text.byte_at(after_pos))
+        if before_ok and after_ok:
+            return true
+        start = pos + 1
+    false
+
+fn ci_migrate_shared_note_output_uses(output: str):
+    if not ci_migrate_shared_defs_active():
+        return
+    g_migrate_shared_usage_text = g_migrate_shared_usage_text ++ "\n" ++ output
 
 // Replace all occurrences of needle with replacement, assuming few matches.
 // Unlike ci_str_replace (O(n²) char-by-char concatenation), this is O(n * k)
@@ -158,6 +210,12 @@ fn ci_migrate_write_shared_defs(output_dir: str):
     // Shared declarations collected during migration.
     if g_migrate_shared_decl_buf.len() > 0:
         defs = defs ++ "\n" ++ g_migrate_shared_decl_buf
+    var pending_i = 0
+    while pending_i < g_migrate_shared_pending_extern_vars.len() as i32:
+        let pending = g_migrate_shared_pending_extern_vars.get(pending_i as i64)
+        if ci_migrate_text_mentions_ident(g_migrate_shared_usage_text, pending.name):
+            defs = defs ++ pending.rendered ++ "\n"
+        pending_i = pending_i + 1
     let defs_path = output_dir ++ "/defs.w"
     let rc = with_fs_write_file(defs_path, defs)
     if rc != 0:
@@ -586,6 +644,8 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
         else:
             output = summary ++ output
 
+    ci_migrate_shared_note_output_uses(output)
+
     // Write output
     let write_result = with_fs_write_file(output_path, output)
     if write_result != 0:
@@ -631,6 +691,8 @@ fn ci_migrate_excludes_contains(excludes: str, basename: str) -> bool:
 pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: str) -> i32:
     g_migrate_fn_translated_total = 0
     g_migrate_fn_untranslatable_total = 0
+    if ci_migrate_shared_defs_active():
+        ci_migrate_shared_defs_reset()
     // Create output directory
     with_fs_mkdir_p(output_dir)
 
@@ -981,9 +1043,6 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: st
         if second == 95 or (second >= 65 and second <= 90):
             return ""
 
-    if with_cimport_is_name_emitted(name) != 0:
-        return ""
-
     if ci_migrate_find_best_var_decl(session, count, name, primary_path) != idx:
         return ""
 
@@ -998,6 +1057,22 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: st
 
     let definition_kind = ci_migrate_var_definition_kind(session, idx)
     let emits_definition = ci_migrate_var_emits_definition(session, idx, primary_path, project_active, project)
+    let already_emitted = with_cimport_is_name_emitted(name) != 0
+    if already_emitted:
+        if ci_migrate_shared_defs_active() and not want_definitions and not emits_definition:
+            let owner_path = ci_migrate_project_var_owner_path(project_active, project, name)
+            if owner_path.len() == 0:
+                let is_const = with_cimport_var_is_const(session, idx)
+                let is_threadlocal = with_cimport_var_is_threadlocal(session, idx)
+                let safe_name = ci_escape_reserved(name)
+                let tl_attr = if is_threadlocal != 0: "@[threadlocal]\n" else: ""
+                if is_const != 0:
+                    let rendered = tl_attr ++ "extern let " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
+                    let _ = ci_migrate_shared_ownerless_extern_add("extern_let", safe_name, rendered)
+                else:
+                    let rendered = tl_attr ++ "extern var " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
+                    let _ = ci_migrate_shared_ownerless_extern_add("extern_var", safe_name, rendered)
+        return ""
     if want_definitions and not emits_definition:
         return ""
     if not want_definitions and emits_definition:
@@ -1041,16 +1116,24 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: st
             return ""
         return rendered
 
+    var shared_ownerless_extern = false
     if ci_migrate_shared_defs_active():
         let owner_path = ci_migrate_project_var_owner_path(project_active, project, name)
         if owner_path.len() > 0:
             return ""
+        shared_ownerless_extern = true
     if is_const != 0:
         let rendered = tl_attr ++ "extern let " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
+        if shared_ownerless_extern:
+            if ci_migrate_shared_ownerless_extern_add("extern_let", safe_name, rendered):
+                return ""
         if ci_migrate_shared_decl_add("extern_let", safe_name, rendered):
             return ""
         return rendered
     let rendered = tl_attr ++ "extern var " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
+    if shared_ownerless_extern:
+        if ci_migrate_shared_ownerless_extern_add("extern_var", safe_name, rendered):
+            return ""
     if ci_migrate_shared_decl_add("extern_var", safe_name, rendered):
         return ""
     rendered
