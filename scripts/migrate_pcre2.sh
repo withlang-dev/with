@@ -30,7 +30,6 @@ $WITH migrate "$PCRE2_SRC/" -o "$MIGRATE_OUT/" \
     --exclude pcre2posix.c \
     --exclude pcre2posix_test.c \
     --exclude pcre2_jit_test.c \
-    --exclude pcre2_jit_compile.c \
     --exclude pcre2_dftables.c \
     --exclude pcre2_fuzzsupport.c \
     -I "$PCRE2_SRC" \
@@ -45,7 +44,7 @@ for f in "$MIGRATE_OUT"/*.w; do
     base=$(basename "$f")
     case "$base" in
         pcre2test.w|pcre2demo.w|pcre2grep.w|pcre2posix_test.w|\
-        pcre2_jit_test.w|pcre2_jit_compile.w|pcre2_dftables.w|\
+        pcre2_jit_test.w|pcre2_dftables.w|\
         pcre2_fuzzsupport.w)
             ;;
         *)
