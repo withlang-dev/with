@@ -3143,7 +3143,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let tb_type_sym = self.ast.get_data1(pat_node)
         // Look up concrete sema type for the type symbol
         let tb_sema_sym = self.sema.pool_lookup_symbol(self.pool.resolve_symbol(tb_type_sym))
-        var tb_concrete_ty = self.sema.ty_i32
+        var tb_concrete_ty = self.sema.ty_i32 as i32
         if self.sema.named_types.contains(tb_sema_sym):
             tb_concrete_ty = self.sema.named_types.get(tb_sema_sym).unwrap()
         // Emit MirIntrinsic.MIR_INTRINSIC_DYN_DOWNCAST(scrutinee, type_sym) → concrete value
@@ -3393,15 +3393,10 @@ fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method
     let obj_type = self.expr_type(self_expr)
     if obj_type != 0 and obj_type != self.sema.ty_void:
         let resolved = self.sema.resolve_alias(obj_type)
-        let type_name_sym = self.sema.get_type_name(resolved)
+        let type_name_sym = self.sema.method_owner_symbol_for_type(resolved as i32)
         if type_name_sym != 0:
             let method_fn = self.sema.lookup_method_fn(type_name_sym, sema_method_sym)
             if method_fn != 0 and self.sema.lookup_method_sig(type_name_sym, sema_method_sym) >= 0:
-                return method_fn
-        let concrete_type_sym = self.sema.dyn_arg_concrete_type_symbol(resolved as i32)
-        if concrete_type_sym != 0:
-            let method_fn = self.sema.lookup_method_fn(concrete_type_sym, sema_method_sym)
-            if method_fn != 0 and self.sema.lookup_method_sig(concrete_type_sym, sema_method_sym) >= 0:
                 return method_fn
 
     if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
@@ -3559,7 +3554,10 @@ fn MirBuilder.receiver_option_intrinsic(self: MirBuilder, recv_expr: i32) -> i32
 
 fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
     // Lower method calls as normal calls with receiver inserted as first arg.
-    let callee_sym = self.resolve_method_callee_sym(self_expr, method_sym)
+    let callee_sym = if self.sema.comp_resolved.contains(node):
+        self.sema.comp_resolved.get(node).unwrap()
+    else:
+        self.resolve_method_callee_sym(self_expr, method_sym)
 
     // Classify intrinsic early — needed to decide whether to mark_unsupported.
     // For instance methods (vec.push), recv_type comes from the receiver expression.

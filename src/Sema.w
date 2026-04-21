@@ -1781,6 +1781,19 @@ fn Sema.is_opaque_value_type(self: Sema, tid: i32) -> i32:
         return 1
     0
 
+fn Sema.is_c_void_like_type(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    if self.get_type_kind(resolved) == TypeKind.TY_VOID:
+        return 1
+    if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return 0
+    let name_sym = self.get_type_d0(resolved)
+    if name_sym != 0 and self.pool_resolve(name_sym) == "c_void":
+        return 1
+    0
+
 // ── Scope management ─────────────────────────────────────────────
 
 fn Sema.push_scope(self: Sema):
@@ -2227,36 +2240,36 @@ fn Sema.types_compatible(self: Sema, expected: TypeId, actual: TypeId) -> i32:
 
     // Structural compatibility for non-interned compound types.
     if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_PTR:
-        if self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r))) == TypeKind.TY_VOID:
-            return 1
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
         if exp_mut != 0 and act_mut == 0:
             return 0
+        if self.is_c_void_like_type(self.get_type_d0(exp_r)) != 0 or self.is_c_void_like_type(self.get_type_d0(act_r)) != 0:
+            return 1
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
     if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_REF:
-        if self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r))) == TypeKind.TY_VOID:
-            return 1
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
         if exp_mut != 0 and act_mut == 0:
             return 0
+        if self.is_c_void_like_type(self.get_type_d0(exp_r)) != 0 or self.is_c_void_like_type(self.get_type_d0(act_r)) != 0:
+            return 1
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
     if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_REF:
-        if self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r))) == TypeKind.TY_VOID:
-            return 1
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
         if exp_mut != 0 and act_mut == 0:
             return 0
+        if self.is_c_void_like_type(self.get_type_d0(exp_r)) != 0 or self.is_c_void_like_type(self.get_type_d0(act_r)) != 0:
+            return 1
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
     if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_PTR:
-        if self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r))) == TypeKind.TY_VOID:
-            return 1
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
         if exp_mut != 0 and act_mut == 0:
             return 0
+        if self.is_c_void_like_type(self.get_type_d0(exp_r)) != 0 or self.is_c_void_like_type(self.get_type_d0(act_r)) != 0:
+            return 1
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
     if exp_k == TypeKind.TY_SLICE and act_k == TypeKind.TY_SLICE:
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))

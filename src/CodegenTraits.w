@@ -473,7 +473,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     for dtm_pi in 0..param_count:
         let dtm_p_name = self.pool.fn_param_name(param_start, dtm_pi)
         let dtm_p_type_node = self.pool.fn_param_type(param_start, dtm_pi)
-        var dtm_p_sema_ty = self.sema.ty_i32
+        var dtm_p_sema_ty = self.sema.ty_i32 as i32
         if dtm_p_type_node > 0:
             if self.sema.typed_expr_types.contains(dtm_p_type_node):
                 let dtm_tt = self.sema.typed_expr_types.get(dtm_p_type_node).unwrap()
@@ -485,7 +485,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
                     let dtm_type_sym = self.pool.get_data0(dtm_p_type_node)
                     let dtm_prim = self.sema.primitive_type_by_sym(dtm_type_sym)
                     if dtm_prim != 0:
-                        dtm_p_sema_ty = dtm_prim as TypeId
+                        dtm_p_sema_ty = dtm_prim as i32
                     else if self.sema.named_types.contains(dtm_type_sym):
                         dtm_p_sema_ty = self.sema.named_types.get(dtm_type_sym).unwrap()
         let dtm_p_local = dtm_builder.body.new_local(dtm_p_sema_ty, 1, dtm_p_name, 1)

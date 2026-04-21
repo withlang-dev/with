@@ -7350,7 +7350,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     // Register captures as MIR locals (locals 1..capture_count)
     for cl_ci in 0..capture_count:
         let cl_cap_sym = captures.get(cl_ci as i64)
-        var cl_cap_sema_ty = self.sema.ty_i32
+        var cl_cap_sema_ty = self.sema.ty_i32 as i32
         let cl_cap_sema_opt = self.local_sema_types.get(cl_cap_sym)
         if cl_cap_sema_opt.is_some():
             cl_cap_sema_ty = cl_cap_sema_opt.unwrap()
@@ -7361,7 +7361,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     for cl_pi in 0..param_count:
         let cl_p_name = self.pool.get_extra(extra_start + cl_pi * 2)
         let cl_p_type_node = self.pool.get_extra(extra_start + cl_pi * 2 + 1)
-        var cl_p_sema_ty = self.sema.ty_i32
+        var cl_p_sema_ty = self.sema.ty_i32 as i32
         if cl_p_type_node > 0:
             if self.sema.typed_expr_types.contains(cl_p_type_node):
                 let cl_tt = self.sema.typed_expr_types.get(cl_p_type_node).unwrap()
@@ -7373,7 +7373,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
                     let cl_type_sym = self.pool.get_data0(cl_p_type_node)
                     let cl_prim = self.sema.primitive_type_by_sym(cl_type_sym)
                     if cl_prim != 0:
-                        cl_p_sema_ty = cl_prim as TypeId
+                        cl_p_sema_ty = cl_prim as i32
                     else if self.sema.named_types.contains(cl_type_sym):
                         cl_p_sema_ty = self.sema.named_types.get(cl_type_sym).unwrap()
         let cl_p_local = closure_builder.body.new_local(cl_p_sema_ty, 1, cl_p_name, 1)
