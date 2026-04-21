@@ -1323,6 +1323,88 @@ EOF
   echo "PASS(cli-selfhost-migrate) typed_cast_macros"
 }
 
+expect_migrate_for_continue_switch_break_semantics() {
+  local case_dir="$tmpdir/migrate_for_continue_switch_break_case"
+  local src="$case_dir/for_continue_switch_break.c"
+  local out_w="$case_dir/for_continue_switch_break.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int issue161(unsigned int *pptr) {
+  int acc = 0;
+  for (; *pptr != 99u; pptr++) {
+    if (*pptr < 10u) continue;
+    switch (*pptr & 0xff00u) {
+    case 0x1100u:
+      break;
+    case 0x2200u:
+      pptr += 2;
+      break;
+    default:
+      return -1;
+    }
+    acc++;
+  }
+  return acc;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) for_continue_switch_break"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! python3 - "$out_w" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text()
+
+cont = re.search(
+    r"(?ms)if \(\(if \(unsafe: \*pptr\) < 10: 1 else: 0\) != 0\) \{\n(?P<body>.*?)^\s+\}",
+    text,
+)
+if cont is None:
+    raise SystemExit(1)
+cont_body = cont.group("body")
+inc_at = cont_body.find("(pptr = pptr + 1)")
+continue_at = cont_body.find("continue")
+if inc_at < 0 or continue_at < 0 or inc_at > continue_at:
+    raise SystemExit(1)
+
+case_4352 = re.search(r"(?ms)^\s+4352 =>\n(?P<body>.*?)(?=^\s+8704 =>)", text)
+if case_4352 is None:
+    raise SystemExit(1)
+case_4352_lines = [line.strip() for line in case_4352.group("body").splitlines() if line.strip()]
+if case_4352_lines != ["0"]:
+    raise SystemExit(1)
+
+case_8704 = re.search(r"(?ms)^\s+8704 =>\n(?P<body>.*?)(?=^\s+_ =>)", text)
+if case_8704 is None or "(pptr = pptr + 2)" not in case_8704.group("body"):
+    raise SystemExit(1)
+PY
+  then
+    echo "FAIL(cli-selfhost-migrate-output) for_continue_switch_break"
+    sed -n '1,260p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) for_continue_switch_break"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) for_continue_switch_break"
+}
+
 expect_migrate_goto_shadowed_local() {
   local case_dir="$tmpdir/migrate_goto_shadowed_local_case"
   local src="$case_dir/shadowed_local.c"
@@ -1827,6 +1909,7 @@ expect_migrate_tentative_global_owner
 expect_migrate_cross_file_tentative_global_owner
 expect_migrate_noop_pointer_cast_exprs
 expect_migrate_typed_cast_macros
+expect_migrate_for_continue_switch_break_semantics
 expect_migrate_goto_shadowed_local
 expect_migrate_recursive_anonymous_records
 expect_migrate_ir_roundtrip
