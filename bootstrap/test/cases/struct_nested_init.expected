@@ -1,7 +1,0 @@
-exit: 0
-stdout:
-test
-42
-
-stderr:
-

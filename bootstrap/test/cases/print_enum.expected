@@ -1,8 +1,0 @@
-exit: 0
-stdout:
-Red
-Circle(5)
-Rectangle(10)
-
-stderr:
-

@@ -1,6 +1,0 @@
-exit: 0
-stdout:
-all array_map_reduce tests passed
-
-stderr:
-

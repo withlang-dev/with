@@ -1,9 +1,0 @@
-exit: 0
-stdout:
-Some(1)
-Some(2)
-true
-false
-
-stderr:
-

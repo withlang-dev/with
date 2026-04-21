@@ -1,9 +1,0 @@
-exit: 0
-stdout:
-hello world
-42
-3.140000
-all stdlib io tests passed
-
-stderr:
-

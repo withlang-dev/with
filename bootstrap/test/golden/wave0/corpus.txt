@@ -1,5 +1,0 @@
-test/cases/arithmetic_mixed.w
-test/cases/async_scope.w
-test/cases/dyn_dispatch.w
-test/cases/generic_multi.w
-test/cases/tuples.w

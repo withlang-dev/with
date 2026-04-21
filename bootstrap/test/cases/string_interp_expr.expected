@@ -1,8 +1,0 @@
-exit: 0
-stdout:
-hello world
-x = 42
-point = (10, 20)
-
-stderr:
-

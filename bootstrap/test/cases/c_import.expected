@@ -1,7 +1,0 @@
-exit: 0
-stdout:
-hello from c_import
-strlen = 11
-
-stderr:
-

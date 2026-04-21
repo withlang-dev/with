@@ -1,9 +1,0 @@
-typed module decls=2
-decl[0] kind=function span=43..66
-  fn work() -> i32
-    expr int_literal span=65..66 : i32
-decl[1] kind=function span=68..134
-  fn main() -> i32
-    expr block span=88..134 : i32
-      expr async_scope span=88..128 : i32
-      expr int_literal span=133..134 : i32

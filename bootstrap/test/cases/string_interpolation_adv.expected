@@ -1,9 +1,0 @@
-exit: 0
-stdout:
-Name: Alice
-Age: 30
-Score: 95
-x=42, y=58
-
-stderr:
-

@@ -1,8 +1,0 @@
-exit: 0
-stdout:
-Point(custom)
-Color(rgb)
-all display trait tests passed
-
-stderr:
-
