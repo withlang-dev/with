@@ -49,7 +49,7 @@ fn InternStringArena.new() -> InternStringArena:
 fn InternStringArena.store(self: InternStringArena, s: str) -> str:
     if s.len() == 0:
         return ""
-    let src = *(&s as *const *const u8)
+    let src = unsafe: *(&s as *const *const u8)
     let len = s.len()
     let need = len + 1
     if self.offset + need > INTERN_PAGE_SIZE:
@@ -60,11 +60,11 @@ fn InternStringArena.store(self: InternStringArena, s: str) -> str:
     let page = self.pages.get(self.pages.len() - 1)
     let dest = (page as i64 + self.offset) as *mut u8
     with_memcpy(dest, src, len)
-    *((dest as i64 + len) as *mut u8) = 0
+    unsafe: *((dest as i64 + len) as *mut u8) = 0
     self.offset = self.offset + need
     var raw: [2]i64 = [dest as i64, len]
     let p = &raw as *const str
-    *p
+    unsafe: *p
 
 // ── InternPool ────────────────────────────────────────────────────
 
@@ -99,7 +99,7 @@ fn intern_text_eq(a: str, b: str) -> bool:
 fn InternPool.init -> InternPool:
     intern_debug_init("InternPool.init:start")
     let ptr = with_alloc(256) as *mut InternPoolState
-    *ptr = InternPoolState {
+    unsafe: *ptr = InternPoolState {
         symbol_texts: Vec.new(),
         symbol_map: intern_new_map_str_i32(),
         strings: InternStringArena.new(),
