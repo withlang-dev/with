@@ -1142,7 +1142,8 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
         if is_unsigned: return wl_build_lshr(self.builder, l, r)
         return wl_build_ashr(self.builder, l, r)
     if op == BinaryOp.OP_CONCAT: return self.mir_str_concat(lhs, rhs)
-    with_eprint("warning: [mir-binop] unhandled binary op")
+    with_eprint("error: unsupported MIR binary op '" ++ mir_binop_name(op) ++ "' reached LLVM codegen")
+    self.had_error = 1
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.mir_str_concat(self: Codegen, lhs: i64, rhs: i64) -> i64:
