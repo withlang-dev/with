@@ -382,6 +382,320 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     let sig_idx = self.get_sig(fn_name)
     self.check_fn_body_with_sig(node, sig_idx)
 
+// ── Reachable comptime_error validation ─────────────────────────
+
+fn Sema.fn_decl_has_c_export(self: Sema, fn_node: i32) -> i32:
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return 0
+    if self.ast.fn_meta_tp_count(meta) != 0:
+        return 0
+    let cc_sym = self.ast.fn_meta_tp_start(meta)
+    if cc_sym == 0:
+        return 0
+    let cc_name = self.pool_resolve(cc_sym)
+    if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
+        return 1
+    0
+
+fn Sema.fn_decl_is_comptime_error_root(self: Sema, fn_node: i32) -> i32:
+    let fn_sym = self.ast.get_data0(fn_node)
+    let fn_name = self.pool_resolve(fn_sym)
+    if fn_name == "main":
+        return 1
+    let flags = self.ast.get_data2(fn_node)
+    if (flags / FnFlags.ENTRY) % 2 == 1:
+        return 1
+    if self.fn_decl_has_c_export(fn_node) != 0:
+        return 1
+    0
+
+fn Sema.emit_reachable_comptime_error(self: Sema, node: i32):
+    let msg_sym = self.ast.get_data0(node)
+    let msg = self.pool_resolve(msg_sym)
+    if msg.len() > 0:
+        self.emit_error(msg, node)
+        return
+    self.emit_error("comptime_error", node)
+
+fn Sema.check_reachable_comptime_errors(self: Sema):
+    if self.diags.has_errors():
+        return
+
+    let seen: HashMap[i32, i32] = sema_new_map_i32_i32()
+    let visiting: HashMap[i32, i32] = sema_new_map_i32_i32()
+    let decl_indices: HashMap[i32, i32] = sema_new_map_i32_i32()
+
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) == NodeKind.NK_FN_DECL:
+            decl_indices.insert(decl, di)
+
+    for di2 in 0..self.ast.decl_count():
+        self.update_decl_source_context(di2)
+        let decl2 = self.ast.get_decl(di2)
+        if self.ast.kind(decl2) != NodeKind.NK_FN_DECL:
+            continue
+        if self.fn_decl_is_comptime_error_root(decl2) == 0:
+            continue
+        self.check_fn_reachable_comptime_errors(decl2, &mut seen, &mut visiting, &mut decl_indices)
+
+fn Sema.update_reachable_fn_source_context(self: Sema, fn_node: i32, decl_indices: &mut HashMap[i32, i32]):
+    if decl_indices.contains(fn_node):
+        self.update_decl_source_context(decl_indices.get(fn_node).unwrap())
+
+fn Sema.check_reachable_call_target(self: Sema, fn_sym: i32, seen: &mut HashMap[i32, i32], visiting: &mut HashMap[i32, i32], decl_indices: &mut HashMap[i32, i32]):
+    if fn_sym == 0:
+        return
+    if self.fn_decl_nodes.contains(fn_sym):
+        let callee = self.fn_decl_nodes.get(fn_sym).unwrap()
+        self.check_fn_reachable_comptime_errors(callee, seen, visiting, decl_indices)
+        return
+    if self.generic_fn_nodes.contains(fn_sym):
+        let callee2 = self.generic_fn_nodes.get(fn_sym).unwrap()
+        self.check_fn_reachable_comptime_errors(callee2, seen, visiting, decl_indices)
+
+fn Sema.check_fn_reachable_comptime_errors(self: Sema, fn_node: i32, seen: &mut HashMap[i32, i32], visiting: &mut HashMap[i32, i32], decl_indices: &mut HashMap[i32, i32]):
+    if seen.contains(fn_node):
+        return
+    if visiting.contains(fn_node):
+        return
+    visiting.insert(fn_node, 1)
+    self.update_reachable_fn_source_context(fn_node, decl_indices)
+    let body = self.ast.get_data1(fn_node)
+    self.check_expr_reachable_comptime_errors(body, seen, visiting, decl_indices)
+    visiting.remove(fn_node)
+    seen.insert(fn_node, 1)
+
+fn Sema.check_call_reachable_comptime_errors(self: Sema, node: i32, seen: &mut HashMap[i32, i32], visiting: &mut HashMap[i32, i32], decl_indices: &mut HashMap[i32, i32]):
+    let callee = self.ast.get_data0(node)
+    self.check_expr_reachable_comptime_errors(callee, seen, visiting, decl_indices)
+
+    let has_resolved = self.has_resolved_call_args(node)
+    if has_resolved != 0:
+        let resolved_count = self.get_resolved_call_arg_count(node)
+        for rai in 0..resolved_count:
+            let arg = self.get_resolved_call_arg(node, rai)
+            if arg > 0:
+                self.check_expr_reachable_comptime_errors(arg, seen, visiting, decl_indices)
+    else:
+        let extra_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        for ai in 0..arg_count:
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(extra_start + ai), seen, visiting, decl_indices)
+
+    var fn_sym = 0
+    if self.comp_resolved.contains(node):
+        fn_sym = self.comp_resolved.get(node).unwrap()
+    else if self.ast.kind(callee) == NodeKind.NK_IDENT:
+        fn_sym = self.ast.get_data0(callee)
+    let saved_file_id = self.local_file_id
+    let saved_module_path = self.current_module_path
+    let saved_module_has_ci = self.current_module_has_ci
+    self.check_reachable_call_target(fn_sym, seen, visiting, decl_indices)
+    self.local_file_id = saved_file_id
+    self.current_module_path = saved_module_path
+    self.current_module_has_ci = saved_module_has_ci
+
+fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32, seen: &mut HashMap[i32, i32], visiting: &mut HashMap[i32, i32], decl_indices: &mut HashMap[i32, i32]):
+    if node == 0:
+        return
+    let kind = self.ast.kind(node)
+
+    if kind == NodeKind.NK_COMPTIME_ERROR:
+        self.emit_reachable_comptime_error(node)
+        return
+
+    if kind == NodeKind.NK_CALL:
+        self.check_call_reachable_comptime_errors(node, seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_BINARY:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data2(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_UNARY:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_UNSAFE_BLOCK:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        for si in 0..stmt_count:
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(extra_start + si), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data2(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_LET_BINDING:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_LET_ELSE:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data2(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data2(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_IF_EXPR:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data2(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_ASSIGN:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_WHILE:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_LOOP:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_FOR:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data2(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_BREAK:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_MATCH:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        let extra_start2 = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        for mi in 0..arm_count:
+            let arm = self.ast.get_extra(extra_start2 + mi)
+            self.check_expr_reachable_comptime_errors(self.ast.get_data2(arm), seen, visiting, decl_indices)
+            self.check_expr_reachable_comptime_errors(self.ast.get_data1(arm), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT:
+        let extra_start3 = self.ast.get_data0(node)
+        let elem_count = self.ast.get_data1(node)
+        for ei in 0..elem_count:
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(extra_start3 + ei), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_STRUCT_LIT or kind == NodeKind.NK_RECORD_UPDATE:
+        if kind == NodeKind.NK_RECORD_UPDATE:
+            self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        let extra_start4 = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        for fi in 0..field_count:
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(extra_start4 + fi * 2 + 1), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_INDEX:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_MULTI_INDEX:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        let spec_start = self.ast.get_data1(node)
+        let spec_count = self.ast.get_data2(node)
+        for spi in 0..spec_count:
+            let spec = self.ast.get_extra(spec_start + spi)
+            self.check_expr_reachable_comptime_errors(self.ast.get_data0(spec), seen, visiting, decl_indices)
+            self.check_expr_reachable_comptime_errors(self.ast.get_data1(spec), seen, visiting, decl_indices)
+            let step_node = self.ast.get_data2(spec) % INDEX_KIND_SHIFT
+            self.check_expr_reachable_comptime_errors(step_node, seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_SLICE:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data2(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_CAST:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_ENUM_VARIANT:
+        let extra_start5 = self.ast.get_data2(node)
+        let arg_count2 = self.ast.get_extra(extra_start5)
+        for vi in 0..arg_count2:
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(extra_start5 + 1 + vi), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_VARIANT_SHORTHAND:
+        let extra_start6 = self.ast.get_data1(node)
+        let arg_count3 = self.ast.get_data2(node)
+        for vsi in 0..arg_count3:
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(extra_start6 + vsi), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_OPTIONAL_CHAIN:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        let extra_start7 = self.ast.get_data2(node)
+        if extra_start7 != 0:
+            let has_args = self.ast.get_extra(extra_start7)
+            if has_args != 0:
+                let arg_count4 = self.ast.get_extra(extra_start7 + 1)
+                for oai in 0..arg_count4:
+                    self.check_expr_reachable_comptime_errors(self.ast.get_extra(extra_start7 + 2 + oai), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_ARRAY_COMPREHENSION:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        self.check_expr_reachable_comptime_errors(self.ast.get_data2(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_ASYNC_SCOPE:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_SELECT_AWAIT:
+        let extra_start8 = self.ast.get_data0(node)
+        let arm_count2 = self.ast.get_data1(node)
+        for sai in 0..arm_count2:
+            let base = extra_start8 + sai * 3
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(base + 1), seen, visiting, decl_indices)
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(base + 2), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_FSTRING:
+        let seg_count = self.ast.get_data0(node)
+        let extra_start9 = self.ast.get_data1(node)
+        var pos = extra_start9
+        for _ in 0..seg_count:
+            let seg_kind = self.ast.get_extra(pos)
+            if seg_kind == FStringSegmentKind.EXPR:
+                self.check_expr_reachable_comptime_errors(self.ast.get_extra(pos + 1), seen, visiting, decl_indices)
+                self.check_expr_reachable_comptime_errors(self.ast.get_extra(pos + 2), seen, visiting, decl_indices)
+                pos = pos + 3
+            else:
+                pos = pos + 2
+
 // ── Concrete type-checking for monomorphized generic functions ───
 // Type-checks a generic function body with concrete type substitutions,
 // populating typed_expr_types so MirLower has type information.
@@ -3471,6 +3785,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     // Known function
     if sig_idx >= 0:
+        self.comp_resolved.insert(node, fn_sym)
         let ret = self.sig_return_type(sig_idx) as i32
         // Check arg count (supports default parameters via required-count
         // metadata packed into fn_meta flags by the parser).
@@ -3536,6 +3851,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     if self.generic_fn_nodes.contains(fn_sym):
         let fn_node = self.generic_fn_nodes.get(fn_sym).unwrap()
         let ret = self.check_generic_call(fn_sym, fn_node, arg_types, arg_count, node)
+        self.comp_resolved.insert(node, fn_sym)
         self.typed_expr_types.insert(node, ret)
         return ret
 

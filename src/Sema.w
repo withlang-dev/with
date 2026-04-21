@@ -2063,6 +2063,7 @@ fn Sema.check_module(self: Sema):
     self.prepare_for_comptime_transform()
     self.check_top_level_comptime_let_values()
     self.check_bodies()
+    self.check_reachable_comptime_errors()
 
 fn Sema.prepare_for_comptime_transform(self: Sema):
     self.compute_method_origins()
