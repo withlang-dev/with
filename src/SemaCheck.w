@@ -1719,6 +1719,8 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         if tk == TypeKind.TY_REF:
             return self.get_type_d0(resolved)
         if tk == TypeKind.TY_PTR:
+            if self.in_unsafe == 0:
+                self.emit_error("raw pointer dereference requires unsafe context", node)
             return self.get_type_d0(resolved)
         return 0
     if op == UnaryOp.UOP_TRY:

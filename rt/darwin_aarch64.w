@@ -37,7 +37,7 @@ extern fn mach_timebase_info(info: &mut MachTimebaseInfo) -> i32
 
 fn get_errno() -> i32:
     let p = __error()
-    *p
+    unsafe: *p
 
 // ── StatBuf (stdlib's view of metadata) ─────────────────────────
 
@@ -127,14 +127,14 @@ pub fn rt_stat_impl(path: *const u8, out: *mut RtStatBuf) -> i32:
     // offset 4: st_mode (u16), offset 48: st_mtimespec.tv_sec (i64),
     // offset 56: st_mtimespec.tv_nsec (i64), offset 96: st_size (i64)
     let base = &native_buf as i64
-    let size = *((base + 96) as *const i64)
-    let mode = *((base + 4) as *const u16)
-    let mtime_sec = *((base + 48) as *const i64)
-    let mtime_nsec = *((base + 56) as *const i64)
-    (*out).size = size
-    (*out).is_dir = if (mode as i32 & 0o170000) == 0o040000: 1 else: 0
-    (*out).is_file = if (mode as i32 & 0o170000) == 0o100000: 1 else: 0
-    (*out).modified_ns = mtime_sec * 1000000000 + mtime_nsec
+    let size = unsafe: *((base + 96) as *const i64)
+    let mode = unsafe: *((base + 4) as *const u16)
+    let mtime_sec = unsafe: *((base + 48) as *const i64)
+    let mtime_nsec = unsafe: *((base + 56) as *const i64)
+    (unsafe: *out).size = size
+    (unsafe: *out).is_dir = if (mode as i32 & 0o170000) == 0o040000: 1 else: 0
+    (unsafe: *out).is_file = if (mode as i32 & 0o170000) == 0o100000: 1 else: 0
+    (unsafe: *out).modified_ns = mtime_sec * 1000000000 + mtime_nsec
     0
 
 @[c_export("rt_getcwd")]
@@ -286,17 +286,17 @@ pub fn rt_sysinfo_impl(out: *mut RtSysInfo) -> i32:
     var cores: i32 = 0
     var cores_len: i64 = 4
     let _ = sysctlbyname("hw.logicalcpu" as *const u8, &cores as *mut u8, &mut cores_len, 0 as *const u8, 0)
-    (*out).cpu_cores = if cores > 0: cores else: 1
+    (unsafe: *out).cpu_cores = if cores > 0: cores else: 1
 
     // Total memory: sysctl hw.memsize
     var memsize: i64 = 0
     var memsize_len: i64 = 8
     let _ = sysctlbyname("hw.memsize" as *const u8, &memsize as *mut u8, &mut memsize_len, 0 as *const u8, 0)
-    (*out).memory_total = memsize
+    (unsafe: *out).memory_total = memsize
 
     // Page size: sysconf(_SC_PAGESIZE)
     let ps = sysconf(29)  // _SC_PAGESIZE = 29 on darwin
-    (*out).page_size = ps
+    (unsafe: *out).page_size = ps
     0
 
 // ── Environment ─────────────────────────────────────────────────

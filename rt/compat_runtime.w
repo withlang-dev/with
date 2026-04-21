@@ -44,13 +44,13 @@ var active_child_pgid: i32 = 0
 fn make_str(ptr: *const u8, len: i64) -> str:
     var raw: [2]i64 = [ptr as i64, len]
     let p = &raw as *const str
-    *p
+    unsafe: *p
 
 fn store_i64(base: i64, offset: i64, value: i64):
-    *((base + offset) as *mut i64) = value
+    unsafe: *((base + offset) as *mut i64) = value
 
 fn load_u64(base: i64, offset: i64) -> u64:
-    *((base + offset) as *const u64)
+    unsafe: *((base + offset) as *const u64)
 
 fn signal_bit(signo: i32) -> u32:
     if signo <= 0:
@@ -63,8 +63,9 @@ fn str_to_c_buf(s: str) -> *mut u8:
         return 0 as *mut u8
     if s.len() > 0:
         let sp = &s as *const *const u8
-        with_memcpy(out, *sp, s.len())
-    *((out as i64 + s.len()) as *mut u8) = 0
+        let data = unsafe: *sp
+        with_memcpy(out, data, s.len())
+    unsafe: *((out as i64 + s.len()) as *mut u8) = 0
     out
 
 fn restore_default_signal_handler(signo: i32):
@@ -98,7 +99,7 @@ fn wait_for_child_process(pid: i32) -> i32:
             return status
         if waited < 0:
             let errp = __error()
-            if errp as i64 != 0 and *errp == EINTR:
+            if errp as i64 != 0 and unsafe: *errp == EINTR:
                 continue
             return -1
 
@@ -193,7 +194,7 @@ pub fn system_str(cmd: str) -> i32:
         with_free(buf)
         let errp = __error()
         if errp as i64 != 0:
-            *errp = EINTR
+            unsafe: *errp = EINTR
         return -1
     let rc = run_shell_command(buf as *const u8)
     with_free(buf)
@@ -211,8 +212,8 @@ pub fn extract_tgz(archive: str, dest: str) -> i32:
     let cmd = with_alloc(total + 1)
     if cmd as i64 == 0:
         return -1
-    let archive_ptr = *(&archive as *const *const u8)
-    let dest_ptr = *(&dest as *const *const u8)
+    let archive_ptr = unsafe: *(&archive as *const *const u8)
+    let dest_ptr = unsafe: *(&dest as *const *const u8)
     var pos: i64 = 0
     with_memcpy((cmd as i64 + pos) as *mut u8, prefix, prefix_len)
     pos = pos + prefix_len
@@ -225,7 +226,7 @@ pub fn extract_tgz(archive: str, dest: str) -> i32:
         with_memcpy((cmd as i64 + pos) as *mut u8, dest_ptr, dest.len())
         pos = pos + dest.len()
     with_memcpy((cmd as i64 + pos) as *mut u8, suffix, suffix_len)
-    *((cmd as i64 + total) as *mut u8) = 0
+    unsafe: *((cmd as i64 + total) as *mut u8) = 0
     if interrupt_flag != 0:
         with_free(cmd)
         return -1

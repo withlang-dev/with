@@ -11,7 +11,7 @@ extern fn abort() -> void
 
 fn str_data(s: str) -> *const u8:
     let p = &s as *const *const u8
-    *p
+    unsafe: *p
 
 fn panic_render(msg: str, file: str, line: i32) -> str:
     if file.len() > 0:

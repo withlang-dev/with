@@ -59,32 +59,32 @@ fn rt_f64_to_buf(val: f64, buf: *mut u8, bufsize: i64) -> i64:
     var pos: i64 = 0
     if f64_is_nan(val):
         if bufsize >= 3:
-            *((buf as i64 + 0) as *mut u8) = 110  // 'n'
-            *((buf as i64 + 1) as *mut u8) = 97   // 'a'
-            *((buf as i64 + 2) as *mut u8) = 110  // 'n'
+            unsafe: *((buf as i64 + 0) as *mut u8) = 110  // 'n'
+            unsafe: *((buf as i64 + 1) as *mut u8) = 97   // 'a'
+            unsafe: *((buf as i64 + 2) as *mut u8) = 110  // 'n'
         return 3
     if val > 1.7e308:
         if bufsize >= 3:
-            *((buf as i64 + 0) as *mut u8) = 105  // 'i'
-            *((buf as i64 + 1) as *mut u8) = 110  // 'n'
-            *((buf as i64 + 2) as *mut u8) = 102  // 'f'
+            unsafe: *((buf as i64 + 0) as *mut u8) = 105  // 'i'
+            unsafe: *((buf as i64 + 1) as *mut u8) = 110  // 'n'
+            unsafe: *((buf as i64 + 2) as *mut u8) = 102  // 'f'
         return 3
     if val < -1.7e308:
         if bufsize >= 4:
-            *((buf as i64 + 0) as *mut u8) = 45   // '-'
-            *((buf as i64 + 1) as *mut u8) = 105  // 'i'
-            *((buf as i64 + 2) as *mut u8) = 110  // 'n'
-            *((buf as i64 + 3) as *mut u8) = 102  // 'f'
+            unsafe: *((buf as i64 + 0) as *mut u8) = 45   // '-'
+            unsafe: *((buf as i64 + 1) as *mut u8) = 105  // 'i'
+            unsafe: *((buf as i64 + 2) as *mut u8) = 110  // 'n'
+            unsafe: *((buf as i64 + 3) as *mut u8) = 102  // 'f'
         return 4
     var v = val
     if v < 0.0:
         if pos < bufsize:
-            *((buf as i64 + pos) as *mut u8) = 45  // '-'
+            unsafe: *((buf as i64 + pos) as *mut u8) = 45  // '-'
             pos = pos + 1
         v = 0.0 - v
     if v == 0.0:
         if pos < bufsize:
-            *((buf as i64 + pos) as *mut u8) = 48  // '0'
+            unsafe: *((buf as i64 + pos) as *mut u8) = 48  // '0'
             pos = pos + 1
         return pos
     // Integer part
@@ -94,14 +94,14 @@ fn rt_f64_to_buf(val: f64, buf: *mut u8, bufsize: i64) -> i64:
     let ilen = u64_to_buf_internal(int_part, &ibuf as *mut u8)
     var ii: i64 = 0
     while ii < ilen and pos < bufsize:
-        *((buf as i64 + pos) as *mut u8) = ibuf[ii]
+        unsafe: *((buf as i64 + pos) as *mut u8) = ibuf[ii]
         pos = pos + 1
         ii = ii + 1
     // Fractional part: multiply by 10^6 once to get all digits as integer,
     // avoiding repeated multiply-by-10 drift.
     if frac > 0.000000001:
         if pos < bufsize:
-            *((buf as i64 + pos) as *mut u8) = 46  // '.'
+            unsafe: *((buf as i64 + pos) as *mut u8) = 46  // '.'
             pos = pos + 1
         // Round to 6 decimal places: frac_int = round(frac * 1000000)
         let frac_int = (frac * 1000000.0 + 0.5) as u64
@@ -116,11 +116,11 @@ fn rt_f64_to_buf(val: f64, buf: *mut u8, bufsize: i64) -> i64:
             fdi = fdi - 1
         var fwi: i32 = 0
         while fwi < 6 and pos < bufsize:
-            *((buf as i64 + pos) as *mut u8) = fdigits[fwi as i64]
+            unsafe: *((buf as i64 + pos) as *mut u8) = fdigits[fwi as i64]
             pos = pos + 1
             fwi = fwi + 1
         // Trim trailing zeros
-        while pos > frac_start and *((buf as i64 + pos - 1) as *const u8) == 48:
+        while pos > frac_start and unsafe: *((buf as i64 + pos - 1) as *const u8) == 48:
             pos = pos - 1
         // If all fractional digits were zero, remove the dot
         if pos == frac_start:
@@ -132,14 +132,14 @@ fn rt_f64_to_fixed_buf(val: f64, precision: i32, buf: *mut u8, bufsize: i64) -> 
     var pos: i64 = 0
     if f64_is_nan(val):
         if bufsize >= 3:
-            *((buf as i64 + 0) as *mut u8) = 110
-            *((buf as i64 + 1) as *mut u8) = 97
-            *((buf as i64 + 2) as *mut u8) = 110
+            unsafe: *((buf as i64 + 0) as *mut u8) = 110
+            unsafe: *((buf as i64 + 1) as *mut u8) = 97
+            unsafe: *((buf as i64 + 2) as *mut u8) = 110
         return 3
     var v = val
     if v < 0.0:
         if pos < bufsize:
-            *((buf as i64 + pos) as *mut u8) = 45
+            unsafe: *((buf as i64 + pos) as *mut u8) = 45
             pos = pos + 1
         v = 0.0 - v
     let int_part = v as u64
@@ -148,12 +148,12 @@ fn rt_f64_to_fixed_buf(val: f64, precision: i32, buf: *mut u8, bufsize: i64) -> 
     let ilen = u64_to_buf_internal(int_part, &ibuf as *mut u8)
     var ii: i64 = 0
     while ii < ilen and pos < bufsize:
-        *((buf as i64 + pos) as *mut u8) = ibuf[ii]
+        unsafe: *((buf as i64 + pos) as *mut u8) = ibuf[ii]
         pos = pos + 1
         ii = ii + 1
     if precision > 0:
         if pos < bufsize:
-            *((buf as i64 + pos) as *mut u8) = 46
+            unsafe: *((buf as i64 + pos) as *mut u8) = 46
             pos = pos + 1
         // Compute scale = 10^precision, then frac_int = round(frac * scale)
         var scale: f64 = 1.0
@@ -173,7 +173,7 @@ fn rt_f64_to_fixed_buf(val: f64, precision: i32, buf: *mut u8, bufsize: i64) -> 
         // Write digits left to right
         var fwi: i32 = 0
         while fwi < precision and pos < bufsize:
-            *((buf as i64 + pos) as *mut u8) = fdigits[fwi as i64]
+            unsafe: *((buf as i64 + pos) as *mut u8) = fdigits[fwi as i64]
             pos = pos + 1
             fwi = fwi + 1
     pos
@@ -185,17 +185,17 @@ fn u64_to_buf_internal(n: u64, buf: *mut u8) -> i64:
     var tpos: i64 = 20
     var val = n
     if val == 0:
-        *((tp as i64 + tpos) as *mut u8) = 48  // '0'
+        unsafe: *((tp as i64 + tpos) as *mut u8) = 48  // '0'
         tpos = tpos - 1
     else:
         while val > 0:
-            *((tp as i64 + tpos) as *mut u8) = (48 + (val % 10) as i32) as u8
+            unsafe: *((tp as i64 + tpos) as *mut u8) = (48 + (val % 10) as i32) as u8
             tpos = tpos - 1
             val = val / 10
     let len = 20 - tpos
     var i: i64 = 0
     while i < len:
-        *((buf as i64 + i) as *mut u8) = tp[tpos + 1 + i]
+        unsafe: *((buf as i64 + i) as *mut u8) = tp[tpos + 1 + i]
         i = i + 1
     len
 
@@ -211,7 +211,7 @@ type RawStr:
 
 fn str_data(s: str) -> *const u8:
     let p = &s as *const *const u8
-    *p
+    unsafe: *p
 
 fn str_length(s: str) -> i64:
     s.len()
@@ -219,7 +219,7 @@ fn str_length(s: str) -> i64:
 fn make_str(ptr: *const u8, len: i64) -> str:
     let raw = RawStr { ptr: ptr, len: len }
     let p = &raw as *const str
-    *p
+    unsafe: *p
 
 fn cstr_len(s: *const u8) -> i64:
     if s as i64 == 0:
@@ -234,7 +234,7 @@ fn cstr_len(s: *const u8) -> i64:
 fn rt_memcpy(dst: *mut u8, src: *const u8, n: i64):
     var i: i64 = 0
     while i < n:
-        *((dst as i64 + i) as *mut u8) = src[i]
+        unsafe: *((dst as i64 + i) as *mut u8) = src[i]
         i = i + 1
 
 fn rt_memcmp(a: *const u8, b: *const u8, n: i64) -> i32:
@@ -252,7 +252,7 @@ fn rt_memcmp(a: *const u8, b: *const u8, n: i64) -> i32:
 fn rt_memset(dst: *mut u8, c: u8, n: i64):
     var i: i64 = 0
     while i < n:
-        *((dst as i64 + i) as *mut u8) = c
+        unsafe: *((dst as i64 + i) as *mut u8) = c
         i = i + 1
 
 // ── Freelist allocator backed by rt_mmap/rt_munmap ─────────────────
@@ -343,17 +343,17 @@ fn alloc_header_ptr(ptr: *const u8) -> *mut u8:
     (ptr as i64 - RT_ALLOC_HEADER_SIZE) as *mut u8
 
 fn alloc_payload_size(ptr: *const u8) -> i64:
-    *(alloc_header_ptr(ptr) as *const i64)
+    unsafe: *(alloc_header_ptr(ptr) as *const i64)
 
 fn alloc_store_small_header(block: i64, size: i64):
-    *(block as *mut i64) = size
+    unsafe: *(block as *mut i64) = size
 
 fn small_block_ptr(block: i64) -> *mut u8:
     (block + RT_ALLOC_HEADER_SIZE) as *mut u8
 
 fn free_small_block(block: i64, idx: i32):
     let old_head = get_freelist(idx)
-    *(block as *mut i64) = old_head
+    unsafe: *(block as *mut i64) = old_head
     set_freelist(idx, block)
 
 fn rt_alloc(size_arg: i64) -> *mut u8:
@@ -366,7 +366,7 @@ fn rt_alloc(size_arg: i64) -> *mut u8:
         if p as i64 == 0:
             rt_exit(99)
         // Store allocation size in header
-        *(p as *mut i64) = size
+        unsafe: *(p as *mut i64) = size
         return (p as i64 + RT_ALLOC_HEADER_SIZE) as *mut u8
 
     // Small allocation: check freelist keyed by payload size class.
@@ -377,7 +377,7 @@ fn rt_alloc(size_arg: i64) -> *mut u8:
     let head = get_freelist(idx)
     if head != 0:
         // Pop from freelist. Zero the payload — recycled memory is dirty.
-        let next = *(head as *const i64)
+        let next = unsafe: *(head as *const i64)
         set_freelist(idx, next)
         alloc_store_small_header(head, cls_size)
         let ptr = small_block_ptr(head)
@@ -402,7 +402,7 @@ fn rt_free(ptr: *mut u8):
     if ptr as i64 == 0:
         return
     let block = alloc_header_ptr(ptr as *const u8) as i64
-    let size = *(block as *const i64)
+    let size = unsafe: *(block as *const i64)
     if size > RT_LARGE_THRESHOLD:
         rt_munmap(block as *mut u8, (size + RT_ALLOC_HEADER_SIZE) as u64)
         return
@@ -445,7 +445,7 @@ fn str_to_cstr(s: str) -> *const u8:
     let slen = str_length(s)
     let buf = rt_alloc(slen + 1)
     rt_memcpy(buf, str_data(s), slen)
-    *((buf as i64 + slen) as *mut u8) = 0
+    unsafe: *((buf as i64 + slen) as *mut u8) = 0
     buf as *const u8
 
 // ── Exported allocator/memory API for std/mem.w ───────────────────
@@ -499,7 +499,7 @@ pub fn memcmp_export(a: *const u8, b: *const u8, n: i64) -> i32:
 fn alloc_str(buf: *const u8, len: i64) -> str:
     let out = rt_alloc(len + 1)
     rt_memcpy(out, buf, len)
-    *((out as i64 + len) as *mut u8) = 0
+    unsafe: *((out as i64 + len) as *mut u8) = 0
     make_str(out as *const u8, len)
 
 // ── I/O helpers ────────────────────────────────────────────────────
@@ -724,12 +724,12 @@ pub fn fmt_str_debug(s: str) -> str:
     let slen = str_length(s)
     let out_len = slen + 2
     let out = rt_alloc(out_len + 1)
-    *(out as *mut u8) = 34  // '"'
+    unsafe: *(out as *mut u8) = 34  // '"'
     let sp = str_data(s)
     if sp as i64 != 0 and slen > 0:
         rt_memcpy((out as i64 + 1) as *mut u8, sp, slen)
-    *((out as i64 + slen + 1) as *mut u8) = 34  // '"'
-    *((out as i64 + out_len) as *mut u8) = 0
+    unsafe: *((out as i64 + slen + 1) as *mut u8) = 34  // '"'
+    unsafe: *((out as i64 + out_len) as *mut u8) = 0
     make_str(out as *const u8, out_len)
 
 // ── Float formatting ───────────────────────────────────────────────
@@ -755,17 +755,17 @@ let FMT_BUF_OFF_LEN: i64 = 8
 let FMT_BUF_OFF_CAP: i64 = 16
 
 fn fb_ptr(b: *mut u8) -> *mut u8:
-    *(b as *const *mut u8)
+    unsafe: *(b as *const *mut u8)
 fn fb_len(b: *mut u8) -> i64:
-    *((b as i64 + FMT_BUF_OFF_LEN) as *const i64)
+    unsafe: *((b as i64 + FMT_BUF_OFF_LEN) as *const i64)
 fn fb_cap(b: *mut u8) -> i64:
-    *((b as i64 + FMT_BUF_OFF_CAP) as *const i64)
+    unsafe: *((b as i64 + FMT_BUF_OFF_CAP) as *const i64)
 fn fb_set_ptr(b: *mut u8, v: *mut u8):
-    *(b as *mut *mut u8) = v
+    unsafe: *(b as *mut *mut u8) = v
 fn fb_set_len(b: *mut u8, v: i64):
-    *((b as i64 + FMT_BUF_OFF_LEN) as *mut i64) = v
+    unsafe: *((b as i64 + FMT_BUF_OFF_LEN) as *mut i64) = v
 fn fb_set_cap(b: *mut u8, v: i64):
-    *((b as i64 + FMT_BUF_OFF_CAP) as *mut i64) = v
+    unsafe: *((b as i64 + FMT_BUF_OFF_CAP) as *mut i64) = v
 
 fn fb_grow(b: *mut u8, needed: i64):
     let cur_len = fb_len(b)
@@ -828,7 +828,7 @@ pub fn fmt_buf_write_char(b: *mut u8, c: u8):
     fb_grow(b, 1)
     let p = fb_ptr(b)
     let cur = fb_len(b)
-    *((p as i64 + cur) as *mut u8) = c
+    unsafe: *((p as i64 + cur) as *mut u8) = c
     fb_set_len(b, cur + 1)
 
 @[c_export("with_fmt_buf_write_i64_spec")]
@@ -858,7 +858,7 @@ pub fn fmt_buf_finish(b: *mut u8) -> str:
     // Null-terminate
     fb_grow(b, 1)
     let fp = fb_ptr(b)  // may have moved after grow
-    *((fp as i64 + len) as *mut u8) = 0
+    unsafe: *((fp as i64 + len) as *mut u8) = 0
     // Return as str (takes ownership of buffer memory)
     let result = make_str(fp as *const u8, len)
     // Free the FmtBuffer header (but not the data — it's now owned by the str)
@@ -888,7 +888,7 @@ fn pad_str(content: *const u8, clen: i64, width: i64, fill_char: i32, align_mode
         // right align (default)
         rt_memset(out, fc, pad)
         rt_memcpy((out as i64 + pad) as *mut u8, content, clen)
-    *((out as i64 + width) as *mut u8) = 0
+    unsafe: *((out as i64 + width) as *mut u8) = 0
     make_str(out as *const u8, width)
 
 // ── with_fmt_int_spec ──────────────────────────────────────────────
@@ -959,7 +959,7 @@ pub fn fmt_int_spec(val_arg: i64, is_unsigned: i32, flags: i64, width: i32, prec
             rt_memcpy(out, &buf as *const u8, prefix_len)
             rt_memset((out as i64 + prefix_len) as *mut u8, 48, pad_count)
             rt_memcpy((out as i64 + prefix_len + pad_count) as *mut u8, (&buf as i64 + prefix_len) as *const u8, dlen)
-            *((out as i64 + width as i64) as *mut u8) = 0
+            unsafe: *((out as i64 + width as i64) as *mut u8) = 0
             return make_str(out as *const u8, width as i64)
         return pad_str(&buf as *const u8, len, width as i64, fill_char, align_mode)
 
@@ -1003,7 +1003,7 @@ pub fn fmt_f64_spec(val: f64, flags: i64, width: i32, precision: i32, mode: i32)
             rt_memcpy(out, &buf as *const u8, sign_len)
             rt_memset((out as i64 + sign_len) as *mut u8, 48, pad_count)
             rt_memcpy((out as i64 + sign_len + pad_count) as *mut u8, (&buf as i64 + sign_len) as *const u8, len - sign_len)
-            *((out as i64 + width as i64) as *mut u8) = 0
+            unsafe: *((out as i64 + width as i64) as *mut u8) = 0
             return make_str(out as *const u8, width as i64)
         return pad_str(&buf as *const u8, len, width as i64, fill_char, align_mode)
 
@@ -1042,7 +1042,7 @@ pub fn str_concat(a: str, b: str) -> str:
         rt_memcpy(out, ap, al)
     if bp as i64 != 0 and bl > 0:
         rt_memcpy((out as i64 + al) as *mut u8, bp, bl)
-    *((out as i64 + total) as *mut u8) = 0
+    unsafe: *((out as i64 + total) as *mut u8) = 0
     make_str(out as *const u8, total)
 
 @[c_export("with_str_eq")]
@@ -1066,7 +1066,7 @@ pub fn str_clone(s: str) -> str:
         return make_str("" as *const u8, 0)
     let out = rt_alloc(slen + 1)
     rt_memcpy(out, str_data(s), slen)
-    *((out as i64 + slen) as *mut u8) = 0
+    unsafe: *((out as i64 + slen) as *mut u8) = 0
     make_str(out as *const u8, slen)
 
 @[c_export("with_str_len")]
@@ -1179,11 +1179,11 @@ pub fn str_to_upper(s: str) -> str:
     while i < slen:
         let c = sp[i]
         if c >= 97 and c <= 122:  // 'a' to 'z'
-            *((out as i64 + i) as *mut u8) = c - 32
+            unsafe: *((out as i64 + i) as *mut u8) = c - 32
         else:
-            *((out as i64 + i) as *mut u8) = c
+            unsafe: *((out as i64 + i) as *mut u8) = c
         i = i + 1
-    *((out as i64 + slen) as *mut u8) = 0
+    unsafe: *((out as i64 + slen) as *mut u8) = 0
     make_str(out as *const u8, slen)
 
 @[c_export("with_str_to_lower")]
@@ -1196,11 +1196,11 @@ pub fn str_to_lower(s: str) -> str:
     while i < slen:
         let c = sp[i]
         if c >= 65 and c <= 90:  // 'A' to 'Z'
-            *((out as i64 + i) as *mut u8) = c + 32
+            unsafe: *((out as i64 + i) as *mut u8) = c + 32
         else:
-            *((out as i64 + i) as *mut u8) = c
+            unsafe: *((out as i64 + i) as *mut u8) = c
         i = i + 1
-    *((out as i64 + slen) as *mut u8) = 0
+    unsafe: *((out as i64 + slen) as *mut u8) = 0
     make_str(out as *const u8, slen)
 
 @[c_export("with_str_repeat")]
@@ -1215,7 +1215,7 @@ pub fn str_repeat(s: str, count: i64) -> str:
     while i < count:
         rt_memcpy((out as i64 + i * slen) as *mut u8, sp, slen)
         i = i + 1
-    *((out as i64 + total) as *mut u8) = 0
+    unsafe: *((out as i64 + total) as *mut u8) = 0
     make_str(out as *const u8, total)
 
 @[c_export("with_str_replace")]
@@ -1248,10 +1248,10 @@ pub fn str_replace(s: str, old: str, new_s: str) -> str:
             j = j + nl
             i = i + ol
         else:
-            *((out as i64 + j) as *mut u8) = sp[i]
+            unsafe: *((out as i64 + j) as *mut u8) = sp[i]
             j = j + 1
             i = i + 1
-    *((out as i64 + new_len) as *mut u8) = 0
+    unsafe: *((out as i64 + new_len) as *mut u8) = 0
     make_str(out as *const u8, new_len)
 
 @[c_export("with_str_from_cstr")]
@@ -1288,8 +1288,8 @@ pub fn bool_to_str(b: i32) -> str:
 @[c_export("str_from_byte")]
 pub fn str_from_byte_export(b: i32) -> str:
     let buf = rt_alloc(2)
-    *buf = (b & 255) as u8
-    *((buf as i64 + 1) as *mut u8) = 0
+    unsafe: *buf = (b & 255) as u8
+    unsafe: *((buf as i64 + 1) as *mut u8) = 0
     make_str(buf as *const u8, 1)
 
 @[c_export("with_parse_i64")]
@@ -1300,7 +1300,7 @@ pub fn parse_i64(s: str) -> i64:
     var result: i64 = 0
     var neg: i32 = 0
     var i: i64 = 0
-    let first = *(sp as *const u8)
+    let first = unsafe: *(sp as *const u8)
     if first == 45:  // '-'
         neg = 1
         i = 1
@@ -1322,7 +1322,7 @@ pub fn parse_float(s: str) -> f64:
     var result: f64 = 0.0
     var neg: i32 = 0
     var i: i64 = 0
-    let first = *(sp as *const u8)
+    let first = unsafe: *(sp as *const u8)
     if first == 45:
         neg = 1
         i = 1
@@ -1358,7 +1358,7 @@ pub fn arg_count() -> i32:
 pub fn arg_at(idx: i32) -> str:
     if idx < 0 or idx >= saved_argc or saved_argv_raw == 0:
         return make_str("" as *const u8, 0)
-    let s = *((saved_argv_raw + idx as i64 * 8) as *const *const u8)
+    let s = unsafe: *((saved_argv_raw + idx as i64 * 8) as *const *const u8)
     make_str(s, cstr_len(s))
 
 @[c_export("with_getenv_str")]
@@ -1384,28 +1384,28 @@ pub fn getenv_impl(name: str) -> str:
 // 0: ptr, 8: len, 16: cap, 24: elem_size
 
 fn vec_get_ptr_field(v: *mut u8) -> *mut u8:
-    *(v as *const *mut u8)
+    unsafe: *(v as *const *mut u8)
 
 fn vec_set_ptr_field(v: *mut u8, p: *mut u8):
-    *(v as *mut *mut u8) = p
+    unsafe: *(v as *mut *mut u8) = p
 
 fn vec_get_len(v: *mut u8) -> i64:
-    *((v as i64 + 8) as *const i64)
+    unsafe: *((v as i64 + 8) as *const i64)
 
 fn vec_set_len(v: *mut u8, n: i64):
-    *((v as i64 + 8) as *mut i64) = n
+    unsafe: *((v as i64 + 8) as *mut i64) = n
 
 fn vec_get_cap(v: *mut u8) -> i64:
-    *((v as i64 + 16) as *const i64)
+    unsafe: *((v as i64 + 16) as *const i64)
 
 fn vec_set_cap(v: *mut u8, n: i64):
-    *((v as i64 + 16) as *mut i64) = n
+    unsafe: *((v as i64 + 16) as *mut i64) = n
 
 fn vec_get_elem_size(v: *mut u8) -> i64:
-    *((v as i64 + 24) as *const i64)
+    unsafe: *((v as i64 + 24) as *const i64)
 
 fn vec_set_elem_size(v: *mut u8, n: i64):
-    *((v as i64 + 24) as *mut i64) = n
+    unsafe: *((v as i64 + 24) as *mut i64) = n
 
 @[c_export("with_vec_new_out")]
 pub fn vec_new_out(out: *mut u8, elem_size: i64):
@@ -1478,7 +1478,7 @@ pub fn vec_push_i32(v: *mut u8, val: i32):
 pub fn vec_get_i32(v: *mut u8, idx: i64) -> i32:
     let p = vec_get_ptr(v, idx)
     if p as i64 != 0:
-        return *(p as *const i32)
+        return unsafe: *(p as *const i32)
     0
 
 @[c_export("with_vec_push_i64")]
@@ -1489,7 +1489,7 @@ pub fn vec_push_i64(v: *mut u8, val: i64):
 pub fn vec_get_i64(v: *mut u8, idx: i64) -> i64:
     let p = vec_get_ptr(v, idx)
     if p as i64 != 0:
-        return *(p as *const i64)
+        return unsafe: *(p as *const i64)
     0
 
 @[c_export("with_vec_push_str")]
@@ -1500,7 +1500,7 @@ pub fn vec_push_str(v: *mut u8, val: str):
 pub fn vec_get_str(v: *mut u8, idx: i64) -> str:
     let p = vec_get_ptr(v, idx)
     if p as i64 != 0:
-        return *(p as *const str)
+        return unsafe: *(p as *const str)
     make_str("" as *const u8, 0)
 
 @[c_export("with_vec_push_bool")]
@@ -1513,21 +1513,21 @@ pub fn vec_get_bool(v: *mut u8, idx: i64) -> i32:
 
 @[c_export("with_ptr_get_i32")]
 pub fn ptr_get_i32(ptr: *const u8, index: i64) -> i32:
-    *((ptr as i64 + index * 4) as *const i32)
+    unsafe: *((ptr as i64 + index * 4) as *const i32)
 
 @[c_export("with_vec_set_i32")]
 pub fn vec_set_i32(v: *mut u8, idx: i64, val: i32):
     let vlen = vec_get_len(v)
     if idx >= 0 and idx < vlen:
         let es = vec_get_elem_size(v)
-        *((vec_get_ptr_field(v) as i64 + idx * es) as *mut i32) = val
+        unsafe: *((vec_get_ptr_field(v) as i64 + idx * es) as *mut i32) = val
 
 @[c_export("with_vec_set_i64")]
 pub fn vec_set_i64(v: *mut u8, idx: i64, val: i64):
     let vlen = vec_get_len(v)
     if idx >= 0 and idx < vlen:
         let es = vec_get_elem_size(v)
-        *((vec_get_ptr_field(v) as i64 + idx * es) as *mut i64) = val
+        unsafe: *((vec_get_ptr_field(v) as i64 + idx * es) as *mut i64) = val
 
 @[c_export("with_vec_remove")]
 pub fn vec_remove(v: *mut u8, idx: i64):
@@ -1547,7 +1547,7 @@ pub fn vec_pop_i32(v: *mut u8) -> i32:
     if vlen == 0: return 0
     vec_set_len(v, vlen - 1)
     let es = vec_get_elem_size(v)
-    *((vec_get_ptr_field(v) as i64 + (vlen - 1) * es) as *const i32)
+    unsafe: *((vec_get_ptr_field(v) as i64 + (vlen - 1) * es) as *const i32)
 
 // ── HashMap operations ─────────────────────────────────────────────
 //
@@ -1570,38 +1570,38 @@ let HM_OFF_ISSTR: i64 = 56
 let HM_SIZE: i64 = 64
 
 fn hm_keys(m: i64) -> *mut u8:
-    *(m as *const *mut u8)
+    unsafe: *(m as *const *mut u8)
 fn hm_vals(m: i64) -> *mut u8:
-    *((m + HM_OFF_VALS) as *const *mut u8)
+    unsafe: *((m + HM_OFF_VALS) as *const *mut u8)
 fn hm_occ(m: i64) -> *mut u8:
-    *((m + HM_OFF_OCC) as *const *mut u8)
+    unsafe: *((m + HM_OFF_OCC) as *const *mut u8)
 fn hm_cap(m: i64) -> i64:
-    *((m + HM_OFF_CAP) as *const i64)
+    unsafe: *((m + HM_OFF_CAP) as *const i64)
 fn hm_len(m: i64) -> i64:
-    *((m + HM_OFF_LEN) as *const i64)
+    unsafe: *((m + HM_OFF_LEN) as *const i64)
 fn hm_key_size(m: i64) -> i64:
-    *((m + HM_OFF_KSZ) as *const i64)
+    unsafe: *((m + HM_OFF_KSZ) as *const i64)
 fn hm_val_size(m: i64) -> i64:
-    *((m + HM_OFF_VSZ) as *const i64)
+    unsafe: *((m + HM_OFF_VSZ) as *const i64)
 fn hm_is_str_key(m: i64) -> i32:
-    *((m + HM_OFF_ISSTR) as *const i32)
+    unsafe: *((m + HM_OFF_ISSTR) as *const i32)
 
 fn hm_set_keys(m: i64, v: *mut u8):
-    *(m as *mut *mut u8) = v
+    unsafe: *(m as *mut *mut u8) = v
 fn hm_set_vals(m: i64, v: *mut u8):
-    *((m + HM_OFF_VALS) as *mut *mut u8) = v
+    unsafe: *((m + HM_OFF_VALS) as *mut *mut u8) = v
 fn hm_set_occ(m: i64, v: *mut u8):
-    *((m + HM_OFF_OCC) as *mut *mut u8) = v
+    unsafe: *((m + HM_OFF_OCC) as *mut *mut u8) = v
 fn hm_set_cap(m: i64, v: i64):
-    *((m + HM_OFF_CAP) as *mut i64) = v
+    unsafe: *((m + HM_OFF_CAP) as *mut i64) = v
 fn hm_set_len(m: i64, v: i64):
-    *((m + HM_OFF_LEN) as *mut i64) = v
+    unsafe: *((m + HM_OFF_LEN) as *mut i64) = v
 fn hm_set_key_size(m: i64, v: i64):
-    *((m + HM_OFF_KSZ) as *mut i64) = v
+    unsafe: *((m + HM_OFF_KSZ) as *mut i64) = v
 fn hm_set_val_size(m: i64, v: i64):
-    *((m + HM_OFF_VSZ) as *mut i64) = v
+    unsafe: *((m + HM_OFF_VSZ) as *mut i64) = v
 fn hm_set_is_str_key(m: i64, v: i32):
-    *((m + HM_OFF_ISSTR) as *mut i32) = v
+    unsafe: *((m + HM_OFF_ISSTR) as *mut i32) = v
 
 // FNV-1a hash
 fn fnv_hash(data: *const u8, len: i64) -> u64:
@@ -1619,17 +1619,17 @@ fn fnv_hash(data: *const u8, len: i64) -> u64:
 fn hm_hash_key(m: i64, key: *const u8) -> u64:
     if hm_is_str_key(m) != 0:
         // key points to a str value {ptr, len}
-        let str_ptr = *(key as *const *const u8)
-        let str_len = *((key as i64 + 8) as *const i64)
+        let str_ptr = unsafe: *(key as *const *const u8)
+        let str_len = unsafe: *((key as i64 + 8) as *const i64)
         return fnv_hash(str_ptr, str_len)
     fnv_hash(key, hm_key_size(m))
 
 fn hm_keys_eq(m: i64, a: *const u8, b: *const u8) -> i32:
     if hm_is_str_key(m) != 0:
-        let a_ptr = *(a as *const *const u8)
-        let a_len = *((a as i64 + 8) as *const i64)
-        let b_ptr = *(b as *const *const u8)
-        let b_len = *((b as i64 + 8) as *const i64)
+        let a_ptr = unsafe: *(a as *const *const u8)
+        let a_len = unsafe: *((a as i64 + 8) as *const i64)
+        let b_ptr = unsafe: *(b as *const *const u8)
+        let b_len = unsafe: *((b as i64 + 8) as *const i64)
         if a_len != b_len: return 0
         if a_len == 0: return 1
         return if rt_memcmp(a_ptr, b_ptr, a_len) == 0: 1 else: 0
@@ -1662,7 +1662,7 @@ fn hm_grow(m: i64):
                 h = ((h + 1) as u64 % (new_cap as u64)) as i64
             rt_memcpy((hm_keys(m) as i64 + h * ksz) as *mut u8, k, ksz)
             rt_memcpy((hm_vals(m) as i64 + h * vsz) as *mut u8, v, vsz)
-            *((hm_occ(m) as i64 + h) as *mut u8) = 1
+            unsafe: *((hm_occ(m) as i64 + h) as *mut u8) = 1
             hm_set_len(m, hm_len(m) + 1)
         i = i + 1
 
@@ -1688,12 +1688,12 @@ pub fn hashmap_new(key_size: i64, val_size: i64) -> *mut u8:
 
 @[c_export("with_hashmap_new_out")]
 pub fn hashmap_new_out(out: *mut *mut u8, key_size: i64, val_size: i64):
-    *out = hashmap_new(key_size, val_size)
+    unsafe: *out = hashmap_new(key_size, val_size)
 
 @[c_export("with_hashmap_new_at")]
 pub fn hashmap_new_at(base: *mut u8, offset: i64, key_size: i64, val_size: i64):
     let slot = (base as i64 + offset) as *mut *mut u8
-    *slot = hashmap_new(key_size, val_size)
+    unsafe: *slot = hashmap_new(key_size, val_size)
 
 @[c_export("with_hashmap_insert")]
 pub fn hashmap_insert(map: *mut u8, key: *const u8, val: *const u8, is_str_key: i64):
@@ -1720,7 +1720,7 @@ pub fn hashmap_insert(map: *mut u8, key: *const u8, val: *const u8, is_str_key: 
         h = ((h + 1) as u64 % (cap as u64)) as i64
     rt_memcpy((hm_keys(m) as i64 + h * ksz) as *mut u8, key, ksz)
     rt_memcpy((hm_vals(m) as i64 + h * vsz) as *mut u8, val, vsz)
-    *((hm_occ(m) as i64 + h) as *mut u8) = 1
+    unsafe: *((hm_occ(m) as i64 + h) as *mut u8) = 1
     hm_set_len(m, hm_len(m) + 1)
 
 @[c_export("with_hashmap_get")]
@@ -1766,7 +1766,7 @@ pub fn hashmap_remove(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key
         if hm_keys_eq(m, (hm_keys(m) as i64 + h * ksz) as *const u8, key) != 0:
             if val_out as i64 != 0:
                 rt_memcpy(val_out, (hm_vals(m) as i64 + h * vsz) as *const u8, vsz)
-            *((hm_occ(m) as i64 + h) as *mut u8) = 0
+            unsafe: *((hm_occ(m) as i64 + h) as *mut u8) = 0
             hm_set_len(m, hm_len(m) - 1)
             // Rehash following entries
             var next = ((h + 1) as u64 % (cap as u64)) as i64
@@ -1776,7 +1776,7 @@ pub fn hashmap_remove(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key
                 let tmpv = rt_alloc(vsz)
                 rt_memcpy(tmpk, (hm_keys(m) as i64 + next * ksz) as *const u8, ksz)
                 rt_memcpy(tmpv, (hm_vals(m) as i64 + next * vsz) as *const u8, vsz)
-                *((hm_occ(m) as i64 + next) as *mut u8) = 0
+                unsafe: *((hm_occ(m) as i64 + next) as *mut u8) = 0
                 hm_set_len(m, hm_len(m) - 1)
                 hashmap_insert(map, tmpk as *const u8, tmpv as *const u8, hm_is_str_key(m) as i64)
                 rt_free_sized(tmpk, ksz)
@@ -1856,9 +1856,9 @@ pub fn sb_append(sb: *mut u8, s: str):
     let slen = str_length(s)
     if slen == 0: return
     let sp = str_data(s)
-    var sb_buf = *(sb as *const *mut u8)
-    var sb_len = *((sb as i64 + SB_OFF_LEN) as *const i64)
-    var sb_cap = *((sb as i64 + SB_OFF_CAP) as *const i64)
+    var sb_buf = unsafe: *(sb as *const *mut u8)
+    var sb_len = unsafe: *((sb as i64 + SB_OFF_LEN) as *const i64)
+    var sb_cap = unsafe: *((sb as i64 + SB_OFF_CAP) as *const i64)
     while sb_len + slen > sb_cap:
         let old_cap = sb_cap
         let new_cap = old_cap * 2
@@ -1869,17 +1869,17 @@ pub fn sb_append(sb: *mut u8, s: str):
         sb_cap = new_cap
     rt_memcpy((sb_buf as i64 + sb_len) as *mut u8, sp, slen)
     sb_len = sb_len + slen
-    *(sb as *mut *mut u8) = sb_buf
-    *((sb as i64 + SB_OFF_LEN) as *mut i64) = sb_len
-    *((sb as i64 + SB_OFF_CAP) as *mut i64) = sb_cap
+    unsafe: *(sb as *mut *mut u8) = sb_buf
+    unsafe: *((sb as i64 + SB_OFF_LEN) as *mut i64) = sb_len
+    unsafe: *((sb as i64 + SB_OFF_CAP) as *mut i64) = sb_cap
 
 @[c_export("with_sb_build")]
 pub fn sb_build(sb: *mut u8) -> str:
-    let sb_buf = *(sb as *const *mut u8)
-    let sb_len = *((sb as i64 + SB_OFF_LEN) as *const i64)
+    let sb_buf = unsafe: *(sb as *const *mut u8)
+    let sb_len = unsafe: *((sb as i64 + SB_OFF_LEN) as *const i64)
     let out = rt_alloc(sb_len + 1)
     rt_memcpy(out, sb_buf as *const u8, sb_len)
-    *((out as i64 + sb_len) as *mut u8) = 0
+    unsafe: *((out as i64 + sb_len) as *mut u8) = 0
     make_str(out as *const u8, sb_len)
 
 // ── File I/O ───────────────────────────────────────────────────────
@@ -1905,7 +1905,7 @@ pub fn fs_read_file(path: str) -> str:
         if r <= 0: break
         total = total + r
     let _ = rt_close(fd)
-    *((buf as i64 + total) as *mut u8) = 0
+    unsafe: *((buf as i64 + total) as *mut u8) = 0
     make_str(buf as *const u8, total)
 
 @[c_export("with_fs_write_file")]
@@ -1939,10 +1939,10 @@ pub fn fs_mkdir_p(path: str) -> i32:
     let slen = str_length(path)
     var i: i64 = 1
     while i < slen:
-        if *((cpath as i64 + i) as *const u8) == 47:  // '/'
-            *((cpath as i64 + i) as *mut u8) = 0
+        if unsafe: *((cpath as i64 + i) as *const u8) == 47:  // '/'
+            unsafe: *((cpath as i64 + i) as *mut u8) = 0
             let _ = rt_mkdir(cpath, 493)  // 0755
-            *((cpath as i64 + i) as *mut u8) = 47
+            unsafe: *((cpath as i64 + i) as *mut u8) = 47
         i = i + 1
     rt_mkdir(cpath, 493)
 
@@ -1992,7 +1992,7 @@ pub fn read_bytes_stdin(count: i32) -> str:
         let r = rt_read(0, (buf as i64 + total) as *mut u8, (count as i64 - total) as u64)
         if r <= 0: break
         total = total + r
-    *((buf as i64 + total) as *mut u8) = 0
+    unsafe: *((buf as i64 + total) as *mut u8) = 0
     make_str(buf as *const u8, total)
 
 @[c_export("with_write_stdout")]
@@ -2013,11 +2013,11 @@ pub fn str_split(s: str, delim: str, out: *mut u8, count: *mut i64):
     if sl == 0 or dl == 0:
         if out as i64 != 0:
             // Store s at out[0] (str is 16 bytes)
-            *(out as *mut str) = s
+            unsafe: *(out as *mut str) = s
         if sl > 0:
-            *count = 1
+            unsafe: *count = 1
         else:
-            *count = 0
+            unsafe: *count = 0
         return
     let sp = str_data(s)
     let dp = str_data(delim)
@@ -2028,7 +2028,7 @@ pub fn str_split(s: str, delim: str, out: *mut u8, count: *mut i64):
         if rt_memcmp((sp as i64 + i) as *const u8, dp, dl) == 0:
             if out as i64 != 0:
                 let part = make_str((sp as i64 + start) as *const u8, i - start)
-                *((out as i64 + n * 16) as *mut str) = part
+                unsafe: *((out as i64 + n * 16) as *mut str) = part
             n = n + 1
             start = i + dl
             i = start
@@ -2036,9 +2036,9 @@ pub fn str_split(s: str, delim: str, out: *mut u8, count: *mut i64):
             i = i + 1
     if out as i64 != 0:
         let last = make_str((sp as i64 + start) as *const u8, sl - start)
-        *((out as i64 + n * 16) as *mut str) = last
+        unsafe: *((out as i64 + n * 16) as *mut str) = last
     n = n + 1
-    *count = n
+    unsafe: *count = n
 
 @[c_export("with_lines_out")]
 pub fn lines_out(out: *mut u8, s: str):
@@ -2063,10 +2063,10 @@ pub fn lines_fn(s: str) -> (*mut u8, i64, i64, i64):
     var v: (i64, i64, i64, i64) = (0, 0, 0, 0)
     lines_out(&v as *mut u8, s)
     let vp = &v as *const *mut u8
-    let vl = *((&v as i64 + 8) as *const i64)
-    let vc = *((&v as i64 + 16) as *const i64)
-    let ve = *((&v as i64 + 24) as *const i64)
-    (*vp, vl, vc, ve)
+    let vl = unsafe: *((&v as i64 + 8) as *const i64)
+    let vc = unsafe: *((&v as i64 + 16) as *const i64)
+    let ve = unsafe: *((&v as i64 + 24) as *const i64)
+    (unsafe: *vp, vl, vc, ve)
 
 @[c_export("with_str_join")]
 pub fn str_join(parts: *mut u8, sep: str) -> str:
@@ -2080,7 +2080,7 @@ pub fn str_join(parts: *mut u8, sep: str) -> str:
     var i: i64 = 0
     while i < plen:
         let p = vec_get_ptr(parts, i)
-        let part_len = *((p as i64 + 8) as *const i64)
+        let part_len = unsafe: *((p as i64 + 8) as *const i64)
         total = total + part_len
         if i > 0:
             total = total + sep_l
@@ -2093,13 +2093,13 @@ pub fn str_join(parts: *mut u8, sep: str) -> str:
             rt_memcpy((out as i64 + pos) as *mut u8, sep_p, sep_l)
             pos = pos + sep_l
         let p = vec_get_ptr(parts, i)
-        let part_ptr = *(p as *const *const u8)
-        let part_len = *((p as i64 + 8) as *const i64)
+        let part_ptr = unsafe: *(p as *const *const u8)
+        let part_len = unsafe: *((p as i64 + 8) as *const i64)
         if part_len > 0:
             rt_memcpy((out as i64 + pos) as *mut u8, part_ptr, part_len)
             pos = pos + part_len
         i = i + 1
-    *((out as i64 + total) as *mut u8) = 0
+    unsafe: *((out as i64 + total) as *mut u8) = 0
     make_str(out as *const u8, total)
 
 @[c_export("with_vec_str_join")]

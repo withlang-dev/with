@@ -27,7 +27,7 @@ type RawStr:
 fn make_str(ptr: *const u8, len: i64) -> str:
     let raw = RawStr { ptr: ptr, len: len }
     let p = &raw as *const str
-    *p
+    unsafe: *p
 
 var last_await_fiber_id: i32 = 0
 var last_await_cancelled_return: i32 = 0
