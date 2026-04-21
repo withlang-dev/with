@@ -1494,6 +1494,8 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
     // Short-circuit evaluation for logical and/or
     if op == 11 or op == 12:
         return self.lower_short_circuit(op, lhs_expr, rhs_expr, node)
+    if op == BinaryOp.OP_IN or op == BinaryOp.OP_NOT_IN:
+        return self.lower_membership(op, lhs_expr, rhs_expr, node)
     // Check for operator overloading: if LHS is a struct with an operator method, lower as call
     let lhs_ty = self.expr_type(lhs_expr)
     let rhs_ty = self.expr_type(rhs_expr)
@@ -1542,6 +1544,81 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
     if self.sema.is_copy(ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, place)
     self.body.new_operand(OperandKind.OK_MOVE, place)
+
+fn MirBuilder.lower_rvalue_to_temp(self: MirBuilder, rv: i32, type_id: i32, span: i32) -> i32:
+    let temp = self.new_temp(type_id)
+    let place = self.place_for_local(temp)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, span)
+    self.body.new_operand(OperandKind.OK_COPY, place)
+
+fn MirBuilder.lower_bin_op_operand(self: MirBuilder, op: i32, lhs: i32, rhs: i32, type_id: i32, span: i32) -> i32:
+    let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, op, lhs, rhs)
+    self.lower_rvalue_to_temp(rv, type_id, span)
+
+fn MirBuilder.lower_not_operand(self: MirBuilder, operand: i32, span: i32) -> i32:
+    let rv = self.body.new_rvalue(RvalueKind.RK_UN_OP, UnaryOp.UOP_NOT, operand, 0)
+    self.lower_rvalue_to_temp(rv, self.sema.ty_bool as i32, span)
+
+fn MirBuilder.lower_range_membership_from_parts(self: MirBuilder, op: i32, lhs_place: i32, start_op: i32, end_op: i32, inclusive: i32, span: i32) -> i32:
+    let lhs_for_start = self.body.new_operand(OperandKind.OK_COPY, lhs_place)
+    let ge = self.lower_bin_op_operand(BinaryOp.OP_GTE, lhs_for_start, start_op, self.sema.ty_bool as i32, span)
+    let lhs_for_end = self.body.new_operand(OperandKind.OK_COPY, lhs_place)
+    let hi_op = if inclusive != 0: BinaryOp.OP_LTE else: BinaryOp.OP_LT
+    let le = self.lower_bin_op_operand(hi_op, lhs_for_end, end_op, self.sema.ty_bool as i32, span)
+    let both = self.lower_bin_op_operand(BinaryOp.OP_AND, ge, le, self.sema.ty_bool as i32, span)
+    if op == BinaryOp.OP_NOT_IN:
+        return self.lower_not_operand(both, span)
+    both
+
+fn MirBuilder.lower_range_literal_membership(self: MirBuilder, op: i32, lhs_expr: i32, range_expr: i32, node: i32) -> i32:
+    let lhs_ty_raw = self.expr_type(lhs_expr)
+    var lhs_ty = lhs_ty_raw
+    let start_node = self.ast.get_data0(range_expr)
+    let end_node = self.ast.get_data1(range_expr)
+    let inclusive = self.ast.get_data2(range_expr)
+    if end_node == 0:
+        with_eprint("error: range membership requires an upper bound")
+        self.mark_unsupported()
+        return self.int_const_operand(0, self.sema.ty_bool as i32)
+    var elem_ty = lhs_ty
+    if elem_ty == 0 and start_node != 0:
+        elem_ty = self.expr_type(start_node)
+    if elem_ty == 0:
+        elem_ty = self.expr_type(end_node)
+    if lhs_ty == 0:
+        lhs_ty = elem_ty
+    let lhs_op = self.lower_expr(lhs_expr)
+    let lhs_place = self.materialize_operand(lhs_op, lhs_ty, self.ast.get_start(lhs_expr))
+    let start_op = if start_node != 0: self.lower_expr(start_node) else: self.int_const_operand(0, elem_ty)
+    let end_op = self.lower_expr(end_node)
+    self.lower_range_membership_from_parts(op, lhs_place, start_op, end_op, inclusive, self.ast.get_start(node))
+
+fn MirBuilder.lower_range_value_membership(self: MirBuilder, op: i32, lhs_expr: i32, range_expr: i32, range_ty: i32, node: i32) -> i32:
+    let elem_ty = self.sema.get_type_d0(range_ty)
+    var lhs_ty = self.expr_type(lhs_expr)
+    if lhs_ty == 0:
+        lhs_ty = elem_ty
+    let lhs_op = self.lower_expr(lhs_expr)
+    let lhs_place = self.materialize_operand(lhs_op, lhs_ty, self.ast.get_start(lhs_expr))
+    let range_op = self.lower_expr(range_expr)
+    let range_place = self.materialize_operand(range_op, range_ty, self.ast.get_start(range_expr))
+    let start_place = self.body.new_field_place(range_place, 0, elem_ty)
+    let end_place = self.body.new_field_place(range_place, 1, elem_ty)
+    let start_op = self.body.new_operand(OperandKind.OK_COPY, start_place)
+    let end_op = self.body.new_operand(OperandKind.OK_COPY, end_place)
+    let inclusive = self.sema.get_type_d1(range_ty)
+    self.lower_range_membership_from_parts(op, lhs_place, start_op, end_op, inclusive, self.ast.get_start(node))
+
+fn MirBuilder.lower_membership(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
+    if self.ast.kind(rhs_expr) == NodeKind.NK_RANGE:
+        return self.lower_range_literal_membership(op, lhs_expr, rhs_expr, node)
+    let rhs_ty = self.expr_type(rhs_expr)
+    let rhs_resolved = if rhs_ty != 0: self.sema.resolve_alias(rhs_ty) else: 0
+    if rhs_resolved != 0 and self.sema.get_type_kind(rhs_resolved) == TypeKind.TY_RANGE:
+        return self.lower_range_value_membership(op, lhs_expr, rhs_expr, rhs_resolved, node)
+    with_eprint("error: unsupported 'in' membership target in MIR lowering")
+    self.mark_unsupported()
+    self.int_const_operand(0, self.sema.ty_bool as i32)
 
 fn MirBuilder.lower_short_circuit(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
     // Short-circuit: for `a or b`, evaluate a; if true, result is true, else evaluate b.
