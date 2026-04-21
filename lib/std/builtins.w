@@ -19,6 +19,8 @@ extern fn with_ewrite(s: str) -> void
 extern fn with_panic(msg: str, file: str, line: i32) -> void
 extern fn with_i32_to_str(n: i32) -> str
 extern fn with_i64_to_str(n: i64) -> str
+extern fn with_fmt_u32(n: u32) -> str
+extern fn with_fmt_u64(n: u64) -> str
 extern fn with_bool_to_str(b: bool) -> str
 
 /// Print a string to stdout followed by a newline.
@@ -79,11 +81,11 @@ impl ToString for i64 =
 
 impl ToString for u32 =
     fn to_string(self: &u32) -> str:
-        with_i64_to_str(*self as i64)
+        with_fmt_u32(*self)
 
 impl ToString for u64 =
     fn to_string(self: &u64) -> str:
-        with_i64_to_str(*self as i64)
+        with_fmt_u64(*self)
 
 impl ToString for bool =
     fn to_string(self: &bool) -> str:
