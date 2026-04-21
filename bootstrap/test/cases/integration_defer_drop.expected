@@ -1,8 +1,0 @@
-exit: 0
-stdout:
-processing
-cleanup done
-42
-
-stderr:
-

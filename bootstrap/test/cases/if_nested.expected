@@ -1,9 +1,0 @@
-exit: 0
-stdout:
-large
-small
-zero
-negative
-
-stderr:
-

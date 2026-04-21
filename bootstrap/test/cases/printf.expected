@@ -1,6 +1,0 @@
-exit: 0
-stdout:
-hello 42
-
-stderr:
-

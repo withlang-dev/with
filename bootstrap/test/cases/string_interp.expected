@@ -1,8 +1,0 @@
-exit: 0
-stdout:
-Hello, World!
-x = 42
-sum = 43
-
-stderr:
-

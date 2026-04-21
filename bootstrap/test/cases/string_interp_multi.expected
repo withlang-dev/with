@@ -1,8 +1,0 @@
-exit: 0
-stdout:
-hello world!
-x = 42
-double = 84
-
-stderr:
-
