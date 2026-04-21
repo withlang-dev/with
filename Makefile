@@ -45,7 +45,6 @@ REGEX_EXCLUDED_C_SOURCES := \
 	pcre2posix.c \
 	pcre2posix_test.c \
 	pcre2_jit_test.c \
-	pcre2_jit_compile.c \
 	pcre2_dftables.c \
 	pcre2_fuzzsupport.c
 

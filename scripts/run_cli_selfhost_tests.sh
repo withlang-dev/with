@@ -1709,6 +1709,47 @@ EOF
   echo "PASS(cli-selfhost-build) pcre2_compile_builds"
 }
 
+expect_pcre2_jit_no_support_fallbacks() {
+  local case_dir="$tmpdir/pcre2_jit_no_support_case"
+  local src="$case_dir/pcre2_jit_no_support.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+use std.re.defs
+use std.re.pcre2_jit_compile
+
+fn main() -> i32:
+    let rc_null = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), 0)
+    if rc_null != PCRE2_ERROR_NULL: return 1
+
+    let rc_test_alloc = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), PCRE2_JIT_TEST_ALLOC)
+    if rc_test_alloc != PCRE2_ERROR_JIT_UNSUPPORTED: return 2
+
+    let stack = pcre2_jit_stack_create_8(1, 1024, (null as *mut pcre2_real_general_context_8))
+    if stack != null: return 3
+
+    pcre2_jit_stack_assign_8((null as *mut pcre2_real_match_context_8), (null as *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8), (null as *mut c_void))
+    pcre2_jit_stack_free_8(stack)
+    pcre2_jit_free_unused_memory_8((null as *mut pcre2_real_general_context_8))
+    _pcre2_jit_free_rodata_8((null as *mut c_void), (null as *mut c_void))
+    _pcre2_jit_free_8((null as *mut c_void), (null as *mut pcre2_memctl))
+
+    if _pcre2_jit_get_size_8((null as *mut c_void)) != 0: return 4
+    if _pcre2_jit_get_target_8() == null: return 5
+    return 0
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$src"; then
+    echo "FAIL(cli-selfhost-run) pcre2_jit_no_support"
+    cat "$tmpdir/out" || true
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-run) pcre2_jit_no_support"
+}
+
 expect_prelude_output_functions_contract() {
   local case_dir="$tmpdir/prelude_output_functions_case"
   local src="$case_dir/prelude_output_functions.w"
@@ -1971,6 +2012,7 @@ expect_migrate_ir_roundtrip
 expect_opaque_field_access_is_rejected
 expect_pcre2_match_heapframe_is_concrete
 expect_pcre2_compile_builds_cleanly
+expect_pcre2_jit_no_support_fallbacks
 
 if [[ "$failures" -ne 0 ]]; then
   echo "cli selfhost tests: $failures failure(s)"
