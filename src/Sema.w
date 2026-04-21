@@ -271,6 +271,9 @@ type Sema {
     bind_is_ephemeral_task: Vec[i32],
     scope_starts: Vec[i32],
     scope_name_map: HashMap[i32, i32],
+    pending_generic_binding_base: HashMap[i32, i32],
+    pending_generic_binding_call: HashMap[i32, i32],
+    pending_generic_binding_decl: HashMap[i32, i32],
     async_scope_names: Vec[i32],
 
     // Borrow tracking
@@ -707,6 +710,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         bind_is_ephemeral_task: Vec.new(),
         scope_starts: Vec.new(),
         scope_name_map: HashMap.new(),
+        pending_generic_binding_base: sema_new_map_i32_i32(),
+        pending_generic_binding_call: sema_new_map_i32_i32(),
+        pending_generic_binding_decl: sema_new_map_i32_i32(),
         async_scope_names: Vec.new(),
         borrow_kinds: Vec.new(),
         borrow_places: Vec.new(),
@@ -1799,6 +1805,15 @@ fn Sema.is_c_void_like_type(self: Sema, tid: i32) -> i32:
 fn Sema.push_scope(self: Sema):
     self.scope_starts.push(self.bind_names.len() as i32)
 
+fn Sema.emit_pending_generic_binding_error(self: Sema, sym: i32):
+    let binding_name = self.pool_resolve(sym)
+    var node = 0
+    if self.pending_generic_binding_decl.contains(sym):
+        node = self.pending_generic_binding_decl.get(sym).unwrap()
+    else if self.pending_generic_binding_call.contains(sym):
+        node = self.pending_generic_binding_call.get(sym).unwrap()
+    self.emit_error("cannot infer generic type for '" ++ binding_name ++ "'; add a type annotation", node)
+
 fn Sema.pop_scope(self: Sema):
     let len = self.scope_starts.len() as i32
     if len == 0:
@@ -1807,8 +1822,22 @@ fn Sema.pop_scope(self: Sema):
     // Expire borrows for bindings leaving scope
     self.expire_borrows_in_scope(start)
     // Remove bindings from map and parallel arrays
+    let reported_pending_calls: Vec[i32] = Vec.new()
     while self.bind_names.len() as i32 > start:
         let removed_sym = self.bind_names.get(self.bind_names.len() - 1)
+        if self.pending_generic_binding_base.contains(removed_sym):
+            let pending_call = if self.pending_generic_binding_call.contains(removed_sym): self.pending_generic_binding_call.get(removed_sym).unwrap() else: 0
+            let report_key = if pending_call != 0: pending_call else: removed_sym
+            var already_reported = 0
+            for rpi in 0..reported_pending_calls.len() as i32:
+                if reported_pending_calls.get(rpi as i64) == report_key:
+                    already_reported = 1
+            if already_reported == 0:
+                reported_pending_calls.push(report_key)
+                self.emit_pending_generic_binding_error(removed_sym)
+            self.pending_generic_binding_base.remove(removed_sym)
+            self.pending_generic_binding_call.remove(removed_sym)
+            self.pending_generic_binding_decl.remove(removed_sym)
         self.scope_name_map.remove(removed_sym)
         self.bind_names.pop()
         self.bind_types.pop()
@@ -1908,6 +1937,14 @@ fn Sema.scope_lookup(self: Sema, sym: i32) -> i32:
     if opt.is_some():
         return self.bind_types.get(opt.unwrap() as i64)
     0 - 1
+
+fn Sema.scope_update_type(self: Sema, sym: i32, tid: i32):
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        self.bind_types.set_i32(opt.unwrap() as i64, tid)
+    for ii in 0..self.implicit_binding_syms.len() as i32:
+        if self.implicit_binding_syms.get(ii as i64) == sym:
+            self.implicit_binding_types.set_i32(ii as i64, tid)
 
 fn Sema.scope_lookup_mut(self: Sema, sym: i32) -> i32:
     let opt = self.scope_name_map.get(sym)

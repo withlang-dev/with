@@ -439,6 +439,9 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
     let saved_bind_is_ephemeral_task = self.bind_is_ephemeral_task
     let saved_scope_starts = self.scope_starts
     let saved_scope_name_map = self.scope_name_map
+    let saved_pending_generic_binding_base = self.pending_generic_binding_base
+    let saved_pending_generic_binding_call = self.pending_generic_binding_call
+    let saved_pending_generic_binding_decl = self.pending_generic_binding_decl
     self.bind_names = Vec.new()
     self.bind_types = Vec.new()
     self.bind_muts = Vec.new()
@@ -449,6 +452,9 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
     self.scope_starts = Vec.new()
     self.scope_starts.push(0)
     self.scope_name_map = HashMap.new()
+    self.pending_generic_binding_base = HashMap.new()
+    self.pending_generic_binding_call = HashMap.new()
+    self.pending_generic_binding_decl = HashMap.new()
 
     // Type-check body with concrete substitutions installed. Generic bodies
     // may still become invalid after instantiation (for example `T + T`
@@ -464,6 +470,9 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
     self.bind_is_ephemeral_task = saved_bind_is_ephemeral_task
     self.scope_starts = saved_scope_starts
     self.scope_name_map = saved_scope_name_map
+    self.pending_generic_binding_base = saved_pending_generic_binding_base
+    self.pending_generic_binding_call = saved_pending_generic_binding_call
+    self.pending_generic_binding_decl = saved_pending_generic_binding_decl
 
     // Restore named_types
     for ti in 0..tp_count:
@@ -1045,8 +1054,13 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
                     f"[moved-use] sym={name} tid={tid} node_kind={self.ast.kind(node)}"
                 )
             self.emit_error("use of moved value", node)
-        self.typed_expr_types.insert(node, tid)
-        return tid
+        var final_tid = tid
+        if self.has_expected_type != 0 and self.expected_expr_type != 0:
+            let pending_tid = self.settle_pending_generic_binding_from_expected(sym, self.expected_expr_type as i32, node)
+            if pending_tid != 0:
+                final_tid = pending_tid
+        self.typed_expr_types.insert(node, final_tid)
+        return final_tid
 
     // Check function names
     if self.generic_fn_nodes.contains(sym) and self.is_ci_visible(sym) != 0:
@@ -1352,7 +1366,13 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
 fn Sema.check_unary(self: Sema, node: i32) -> i32:
     let op = self.ast.get_data0(node)
     let operand_node = self.ast.get_data1(node)
-    let operand = self.check_expr(operand_node)
+    var expected_operand = 0
+    if (op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF) and self.has_expected_type != 0 and self.expected_expr_type != 0:
+        let expected_ref = self.resolve_alias(self.expected_expr_type)
+        let expected_ref_kind = self.get_type_kind(expected_ref)
+        if expected_ref_kind == TypeKind.TY_REF or expected_ref_kind == TypeKind.TY_PTR:
+            expected_operand = self.get_type_d0(expected_ref)
+    let operand = if expected_operand != 0: self.check_expr_with_expected(operand_node, expected_operand as TypeId) else: self.check_expr(operand_node)
     if operand == 0:
         return 0
 
@@ -1485,10 +1505,13 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
         let opaque_node = if ann_type_node != 0: ann_type_node else: value
         self.emit_error("opaque values cannot be stored by value; use a pointer or reference", opaque_node)
 
+    let had_binding = self.scope_has(name)
     self.scope_put_at(name, bind_type as i32, is_mut, node)
     self.typed_binding_types.insert(node, bind_type as i32)
     self.typed_binding_names.insert(node, name)
     self.typed_binding_muts.insert(node, is_mut)
+    if ann_type == 0 and had_binding == 0:
+        self.register_pending_generic_binding(name, node, value, bind_type as i32)
     var is_task_val = self.expr_is_task_value(value)
     if is_task_val == 0:
         is_task_val = self.type_is_task(bind_type as i32)
@@ -2936,10 +2959,16 @@ fn Sema.check_with_expr(self: Sema, node: i32) -> i32:
     let encoded_name = self.ast.get_data2(node)
     let name = decode_with_binding_sym(encoded_name)
     let is_mut = decode_with_binding_is_mut(encoded_name)
-    let source_ty = self.check_expr(source)
+    var source_ty = self.check_expr(source)
     self.push_scope()
+    let had_binding = self.scope_has(name)
     self.scope_put(name, source_ty as i32, is_mut)
+    if had_binding == 0:
+        self.register_pending_generic_binding(name, 0, source, source_ty as i32)
     let body_ty = self.check_expr(body)
+    let final_source_ty = self.scope_lookup(name)
+    if final_source_ty >= 0:
+        source_ty = final_source_ty as TypeId
     self.pop_scope()
     // Form 2 builder rule: `with <expr> as mut x:` returns `x` when body
     // ends in Unit; otherwise returns the final expression value.
@@ -2951,13 +2980,19 @@ fn Sema.check_with_implicit(self: Sema, node: i32) -> i32:
     let source = self.ast.get_data0(node)
     let body = self.ast.get_data1(node)
     let binding_name = self.ast.get_data2(node)
-    let source_ty = self.check_expr(source)
+    var source_ty = self.check_expr(source)
     // Push implicit binding onto stack
     self.implicit_binding_types.push(source_ty as i32)
     self.implicit_binding_syms.push(binding_name)
     self.push_scope()
+    let had_binding = self.scope_has(binding_name)
     self.scope_put(binding_name, source_ty as i32, 0)
+    if had_binding == 0:
+        self.register_pending_generic_binding(binding_name, 0, source, source_ty as i32)
     let body_ty = self.check_expr(body)
+    let final_source_ty = self.scope_lookup(binding_name)
+    if final_source_ty >= 0:
+        source_ty = final_source_ty as TypeId
     self.pop_scope()
     // Pop implicit binding
     self.implicit_binding_types.pop()
@@ -4463,6 +4498,167 @@ fn Sema.generic_constructor_return_type(self: Sema, owner_sym: i32, recv_type: i
                 return expected as i32
     recv_type
 
+fn Sema.is_pending_generic_collection_base(self: Sema, base_sym: i32) -> i32:
+    if base_sym == self.syms.vec or base_sym == self.syms.hashmap or base_sym == self.syms.hashset:
+        return 1
+    0
+
+fn Sema.pending_generic_constructor_base(self: Sema, value: i32, val_type: i32) -> i32:
+    if value == 0:
+        return 0
+    if self.ast.kind(value) == NodeKind.NK_GROUPED:
+        return self.pending_generic_constructor_base(self.ast.get_data0(value), val_type)
+    if self.ast.kind(value) == NodeKind.NK_IDENT:
+        let src_sym = self.ast.get_data0(value)
+        if self.pending_generic_binding_base.contains(src_sym):
+            return self.pending_generic_binding_base.get(src_sym).unwrap()
+        return 0
+    if self.ast.kind(value) != NodeKind.NK_CALL:
+        return 0
+    let callee = self.ast.get_data0(value)
+    if self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS:
+        return 0
+    let field = self.ast.get_data1(callee)
+    let method_name = self.pool_resolve(field)
+    if field != self.syms.new and method_name != "with_capacity":
+        return 0
+    let recv = self.ast.get_data0(callee)
+    let base_sym = self.static_receiver_base_sym(recv)
+    if self.is_pending_generic_collection_base(base_sym) == 0:
+        return 0
+    if base_sym != self.syms.vec and method_name == "with_capacity":
+        return 0
+    let resolved = self.resolve_alias(val_type as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return 0
+    if self.get_type_d0(resolved) != base_sym:
+        return 0
+    base_sym
+
+fn Sema.pending_generic_constructor_call_node(self: Sema, value: i32) -> i32:
+    if value == 0:
+        return 0
+    if self.ast.kind(value) == NodeKind.NK_GROUPED:
+        return self.pending_generic_constructor_call_node(self.ast.get_data0(value))
+    if self.ast.kind(value) == NodeKind.NK_IDENT:
+        let src_sym = self.ast.get_data0(value)
+        if self.pending_generic_binding_call.contains(src_sym):
+            return self.pending_generic_binding_call.get(src_sym).unwrap()
+        return 0
+    if self.ast.kind(value) == NodeKind.NK_CALL:
+        return value
+    0
+
+fn Sema.register_pending_generic_binding(self: Sema, sym: i32, decl_node: i32, value: i32, val_type: i32):
+    if self.is_discard_binding_symbol(sym) != 0:
+        return
+    let base_sym = self.pending_generic_constructor_base(value, val_type)
+    if base_sym == 0:
+        return
+    self.pending_generic_binding_base.insert(sym, base_sym)
+    let call_node = self.pending_generic_constructor_call_node(value)
+    if call_node != 0:
+        self.pending_generic_binding_call.insert(sym, call_node)
+    if decl_node != 0:
+        self.pending_generic_binding_decl.insert(sym, decl_node)
+
+fn Sema.pending_generic_expected_type_for_base(self: Sema, expected: i32, base_sym: i32) -> i32:
+    if expected == 0 or base_sym == 0:
+        return 0
+    var resolved = self.resolve_alias(expected as TypeId)
+    let expected_kind = self.get_type_kind(resolved)
+    if expected_kind == TypeKind.TY_REF or expected_kind == TypeKind.TY_PTR:
+        resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.get_generic_inst_base(resolved as i32) != base_sym:
+        return 0
+    resolved as i32
+
+fn Sema.settle_pending_generic_binding(self: Sema, sym: i32, concrete_type: i32, expr_node: i32) -> i32:
+    if concrete_type == 0:
+        return 0
+    if not self.pending_generic_binding_base.contains(sym):
+        return 0
+    let base_sym = self.pending_generic_binding_base.get(sym).unwrap()
+    let concrete = self.resolve_alias(concrete_type as TypeId)
+    if self.get_type_kind(concrete) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.get_generic_inst_base(concrete as i32) != base_sym:
+        return 0
+    let call_node = if self.pending_generic_binding_call.contains(sym): self.pending_generic_binding_call.get(sym).unwrap() else: 0
+    for bi in 0..self.bind_names.len() as i32:
+        let other_sym = self.bind_names.get(bi as i64)
+        if not self.pending_generic_binding_base.contains(other_sym):
+            continue
+        if self.pending_generic_binding_base.get(other_sym).unwrap() != base_sym:
+            continue
+        let other_call = if self.pending_generic_binding_call.contains(other_sym): self.pending_generic_binding_call.get(other_sym).unwrap() else: 0
+        if call_node != 0 and other_call != call_node:
+            continue
+        if call_node == 0 and other_sym != sym:
+            continue
+        self.bind_types.set_i32(bi as i64, concrete as i32)
+        if self.pending_generic_binding_decl.contains(other_sym):
+            let decl_node = self.pending_generic_binding_decl.get(other_sym).unwrap()
+            self.typed_binding_types.insert(decl_node, concrete as i32)
+        self.pending_generic_binding_base.remove(other_sym)
+        self.pending_generic_binding_call.remove(other_sym)
+        self.pending_generic_binding_decl.remove(other_sym)
+    if call_node != 0:
+        self.typed_expr_types.insert(call_node, concrete as i32)
+    if expr_node != 0:
+        self.typed_expr_types.insert(expr_node, concrete as i32)
+    self.scope_update_type(sym, concrete as i32)
+    concrete as i32
+
+fn Sema.settle_pending_generic_binding_from_expected(self: Sema, sym: i32, expected: i32, expr_node: i32) -> i32:
+    if not self.pending_generic_binding_base.contains(sym):
+        return 0
+    let base_sym = self.pending_generic_binding_base.get(sym).unwrap()
+    let concrete = self.pending_generic_expected_type_for_base(expected, base_sym)
+    if concrete == 0:
+        return 0
+    self.settle_pending_generic_binding(sym, concrete, expr_node)
+
+fn Sema.infer_pending_generic_method_receiver(self: Sema, expr: i32, field: i32, arg_types: Vec[i32], arg_count: i32, node: i32) -> i32:
+    let _ = node
+    if expr == 0 or self.ast.kind(expr) != NodeKind.NK_IDENT:
+        return 0
+    let sym = self.ast.get_data0(expr)
+    if not self.pending_generic_binding_base.contains(sym):
+        return 0
+    let base_sym = self.pending_generic_binding_base.get(sym).unwrap()
+    let args: Vec[i32] = Vec.new()
+    if base_sym == self.syms.vec:
+        if (field == self.syms.push or field == self.syms.contains) and arg_count >= 1:
+            let elem_ty = arg_types.get(0)
+            if elem_ty != 0 and elem_ty != self.ty_void:
+                args.push(elem_ty)
+                let concrete = self.ensure_generic_inst_type(base_sym, args, 1) as i32
+                return self.settle_pending_generic_binding(sym, concrete, expr)
+        if field == self.syms.join:
+            args.push(self.ty_str as i32)
+            let concrete2 = self.ensure_generic_inst_type(base_sym, args, 1) as i32
+            return self.settle_pending_generic_binding(sym, concrete2, expr)
+    if base_sym == self.syms.hashset:
+        if (field == self.syms.insert or field == self.syms.contains or field == self.syms.remove) and arg_count >= 1:
+            let elem_ty2 = arg_types.get(0)
+            if elem_ty2 != 0 and elem_ty2 != self.ty_void:
+                args.push(elem_ty2)
+                let concrete3 = self.ensure_generic_inst_type(base_sym, args, 1) as i32
+                return self.settle_pending_generic_binding(sym, concrete3, expr)
+    if base_sym == self.syms.hashmap:
+        if field == self.syms.insert and arg_count >= 2:
+            let key_ty = arg_types.get(0)
+            let val_ty = arg_types.get(1)
+            if key_ty != 0 and key_ty != self.ty_void and val_ty != 0 and val_ty != self.ty_void:
+                args.push(key_ty)
+                args.push(val_ty)
+                let concrete4 = self.ensure_generic_inst_type(base_sym, args, 2) as i32
+                return self.settle_pending_generic_binding(sym, concrete4, expr)
+    0
+
 fn Sema.ensure_vec_str_type(self: Sema) -> i32:
     let args: Vec[i32] = Vec.new()
     args.push(self.ty_str as i32)
@@ -4767,6 +4963,10 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
         arg_types.push(mc_arg_ty as i32)
         if mc_is_closure:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
+
+    let inferred_pending_receiver = self.infer_pending_generic_method_receiver(expr, field, arg_types, arg_count, node)
+    if inferred_pending_receiver != 0:
+        obj_type = inferred_pending_receiver as TypeId
 
     // Validate atomic ordering constraints (spec §14.17.1)
     if mc_order_type != 0:
