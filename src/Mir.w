@@ -1820,6 +1820,9 @@ fn validate_typed_mir_body(mir_mod: MirModule, body: MirBody) -> MirValidationEr
                 if mir_validate_place_type(mir_mod, body, rv_d0) == 0:
                     return mir_validation_fail(body.fn_sym, span, "place-based rvalue does not resolve to a concrete place type")
 
+            if rk == RvalueKind.RK_BIN_OP and (rv_d0 == BinaryOp.OP_IN or rv_d0 == BinaryOp.OP_NOT_IN):
+                return mir_validation_fail(body.fn_sym, span, "membership operator must be lowered before MIR codegen")
+
             if rk == RvalueKind.RK_BIN_OP and mir_validate_is_compare_op(rv_d0):
                 let lhs_ty = mir_validate_operand_type(mir_mod, body, rv_d1)
                 let rhs_ty = mir_validate_operand_type(mir_mod, body, rv_d2)
