@@ -874,6 +874,8 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             self.comp_resolved.insert(node, name)
         let expected_variant_ty = self.expected_variant_constructor_type(name)
         if expected_variant_ty != 0:
+            let resolved_variant_sym = self.qualified_enum_variant_sym(expected_variant_ty, name)
+            self.comp_resolved.insert(node, resolved_variant_sym)
             self.typed_expr_types.insert(node, expected_variant_ty)
             return expected_variant_ty as TypeId
         // Fall through to variant_lookup if expected type is not an enum
@@ -2574,6 +2576,18 @@ fn Sema.expected_variant_constructor_type(self: Sema, variant_name: i32) -> i32:
                     return expected as i32
     0
 
+fn Sema.qualified_enum_variant_sym(self: Sema, enum_tid: i32, variant_name: i32) -> i32:
+    if enum_tid == 0 or variant_name == 0:
+        return variant_name
+    let owner_sym = self.enum_pattern_owner_sym(enum_tid)
+    if owner_sym == 0:
+        return variant_name
+    let qual_name = self.pool_resolve(owner_sym) ++ "." ++ self.pool_resolve(variant_name)
+    let qual_sym = self.pool_intern(qual_name)
+    if self.variant_lookup.contains(qual_sym):
+        return qual_sym
+    variant_name
+
 fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
     if node == 0:
         return
@@ -2626,13 +2640,14 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         let pattern_enum_ty = self.resolve_variant_pattern_enum_type(node, subject_type, v_name)
         if pattern_enum_ty == 0:
             return
+        let resolved_variant_sym = self.qualified_enum_variant_sym(pattern_enum_ty, v_name)
+        self.comp_resolved.insert(node, resolved_variant_sym)
         let v_extra = self.ast.get_data1(node)
         if subject_enum_ty == 0:
             if bind_count != 0:
                 self.emit_error("variant payload pattern requires an enum subject", node)
                 return
-            let value_sym = self.pattern_variant_value_sym(node, v_name)
-            self.pattern_value_syms.insert(node, value_sym)
+            self.pattern_value_syms.insert(node, resolved_variant_sym)
             return
         var payload_start = 0
         var payload_count = 0
@@ -3531,6 +3546,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         var final_variant_ty: TypeId = if variant_expected_ty != 0: variant_expected_ty as TypeId else: variant_tid as TypeId
         if inferred_variant_ty != 0:
             final_variant_ty = self.preferred_compatible_type(final_variant_ty, inferred_variant_ty as TypeId)
+        let resolved_variant_sym = self.qualified_enum_variant_sym(final_variant_ty as i32, fn_sym)
+        self.comp_resolved.insert(node, resolved_variant_sym)
         self.typed_expr_types.insert(node, final_variant_ty as i32)
         return final_variant_ty as i32
 
