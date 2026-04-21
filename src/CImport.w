@@ -3845,6 +3845,68 @@ fn ci_stmt_merge_ir(stmts: &mut CiStmtPool, first: CiStmtId, second: CiStmtId) -
 fn ci_stmt_merge3_ir(stmts: &mut CiStmtPool, first: CiStmtId, second: CiStmtId, third: CiStmtId) -> CiStmtId:
     ci_stmt_merge_ir(stmts, ci_stmt_merge_ir(stmts, first, second), third)
 
+fn ci_for_continue_runs_inc_ir(stmts: &mut CiStmtPool, stmt_id: CiStmtId, inc_stmt_id: CiStmtId) -> CiStmtId:
+    if (stmt_id as i32) == 0 or (inc_stmt_id as i32) == 0:
+        return stmt_id
+    let kind = stmts.kind(stmt_id)
+    if kind == CiStmtKind.CIS_CONTINUE:
+        return ci_stmt_merge_ir(stmts, inc_stmt_id, stmts.continue_())
+    if kind == CiStmtKind.CIS_BLOCK:
+        let extra_start = stmts.get_d0(stmt_id)
+        let count = stmts.get_d1(stmt_id)
+        var rewritten_ids: Vec[i32] = Vec.new()
+        var i: i32 = 0
+        while i < count:
+            let child_id = (stmts.get_extra(extra_start + i)) as CiStmtId
+            let rewritten = ci_for_continue_runs_inc_ir(stmts, child_id, inc_stmt_id)
+            rewritten_ids.push(rewritten as i32)
+            i = i + 1
+        let new_start = stmts.extra.len() as i32
+        var ri: i64 = 0
+        while ri < rewritten_ids.len():
+            let _ = stmts.add_extra(rewritten_ids.get(ri))
+            ri = ri + 1
+        return stmts.block(new_start, count)
+    if kind == CiStmtKind.CIS_IF:
+        let cond_id = (stmts.get_d0(stmt_id)) as CiExprId
+        let then_id = (stmts.get_d1(stmt_id)) as CiStmtId
+        let else_id = (stmts.get_d2(stmt_id)) as CiStmtId
+        let rewritten_then = ci_for_continue_runs_inc_ir(stmts, then_id, inc_stmt_id)
+        var rewritten_else: CiStmtId = 0 as CiStmtId
+        if (else_id as i32) != 0:
+            rewritten_else = ci_for_continue_runs_inc_ir(stmts, else_id, inc_stmt_id)
+        return stmts.if_stmt(cond_id, rewritten_then, rewritten_else)
+    if kind == CiStmtKind.CIS_MATCH:
+        let subject_id = stmts.get_d0(stmt_id)
+        let arms_start = stmts.get_d1(stmt_id)
+        let arm_count = stmts.get_d2(stmt_id)
+        var rewritten_records: Vec[i32] = Vec.new()
+        var cursor = arms_start
+        var ai: i32 = 0
+        while ai < arm_count:
+            let value_count = stmts.get_extra(cursor)
+            rewritten_records.push(value_count)
+            cursor = cursor + 1
+            var vi: i32 = 0
+            while vi < value_count:
+                rewritten_records.push(stmts.get_extra(cursor))
+                cursor = cursor + 1
+                vi = vi + 1
+            let body_id = (stmts.get_extra(cursor)) as CiStmtId
+            cursor = cursor + 1
+            let rewritten_body = ci_for_continue_runs_inc_ir(stmts, body_id, inc_stmt_id)
+            rewritten_records.push(rewritten_body as i32)
+            ai = ai + 1
+        let new_start = stmts.extra.len() as i32
+        var ri: i64 = 0
+        while ri < rewritten_records.len():
+            let _ = stmts.add_extra(rewritten_records.get(ri))
+            ri = ri + 1
+        return stmts.add(CiStmtKind.CIS_MATCH, subject_id, new_start, arm_count, 0)
+    if kind == CiStmtKind.CIS_WHILE or kind == CiStmtKind.CIS_DO_WHILE or kind == CiStmtKind.CIS_FOR:
+        return stmt_id
+    stmt_id
+
 fn ci_default_expr_from_text(default_text: str, exprs: &mut CiExprPool) -> CiExprId:
     if default_text.len() == 0:
         return 0 as CiExprId
@@ -6722,7 +6784,7 @@ fn ci_lower_for_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs
     else:
         cond_id = exprs.bool_lit(1, 0 as CiTypeId)
 
-    let body_id = ci_lower_stmt_ir(session, parts.body_cursor, stmts, exprs, types, 0, inner_scope)
+    var body_id = ci_lower_stmt_ir(session, parts.body_cursor, stmts, exprs, types, 0, inner_scope)
     if (body_id as i32) == 0:
         if g_ci_bail_location.len() == 0:
             g_ci_bail_location = with_ci_cursor_location(session, parts.body_cursor)
@@ -6737,6 +6799,7 @@ fn ci_lower_for_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs
                 g_ci_bail_location = with_ci_cursor_location(session, parts.inc_cursor)
                 g_ci_bail_kind = with_ci_cursor_kind(session, parts.inc_cursor)
             return 0 as CiStmtId
+        body_id = ci_for_continue_runs_inc_ir(stmts, body_id, inc_stmt_id)
 
     // Body + inc wrapped in a block (if we have an inc).
     var while_body_id: CiStmtId = body_id
@@ -6887,6 +6950,7 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
     var arm_records: Vec[i32] = Vec.new()
     var arm_count = 0
     var default_body_id: CiStmtId = 0 as CiStmtId
+    var has_default_body = false
     var i = 0
     while i < body_nc:
         let child = with_ci_child(session, body_cursor, i)
@@ -6910,7 +6974,7 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
                 if (inner_id as i32) == 0:
                     return 0 as CiStmtId
                 body_ids.push(inner_id as i32)
-            var hit_break = false
+            var hit_break = ci_stmt_ends_with_terminator(session, chain)
             var j = i + 1
             while j < body_nc:
                 let sib = with_ci_child(session, body_cursor, j)
@@ -6937,9 +7001,9 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
                         body_ids.push(fwd_id as i32)
             let raw_body = ci_stmt_from_flat_ids(stmts, &body_ids)
             let body_id = ci_strip_trailing_break_ir(stmts, raw_body)
-            if (body_id as i32) == 0 and body_ids.len() > 0:
+            if (body_id as i32) == 0 and body_ids.len() > 0 and not hit_break:
                 return 0 as CiStmtId
-            if (body_id as i32) != 0:
+            if (body_id as i32) != 0 or hit_break:
                 arm_records.push(value_ids.len() as i32)
                 var vi: i64 = 0
                 while vi < value_ids.len():
@@ -6952,6 +7016,7 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
         else if ck == CXK_DEFAULT_STMT:
             let inner = ci_drill_innermost_case_substmt(session, child)
             var body_ids: Vec[i32] = Vec.new()
+            var hit_break = false
             if inner >= 0:
                 let inner_kind = with_ci_cursor_kind(session, inner)
                 if inner_kind != CXK_BREAK_STMT and not ci_is_null_like_stmt(session, inner):
@@ -6959,7 +7024,7 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
                     if (inner_id as i32) == 0:
                         return 0 as CiStmtId
                     body_ids.push(inner_id as i32)
-            var hit_break = false
+                hit_break = ci_stmt_ends_with_terminator(session, inner)
             var j = i + 1
             while j < body_nc:
                 let sib = with_ci_child(session, body_cursor, j)
@@ -6986,13 +7051,16 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
                         body_ids.push(fwd_id as i32)
             let raw_body = ci_stmt_from_flat_ids(stmts, &body_ids)
             let body_id = ci_strip_trailing_break_ir(stmts, raw_body)
-            if (body_id as i32) != 0:
+            if (body_id as i32) == 0 and body_ids.len() > 0 and not hit_break:
+                return 0 as CiStmtId
+            if (body_id as i32) != 0 or hit_break:
                 default_body_id = body_id
+                has_default_body = true
             i = j
             continue
         i = i + 1
 
-    if (default_body_id as i32) != 0:
+    if has_default_body:
         arm_records.push(0)
         arm_records.push(default_body_id as i32)
         arm_count = arm_count + 1
@@ -7698,15 +7766,18 @@ fn ci_lower_stmt_goto_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, expr
             cond_id = prepared_cond.value_expr
         else:
             cond_id = exprs.bool_lit(1, 0 as CiTypeId)
-        let body_id = ci_lower_stmt_goto_ir(session, parts.body_cursor, stmts, exprs, types, inner_scope, label_map, loop_depth + 1)
+        var body_id = ci_lower_stmt_goto_ir(session, parts.body_cursor, stmts, exprs, types, inner_scope, label_map, loop_depth + 1)
         if (body_id as i32) == 0:
             return 0 as CiStmtId
-        let pending_break = ci_goto_pending_guard_ir(stmts, exprs, loop_depth + 1)
-        var loop_body = ci_stmt_merge_ir(stmts, body_id, pending_break)
+        var inc_id: CiStmtId = 0 as CiStmtId
         if parts.inc_cursor >= 0:
-            let inc_id = ci_lower_stmt_expr_ir(session, parts.inc_cursor, stmts, exprs, types, inner_scope)
+            inc_id = ci_lower_stmt_expr_ir(session, parts.inc_cursor, stmts, exprs, types, inner_scope)
             if (inc_id as i32) == 0:
                 return 0 as CiStmtId
+            body_id = ci_for_continue_runs_inc_ir(stmts, body_id, inc_id)
+        let pending_break = ci_goto_pending_guard_ir(stmts, exprs, loop_depth + 1)
+        var loop_body = ci_stmt_merge_ir(stmts, body_id, pending_break)
+        if (inc_id as i32) != 0:
             loop_body = ci_stmt_merge_ir(stmts, loop_body, inc_id)
         var while_id: CiStmtId = 0 as CiStmtId
         if (cond_setup_id as i32) == 0:
