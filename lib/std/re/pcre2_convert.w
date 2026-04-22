@@ -20,57 +20,57 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
     var pattype: c_uint = (options & ((16 | 4) | 8))
 
     var __ci_expr_logic_0: c_int = 0
-    
+
     if ((if pattern == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if (if plength == 0: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_0 != 0) {
         (pattern = (&null_str[0] as *mut u8))
     }
-    
+
 
     var __ci_expr_logic_1: c_int
-    
+
     if ((if pattern == null: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
         (__ci_expr_logic_1 = (if (if bufflenptr == null: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_1 != 0) {
         if ((if bufflenptr != null: 1 else: 0) != 0) {
             ((unsafe: *bufflenptr) = 0)
         }
-        
+
         return -51
-        
+
     }
-    
+
 
     var __ci_expr_logic_3: c_int
-    
+
     var __ci_expr_logic_2: c_int
-    
+
     if ((if (options & (~((((1 | 2) | 48) | 80) | ((16 | 4) | 8)))) != 0: 1 else: 0) != 0) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
         (__ci_expr_logic_2 = (if (if (pattype & ((~pattype) +% 1)) != pattype: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_2 != 0) {
         (__ci_expr_logic_3 = (if true: 1 else: 0))
     } else {
         (__ci_expr_logic_3 = (if (if pattype == 0: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_3 != 0) {
         ((unsafe: *bufflenptr) = 0)
-        
+
         return -34
-        
+
     }
-    
+
 
     if ((if plength == (~(0 as c_ulong)): 1 else: 0) != 0) {
         (plength = _pcre2_strlen_8(pattern))
@@ -81,46 +81,46 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
     }
 
     var __ci_expr_logic_4: c_int = 0
-    
+
     if (utf != 0) {
         (__ci_expr_logic_4 = (if (if (options & 2) == 0: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_4 != 0) {
         var erroroffset: c_ulong
-        
+
         (rc = _pcre2_valid_utf_8(pattern, plength, (&mut erroroffset as *mut c_ulong)))
-        
+
         if ((if rc != 0: 1 else: 0) != 0) {
             ((unsafe: *bufflenptr) = erroroffset)
-            
+
             return rc
-            
+
         }
-        
+
     }
-    
+
 
     var __ci_expr_logic_5: c_int = 0
-    
+
     if ((if buffptr != null: 1 else: 0) != 0) {
         (__ci_expr_logic_5 = (if (if (unsafe: *buffptr) != null: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_5 != 0) {
         (use_buffer = (unsafe: *buffptr))
-        
+
         (use_length = (unsafe: *bufflenptr))
-        
+
     }
-    
+
 
     var i: c_int = 0
-    
+
     while ((if i < 2: 1 else: 0) != 0) {
         var allocated: *mut u8
-        
-        var dummyrun: c_int = with 0 as __ci_expr_seq_78 {
+
+        var dummyrun: c_int = with 0 as __ci_expr_seq_114 {
             var __ci_expr_logic_6: c_int
             if ((if buffptr == null: 1 else: 0) != 0) {
                 (__ci_expr_logic_6 = (if true: 1 else: 0))
@@ -129,7 +129,7 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
             }
             __ci_expr_logic_6
         }
-        
+
         match pattype:
             16 =>
                 (rc = convert_glob((options & (~16)), pattern, plength, utf, use_buffer, use_length, bufflenptr, dummyrun, ccontext))
@@ -141,53 +141,53 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
                         break
                     }
                 }
-                
+
                 ((unsafe: *bufflenptr) = 0)
-                
+
                 return -44
-                
-        
+
+
         var __ci_expr_logic_8: c_int
-        
+
         var __ci_expr_logic_7: c_int
-        
+
         if ((if rc != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_7 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_7 = (if (if buffptr == null: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_7 != 0) {
             (__ci_expr_logic_8 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_8 = (if (if (unsafe: *buffptr) != null: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_8 != 0) {
             return rc
         }
-        
-        
+
+
         (allocated = ((_pcre2_memctl_malloc_8((sizeof[pcre2_memctl]() +% (((unsafe: *bufflenptr) +% 1) *% 8)), (ccontext as *mut pcre2_memctl)) as *mut u8)))
-        
+
         if ((if allocated == null: 1 else: 0) != 0) {
             ((unsafe: *bufflenptr) = 0)
-            
+
             return -48
-            
+
         }
-        
+
         ((unsafe: *buffptr) = ((((allocated as *mut c_char) + sizeof[pcre2_memctl]()) as *mut u8)))
-        
+
         (use_buffer = (unsafe: *buffptr))
-        
+
         (use_length = ((unsafe: *bufflenptr) +% 1))
-        
-        
+
+
         (i = i + 1)
-        
+
     }
-    
+
 
     while true {
         if (not (0 != 0)) {
@@ -204,9 +204,9 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
 fn pcre2_converted_pattern_free_8(converted: *mut u8) {
     if ((if converted != null: 1 else: 0) != 0) {
         var memctl: *mut pcre2_memctl = ((((converted as *mut c_char) - sizeof[pcre2_memctl]()) as *mut pcre2_memctl))
-        
+
         memctl.free(memctl, memctl.memory_data)
-        
+
     }
 
 }
@@ -316,7 +316,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                     }
                     if (__ci_expr_logic_1 != 0) {
                         if ((if (c__goto_178_12 & 32) == 0: 1 else: 0) != 0) {
-                            (c__goto_178_12 = ((c__goto_178_12 & 31) << 6) | (posix__goto_154_12[1] & 63))
+                            (c__goto_178_12 = ((c__goto_178_12 & 31) << 6) | ((unsafe: posix__goto_154_12[1]) & 63))
                             if (__goto_pending != 0) {
                                 break
                             }
@@ -326,7 +326,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                             }
                         } else {
                             if ((if (c__goto_178_12 & 16) == 0: 1 else: 0) != 0) {
-                                (c__goto_178_12 = (((c__goto_178_12 & 15) << 12) | ((posix__goto_154_12[1] & 63) << 6)) | (posix__goto_154_12[2] & 63))
+                                (c__goto_178_12 = (((c__goto_178_12 & 15) << 12) | (((unsafe: posix__goto_154_12[1]) & 63) << 6)) | ((unsafe: posix__goto_154_12[2]) & 63))
                                 if (__goto_pending != 0) {
                                     break
                                 }
@@ -336,7 +336,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                                 }
                             } else {
                                 if ((if (c__goto_178_12 & 8) == 0: 1 else: 0) != 0) {
-                                    (c__goto_178_12 = ((((c__goto_178_12 & 7) << 18) | ((posix__goto_154_12[1] & 63) << 12)) | ((posix__goto_154_12[2] & 63) << 6)) | (posix__goto_154_12[3] & 63))
+                                    (c__goto_178_12 = ((((c__goto_178_12 & 7) << 18) | (((unsafe: posix__goto_154_12[1]) & 63) << 12)) | (((unsafe: posix__goto_154_12[2]) & 63) << 6)) | ((unsafe: posix__goto_154_12[3]) & 63))
                                     if (__goto_pending != 0) {
                                         break
                                     }
@@ -346,7 +346,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                                     }
                                 } else {
                                     if ((if (c__goto_178_12 & 4) == 0: 1 else: 0) != 0) {
-                                        (c__goto_178_12 = (((((c__goto_178_12 & 3) << 24) | ((posix__goto_154_12[1] & 63) << 18)) | ((posix__goto_154_12[2] & 63) << 12)) | ((posix__goto_154_12[3] & 63) << 6)) | (posix__goto_154_12[4] & 63))
+                                        (c__goto_178_12 = (((((c__goto_178_12 & 3) << 24) | (((unsafe: posix__goto_154_12[1]) & 63) << 18)) | (((unsafe: posix__goto_154_12[2]) & 63) << 12)) | (((unsafe: posix__goto_154_12[3]) & 63) << 6)) | ((unsafe: posix__goto_154_12[4]) & 63))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -355,7 +355,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                                             break
                                         }
                                     } else {
-                                        (c__goto_178_12 = ((((((c__goto_178_12 & 1) << 30) | ((posix__goto_154_12[1] & 63) << 24)) | ((posix__goto_154_12[2] & 63) << 18)) | ((posix__goto_154_12[3] & 63) << 12)) | ((posix__goto_154_12[4] & 63) << 6)) | (posix__goto_154_12[5] & 63))
+                                        (c__goto_178_12 = ((((((c__goto_178_12 & 1) << 30) | (((unsafe: posix__goto_154_12[1]) & 63) << 24)) | (((unsafe: posix__goto_154_12[2]) & 63) << 18)) | (((unsafe: posix__goto_154_12[3]) & 63) << 12)) | (((unsafe: posix__goto_154_12[4]) & 63) << 6)) | ((unsafe: posix__goto_154_12[5]) & 63))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -430,92 +430,92 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                             match posix_state__goto_161_10:
                                 5 =>
                                     var __ci_expr_logic_4: c_int = 0
-                                    
+
                                     if ((if c__goto_178_12 >= 97: 1 else: 0) != 0) {
                                         (__ci_expr_logic_4 = (if (if c__goto_178_12 <= 122: 1 else: 0) != 0: 1 else: 0))
                                     }
-                                    
+
                                     if (__ci_expr_logic_4 != 0) {
                                         break
                                     }
-                                    
-                                    
+
+
                                     (posix_state__goto_161_10 = 3)
-                                    
+
                                     var __ci_expr_logic_6: c_int = 0
-                                    
+
                                     var __ci_expr_logic_5: c_int = 0
-                                    
+
                                     if ((if c__goto_178_12 == 58: 1 else: 0) != 0) {
                                         (__ci_expr_logic_5 = (if (if plength > 0: 1 else: 0) != 0: 1 else: 0))
                                     }
-                                    
+
                                     if (__ci_expr_logic_5 != 0) {
                                         (__ci_expr_logic_6 = (if (if (unsafe: *posix__goto_154_12) == 93: 1 else: 0) != 0: 1 else: 0))
                                     }
-                                    
+
                                     if (__ci_expr_logic_6 != 0) {
                                         while ((if (unsafe: *s__goto_224_11) != 0: 1 else: 0) != 0) {
                                             if ((if p__goto_155_14 >= endp__goto_157_14: 1 else: 0) != 0) {
                                                 return -48
                                             }
-                                            
+
                                             if (__goto_pending != 0) {
                                                 break
                                             }
-                                            
+
                                             var __ci_expr_old_7: *mut u8 = p__goto_155_14
-                                            
+
                                             (p__goto_155_14 = p__goto_155_14 + 1)
-                                            
+
                                             ((unsafe: *__ci_expr_old_7) = (unsafe: *s__goto_224_11))
-                                            
+
                                             if (__goto_pending != 0) {
                                                 break
                                             }
-                                            
+
                                             if (__goto_pending != 0) {
                                                 break
                                             }
-                                            
+
                                             (s__goto_224_11 = s__goto_224_11 + 1)
-                                            
+
                                         }
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
-                                        
+
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         (plength = plength - 1)
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         (posix__goto_154_12 = posix__goto_154_12 + 1)
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         continue
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                     }
-                                    
-                                    
+
+
                                     if ((if c__goto_178_12 == 91: 1 else: 0) != 0) {
                                         (posix_state__goto_161_10 = 4)
                                     }
-                                    
+
                                 3 =>
                                     if ((if c__goto_178_12 == 91: 1 else: 0) != 0) {
                                         (posix_state__goto_161_10 = 4)
@@ -578,629 +578,629 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                                     if ((if p__goto_155_14 >= endp__goto_157_14: 1 else: 0) != 0) {
                                         return -48
                                     }
-                                    
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
+
                                     var __ci_expr_old_9: *mut u8 = p__goto_155_14
-                                    
+
                                     (p__goto_155_14 = p__goto_155_14 + 1)
-                                    
+
                                     ((unsafe: *__ci_expr_old_9) = (unsafe: *s__goto_253_5))
-                                    
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
+
                                     (s__goto_253_5 = s__goto_253_5 + 1)
-                                    
+
                                 }
-                                
+
                                 if (__goto_pending != 0) {
                                     break
                                 }
-                                
-                                
+
+
                                 (posix_state__goto_161_10 = 3)
-                                
+
                                 if ((if plength > 0: 1 else: 0) != 0) {
                                     if ((if (unsafe: *posix__goto_154_12) == 94: 1 else: 0) != 0) {
                                         (posix__goto_154_12 = posix__goto_154_12 + 1)
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         (plength = plength - 1)
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         while ((if (unsafe: *s__goto_291_9) != 0: 1 else: 0) != 0) {
                                             if ((if p__goto_155_14 >= endp__goto_157_14: 1 else: 0) != 0) {
                                                 return -48
                                             }
-                                            
+
                                             if (__goto_pending != 0) {
                                                 break
                                             }
-                                            
+
                                             var __ci_expr_old_10: *mut u8 = p__goto_155_14
-                                            
+
                                             (p__goto_155_14 = p__goto_155_14 + 1)
-                                            
+
                                             ((unsafe: *__ci_expr_old_10) = (unsafe: *s__goto_291_9))
-                                            
+
                                             if (__goto_pending != 0) {
                                                 break
                                             }
-                                            
+
                                             if (__goto_pending != 0) {
                                                 break
                                             }
-                                            
+
                                             (s__goto_291_9 = s__goto_291_9 + 1)
-                                            
+
                                         }
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
-                                        
+
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                     }
-                                    
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
+
                                     var __ci_expr_logic_11: c_int = 0
-                                    
+
                                     if ((if plength > 0: 1 else: 0) != 0) {
                                         (__ci_expr_logic_11 = (if (if (unsafe: *posix__goto_154_12) == 93: 1 else: 0) != 0: 1 else: 0))
                                     }
-                                    
+
                                     if (__ci_expr_logic_11 != 0) {
                                         (posix__goto_154_12 = posix__goto_154_12 + 1)
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         (plength = plength - 1)
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         while ((if (unsafe: *s__goto_297_9) != 0: 1 else: 0) != 0) {
                                             if ((if p__goto_155_14 >= endp__goto_157_14: 1 else: 0) != 0) {
                                                 return -48
                                             }
-                                            
+
                                             if (__goto_pending != 0) {
                                                 break
                                             }
-                                            
+
                                             var __ci_expr_old_12: *mut u8 = p__goto_155_14
-                                            
+
                                             (p__goto_155_14 = p__goto_155_14 + 1)
-                                            
+
                                             ((unsafe: *__ci_expr_old_12) = (unsafe: *s__goto_297_9))
-                                            
+
                                             if (__goto_pending != 0) {
                                                 break
                                             }
-                                            
+
                                             if (__goto_pending != 0) {
                                                 break
                                             }
-                                            
+
                                             (s__goto_297_9 = s__goto_297_9 + 1)
-                                            
+
                                         }
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
-                                        
+
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                     }
-                                    
-                                    
+
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
+
                                 }
-                                
+
                             92 =>
                                 if ((if plength == 0: 1 else: 0) != 0) {
                                     return 101
                                 }
-                                
+
                                 if (extended__goto_163_6 != 0) {
                                     (nextisliteral__goto_164_6 = 1)
                                 } else {
                                     var __ci_expr_logic_13: c_int = 0
-                                    
+
                                     if ((if (unsafe: *posix__goto_154_12) < 255: 1 else: 0) != 0) {
                                         (__ci_expr_logic_13 = (if (if string_find_char(posix_meta_escapes, (unsafe: *posix__goto_154_12)) != null: 1 else: 0) != 0: 1 else: 0))
                                     }
-                                    
+
                                     if (__ci_expr_logic_13 != 0) {
                                         var __ci_expr_logic_14: c_int = 0
-                                        
+
                                         if ((if (unsafe: *posix__goto_154_12) >= 48: 1 else: 0) != 0) {
                                             (__ci_expr_logic_14 = (if (if (unsafe: *posix__goto_154_12) <= 57: 1 else: 0) != 0: 1 else: 0))
                                         }
-                                        
+
                                         if (__ci_expr_logic_14 != 0) {
                                             while ((if (unsafe: *s__goto_308_51) != 0: 1 else: 0) != 0) {
                                                 if ((if p__goto_155_14 >= endp__goto_157_14: 1 else: 0) != 0) {
                                                     return -48
                                                 }
-                                                
+
                                                 if (__goto_pending != 0) {
                                                     break
                                                 }
-                                                
+
                                                 var __ci_expr_old_15: *mut u8 = p__goto_155_14
-                                                
+
                                                 (p__goto_155_14 = p__goto_155_14 + 1)
-                                                
+
                                                 ((unsafe: *__ci_expr_old_15) = (unsafe: *s__goto_308_51))
-                                                
+
                                                 if (__goto_pending != 0) {
                                                     break
                                                 }
-                                                
+
                                                 if (__goto_pending != 0) {
                                                     break
                                                 }
-                                                
+
                                                 (s__goto_308_51 = s__goto_308_51 + 1)
-                                                
+
                                             }
-                                            
+
                                             if (__goto_pending != 0) {
                                                 break
                                             }
-                                            
+
                                         }
-                                        
-                                        
+
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         if ((if (p__goto_155_14 + ((1 as isize) as usize)) > endp__goto_157_14: 1 else: 0) != 0) {
                                             return -48
                                         }
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         var __ci_expr_old_16: *mut u8 = p__goto_155_14
-                                        
+
                                         (p__goto_155_14 = p__goto_155_14 + 1)
-                                        
+
                                         var __ci_expr_old_17: *const u8 = posix__goto_154_12
-                                        
+
                                         (posix__goto_154_12 = posix__goto_154_12 + 1)
-                                        
+
                                         ((unsafe: *__ci_expr_old_16) = (unsafe: *__ci_expr_old_17))
-                                        
+
                                         (lastspecial__goto_162_10 = (unsafe: *__ci_expr_old_16))
-                                        
-                                        
+
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         (plength = plength - 1)
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                     } else {
                                         (nextisliteral__goto_164_6 = 1)
                                     }
-                                    
-                                    
+
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
+
                                 }
-                                
+
                             41 =>
                                 var __ci_expr_logic_18: c_int
-                                
+
                                 if ((if not (extended__goto_163_6 != 0): 1 else: 0) != 0) {
                                     (__ci_expr_logic_18 = (if true: 1 else: 0))
                                 } else {
                                     (__ci_expr_logic_18 = (if (if bracount__goto_160_10 == 0: 1 else: 0) != 0: 1 else: 0))
                                 }
-                                
+
                                 if (__ci_expr_logic_18 != 0) {
                                     __pc = 2
                                     __goto_pending = 1
                                 }
-                                
-                                
+
+
                                 (bracount__goto_160_10 = bracount__goto_160_10 - 1)
-                                
+
                                 __pc = 1
                                 __goto_pending = 1
-                                
+
                             40 =>
                                 (bracount__goto_160_10 = bracount__goto_160_10 + 1)
-                                
+
                                 if ((if not (extended__goto_163_6 != 0): 1 else: 0) != 0) {
                                     __pc = 2
                                     __goto_pending = 1
                                 }
-                                
+
                                 (posix_state__goto_161_10 = 2)
-                                
+
                                 (lastspecial__goto_162_10 = c__goto_178_12)
-                                
+
                                 if ((if (p__goto_155_14 + ((1 as isize) as usize)) > endp__goto_157_14: 1 else: 0) != 0) {
                                     return -48
                                 }
-                                
+
                                 var __ci_expr_old_19: *mut u8 = p__goto_155_14
-                                
+
                                 (p__goto_155_14 = p__goto_155_14 + 1)
-                                
+
                                 ((unsafe: *__ci_expr_old_19) = c__goto_178_12)
-                                
-                                
-                                
-                                
+
+
+
+
                             63 =>
                                 if ((if not (extended__goto_163_6 != 0): 1 else: 0) != 0) {
                                     __pc = 2
                                     __goto_pending = 1
                                 }
-                                
+
                                 (posix_state__goto_161_10 = 2)
-                                
+
                                 (lastspecial__goto_162_10 = c__goto_178_12)
-                                
+
                                 if ((if (p__goto_155_14 + ((1 as isize) as usize)) > endp__goto_157_14: 1 else: 0) != 0) {
                                     return -48
                                 }
-                                
+
                                 var __ci_expr_old_19: *mut u8 = p__goto_155_14
-                                
+
                                 (p__goto_155_14 = p__goto_155_14 + 1)
-                                
+
                                 ((unsafe: *__ci_expr_old_19) = c__goto_178_12)
-                                
-                                
-                                
+
+
+
                             43 =>
                                 if ((if not (extended__goto_163_6 != 0): 1 else: 0) != 0) {
                                     __pc = 2
                                     __goto_pending = 1
                                 }
-                                
+
                                 (posix_state__goto_161_10 = 2)
-                                
+
                                 (lastspecial__goto_162_10 = c__goto_178_12)
-                                
+
                                 if ((if (p__goto_155_14 + ((1 as isize) as usize)) > endp__goto_157_14: 1 else: 0) != 0) {
                                     return -48
                                 }
-                                
+
                                 var __ci_expr_old_19: *mut u8 = p__goto_155_14
-                                
+
                                 (p__goto_155_14 = p__goto_155_14 + 1)
-                                
+
                                 ((unsafe: *__ci_expr_old_19) = c__goto_178_12)
-                                
-                                
-                                
+
+
+
                             123 =>
                                 if ((if not (extended__goto_163_6 != 0): 1 else: 0) != 0) {
                                     __pc = 2
                                     __goto_pending = 1
                                 }
-                                
+
                                 (posix_state__goto_161_10 = 2)
-                                
+
                                 (lastspecial__goto_162_10 = c__goto_178_12)
-                                
+
                                 if ((if (p__goto_155_14 + ((1 as isize) as usize)) > endp__goto_157_14: 1 else: 0) != 0) {
                                     return -48
                                 }
-                                
+
                                 var __ci_expr_old_19: *mut u8 = p__goto_155_14
-                                
+
                                 (p__goto_155_14 = p__goto_155_14 + 1)
-                                
+
                                 ((unsafe: *__ci_expr_old_19) = c__goto_178_12)
-                                
-                                
-                                
+
+
+
                             125 =>
                                 if ((if not (extended__goto_163_6 != 0): 1 else: 0) != 0) {
                                     __pc = 2
                                     __goto_pending = 1
                                 }
-                                
+
                                 (posix_state__goto_161_10 = 2)
-                                
+
                                 (lastspecial__goto_162_10 = c__goto_178_12)
-                                
+
                                 if ((if (p__goto_155_14 + ((1 as isize) as usize)) > endp__goto_157_14: 1 else: 0) != 0) {
                                     return -48
                                 }
-                                
+
                                 var __ci_expr_old_19: *mut u8 = p__goto_155_14
-                                
+
                                 (p__goto_155_14 = p__goto_155_14 + 1)
-                                
+
                                 ((unsafe: *__ci_expr_old_19) = c__goto_178_12)
-                                
-                                
-                                
+
+
+
                             124 =>
                                 if ((if not (extended__goto_163_6 != 0): 1 else: 0) != 0) {
                                     __pc = 2
                                     __goto_pending = 1
                                 }
-                                
+
                                 (posix_state__goto_161_10 = 2)
-                                
+
                                 (lastspecial__goto_162_10 = c__goto_178_12)
-                                
+
                                 if ((if (p__goto_155_14 + ((1 as isize) as usize)) > endp__goto_157_14: 1 else: 0) != 0) {
                                     return -48
                                 }
-                                
+
                                 var __ci_expr_old_19: *mut u8 = p__goto_155_14
-                                
+
                                 (p__goto_155_14 = p__goto_155_14 + 1)
-                                
+
                                 ((unsafe: *__ci_expr_old_19) = c__goto_178_12)
-                                
-                                
-                                
+
+
+
                             46 =>
                                 (posix_state__goto_161_10 = 2)
-                                
+
                                 (lastspecial__goto_162_10 = c__goto_178_12)
-                                
+
                                 if ((if (p__goto_155_14 + ((1 as isize) as usize)) > endp__goto_157_14: 1 else: 0) != 0) {
                                     return -48
                                 }
-                                
+
                                 var __ci_expr_old_19: *mut u8 = p__goto_155_14
-                                
+
                                 (p__goto_155_14 = p__goto_155_14 + 1)
-                                
+
                                 ((unsafe: *__ci_expr_old_19) = c__goto_178_12)
-                                
-                                
+
+
                             36 =>
                                 (posix_state__goto_161_10 = 2)
-                                
+
                                 (lastspecial__goto_162_10 = c__goto_178_12)
-                                
+
                                 if ((if (p__goto_155_14 + ((1 as isize) as usize)) > endp__goto_157_14: 1 else: 0) != 0) {
                                     return -48
                                 }
-                                
+
                                 var __ci_expr_old_19: *mut u8 = p__goto_155_14
-                                
+
                                 (p__goto_155_14 = p__goto_155_14 + 1)
-                                
+
                                 ((unsafe: *__ci_expr_old_19) = c__goto_178_12)
-                                
-                                
+
+
                             42 =>
                                 if ((if lastspecial__goto_162_10 != 42: 1 else: 0) != 0) {
                                     var __ci_expr_logic_21: c_int = 0
-                                    
+
                                     if ((if not (extended__goto_163_6 != 0): 1 else: 0) != 0) {
                                         var __ci_expr_logic_20: c_int
-                                        
+
                                         if ((if posix_state__goto_161_10 < 2: 1 else: 0) != 0) {
                                             (__ci_expr_logic_20 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_20 = (if (if lastspecial__goto_162_10 == 40: 1 else: 0) != 0: 1 else: 0))
                                         }
-                                        
+
                                         (__ci_expr_logic_21 = (if __ci_expr_logic_20 != 0: 1 else: 0))
-                                        
+
                                     }
-                                    
+
                                     if (__ci_expr_logic_21 != 0) {
                                         __pc = 2
                                         __goto_pending = 1
                                     }
-                                    
-                                    
+
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
+
                                     __pc = 1
                                     __goto_pending = 1
-                                    
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
+
                                 }
                             94 =>
                                 if (extended__goto_163_6 != 0) {
                                     __pc = 1
                                     __goto_pending = 1
                                 }
-                                
+
                                 var __ci_expr_logic_22: c_int
-                                
+
                                 if ((if posix_state__goto_161_10 == 0: 1 else: 0) != 0) {
                                     (__ci_expr_logic_22 = (if true: 1 else: 0))
                                 } else {
                                     (__ci_expr_logic_22 = (if (if lastspecial__goto_162_10 == 40: 1 else: 0) != 0: 1 else: 0))
                                 }
-                                
+
                                 if (__ci_expr_logic_22 != 0) {
                                     (posix_state__goto_161_10 = 1)
-                                    
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
+
                                     __pc = 1
                                     __goto_pending = 1
-                                    
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
+
                                 }
-                                
-                                
+
+
                                 var __ci_expr_logic_23: c_int = 0
-                                
+
                                 if ((if c__goto_178_12 < 255: 1 else: 0) != 0) {
                                     (__ci_expr_logic_23 = (if (if string_find_char(pcre2_escaped_literals, c__goto_178_12) != null: 1 else: 0) != 0: 1 else: 0))
                                 }
-                                
+
                                 if (__ci_expr_logic_23 != 0) {
                                     while ((if (unsafe: *s__goto_367_7) != 0: 1 else: 0) != 0) {
                                         if ((if p__goto_155_14 >= endp__goto_157_14: 1 else: 0) != 0) {
                                             return -48
                                         }
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         var __ci_expr_old_24: *mut u8 = p__goto_155_14
-                                        
+
                                         (p__goto_155_14 = p__goto_155_14 + 1)
-                                        
+
                                         ((unsafe: *__ci_expr_old_24) = (unsafe: *s__goto_367_7))
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         (s__goto_367_7 = s__goto_367_7 + 1)
-                                        
+
                                     }
-                                    
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
-                                    
+
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
+
                                 }
-                                
-                                
+
+
                                 (lastspecial__goto_162_10 = 255)
-                                
+
                                 if ((if (p__goto_155_14 + ((clength__goto_179_7 as isize) as usize)) > endp__goto_157_14: 1 else: 0) != 0) {
                                     return -48
                                 }
-                                
+
                                 with_memcpy((p__goto_155_14 as *i8), ((posix__goto_154_12 - ((clength__goto_179_7 as isize) as usize)) as *i8), ((clength__goto_179_7 * (8 / 8)) as i64))
-                                
+
                                 (p__goto_155_14 = p__goto_155_14 + clength__goto_179_7)
-                                
+
                                 (posix_state__goto_161_10 = 2)
-                                
-                                
+
+
                             _ =>
                                 var __ci_expr_logic_23: c_int = 0
-                                
+
                                 if ((if c__goto_178_12 < 255: 1 else: 0) != 0) {
                                     (__ci_expr_logic_23 = (if (if string_find_char(pcre2_escaped_literals, c__goto_178_12) != null: 1 else: 0) != 0: 1 else: 0))
                                 }
-                                
+
                                 if (__ci_expr_logic_23 != 0) {
                                     while ((if (unsafe: *s__goto_367_7) != 0: 1 else: 0) != 0) {
                                         if ((if p__goto_155_14 >= endp__goto_157_14: 1 else: 0) != 0) {
                                             return -48
                                         }
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         var __ci_expr_old_24: *mut u8 = p__goto_155_14
-                                        
+
                                         (p__goto_155_14 = p__goto_155_14 + 1)
-                                        
+
                                         ((unsafe: *__ci_expr_old_24) = (unsafe: *s__goto_367_7))
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        
+
                                         (s__goto_367_7 = s__goto_367_7 + 1)
-                                        
+
                                     }
-                                    
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
-                                    
+
+
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    
+
                                 }
-                                
-                                
+
+
                                 (lastspecial__goto_162_10 = 255)
-                                
+
                                 if ((if (p__goto_155_14 + ((clength__goto_179_7 as isize) as usize)) > endp__goto_157_14: 1 else: 0) != 0) {
                                     return -48
                                 }
-                                
+
                                 with_memcpy((p__goto_155_14 as *i8), ((posix__goto_154_12 - ((clength__goto_179_7 as isize) as usize)) as *i8), ((clength__goto_179_7 * (8 / 8)) as i64))
-                                
+
                                 (p__goto_155_14 = p__goto_155_14 + clength__goto_179_7)
-                                
+
                                 (posix_state__goto_161_10 = 2)
-                                
+
                     }
                     if (__goto_pending != 0) {
                         break
@@ -1245,11 +1245,11 @@ fn convert_glob_write(out: *mut pcre2_output_context, chr: u8) {
 
     if ((if out.output < out.output_end: 1 else: 0) != 0) {
         var __ci_expr_old_0: *mut u8 = out.output
-        
+
         (out.output = out.output + 1)
-        
+
         ((unsafe: *__ci_expr_old_0) = chr)
-        
+
     }
 
 }
@@ -1266,26 +1266,26 @@ fn convert_glob_write_str(out: *mut pcre2_output_context, __param_length: c_ulon
 
     while true {
         (output_size = output_size + 1)
-        
+
         if ((if output < output_end: 1 else: 0) != 0) {
             var __ci_expr_old_0: *mut u8 = output
-            
+
             (output = output + 1)
-            
+
             var __ci_expr_old_1: *mut u8 = out_str
-            
+
             (out_str = out_str + 1)
-            
+
             ((unsafe: *__ci_expr_old_0) = (unsafe: *__ci_expr_old_1))
-            
+
         }
-        
+
         (length = length - 1)
-        
+
         if (not ((if length != 0: 1 else: 0) != 0)) {
             break
         }
-        
+
     }
 
     (out.output = output)
@@ -1331,49 +1331,49 @@ fn convert_glob_parse_class(from: *mut *const u8, pattern_end: *const u8, out: *
         if ((if pattern >= pattern_end: 1 else: 0) != 0) {
             return 0
         }
-        
+
         var __ci_expr_old_0: *const u8 = pattern
-        
+
         (pattern = pattern + 1)
-        
+
         (c = (unsafe: *__ci_expr_old_0))
-        
-        
+
+
         var __ci_expr_logic_1: c_int
-        
+
         if ((if c < 97: 1 else: 0) != 0) {
             (__ci_expr_logic_1 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_1 = (if (if c > 122: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_1 != 0) {
             break
         }
-        
-        
+
+
     }
 
     var __ci_expr_logic_3: c_int
-    
+
     var __ci_expr_logic_2: c_int
-    
+
     if ((if c != 58: 1 else: 0) != 0) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
         (__ci_expr_logic_2 = (if (if pattern >= pattern_end: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_2 != 0) {
         (__ci_expr_logic_3 = (if true: 1 else: 0))
     } else {
         (__ci_expr_logic_3 = (if (if (unsafe: *pattern) != 93: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_3 != 0) {
         return 0
     }
-    
+
 
     (class_ptr = ((posix_classes as *const c_char)))
 
@@ -1383,48 +1383,48 @@ fn convert_glob_parse_class(from: *mut *const u8, pattern_end: *const u8, out: *
         if ((if (unsafe: *class_ptr) == 0: 1 else: 0) != 0) {
             return 0
         }
-        
+
         (pattern = start)
-        
+
         while ((if (unsafe: *pattern) == (((unsafe: *class_ptr) as u8)): 1 else: 0) != 0) {
             if ((if (unsafe: *pattern) == 58: 1 else: 0) != 0) {
                 (pattern = pattern + 2)
-                
+
                 (start = start - 2)
-                
+
                 while true {
                     var __ci_expr_old_4: *const u8 = start
-                    
+
                     (start = start + 1)
-                    
+
                     convert_glob_write(out, (unsafe: *__ci_expr_old_4))
-                    
+
                     if (not ((if start < pattern: 1 else: 0) != 0)) {
                         break
                     }
-                    
+
                 }
-                
+
                 ((unsafe: *from) = pattern)
-                
+
                 return class_index
-                
+
             }
-            
+
             (pattern = pattern + 1)
-            
+
             (class_ptr = class_ptr + 1)
-            
+
         }
-        
+
         while ((if (unsafe: *class_ptr) != 58: 1 else: 0) != 0) {
             (class_ptr = class_ptr + 1)
         }
-        
+
         (class_ptr = class_ptr + 1)
-        
+
         (class_index = class_index + 1)
-        
+
     }
 
 }
@@ -1439,13 +1439,13 @@ fn convert_glob_char_in_class(class_index: c_int, c: u8) -> c_int {
             if ((if c == 95: 1 else: 0) != 0) {
                 return 0
             }
-            
-            if ((if ((cbits + ((64 as isize) as usize))[(c / 8)] & (1 << (c & 7))) != 0: 1 else: 0) != 0) {
+
+            if ((if ((unsafe: (cbits + ((64 as isize) as usize))[(c / 8)]) & (1 << (c & 7))) != 0: 1 else: 0) != 0) {
                 return 0
             }
-            
+
             (cbit = 160)
-            
+
         2 =>
             (cbit = 128)
         3 =>
@@ -1454,48 +1454,48 @@ fn convert_glob_char_in_class(class_index: c_int, c: u8) -> c_int {
             if ((if c == 95: 1 else: 0) != 0) {
                 return 0
             }
-            
+
             (cbit = 160)
-            
+
         5 =>
-            if ((if ((cbits + ((288 as isize) as usize))[(c / 8)] & (1 << (c & 7))) != 0: 1 else: 0) != 0) {
+            if ((if ((unsafe: (cbits + ((288 as isize) as usize))[(c / 8)]) & (1 << (c & 7))) != 0: 1 else: 0) != 0) {
                 return 1
             }
-            
+
             (cbit = 224)
-            
+
         6 =>
             var __ci_expr_logic_2: c_int
-            
+
             var __ci_expr_logic_1: c_int
-            
+
             var __ci_expr_logic_0: c_int
-            
+
             if ((if c == 10: 1 else: 0) != 0) {
                 (__ci_expr_logic_0 = (if true: 1 else: 0))
             } else {
                 (__ci_expr_logic_0 = (if (if c == 11: 1 else: 0) != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_0 != 0) {
                 (__ci_expr_logic_1 = (if true: 1 else: 0))
             } else {
                 (__ci_expr_logic_1 = (if (if c == 12: 1 else: 0) != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_1 != 0) {
                 (__ci_expr_logic_2 = (if true: 1 else: 0))
             } else {
                 (__ci_expr_logic_2 = (if (if c == 13: 1 else: 0) != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_2 != 0) {
                 return 0
             }
-            
-            
+
+
             (cbit = 0)
-            
+
         7 =>
             (cbit = 288)
         8 =>
@@ -1515,7 +1515,7 @@ fn convert_glob_char_in_class(class_index: c_int, c: u8) -> c_int {
         _ =>
             return 0
 
-    return (if ((cbits + ((cbit as isize) as usize))[(c / 8)] & (1 << (c & 7))) != 0: 1 else: 0)
+    return (if ((unsafe: (cbits + ((cbit as isize) as usize))[(c / 8)]) & (1 << (c & 7))) != 0: 1 else: 0)
 
 }
 
@@ -1531,68 +1531,68 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
     var char_start: *const u8 = null
 
     var c: c_uint
-    
+
     var prev_c: c_uint
-    
+
 
     var len: c_int
-    
+
     var class_index: c_int
-    
+
 
     utf
 
     if ((if pattern >= pattern_end: 1 else: 0) != 0) {
         ((unsafe: *from) = pattern)
-        
+
         return 106
-        
+
     }
 
     var __ci_expr_logic_0: c_int
-    
+
     if ((if (unsafe: *pattern) == 33: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
         (__ci_expr_logic_0 = (if (if (unsafe: *pattern) == 94: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_0 != 0) {
         (pattern = pattern + 1)
-        
+
         if ((if pattern >= pattern_end: 1 else: 0) != 0) {
             ((unsafe: *from) = pattern)
-            
+
             return 106
-            
+
         }
-        
+
         (is_negative = 1)
-        
+
         (out.out_str[0] = 91)
-        
+
         (out.out_str[1] = 94)
-        
+
         (len = 2)
-        
+
         if ((if not (no_wildsep != 0): 1 else: 0) != 0) {
             if (with_escape != 0) {
                 (out.out_str[len] = 92)
-                
+
                 (len = len + 1)
-                
+
             }
-            
+
             (out.out_str[len] = separator)
-            
+
         }
-        
+
         convert_glob_write_str(out, (len + 1))
-        
+
     } else {
         convert_glob_write(out, 91)
     }
-    
+
 
     (has_prev_c = 0)
 
@@ -1600,448 +1600,448 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
 
     if ((if (unsafe: *pattern) == 93: 1 else: 0) != 0) {
         (out.out_str[0] = 92)
-        
+
         (out.out_str[1] = 93)
-        
+
         convert_glob_write_str(out, 2)
-        
+
         (has_prev_c = 1)
-        
+
         (prev_c = 93)
-        
+
         (pattern = pattern + 1)
-        
+
     }
 
     while ((if pattern < pattern_end: 1 else: 0) != 0) {
         (char_start = pattern)
-        
+
         var __ci_expr_old_1: *const u8 = pattern
-        
+
         (pattern = pattern + 1)
-        
+
         (c = (unsafe: *__ci_expr_old_1))
-        
-        
+
+
         var __ci_expr_logic_2: c_int = 0
-        
+
         if (utf != 0) {
             (__ci_expr_logic_2 = (if (if c >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_2 != 0) {
             if ((if (c & 32) == 0: 1 else: 0) != 0) {
                 var __ci_expr_old_3: *const u8 = pattern
-                
+
                 (pattern = pattern + 1)
-                
+
                 (c = ((c & 31) << 6) | ((unsafe: *__ci_expr_old_3) & 63))
-                
+
             } else {
                 if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                    (c = (((c & 15) << 12) | (((unsafe: *pattern) & 63) << 6)) | (pattern[1] & 63))
-                    
+                    (c = (((c & 15) << 12) | (((unsafe: *pattern) & 63) << 6)) | ((unsafe: pattern[1]) & 63))
+
                     (pattern = pattern + 2)
-                    
+
                 } else {
                     if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                        (c = ((((c & 7) << 18) | (((unsafe: *pattern) & 63) << 12)) | ((pattern[1] & 63) << 6)) | (pattern[2] & 63))
-                        
+                        (c = ((((c & 7) << 18) | (((unsafe: *pattern) & 63) << 12)) | (((unsafe: pattern[1]) & 63) << 6)) | ((unsafe: pattern[2]) & 63))
+
                         (pattern = pattern + 3)
-                        
+
                     } else {
                         if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                            (c = (((((c & 3) << 24) | (((unsafe: *pattern) & 63) << 18)) | ((pattern[1] & 63) << 12)) | ((pattern[2] & 63) << 6)) | (pattern[3] & 63))
-                            
+                            (c = (((((c & 3) << 24) | (((unsafe: *pattern) & 63) << 18)) | (((unsafe: pattern[1]) & 63) << 12)) | (((unsafe: pattern[2]) & 63) << 6)) | ((unsafe: pattern[3]) & 63))
+
                             (pattern = pattern + 4)
-                            
+
                         } else {
-                            (c = ((((((c & 1) << 30) | (((unsafe: *pattern) & 63) << 24)) | ((pattern[1] & 63) << 18)) | ((pattern[2] & 63) << 12)) | ((pattern[3] & 63) << 6)) | (pattern[4] & 63))
-                            
+                            (c = ((((((c & 1) << 30) | (((unsafe: *pattern) & 63) << 24)) | (((unsafe: pattern[1]) & 63) << 18)) | (((unsafe: pattern[2]) & 63) << 12)) | (((unsafe: pattern[3]) & 63) << 6)) | ((unsafe: pattern[4]) & 63))
+
                             (pattern = pattern + 5)
-                            
+
                         }
                     }
                 }
             }
-            
+
         }
-        
-        
+
+
         if ((if c == 93: 1 else: 0) != 0) {
             convert_glob_write(out, c)
-            
+
             var __ci_expr_logic_5: c_int = 0
-            
+
             var __ci_expr_logic_4: c_int = 0
-            
+
             if ((if not (is_negative != 0): 1 else: 0) != 0) {
                 (__ci_expr_logic_4 = (if (if not (no_wildsep != 0): 1 else: 0) != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_4 != 0) {
                 (__ci_expr_logic_5 = (if separator_seen != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_5 != 0) {
                 (out.out_str[0] = 40)
-                
+
                 (out.out_str[1] = 63)
-                
+
                 (out.out_str[2] = 60)
-                
+
                 (out.out_str[3] = 33)
-                
+
                 convert_glob_write_str(out, 4)
-                
+
                 convert_glob_print_separator(out, separator, with_escape)
-                
+
                 convert_glob_write(out, 41)
-                
+
             }
-            
-            
+
+
             ((unsafe: *from) = pattern)
-            
+
             return 0
-            
+
         }
-        
+
         if ((if pattern >= pattern_end: 1 else: 0) != 0) {
             break
         }
-        
+
         var __ci_expr_logic_6: c_int = 0
-        
+
         if ((if c == 91: 1 else: 0) != 0) {
             (__ci_expr_logic_6 = (if (if (unsafe: *pattern) == 58: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_6 != 0) {
             ((unsafe: *from) = pattern)
-            
+
             (class_index = convert_glob_parse_class(from, pattern_end, out))
-            
+
             if ((if class_index != 0: 1 else: 0) != 0) {
                 (pattern = (unsafe: *from))
-                
+
                 (has_prev_c = 0)
-                
+
                 (prev_c = 0)
-                
+
                 var __ci_expr_logic_7: c_int = 0
-                
+
                 if ((if not (is_negative != 0): 1 else: 0) != 0) {
                     (__ci_expr_logic_7 = (if convert_glob_char_in_class(class_index, separator) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_7 != 0) {
                     (separator_seen = 1)
                 }
-                
-                
+
+
                 continue
-                
+
             }
-            
+
         } else {
             var __ci_expr_logic_9: c_int = 0
-            
+
             var __ci_expr_logic_8: c_int = 0
-            
+
             if ((if c == 45: 1 else: 0) != 0) {
                 (__ci_expr_logic_8 = (if has_prev_c != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_8 != 0) {
                 (__ci_expr_logic_9 = (if (if (unsafe: *pattern) != 93: 1 else: 0) != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_9 != 0) {
                 convert_glob_write(out, 45)
-                
+
                 (char_start = pattern)
-                
+
                 var __ci_expr_old_10: *const u8 = pattern
-                
+
                 (pattern = pattern + 1)
-                
+
                 (c = (unsafe: *__ci_expr_old_10))
-                
-                
+
+
                 var __ci_expr_logic_11: c_int = 0
-                
+
                 if (utf != 0) {
                     (__ci_expr_logic_11 = (if (if c >= 192: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_11 != 0) {
                     if ((if (c & 32) == 0: 1 else: 0) != 0) {
                         var __ci_expr_old_12: *const u8 = pattern
-                        
+
                         (pattern = pattern + 1)
-                        
+
                         (c = ((c & 31) << 6) | ((unsafe: *__ci_expr_old_12) & 63))
-                        
+
                     } else {
                         if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                            (c = (((c & 15) << 12) | (((unsafe: *pattern) & 63) << 6)) | (pattern[1] & 63))
-                            
+                            (c = (((c & 15) << 12) | (((unsafe: *pattern) & 63) << 6)) | ((unsafe: pattern[1]) & 63))
+
                             (pattern = pattern + 2)
-                            
+
                         } else {
                             if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                                (c = ((((c & 7) << 18) | (((unsafe: *pattern) & 63) << 12)) | ((pattern[1] & 63) << 6)) | (pattern[2] & 63))
-                                
+                                (c = ((((c & 7) << 18) | (((unsafe: *pattern) & 63) << 12)) | (((unsafe: pattern[1]) & 63) << 6)) | ((unsafe: pattern[2]) & 63))
+
                                 (pattern = pattern + 3)
-                                
+
                             } else {
                                 if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                                    (c = (((((c & 3) << 24) | (((unsafe: *pattern) & 63) << 18)) | ((pattern[1] & 63) << 12)) | ((pattern[2] & 63) << 6)) | (pattern[3] & 63))
-                                    
+                                    (c = (((((c & 3) << 24) | (((unsafe: *pattern) & 63) << 18)) | (((unsafe: pattern[1]) & 63) << 12)) | (((unsafe: pattern[2]) & 63) << 6)) | ((unsafe: pattern[3]) & 63))
+
                                     (pattern = pattern + 4)
-                                    
+
                                 } else {
-                                    (c = ((((((c & 1) << 30) | (((unsafe: *pattern) & 63) << 24)) | ((pattern[1] & 63) << 18)) | ((pattern[2] & 63) << 12)) | ((pattern[3] & 63) << 6)) | (pattern[4] & 63))
-                                    
+                                    (c = ((((((c & 1) << 30) | (((unsafe: *pattern) & 63) << 24)) | (((unsafe: pattern[1]) & 63) << 18)) | (((unsafe: pattern[2]) & 63) << 12)) | (((unsafe: pattern[3]) & 63) << 6)) | ((unsafe: pattern[4]) & 63))
+
                                     (pattern = pattern + 5)
-                                    
+
                                 }
                             }
                         }
                     }
-                    
+
                 }
-                
-                
+
+
                 if ((if pattern >= pattern_end: 1 else: 0) != 0) {
                     break
                 }
-                
+
                 var __ci_expr_logic_13: c_int = 0
-                
+
                 if ((if escape != 0: 1 else: 0) != 0) {
                     (__ci_expr_logic_13 = (if (if c == escape: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_13 != 0) {
                     (char_start = pattern)
-                    
+
                     var __ci_expr_old_14: *const u8 = pattern
-                    
+
                     (pattern = pattern + 1)
-                    
+
                     (c = (unsafe: *__ci_expr_old_14))
-                    
-                    
+
+
                     var __ci_expr_logic_15: c_int = 0
-                    
+
                     if (utf != 0) {
                         (__ci_expr_logic_15 = (if (if c >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
-                    
+
                     if (__ci_expr_logic_15 != 0) {
                         if ((if (c & 32) == 0: 1 else: 0) != 0) {
                             var __ci_expr_old_16: *const u8 = pattern
-                            
+
                             (pattern = pattern + 1)
-                            
+
                             (c = ((c & 31) << 6) | ((unsafe: *__ci_expr_old_16) & 63))
-                            
+
                         } else {
                             if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                                (c = (((c & 15) << 12) | (((unsafe: *pattern) & 63) << 6)) | (pattern[1] & 63))
-                                
+                                (c = (((c & 15) << 12) | (((unsafe: *pattern) & 63) << 6)) | ((unsafe: pattern[1]) & 63))
+
                                 (pattern = pattern + 2)
-                                
+
                             } else {
                                 if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                                    (c = ((((c & 7) << 18) | (((unsafe: *pattern) & 63) << 12)) | ((pattern[1] & 63) << 6)) | (pattern[2] & 63))
-                                    
+                                    (c = ((((c & 7) << 18) | (((unsafe: *pattern) & 63) << 12)) | (((unsafe: pattern[1]) & 63) << 6)) | ((unsafe: pattern[2]) & 63))
+
                                     (pattern = pattern + 3)
-                                    
+
                                 } else {
                                     if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                                        (c = (((((c & 3) << 24) | (((unsafe: *pattern) & 63) << 18)) | ((pattern[1] & 63) << 12)) | ((pattern[2] & 63) << 6)) | (pattern[3] & 63))
-                                        
+                                        (c = (((((c & 3) << 24) | (((unsafe: *pattern) & 63) << 18)) | (((unsafe: pattern[1]) & 63) << 12)) | (((unsafe: pattern[2]) & 63) << 6)) | ((unsafe: pattern[3]) & 63))
+
                                         (pattern = pattern + 4)
-                                        
+
                                     } else {
-                                        (c = ((((((c & 1) << 30) | (((unsafe: *pattern) & 63) << 24)) | ((pattern[1] & 63) << 18)) | ((pattern[2] & 63) << 12)) | ((pattern[3] & 63) << 6)) | (pattern[4] & 63))
-                                        
+                                        (c = ((((((c & 1) << 30) | (((unsafe: *pattern) & 63) << 24)) | (((unsafe: pattern[1]) & 63) << 18)) | (((unsafe: pattern[2]) & 63) << 12)) | (((unsafe: pattern[3]) & 63) << 6)) | ((unsafe: pattern[4]) & 63))
+
                                         (pattern = pattern + 5)
-                                        
+
                                     }
                                 }
                             }
                         }
-                        
+
                     }
-                    
-                    
+
+
                 } else {
                     var __ci_expr_logic_17: c_int = 0
-                    
+
                     if ((if c == 91: 1 else: 0) != 0) {
                         (__ci_expr_logic_17 = (if (if (unsafe: *pattern) == 58: 1 else: 0) != 0: 1 else: 0))
                     }
-                    
+
                     if (__ci_expr_logic_17 != 0) {
                         ((unsafe: *from) = pattern)
-                        
+
                         return -64
-                        
+
                     }
-                    
+
                 }
-                
-                
+
+
                 if ((if prev_c > c: 1 else: 0) != 0) {
                     ((unsafe: *from) = pattern)
-                    
+
                     return -64
-                    
+
                 }
-                
+
                 var __ci_expr_logic_18: c_int = 0
-                
+
                 if ((if prev_c < separator: 1 else: 0) != 0) {
                     (__ci_expr_logic_18 = (if (if separator < c: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_18 != 0) {
                     (separator_seen = 1)
                 }
-                
-                
+
+
                 (has_prev_c = 0)
-                
+
                 (prev_c = 0)
-                
+
             } else {
                 var __ci_expr_logic_19: c_int = 0
-                
+
                 if ((if escape != 0: 1 else: 0) != 0) {
                     (__ci_expr_logic_19 = (if (if c == escape: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_19 != 0) {
                     (char_start = pattern)
-                    
+
                     var __ci_expr_old_20: *const u8 = pattern
-                    
+
                     (pattern = pattern + 1)
-                    
+
                     (c = (unsafe: *__ci_expr_old_20))
-                    
-                    
+
+
                     var __ci_expr_logic_21: c_int = 0
-                    
+
                     if (utf != 0) {
                         (__ci_expr_logic_21 = (if (if c >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
-                    
+
                     if (__ci_expr_logic_21 != 0) {
                         if ((if (c & 32) == 0: 1 else: 0) != 0) {
                             var __ci_expr_old_22: *const u8 = pattern
-                            
+
                             (pattern = pattern + 1)
-                            
+
                             (c = ((c & 31) << 6) | ((unsafe: *__ci_expr_old_22) & 63))
-                            
+
                         } else {
                             if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                                (c = (((c & 15) << 12) | (((unsafe: *pattern) & 63) << 6)) | (pattern[1] & 63))
-                                
+                                (c = (((c & 15) << 12) | (((unsafe: *pattern) & 63) << 6)) | ((unsafe: pattern[1]) & 63))
+
                                 (pattern = pattern + 2)
-                                
+
                             } else {
                                 if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                                    (c = ((((c & 7) << 18) | (((unsafe: *pattern) & 63) << 12)) | ((pattern[1] & 63) << 6)) | (pattern[2] & 63))
-                                    
+                                    (c = ((((c & 7) << 18) | (((unsafe: *pattern) & 63) << 12)) | (((unsafe: pattern[1]) & 63) << 6)) | ((unsafe: pattern[2]) & 63))
+
                                     (pattern = pattern + 3)
-                                    
+
                                 } else {
                                     if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                                        (c = (((((c & 3) << 24) | (((unsafe: *pattern) & 63) << 18)) | ((pattern[1] & 63) << 12)) | ((pattern[2] & 63) << 6)) | (pattern[3] & 63))
-                                        
+                                        (c = (((((c & 3) << 24) | (((unsafe: *pattern) & 63) << 18)) | (((unsafe: pattern[1]) & 63) << 12)) | (((unsafe: pattern[2]) & 63) << 6)) | ((unsafe: pattern[3]) & 63))
+
                                         (pattern = pattern + 4)
-                                        
+
                                     } else {
-                                        (c = ((((((c & 1) << 30) | (((unsafe: *pattern) & 63) << 24)) | ((pattern[1] & 63) << 18)) | ((pattern[2] & 63) << 12)) | ((pattern[3] & 63) << 6)) | (pattern[4] & 63))
-                                        
+                                        (c = ((((((c & 1) << 30) | (((unsafe: *pattern) & 63) << 24)) | (((unsafe: pattern[1]) & 63) << 18)) | (((unsafe: pattern[2]) & 63) << 12)) | (((unsafe: pattern[3]) & 63) << 6)) | ((unsafe: pattern[4]) & 63))
+
                                         (pattern = pattern + 5)
-                                        
+
                                     }
                                 }
                             }
                         }
-                        
+
                     }
-                    
-                    
+
+
                     if ((if pattern >= pattern_end: 1 else: 0) != 0) {
                         break
                     }
-                    
+
                 }
-                
-                
+
+
                 (has_prev_c = 1)
-                
+
                 (prev_c = c)
-                
+
             }
-            
+
         }
-        
-        
+
+
         var __ci_expr_logic_25: c_int
-        
+
         var __ci_expr_logic_24: c_int
-        
+
         var __ci_expr_logic_23: c_int
-        
+
         if ((if c == 91: 1 else: 0) != 0) {
             (__ci_expr_logic_23 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_23 = (if (if c == 93: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_23 != 0) {
             (__ci_expr_logic_24 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_24 = (if (if c == 92: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_24 != 0) {
             (__ci_expr_logic_25 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_25 = (if (if c == 45: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_25 != 0) {
             convert_glob_write(out, 92)
         }
-        
-        
+
+
         if ((if c == separator: 1 else: 0) != 0) {
             (separator_seen = 1)
         }
-        
+
         while true {
             var __ci_expr_old_26: *const u8 = char_start
-            
+
             (char_start = char_start + 1)
-            
+
             convert_glob_write(out, (unsafe: *__ci_expr_old_26))
-            
+
             if (not ((if char_start < pattern: 1 else: 0) != 0)) {
                 break
             }
-            
+
         }
-        
+
     }
 
     ((unsafe: *from) = pattern)
@@ -2098,38 +2098,38 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
     var no_slash_z: c_int = 0
 
     var with_escape: c_int
-    
+
     var is_start: c_int
-    
+
     var after_separator: c_int
-    
+
 
     var result: c_int = 0
 
     utf
 
     var __ci_expr_logic_1: c_int = 0
-    
+
     if (utf != 0) {
         var __ci_expr_logic_0: c_int
-        
+
         if ((if separator >= 128: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_0 = (if (if escape >= 128: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
-        
+
     }
-    
+
     if (__ci_expr_logic_1 != 0) {
         ((unsafe: *bufflenptr) = 0)
-        
+
         return -64
-        
+
     }
-    
+
 
     (with_escape = (if string_find_char(pcre2_escaped_literals, separator) != null: 1 else: 0))
 
@@ -2152,396 +2152,396 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
     (is_start = 1)
 
     var __ci_expr_logic_2: c_int = 0
-    
+
     if ((if pattern < pattern_end: 1 else: 0) != 0) {
-        (__ci_expr_logic_2 = (if (if pattern[0] == 42: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if (if (unsafe: pattern[0]) == 42: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_2 != 0) {
         if (no_wildsep != 0) {
             (is_start = 0)
         } else {
             var __ci_expr_logic_4: c_int = 0
-            
+
             var __ci_expr_logic_3: c_int = 0
-            
+
             if ((if not (no_starstar != 0): 1 else: 0) != 0) {
                 (__ci_expr_logic_3 = (if (if (pattern + ((1 as isize) as usize)) < pattern_end: 1 else: 0) != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_3 != 0) {
-                (__ci_expr_logic_4 = (if (if pattern[1] == 42: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_4 = (if (if (unsafe: pattern[1]) == 42: 1 else: 0) != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_4 != 0) {
                 (is_start = 0)
             }
-            
+
         }
-        
+
     }
-    
+
 
     if (is_start != 0) {
         (out.out_str[0] = 92)
-        
+
         (out.out_str[1] = 65)
-        
+
         convert_glob_write_str((&mut out as *mut pcre2_output_context), 2)
-        
+
     }
 
     while ((if pattern < pattern_end: 1 else: 0) != 0) {
         var __ci_expr_old_5: *const u8 = pattern
-        
+
         (pattern = pattern + 1)
-        
+
         (c = (unsafe: *__ci_expr_old_5))
-        
-        
+
+
         if ((if c == 42: 1 else: 0) != 0) {
             (is_start = (if pattern == (pattern_start + ((1 as isize) as usize)): 1 else: 0))
-            
+
             if (in_atomic != 0) {
                 convert_glob_write((&mut out as *mut pcre2_output_context), 41)
-                
+
                 (in_atomic = 0)
-                
+
             }
-            
+
             var __ci_expr_logic_7: c_int = 0
-            
+
             var __ci_expr_logic_6: c_int = 0
-            
+
             if ((if not (no_starstar != 0): 1 else: 0) != 0) {
                 (__ci_expr_logic_6 = (if (if pattern < pattern_end: 1 else: 0) != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_6 != 0) {
                 (__ci_expr_logic_7 = (if (if (unsafe: *pattern) == 42: 1 else: 0) != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_7 != 0) {
                 var __ci_expr_logic_8: c_int
-                
+
                 if (is_start != 0) {
                     (__ci_expr_logic_8 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_8 = (if (if pattern[-2] == separator: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_8 = (if (if (unsafe: pattern[-2]) == separator: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 (after_separator = __ci_expr_logic_8)
-                
-                
+
+
                 while true {
                     (pattern = pattern + 1)
-                    
+
                     var __ci_expr_logic_9: c_int = 0
-                    
+
                     if ((if pattern < pattern_end: 1 else: 0) != 0) {
                         (__ci_expr_logic_9 = (if (if (unsafe: *pattern) == 42: 1 else: 0) != 0: 1 else: 0))
                     }
-                    
+
                     if (not (__ci_expr_logic_9 != 0)) {
                         break
                     }
-                    
+
                 }
-                
+
                 if ((if pattern >= pattern_end: 1 else: 0) != 0) {
                     (no_slash_z = 1)
-                    
+
                     break
-                    
+
                 }
-                
+
                 (after_starstar = 1)
-                
+
                 var __ci_expr_logic_13: c_int = 0
-                
+
                 var __ci_expr_logic_12: c_int = 0
-                
+
                 var __ci_expr_logic_11: c_int = 0
-                
+
                 var __ci_expr_logic_10: c_int = 0
-                
+
                 if (after_separator != 0) {
                     (__ci_expr_logic_10 = (if (if escape != 0: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_10 != 0) {
                     (__ci_expr_logic_11 = (if (if (unsafe: *pattern) == escape: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_11 != 0) {
                     (__ci_expr_logic_12 = (if (if (pattern + ((1 as isize) as usize)) < pattern_end: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_12 != 0) {
-                    (__ci_expr_logic_13 = (if (if pattern[1] == separator: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_13 = (if (if (unsafe: pattern[1]) == separator: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_13 != 0) {
                     (pattern = pattern + 1)
                 }
-                
-                
+
+
                 if (is_start != 0) {
                     if ((if (unsafe: *pattern) != separator: 1 else: 0) != 0) {
                         continue
                     }
-                    
+
                     (out.out_str[0] = 40)
-                    
+
                     (out.out_str[1] = 63)
-                    
+
                     (out.out_str[2] = 58)
-                    
+
                     (out.out_str[3] = 92)
-                    
+
                     (out.out_str[4] = 65)
-                    
+
                     (out.out_str[5] = 124)
-                    
+
                     convert_glob_write_str((&mut out as *mut pcre2_output_context), 6)
-                    
+
                     convert_glob_print_separator((&mut out as *mut pcre2_output_context), separator, with_escape)
-                    
+
                     convert_glob_write((&mut out as *mut pcre2_output_context), 41)
-                    
+
                     (pattern = pattern + 1)
-                    
+
                     continue
-                    
+
                 }
-                
+
                 convert_glob_print_commit((&mut out as *mut pcre2_output_context))
-                
+
                 var __ci_expr_logic_14: c_int
-                
+
                 if ((if not (after_separator != 0): 1 else: 0) != 0) {
                     (__ci_expr_logic_14 = (if true: 1 else: 0))
                 } else {
                     (__ci_expr_logic_14 = (if (if (unsafe: *pattern) != separator: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_14 != 0) {
                     (out.out_str[0] = 46)
-                    
+
                     (out.out_str[1] = 42)
-                    
+
                     (out.out_str[2] = 63)
-                    
+
                     convert_glob_write_str((&mut out as *mut pcre2_output_context), 3)
-                    
+
                     continue
-                    
+
                 }
-                
-                
+
+
                 (out.out_str[0] = 40)
-                
+
                 (out.out_str[1] = 63)
-                
+
                 (out.out_str[2] = 58)
-                
+
                 (out.out_str[3] = 46)
-                
+
                 (out.out_str[4] = 42)
-                
+
                 (out.out_str[5] = 63)
-                
+
                 convert_glob_write_str((&mut out as *mut pcre2_output_context), 6)
-                
+
                 convert_glob_print_separator((&mut out as *mut pcre2_output_context), separator, with_escape)
-                
+
                 (out.out_str[0] = 41)
-                
+
                 (out.out_str[1] = 63)
-                
+
                 (out.out_str[2] = 63)
-                
+
                 convert_glob_write_str((&mut out as *mut pcre2_output_context), 3)
-                
+
                 (pattern = pattern + 1)
-                
+
                 continue
-                
+
             }
-            
-            
+
+
             var __ci_expr_logic_15: c_int = 0
-            
+
             if ((if pattern < pattern_end: 1 else: 0) != 0) {
                 (__ci_expr_logic_15 = (if (if (unsafe: *pattern) == 42: 1 else: 0) != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_15 != 0) {
                 while true {
                     (pattern = pattern + 1)
-                    
+
                     var __ci_expr_logic_16: c_int = 0
-                    
+
                     if ((if pattern < pattern_end: 1 else: 0) != 0) {
                         (__ci_expr_logic_16 = (if (if (unsafe: *pattern) == 42: 1 else: 0) != 0: 1 else: 0))
                     }
-                    
+
                     if (not (__ci_expr_logic_16 != 0)) {
                         break
                     }
-                    
+
                 }
-                
+
             }
-            
-            
+
+
             if (no_wildsep != 0) {
                 if ((if pattern >= pattern_end: 1 else: 0) != 0) {
                     (no_slash_z = 1)
-                    
+
                     break
-                    
+
                 }
-                
+
                 if (is_start != 0) {
                     continue
                 }
-                
+
             }
-            
+
             if ((if not (is_start != 0): 1 else: 0) != 0) {
                 if (after_starstar != 0) {
                     (out.out_str[0] = 40)
-                    
+
                     (out.out_str[1] = 63)
-                    
+
                     (out.out_str[2] = 62)
-                    
+
                     convert_glob_write_str((&mut out as *mut pcre2_output_context), 3)
-                    
+
                     (in_atomic = 1)
-                    
+
                 } else {
                     convert_glob_print_commit((&mut out as *mut pcre2_output_context))
                 }
-                
+
             }
-            
+
             if (no_wildsep != 0) {
                 convert_glob_write((&mut out as *mut pcre2_output_context), 46)
             } else {
                 convert_glob_print_wildcard((&mut out as *mut pcre2_output_context), separator, with_escape)
             }
-            
+
             (out.out_str[0] = 42)
-            
+
             (out.out_str[1] = 63)
-            
+
             if ((if pattern >= pattern_end: 1 else: 0) != 0) {
                 (out.out_str[1] = 43)
             }
-            
+
             convert_glob_write_str((&mut out as *mut pcre2_output_context), 2)
-            
+
             continue
-            
+
         }
-        
+
         if ((if c == 63: 1 else: 0) != 0) {
             if (no_wildsep != 0) {
                 convert_glob_write((&mut out as *mut pcre2_output_context), 46)
             } else {
                 convert_glob_print_wildcard((&mut out as *mut pcre2_output_context), separator, with_escape)
             }
-            
+
             continue
-            
+
         }
-        
+
         if ((if c == 91: 1 else: 0) != 0) {
             (result = convert_glob_parse_range((&mut pattern as *mut *const u8), pattern_end, (&mut out as *mut pcre2_output_context), utf, separator, with_escape, escape, no_wildsep))
-            
+
             if ((if result != 0: 1 else: 0) != 0) {
                 break
             }
-            
+
             continue
-            
+
         }
-        
+
         var __ci_expr_logic_17: c_int = 0
-        
+
         if ((if escape != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_17 = (if (if c == escape: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_17 != 0) {
             if ((if pattern >= pattern_end: 1 else: 0) != 0) {
                 (result = -64)
-                
+
                 break
-                
+
             }
-            
+
             var __ci_expr_old_18: *const u8 = pattern
-            
+
             (pattern = pattern + 1)
-            
+
             (c = (unsafe: *__ci_expr_old_18))
-            
-            
+
+
         }
-        
-        
+
+
         var __ci_expr_logic_19: c_int = 0
-        
+
         if ((if c < 255: 1 else: 0) != 0) {
             (__ci_expr_logic_19 = (if (if string_find_char(pcre2_escaped_literals, c) != null: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_19 != 0) {
             convert_glob_write((&mut out as *mut pcre2_output_context), 92)
         }
-        
-        
+
+
         convert_glob_write((&mut out as *mut pcre2_output_context), c)
-        
+
     }
 
     if ((if result == 0: 1 else: 0) != 0) {
         if ((if not (no_slash_z != 0): 1 else: 0) != 0) {
             (out.out_str[0] = 92)
-            
+
             (out.out_str[1] = 122)
-            
+
             convert_glob_write_str((&mut out as *mut pcre2_output_context), 2)
-            
+
         }
-        
+
         if (in_atomic != 0) {
             convert_glob_write((&mut out as *mut pcre2_output_context), 41)
         }
-        
+
         convert_glob_write((&mut out as *mut pcre2_output_context), 0)
-        
+
         var __ci_expr_logic_20: c_int = 0
-        
+
         if ((if not (dummyrun != 0): 1 else: 0) != 0) {
             (__ci_expr_logic_20 = (if (if out.output_size != (((((out.output as usize) -% (use_buffer as usize)) / sizeof[u8]()) as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_20 != 0) {
             (result = -48)
         }
-        
-        
+
+
     }
 
     if ((if result != 0: 1 else: 0) != 0) {
         ((unsafe: *bufflenptr) = ((pattern as usize) -% (pattern_start as usize)) / sizeof[u8]())
-        
+
         return result
-        
+
     }
 
     ((unsafe: *bufflenptr) = (out.output_size -% 1))
@@ -2549,4 +2549,3 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
     return 0
 
 }
-

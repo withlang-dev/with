@@ -29,18 +29,11 @@ fn ci_make_indent(n: i32) -> str:
         i = i + 1
     out
 
-// Prepend `spaces` spaces to every line of `text`, matching
-// ci_indent_block's convention: empty lines get the prefix applied
-// too (so they become whitespace-only lines at the new indent
-// level).
+// Prepend `spaces` spaces to non-empty lines of `text`.
 //
 // The bare `\n` separators that CIS_BLOCK inserts between children
-// get prefixed too when a container above the block re-indents —
-// each container level adds another prefix, matching the legacy
-// per-level ci_indent_block layering. The outermost result has no
-// outer container to re-indent, so its own CIS_BLOCK separators
-// stay bare (matching ci_try_translate_fn_body's top-level bare
-// blanks between statements).
+// stay bare when a container above the block re-indents, so generated
+// output never contains whitespace-only lines.
 fn ci_reindent_spaces(text: str, spaces: i32) -> str:
     if text.len() == 0:
         return ""
@@ -62,7 +55,8 @@ fn ci_reindent_spaces(text: str, spaces: i32) -> str:
         var end = start
         while end < tlen and text.byte_at(end as i64) != 10:
             end = end + 1
-        parts.push(prefix)
+        if end > start:
+            parts.push(prefix)
         parts.push(text.slice(start as i64, end as i64))
         parts.push("\n")
         start = end + 1
@@ -184,7 +178,7 @@ fn ci_float_type_name(bits: i32) -> str:
     "f64"
 
 // Wrap an expression source snippet in `(unsafe: ...)` for rendering
-// a dereference. Keeping the `unsafe:` wrapping in one place makes
+// raw pointer access. Keeping the `unsafe:` wrapping in one place makes
 // it cheap to change the convention later.
 fn ci_wrap_unsafe(inner: str) -> str:
     "(unsafe: " ++ inner ++ ")"
@@ -426,7 +420,12 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
     if kind == CiExprKind.CIE_INDEX:
         let base = (exprs.get_d0(id)) as CiExprId
         let idx = (exprs.get_d1(id)) as CiExprId
-        return ci_print_expr(exprs, types, base, 0, 0) ++ "[" ++ ci_print_expr(exprs, types, idx, 0, 0) ++ "]"
+        let rendered = ci_print_expr(exprs, types, base, 0, 0) ++ "[" ++ ci_print_expr(exprs, types, idx, 0, 0) ++ "]"
+        let base_ty = exprs.get_type(base)
+        let base_is_ptr = (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER
+        if exprs.get_d2(id) != 0 or base_is_ptr:
+            return ci_wrap_unsafe(rendered)
+        return rendered
     if kind == CiExprKind.CIE_CAST:
         let target = (exprs.get_d0(id)) as CiTypeId
         let operand = (exprs.get_d1(id)) as CiExprId

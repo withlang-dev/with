@@ -4437,6 +4437,34 @@ fn ci_cursor_type_is_pointerish(session: i64, cursor: i32) -> bool:
     let ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
     ci_starts_with(ty_str, "*")
 
+fn ci_cursor_type_text(session: i64, cursor: i32) -> str:
+    if cursor < 0:
+        return ""
+    let ty = with_ci_cursor_type(session, cursor)
+    if ty < 0:
+        return ""
+    with_ci_type_translated(session, ty)
+
+fn ci_index_base_is_raw_pointer(session: i64, cursor: i32, base_id: CiExprId, exprs: &CiExprPool, types: &CiTypePool) -> i32:
+    let expr_ty = exprs.get_type(base_id)
+    if (expr_ty as i32) != 0:
+        if types.kind(expr_ty) == CiTypeKind.CT_ARRAY:
+            return 0
+        if types.kind(expr_ty) == CiTypeKind.CT_POINTER:
+            return 1
+    let peeled = ci_peel_transparent(session, cursor)
+    let cursor_ty = ci_cursor_type_text(session, cursor)
+    let peeled_ty = ci_cursor_type_text(session, peeled)
+    if ci_cursor_is_array_type(session, cursor) or ci_cursor_is_array_type(session, peeled):
+        return 0
+    if (cursor_ty.len() > 0 and cursor_ty.byte_at(0) == 91) or (peeled_ty.len() > 0 and peeled_ty.byte_at(0) == 91):
+        return 0
+    if ci_cursor_type_is_pointerish(session, cursor):
+        return 1
+    if ci_cursor_type_is_pointerish(session, peeled):
+        return 1
+    0
+
 fn ci_expr_is_string_lit(exprs: &CiExprPool, id: CiExprId) -> bool:
     if (id as i32) == 0:
         return false
@@ -4722,7 +4750,8 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
             let arr_id = ci_lower_expr_ir(session, arr_cursor, exprs, types, scope)
             let idx_id = ci_lower_expr_ir(session, idx_cursor, exprs, types, scope)
             if (arr_id as i32) != 0 and (idx_id as i32) != 0:
-                return exprs.add(CiExprKind.CIE_INDEX, arr_id as i32, idx_id as i32, 0, 0 as CiTypeId)
+                let raw_ptr_index = ci_index_base_is_raw_pointer(session, arr_cursor, arr_id, exprs, types)
+                return exprs.add(CiExprKind.CIE_INDEX, arr_id as i32, idx_id as i32, raw_ptr_index, 0 as CiTypeId)
         return 0 as CiExprId
 
     // Call expression.
@@ -6115,10 +6144,13 @@ fn ci_lower_lvalue_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, ex
         return ci_value_ir_invalid()
 
     if kind == CXK_ARRAY_SUBSCRIPT and nc >= 2:
-        let arr = ci_lower_value_expr_ir(session, with_ci_child(session, cursor, 0), stmts, exprs, types, scope)
-        let idx = ci_lower_value_expr_ir(session, with_ci_child(session, cursor, 1), stmts, exprs, types, scope)
+        let arr_cursor = with_ci_child(session, cursor, 0)
+        let idx_cursor = with_ci_child(session, cursor, 1)
+        let arr = ci_lower_value_expr_ir(session, arr_cursor, stmts, exprs, types, scope)
+        let idx = ci_lower_value_expr_ir(session, idx_cursor, stmts, exprs, types, scope)
         if ci_value_ir_valid(arr) and ci_value_ir_valid(idx):
-            let index_id = exprs.add(CiExprKind.CIE_INDEX, arr.value_expr as i32, idx.value_expr as i32, 0, 0 as CiTypeId)
+            let raw_ptr_index = ci_index_base_is_raw_pointer(session, arr_cursor, arr.value_expr, exprs, types)
+            let index_id = exprs.add(CiExprKind.CIE_INDEX, arr.value_expr as i32, idx.value_expr as i32, raw_ptr_index, 0 as CiTypeId)
             return CiValueExprIR {
                 setup_stmt: ci_stmt_merge_ir(stmts, arr.setup_stmt, idx.setup_stmt),
                 value_expr: index_id,
@@ -6488,12 +6520,15 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
         return ci_value_ir_invalid()
 
     if kind == CXK_ARRAY_SUBSCRIPT and nc >= 2:
-        let arr = ci_lower_value_expr_ir(session, with_ci_child(session, cursor, 0), stmts, exprs, types, scope)
-        let idx = ci_lower_value_expr_ir(session, with_ci_child(session, cursor, 1), stmts, exprs, types, scope)
+        let arr_cursor = with_ci_child(session, cursor, 0)
+        let idx_cursor = with_ci_child(session, cursor, 1)
+        let arr = ci_lower_value_expr_ir(session, arr_cursor, stmts, exprs, types, scope)
+        let idx = ci_lower_value_expr_ir(session, idx_cursor, stmts, exprs, types, scope)
         if ci_value_ir_valid(arr) and ci_value_ir_valid(idx):
+            let raw_ptr_index = ci_index_base_is_raw_pointer(session, arr_cursor, arr.value_expr, exprs, types)
             return CiValueExprIR {
                 setup_stmt: ci_stmt_merge_ir(stmts, arr.setup_stmt, idx.setup_stmt),
-                value_expr: exprs.add(CiExprKind.CIE_INDEX, arr.value_expr as i32, idx.value_expr as i32, 0, 0 as CiTypeId),
+                value_expr: exprs.add(CiExprKind.CIE_INDEX, arr.value_expr as i32, idx.value_expr as i32, raw_ptr_index, 0 as CiTypeId),
             }
         return ci_value_ir_invalid()
 
@@ -8225,7 +8260,8 @@ fn ci_indent_block(text: str, indent: i32) -> str:
         var end = start
         while end < len and text.byte_at(end as i64) != 10:
             end = end + 1
-        parts.push(prefix)
+        if end > start:
+            parts.push(prefix)
         parts.push(text.slice(start as i64, end as i64))
         parts.push("\n")
         start = end + 1

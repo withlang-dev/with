@@ -91,11 +91,11 @@ fn pcre2_set_bsr_8(ccontext: *mut pcre2_real_compile_context_8, value: c_uint) -
     match value:
         2 | 1 =>
             (ccontext.bsr_convention = value)
-            
+
             return 0
-            
+
             return -29
-            
+
         _ =>
             return -29
 
@@ -140,11 +140,11 @@ fn pcre2_set_newline_8(ccontext: *mut pcre2_real_compile_context_8, newline: c_u
     match newline:
         1 | 2 | 3 | 4 | 5 | 6 =>
             (ccontext.newline_convention = newline)
-            
+
             return 0
-            
+
             return -29
-            
+
         _ =>
             return -29
 
@@ -178,25 +178,25 @@ fn pcre2_set_optimize_8(ccontext: *mut pcre2_real_compile_context_8, directive: 
             (ccontext.optimization_flags = 7)
         _ =>
             var __ci_expr_logic_0: c_int = 0
-            
+
             if ((if directive >= 64: 1 else: 0) != 0) {
                 (__ci_expr_logic_0 = (if (if directive <= 69: 1 else: 0) != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_0 != 0) {
                 if ((if (directive & 1) != 0: 1 else: 0) != 0) {
                     (ccontext.optimization_flags = ccontext.optimization_flags & (~(1 << ((directive >> 1) -% 32))))
                 } else {
                     (ccontext.optimization_flags = ccontext.optimization_flags | (1 << ((directive >> 1) -% 32)))
                 }
-                
+
                 return 0
-                
+
             }
-            
-            
+
+
             return -34
-            
+
 
     return 0
 
@@ -241,24 +241,24 @@ fn pcre2_convert_context_free_8(ccontext: *mut pcre2_real_convert_context_8) {
 
 fn pcre2_set_glob_escape_8(ccontext: *mut pcre2_real_convert_context_8, escape: c_uint) -> c_int {
     var __ci_expr_logic_1: c_int
-    
+
     if ((if escape > 255: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_0: c_int = 0
-        
+
         if ((if escape != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if (if string_find_char(globpunct, escape) == null: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
-        
+
     }
-    
+
     if (__ci_expr_logic_1 != 0) {
         return -29
     }
-    
+
 
     (ccontext.glob_escape = escape)
 
@@ -268,21 +268,21 @@ fn pcre2_set_glob_escape_8(ccontext: *mut pcre2_real_convert_context_8, escape: 
 
 fn pcre2_set_glob_separator_8(ccontext: *mut pcre2_real_convert_context_8, separator: c_uint) -> c_int {
     var __ci_expr_logic_1: c_int = 0
-    
+
     var __ci_expr_logic_0: c_int = 0
-    
+
     if ((if separator != 47: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if (if separator != 92: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_0 != 0) {
         (__ci_expr_logic_1 = (if (if separator != 46: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_1 != 0) {
         return -29
     }
-    
+
 
     (ccontext.glob_separator = separator)
 
@@ -421,11 +421,11 @@ fn _pcre2_memctl_malloc_8(size: c_ulong, memctl: *mut pcre2_memctl) -> *mut c_vo
 
     if ((if memctl == null: 1 else: 0) != 0) {
         (newmemctl.malloc = ((default_malloc as *mut fn(c_ulong, *mut c_void) -> *mut c_void)))
-        
+
         (newmemctl.free = ((default_free as *mut fn(*mut c_void, *mut c_void) -> void)))
-        
+
         (newmemctl.memory_data = null)
-        
+
     } else {
         ((unsafe: *newmemctl) = (unsafe: *memctl))
     }
@@ -447,4 +447,3 @@ fn default_free(block: *mut c_void, data: *mut c_void) {
     with_free((block as *mut i8))
 
 }
-

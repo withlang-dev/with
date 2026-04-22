@@ -7231,24 +7231,58 @@ context — it requires a pointer type annotation. Using `null` without
 type context is a compile error. `null` is not the same as `0`.
 Dereferencing `null` is undefined behavior (caught by `unsafe`).
 
-### 16.11 Raw Pointer Arithmetic
+### 16.11 Unsafe Context
 
 ```
-unsafe:
-    let p: *mut i32 = alloc(10 * sizeof[i32]())
-    let third = p + 2          // points to 3rd element
-    let val = *(p + 2)         // dereference offset
-    let val2 = p[2]            // sugar for *(p + 2)
-    p[0] = 42                  // write through pointer
-    let diff = end - start     // element count between pointers
+fn use_ptr(p: *mut i32, end: *mut i32):
+    let third = p + 2          // pointer arithmetic is safe
+    let diff = end - p         // pointer difference is safe
+
+    unsafe:
+        let val = *third       // raw pointer dereference
+        let val2 = p[2]        // raw pointer indexing
+        p[0] = 42              // write through raw pointer
 ```
+
+Certain operations in With can violate memory safety if misused.
+These operations are permitted only within an `unsafe` context:
+the body of an `unsafe fn` or the scope of an `unsafe:` block.
+
+The operations that require an unsafe context are:
+
+- Raw pointer dereference (`*p` for read or write)
+- Raw pointer indexing (`p[i]` for read, `p[i] = v` for write)
+- Calls to `extern` functions
+- Other operations explicitly marked as unsafe in their definition
+
+The following operations involving raw pointers are safe and do
+not require an unsafe context:
+
+- Raw pointer arithmetic (`p + n`, `p - n`, `p - q`)
+- Raw pointer comparison (`p == q`, `p < q`, etc.)
+- Taking the address of a value (`&x`, `&mut x`)
+- Casting a pointer to an integer (`p as usize`)
+- Casting an integer to a pointer (`n as *T`)
+
+Raw pointer arithmetic uses element units:
 
 - `ptr + n` advances by `n * sizeof(T)` bytes.
 - `ptr - n` retreats by `n * sizeof(T)` bytes.
-- `ptr[n]` is sugar for `*(ptr + n)`.
 - `ptr1 - ptr2` returns the element count between pointers.
-- All pointer arithmetic requires `unsafe` context.
-- Result preserves mutability: `*mut T + n` → `*mut T`.
+- Result preserves mutability: `*mut T + n` -> `*mut T`.
+
+Computing a pointer value cannot by itself read invalid memory,
+write invalid memory, or violate type invariants. The unsafe
+requirement is placed at the access site, not at every intermediate
+computation:
+
+> `unsafe` is required when you are about to touch memory through
+> a raw pointer, not when you are merely computing one.
+
+Users may freely compute pointer addresses in safe code. The
+resulting pointer value carries the same responsibility as any raw
+pointer: it may only be used to access memory within an unsafe
+context.
 
 ### 16.12 Intrinsics
 
@@ -8394,23 +8428,22 @@ All code is safe unless explicitly `unsafe`.
 ### 19.2 `unsafe` Required For
 
 - Raw pointer dereference
+- Raw pointer indexing
 - FFI function calls
 - Inline assembly (`asm` expressions)
 - Intrusive / self-referential structures
 - Manual memory management beyond allocators
 - Calling functions marked `unsafe`
 
-Note: See issues #145 and #146 for enforcement status.
-
 ### 19.2a `unsafe fn` — Function-Level Unsafe Context
 
-Functions that pervasively perform unsafe operations (raw pointer
-dereference, pointer arithmetic) may be declared `unsafe fn`:
+Functions that pervasively perform unsafe memory accesses may be
+declared `unsafe fn`:
 
 ```
 unsafe fn sha256_compress(ctx: &mut Sha256):
-    ctx.state[0] +%= a          // pointer deref permitted — no wrapper
-    let b = ctx.buf[off]        // auto-deref through pointer — no wrapper
+    ctx.state[0] +%= a          // raw pointer indexing permitted
+    let b = ctx.buf[off]        // auto-deref through pointer permitted
 ```
 
 Inside an `unsafe fn` body, all operations that would normally

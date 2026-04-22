@@ -27,25 +27,25 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
     }
 
     var __ci_expr_logic_2: c_int
-    
+
     var __ci_expr_logic_1: c_int
-    
+
     if ((if codes == null: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
         (__ci_expr_logic_1 = (if (if serialized_bytes == null: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_1 != 0) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
         (__ci_expr_logic_2 = (if (if serialized_size == null: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_2 != 0) {
         return -51
     }
-    
+
 
     if ((if number_of_codes <= 0: 1 else: 0) != 0) {
         return -29
@@ -56,18 +56,18 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
     (tables = ((null as *const u8)))
 
     (i = 0)
-    
+
     while ((if i < number_of_codes: 1 else: 0) != 0) {
-        if ((if codes[i] == null: 1 else: 0) != 0) {
+        if ((if (unsafe: codes[i]) == null: 1 else: 0) != 0) {
             return -51
         }
-        
-        (re = codes[i])
-        
+
+        (re = (unsafe: codes[i]))
+
         if ((if re.magic_number != 1346589253: 1 else: 0) != 0) {
             return -31
         }
-        
+
         if ((if tables == null: 1 else: 0) != 0) {
             (tables = re.tables)
         } else {
@@ -75,14 +75,14 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
                 return -30
             }
         }
-        
+
         (total_size = total_size + re.blocksize)
-        
-        
+
+
         (i = i + 1)
-        
+
     }
-    
+
 
     (bytes = ((memctl.malloc((total_size +% sizeof[pcre2_memctl]()), memctl.memory_data) as *mut u8)))
 
@@ -111,25 +111,25 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
     (dst_bytes = dst_bytes + ((512 + 320) + 256))
 
     (i = 0)
-    
+
     while ((if i < number_of_codes: 1 else: 0) != 0) {
-        (re = codes[i])
-        
+        (re = (unsafe: codes[i]))
+
         with_memcpy((dst_bytes as *i8), ((re as *const c_char) as *i8), (re.blocksize as i64))
-        
+
         with_memset(((dst_bytes + 0) as *i8), 0, (sizeof[pcre2_memctl]() as i64))
-        
+
         with_memset(((dst_bytes + 24) as *i8), 0, (8 as i64))
-        
+
         with_memset(((dst_bytes + 32) as *i8), 0, (8 as i64))
-        
+
         (dst_bytes = dst_bytes + re.blocksize)
-        
-        
+
+
         (i = i + 1)
-        
+
     }
-    
+
 
     ((unsafe: *serialized_bytes) = bytes)
 
@@ -319,7 +319,7 @@ fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_o
                     if (__goto_pending != 0) {
                         break
                     }
-                    (codes[i__goto_171_9] = dst_re__goto_169_18)
+                    ((unsafe: codes[i__goto_171_9]) = dst_re__goto_169_18)
                     if (__goto_pending != 0) {
                         break
                     }
@@ -360,11 +360,11 @@ fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_o
                 }
                 (j__goto_171_12 = 0)
                 while ((if j__goto_171_12 < i__goto_171_9: 1 else: 0) != 0) {
-                    memctl__goto_165_21.free(codes[j__goto_171_12], memctl__goto_165_21.memory_data)
+                    memctl__goto_165_21.free((unsafe: codes[j__goto_171_12]), memctl__goto_165_21.memory_data)
                     if (__goto_pending != 0) {
                         break
                     }
-                    (codes[j__goto_171_12] = ((null as *mut pcre2_real_code_8)))
+                    ((unsafe: codes[j__goto_171_12]) = ((null as *mut pcre2_real_code_8)))
                     if (__goto_pending != 0) {
                         break
                     }
@@ -410,10 +410,9 @@ fn pcre2_serialize_get_number_of_codes_8(bytes: *const u8) -> c_int {
 fn pcre2_serialize_free_8(bytes: *mut u8) {
     if ((if bytes != null: 1 else: 0) != 0) {
         var memctl: *mut pcre2_memctl = (((bytes - sizeof[pcre2_memctl]()) as *mut pcre2_memctl))
-        
+
         memctl.free(memctl, memctl.memory_data)
-        
+
     }
 
 }
-

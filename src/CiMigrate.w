@@ -171,6 +171,14 @@ fn ci_comment_prefix_lines(text: str) -> str:
         start = end
     result
 
+fn ci_migrate_normalize_output(text: str) -> str:
+    if text.len() == 0:
+        return ""
+    var end = text.len()
+    while end > 0 and text.byte_at(end - 1) == 10:
+        end = end - 1
+    text.slice(0, end) ++ "\n"
+
 fn ci_migrate_render_stub(name: str, safe_name: str, params: str, ret: str, source_file: str, fn_cursor: i32, session: i64, bail_loc: str, bail_kind_name: str) -> str:
     let ret_suffix = if ret == "void" or ret.len() == 0: "" else: " -> " ++ ret
     var comment = "// [MIGRATOR_UNTRANSLATED]\n"
@@ -217,7 +225,7 @@ fn ci_migrate_write_shared_defs(output_dir: str):
             defs = defs ++ pending.rendered ++ "\n"
         pending_i = pending_i + 1
     let defs_path = output_dir ++ "/defs.w"
-    let rc = with_fs_write_file(defs_path, defs)
+    let rc = with_fs_write_file(defs_path, ci_migrate_normalize_output(defs))
     if rc != 0:
         eprint("migrate: failed to write shared defs: " ++ defs_path)
     else:
@@ -645,6 +653,7 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
             output = summary ++ output
 
     ci_migrate_shared_note_output_uses(output)
+    output = ci_migrate_normalize_output(output)
 
     // Write output
     let write_result = with_fs_write_file(output_path, output)

@@ -225,7 +225,7 @@ fn cstr_len(s: *const u8) -> i64:
     if s as i64 == 0:
         return 0
     var n: i64 = 0
-    while s[n] != 0:
+    while (unsafe: s[n]) != 0:
         n = n + 1
     n
 
@@ -240,8 +240,8 @@ fn rt_memcpy(dst: *mut u8, src: *const u8, n: i64):
 fn rt_memcmp(a: *const u8, b: *const u8, n: i64) -> i32:
     var i: i64 = 0
     while i < n:
-        let ca = a[i]
-        let cb = b[i]
+        let ca = unsafe: a[i]
+        let cb = unsafe: b[i]
         if ca != cb:
             if (ca as i32) < (cb as i32):
                 return -1
@@ -676,7 +676,7 @@ fn u64_base_to_buf(n_arg: u64, base: i32, uppercase: i32, buf: *mut u8) -> i64:
     else:
         while n > 0:
             let digit_idx = (n % (base as u64)) as i64
-            tmp[pos] = digits[digit_idx]
+            tmp[pos] = unsafe: digits[digit_idx]
             n = n / (base as u64)
             pos = pos - 1
     let len = 65 - pos as i64
@@ -1079,7 +1079,7 @@ pub fn str_byte_at(s: str, idx: i64) -> i32:
     if idx < 0 or idx >= slen:
         return 0
     let p = str_data(s)
-    (p[idx]) as i32
+    (unsafe: p[idx]) as i32
 
 @[c_export("with_str_slice")]
 pub fn str_slice(s: str, start_arg: i64, end_arg: i64) -> str:
@@ -1155,13 +1155,13 @@ pub fn str_trim(s: str) -> str:
     let sp = str_data(s)
     var start: i64 = 0
     while start < slen:
-        let c = sp[start]
+        let c = unsafe: sp[start]
         if c != 32 and c != 9 and c != 10 and c != 13:  // ' ', '\t', '\n', '\r'
             break
         start = start + 1
     var end = slen
     while end > start:
-        let c = sp[end - 1]
+        let c = unsafe: sp[end - 1]
         if c != 32 and c != 9 and c != 10 and c != 13:
             break
         end = end - 1
@@ -1177,7 +1177,7 @@ pub fn str_to_upper(s: str) -> str:
     let sp = str_data(s)
     var i: i64 = 0
     while i < slen:
-        let c = sp[i]
+        let c = unsafe: sp[i]
         if c >= 97 and c <= 122:  // 'a' to 'z'
             unsafe: *((out as i64 + i) as *mut u8) = c - 32
         else:
@@ -1194,7 +1194,7 @@ pub fn str_to_lower(s: str) -> str:
     let sp = str_data(s)
     var i: i64 = 0
     while i < slen:
-        let c = sp[i]
+        let c = unsafe: sp[i]
         if c >= 65 and c <= 90:  // 'A' to 'Z'
             unsafe: *((out as i64 + i) as *mut u8) = c + 32
         else:
@@ -1307,7 +1307,7 @@ pub fn parse_i64(s: str) -> i64:
     else if first == 43:  // '+'
         i = 1
     while i < slen:
-        let c = sp[i]
+        let c = unsafe: sp[i]
         if c < 48 or c > 57:
             break
         result = result * 10 + (c - 48) as i64
@@ -1330,17 +1330,17 @@ pub fn parse_float(s: str) -> f64:
         i = 1
     // Integer part
     while i < slen:
-        let c = sp[i]
+        let c = unsafe: sp[i]
         if c < 48 or c > 57:
             break
         result = result * 10.0 + (c - 48) as f64
         i = i + 1
     // Fractional part
-    if i < slen and sp[i] == 46:  // '.'
+    if i < slen and (unsafe: sp[i]) == 46:  // '.'
         i = i + 1
         var frac: f64 = 0.1
         while i < slen:
-            let c = sp[i]
+            let c = unsafe: sp[i]
             if c < 48 or c > 57:
                 break
             result = result + (c - 48) as f64 * frac
@@ -1609,7 +1609,7 @@ fn fnv_hash(data: *const u8, len: i64) -> u64:
     var h: u64 = 14695981039346656037
     var i: i64 = 0
     while i < len:
-        let byte = data[i]
+        let byte = unsafe: data[i]
         h = h ^ (byte as u64)
         // FNV prime: 1099511628211
         h = h * 1099511628211
@@ -1653,12 +1653,12 @@ fn hm_grow(m: i64):
 
     var i: i64 = 0
     while i < old_cap:
-        if old_occ[i] != 0:
+        if (unsafe: old_occ[i]) != 0:
             let k = (old_keys as i64 + i * ksz) as *const u8
             let v = (old_vals as i64 + i * vsz) as *const u8
             // Re-insert
             var h = (hm_hash_key(m, k) % (new_cap as u64)) as i64
-            while hm_occ(m)[h] != 0:
+            while (unsafe: hm_occ(m)[h]) != 0:
                 h = ((h + 1) as u64 % (new_cap as u64)) as i64
             rt_memcpy((hm_keys(m) as i64 + h * ksz) as *mut u8, k, ksz)
             rt_memcpy((hm_vals(m) as i64 + h * vsz) as *mut u8, v, vsz)
@@ -1711,7 +1711,7 @@ pub fn hashmap_insert(map: *mut u8, key: *const u8, val: *const u8, is_str_key: 
 
     var h = (hm_hash_key(m, key) % (cap as u64)) as i64
     loop:
-        if hm_occ(m)[h] == 0:
+        if (unsafe: hm_occ(m)[h]) == 0:
             break
         if hm_keys_eq(m, (hm_keys(m) as i64 + h * ksz) as *const u8, key) != 0:
             // Update existing
@@ -1735,7 +1735,7 @@ pub fn hashmap_get(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key: i
     var h = (hm_hash_key(m, key) % (cap as u64)) as i64
     var probes: i64 = 0
     while probes < cap:
-        if hm_occ(m)[h] == 0:
+        if (unsafe: hm_occ(m)[h]) == 0:
             return 0
         if hm_keys_eq(m, (hm_keys(m) as i64 + h * ksz) as *const u8, key) != 0:
             if val_out as i64 != 0:
@@ -1761,7 +1761,7 @@ pub fn hashmap_remove(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key
     var h = (hm_hash_key(m, key) % (cap as u64)) as i64
     var probes: i64 = 0
     while probes < cap:
-        if hm_occ(m)[h] == 0:
+        if (unsafe: hm_occ(m)[h]) == 0:
             return 0
         if hm_keys_eq(m, (hm_keys(m) as i64 + h * ksz) as *const u8, key) != 0:
             if val_out as i64 != 0:
@@ -1770,7 +1770,7 @@ pub fn hashmap_remove(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key
             hm_set_len(m, hm_len(m) - 1)
             // Rehash following entries
             var next = ((h + 1) as u64 % (cap as u64)) as i64
-            while hm_occ(m)[next] != 0:
+            while (unsafe: hm_occ(m)[next]) != 0:
                 // Save key+val, clear slot, re-insert
                 let tmpk = rt_alloc(ksz)
                 let tmpv = rt_alloc(vsz)
@@ -1809,7 +1809,7 @@ pub fn hashmap_keys_out(out: *mut u8, map: *mut u8, key_size: i64):
     vec_new_out(out, effective_ksz)
     var i: i64 = 0
     while i < cap:
-        if hm_occ(m)[i] != 0:
+        if (unsafe: hm_occ(m)[i]) != 0:
             vec_push(out, (hm_keys(m) as i64 + i * ksz) as *const u8)
         i = i + 1
 
@@ -2048,7 +2048,7 @@ pub fn lines_out(out: *mut u8, s: str):
     var start: i64 = 0
     var i: i64 = 0
     while i < sl:
-        if sp[i] == 10:  // '\n'
+        if (unsafe: sp[i]) == 10:  // '\n'
             let line = make_str((sp as i64 + start) as *const u8, i - start)
             vec_push(out, &line as *const u8)
             start = i + 1

@@ -1922,6 +1922,18 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
         let lhs_llvm_tk = wl_get_type_kind(wl_type_of(lhs))
         let rhs_llvm_tk = wl_get_type_kind(wl_type_of(rhs))
         if d0 == BinaryOp.OP_ADD or d0 == BinaryOp.OP_SUB:
+            if d0 == BinaryOp.OP_SUB and (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF) and (rhs_tk == TypeKind.TY_PTR or rhs_tk == TypeKind.TY_REF) and lhs_llvm_tk == wl_pointer_type_kind() and rhs_llvm_tk == wl_pointer_type_kind():
+                let i64_ty = wl_i64_type(self.context)
+                let lhs_i = wl_build_ptr_to_int(self.builder, lhs, i64_ty)
+                let rhs_i = wl_build_ptr_to_int(self.builder, rhs, i64_ty)
+                let byte_diff = wl_build_sub(self.builder, lhs_i, rhs_i)
+                let elem_ty = self.mir_pointer_elem_llvm_type(lhs_sema)
+                var elem_size: i64 = 1
+                if elem_ty != 0:
+                    let abi_size = self.abi_size_of(elem_ty)
+                    if abi_size > 0:
+                        elem_size = abi_size
+                return wl_build_sdiv(self.builder, byte_diff, wl_const_int(i64_ty, elem_size, 0))
             if (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF) and lhs_llvm_tk == wl_pointer_type_kind() and rhs_llvm_tk == wl_integer_type_kind():
                 let elem_ty = self.mir_pointer_elem_llvm_type(lhs_sema)
                 let indices: Vec[i64] = Vec.new()

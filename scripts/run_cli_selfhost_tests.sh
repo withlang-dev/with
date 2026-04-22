@@ -1333,6 +1333,108 @@ EOF
   echo "PASS(cli-selfhost-migrate) noop_pointer_cast_exprs"
 }
 
+expect_migrate_raw_pointer_index_unsafe() {
+  local case_dir="$tmpdir/migrate_raw_pointer_index_unsafe_case"
+  local src="$case_dir/raw_pointer_index_unsafe.c"
+  local out_w="$case_dir/raw_pointer_index_unsafe.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int issue146_ptr_ops(int *p, int *q) {
+  int *r = p + 1;
+  int d = (int)(q - p);
+  r[0] = r[0] + d;
+  return p[1];
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) raw_pointer_index_unsafe"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_regex "$out_w" 'p \+ .*\(1' \
+    || ! file_has_literal "$out_w" '(unsafe: r[0])' \
+    || ! file_has_literal "$out_w" '(unsafe: p[1])'; then
+    echo "FAIL(cli-selfhost-migrate-output) raw_pointer_index_unsafe"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) raw_pointer_index_unsafe"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) raw_pointer_index_unsafe"
+}
+
+expect_migrate_prefer_brace_no_trailing_ws() {
+  local case_dir="$tmpdir/migrate_prefer_brace_ws_case"
+  local src="$case_dir/prefer_brace_ws.c"
+  local out_w="$case_dir/prefer_brace_ws.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int prefer_brace_ws(int *p) {
+  while (*p != 0) {
+    if (*p < 3) {
+      p++;
+      continue;
+    }
+    p++;
+  }
+  return 0;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) prefer_brace_ws"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! python3 - "$out_w" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text()
+lines = text.splitlines()
+if any(line != line.rstrip() for line in lines):
+    raise SystemExit(1)
+if any(re.match(r"^\s*(if|while)\b.*:\s*$", line) for line in lines):
+    raise SystemExit(1)
+if not any(re.match(r"^\s*while\b.*\{\s*$", line) for line in lines):
+    raise SystemExit(1)
+if not any(re.match(r"^\s*if\b.*\{\s*$", line) for line in lines):
+    raise SystemExit(1)
+PY
+  then
+    echo "FAIL(cli-selfhost-migrate-output) prefer_brace_ws"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) prefer_brace_ws"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) prefer_brace_ws"
+}
+
 expect_migrate_typed_cast_macros() {
   local case_dir="$tmpdir/migrate_typed_cast_macros_case"
   local src="$case_dir/typed_cast_macros.c"
@@ -2004,6 +2106,8 @@ expect_migrate_initializer_regressions
 expect_migrate_tentative_global_owner
 expect_migrate_cross_file_tentative_global_owner
 expect_migrate_noop_pointer_cast_exprs
+expect_migrate_raw_pointer_index_unsafe
+expect_migrate_prefer_brace_no_trailing_ws
 expect_migrate_typed_cast_macros
 expect_migrate_for_continue_switch_break_semantics
 expect_migrate_goto_shadowed_local

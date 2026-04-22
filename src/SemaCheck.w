@@ -1614,12 +1614,18 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         if op == BinaryOp.OP_ADD and lhs == self.ty_str and rhs == self.ty_str:
             self.emit_error("string concatenation uses '++', not '+'", node)
             return 0
-        // Pointer arithmetic: ptr + int → ptr, ptr - int → ptr
+        // Pointer arithmetic computes addresses in safe code. Only raw
+        // pointer memory access (`*p`, `p[i]`) requires unsafe.
         let lhs_k = self.get_type_kind(self.resolve_alias(lhs))
         let rhs_k = self.get_type_kind(self.resolve_alias(rhs))
         if self.in_comptime_fn != 0 and (lhs_k == TypeKind.TY_PTR or rhs_k == TypeKind.TY_PTR):
             self.emit_error("raw pointer arithmetic is not allowed in comptime", node)
             return 0
+        if op == BinaryOp.OP_SUB and lhs_k == TypeKind.TY_PTR and rhs_k == TypeKind.TY_PTR:
+            if self.types_compatible(lhs, rhs) == 0 and self.types_compatible(rhs, lhs) == 0:
+                self.emit_error("pointer subtraction requires compatible pointer types", node)
+                return 0
+            return self.ty_isize as i32
         if (op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB) and lhs_k == TypeKind.TY_PTR and (rhs_k == TypeKind.TY_INT or rhs == self.ty_i32 or rhs == self.ty_i64 or rhs == self.ty_usize or rhs == self.ty_isize):
             return lhs as i32
         let result = self.arithmetic_result_type(lhs, rhs)
@@ -2271,6 +2277,9 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
     let tk = self.get_type_kind(resolved)
     if tk == TypeKind.TY_PTR:
         self.check_runtime_index_operand(index)
+        if self.in_unsafe == 0:
+            self.emit_error("raw pointer indexing requires unsafe context", node)
+            return 0
         let elem_ty = self.get_type_d0(resolved)
         self.typed_expr_types.insert(node, elem_ty)
         return elem_ty
@@ -2281,6 +2290,9 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
         container_tk = self.get_type_kind(container_tid)
         if container_tk == TypeKind.TY_PTR:
             self.check_runtime_index_operand(index)
+            if self.in_unsafe == 0:
+                self.emit_error("raw pointer indexing requires unsafe context", node)
+                return 0
             let elem_ty = self.get_type_d0(container_tid)
             self.typed_expr_types.insert(node, elem_ty)
             return elem_ty

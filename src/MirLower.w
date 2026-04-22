@@ -804,6 +804,12 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         if lhs_ty != 0 and lhs_ty != self.sema.ty_void as i32:
             let lhs_resolved = self.sema.resolve_alias(lhs_ty) as i32
             let lhs_tk = self.sema.get_type_kind(lhs_resolved)
+            if op == BinaryOp.OP_SUB and (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF):
+                if rhs_ty != 0 and rhs_ty != self.sema.ty_void as i32:
+                    let rhs_resolved = self.sema.resolve_alias(rhs_ty) as i32
+                    let rhs_tk = self.sema.get_type_kind(rhs_resolved)
+                    if rhs_tk == TypeKind.TY_PTR or rhs_tk == TypeKind.TY_REF:
+                        return self.sema.ty_isize as i32
             if (op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB) and (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF):
                 return lhs_ty
         if rhs_ty != 0 and rhs_ty != self.sema.ty_void as i32:

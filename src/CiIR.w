@@ -182,7 +182,7 @@ enum CiExprKind: i32:
     // Postfix / lvalue
     CIE_CALL = 30            // d0 = callee, d1 = args_start, d2 = args_count
     CIE_FIELD = 31           // d0 = base, d1 = field_sym_idx, d2 = is_arrow
-    CIE_INDEX = 32           // d0 = base, d1 = index
+    CIE_INDEX = 32           // d0 = base, d1 = index, d2 = raw pointer index
     CIE_CAST = 33            // d0 = target_ty_id, d1 = operand
     CIE_DEREF = 34           // d0 = operand
     CIE_ADDR_OF = 35         // d0 = operand, d1 = is_mut (0 = `&`, 1 = `&mut`)

@@ -789,11 +789,11 @@ fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend:
                     if (literal__goto_82_6 != 0) {
                         var __ci_expr_logic_1: c_int = 0
                         var __ci_expr_logic_0: c_int = 0
-                        if ((if ptr__goto_83_12[0] == 92: 1 else: 0) != 0) {
+                        if ((if (unsafe: ptr__goto_83_12[0]) == 92: 1 else: 0) != 0) {
                             (__ci_expr_logic_0 = (if (if ptr__goto_83_12 < (ptrend - ((1 as isize) as usize)): 1 else: 0) != 0: 1 else: 0))
                         }
                         if (__ci_expr_logic_0 != 0) {
-                            (__ci_expr_logic_1 = (if (if ptr__goto_83_12[1] == 69: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_1 = (if (if (unsafe: ptr__goto_83_12[1]) == 69: 1 else: 0) != 0: 1 else: 0))
                         }
                         if (__ci_expr_logic_1 != 0) {
                             (literal__goto_82_6 = 0)
@@ -837,7 +837,7 @@ fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend:
                                 if ((if (unsafe: *ptr__goto_83_12) == 36: 1 else: 0) != 0) {
                                     var __ci_expr_logic_4: c_int = 0
                                     if ((if ptr__goto_83_12 < (ptrend - ((1 as isize) as usize)): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_4 = (if (if ptr__goto_83_12[1] == 123: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_4 = (if (if (unsafe: ptr__goto_83_12[1]) == 123: 1 else: 0) != 0: 1 else: 0))
                                     }
                                     if (__ci_expr_logic_4 != 0) {
                                         (nestlevel__goto_81_10 = nestlevel__goto_81_10 + 1)
@@ -920,18 +920,18 @@ fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes
                         }
                         if ((if c__goto_220_12 >= 192: 1 else: 0) != 0) {
                             if ((if (c__goto_220_12 & 32) == 0: 1 else: 0) != 0) {
-                                (c__goto_220_12 = ((c__goto_220_12 & 31) << 6) | (ptr__goto_205_12[1] & 63))
+                                (c__goto_220_12 = ((c__goto_220_12 & 31) << 6) | ((unsafe: ptr__goto_205_12[1]) & 63))
                             } else {
                                 if ((if (c__goto_220_12 & 16) == 0: 1 else: 0) != 0) {
-                                    (c__goto_220_12 = (((c__goto_220_12 & 15) << 12) | ((ptr__goto_205_12[1] & 63) << 6)) | (ptr__goto_205_12[2] & 63))
+                                    (c__goto_220_12 = (((c__goto_220_12 & 15) << 12) | (((unsafe: ptr__goto_205_12[1]) & 63) << 6)) | ((unsafe: ptr__goto_205_12[2]) & 63))
                                 } else {
                                     if ((if (c__goto_220_12 & 8) == 0: 1 else: 0) != 0) {
-                                        (c__goto_220_12 = ((((c__goto_220_12 & 7) << 18) | ((ptr__goto_205_12[1] & 63) << 12)) | ((ptr__goto_205_12[2] & 63) << 6)) | (ptr__goto_205_12[3] & 63))
+                                        (c__goto_220_12 = ((((c__goto_220_12 & 7) << 18) | (((unsafe: ptr__goto_205_12[1]) & 63) << 12)) | (((unsafe: ptr__goto_205_12[2]) & 63) << 6)) | ((unsafe: ptr__goto_205_12[3]) & 63))
                                     } else {
                                         if ((if (c__goto_220_12 & 4) == 0: 1 else: 0) != 0) {
-                                            (c__goto_220_12 = (((((c__goto_220_12 & 3) << 24) | ((ptr__goto_205_12[1] & 63) << 18)) | ((ptr__goto_205_12[2] & 63) << 12)) | ((ptr__goto_205_12[3] & 63) << 6)) | (ptr__goto_205_12[4] & 63))
+                                            (c__goto_220_12 = (((((c__goto_220_12 & 3) << 24) | (((unsafe: ptr__goto_205_12[1]) & 63) << 18)) | (((unsafe: ptr__goto_205_12[2]) & 63) << 12)) | (((unsafe: ptr__goto_205_12[3]) & 63) << 6)) | ((unsafe: ptr__goto_205_12[4]) & 63))
                                         } else {
-                                            (c__goto_220_12 = ((((((c__goto_220_12 & 1) << 30) | ((ptr__goto_205_12[1] & 63) << 24)) | ((ptr__goto_205_12[2] & 63) << 18)) | ((ptr__goto_205_12[3] & 63) << 12)) | ((ptr__goto_205_12[4] & 63) << 6)) | (ptr__goto_205_12[5] & 63))
+                                            (c__goto_220_12 = ((((((c__goto_220_12 & 1) << 30) | (((unsafe: ptr__goto_205_12[1]) & 63) << 24)) | (((unsafe: ptr__goto_205_12[2]) & 63) << 18)) | (((unsafe: ptr__goto_205_12[3]) & 63) << 12)) | (((unsafe: ptr__goto_205_12[4]) & 63) << 6)) | ((unsafe: ptr__goto_205_12[5]) & 63))
                                         }
                                     }
                                 }
@@ -996,7 +996,7 @@ fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes
                             (__ci_expr_logic_3 = (if 1 != 0: 1 else: 0))
                         }
                         if (__ci_expr_logic_3 != 0) {
-                            (__ci_expr_logic_4 = (if (if (ctypes[(unsafe: *ptr__goto_205_12)] & 16) != 0: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_4 = (if (if ((unsafe: ctypes[(unsafe: *ptr__goto_205_12)]) & 16) != 0: 1 else: 0) != 0: 1 else: 0))
                         }
                         if (not (__ci_expr_logic_4 != 0)) {
                             break
@@ -1099,37 +1099,37 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
     match state.to_case:
         1 | 2 =>
             (rest_to_upper = (if state.to_case == 2: 1 else: 0))
-            
+
             (next_to_upper = rest_to_upper)
-            
+
         3 =>
             (next_to_upper = 1)
-            
+
             (rest_to_upper = 0)
-            
+
             (state.to_case = 1)
-            
+
         4 =>
             (next_to_upper = 0)
-            
+
             (rest_to_upper = 1)
-            
+
             (state.to_case = 2)
-            
+
         _ =>
             while true {
                 if (not (0 != 0)) {
                     break
                 }
             }
-            
+
             return 0
-            
+
             (rest_to_upper = (if state.to_case == 2: 1 else: 0))
-            
+
             (next_to_upper = rest_to_upper)
-            
-            
+
+
 
     (single_char = state.single_char)
 
@@ -1139,177 +1139,177 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
 
     while ((if input < input_end: 1 else: 0) != 0) {
         var ch: c_uint
-        
+
         var chlen: c_uint
-        
+
         var __ci_expr_old_0: *const u8 = input
-        
+
         (input = input + 1)
-        
+
         (ch = (unsafe: *__ci_expr_old_0))
-        
-        
+
+
         var __ci_expr_logic_1: c_int = 0
-        
+
         if (utf != 0) {
             (__ci_expr_logic_1 = (if (if ch >= 192: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_1 != 0) {
             if ((if (ch & 32) == 0: 1 else: 0) != 0) {
                 var __ci_expr_old_2: *const u8 = input
-                
+
                 (input = input + 1)
-                
+
                 (ch = ((ch & 31) << 6) | ((unsafe: *__ci_expr_old_2) & 63))
-                
+
             } else {
                 if ((if (ch & 16) == 0: 1 else: 0) != 0) {
-                    (ch = (((ch & 15) << 12) | (((unsafe: *input) & 63) << 6)) | (input[1] & 63))
-                    
+                    (ch = (((ch & 15) << 12) | (((unsafe: *input) & 63) << 6)) | ((unsafe: input[1]) & 63))
+
                     (input = input + 2)
-                    
+
                 } else {
                     if ((if (ch & 8) == 0: 1 else: 0) != 0) {
-                        (ch = ((((ch & 7) << 18) | (((unsafe: *input) & 63) << 12)) | ((input[1] & 63) << 6)) | (input[2] & 63))
-                        
+                        (ch = ((((ch & 7) << 18) | (((unsafe: *input) & 63) << 12)) | (((unsafe: input[1]) & 63) << 6)) | ((unsafe: input[2]) & 63))
+
                         (input = input + 3)
-                        
+
                     } else {
                         if ((if (ch & 4) == 0: 1 else: 0) != 0) {
-                            (ch = (((((ch & 3) << 24) | (((unsafe: *input) & 63) << 18)) | ((input[1] & 63) << 12)) | ((input[2] & 63) << 6)) | (input[3] & 63))
-                            
+                            (ch = (((((ch & 3) << 24) | (((unsafe: *input) & 63) << 18)) | (((unsafe: input[1]) & 63) << 12)) | (((unsafe: input[2]) & 63) << 6)) | ((unsafe: input[3]) & 63))
+
                             (input = input + 4)
-                            
+
                         } else {
-                            (ch = ((((((ch & 1) << 30) | (((unsafe: *input) & 63) << 24)) | ((input[1] & 63) << 18)) | ((input[2] & 63) << 12)) | ((input[3] & 63) << 6)) | (input[4] & 63))
-                            
+                            (ch = ((((((ch & 1) << 30) | (((unsafe: *input) & 63) << 24)) | (((unsafe: input[1]) & 63) << 18)) | (((unsafe: input[2]) & 63) << 12)) | (((unsafe: input[3]) & 63) << 6)) | ((unsafe: input[4]) & 63))
+
                             (input = input + 5)
-                            
+
                         }
                     }
                 }
             }
-            
+
         }
-        
-        
+
+
         var __ci_expr_logic_4: c_int = 0
-        
+
         var __ci_expr_logic_3: c_int
-        
+
         if (utf != 0) {
             (__ci_expr_logic_3 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_3 = (if ucp != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_3 != 0) {
             (__ci_expr_logic_4 = (if (if ch >= 128: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_4 != 0) {
             var type_: c_uint = ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((ch as c_int) / 128)] * 128) + ((ch as c_int) % 128))] as isize) as usize)).chartype
-            
+
             var __ci_expr_logic_6: c_int = 0
-            
+
             if ((if _pcre2_ucp_gentype_8[type_] == 1: 1 else: 0) != 0) {
                 var __ci_expr_ternary_5: c_int = 0
-                
+
                 if (next_to_upper != 0) {
                     (__ci_expr_ternary_5 = ucp_Lu)
                 } else {
                     (__ci_expr_ternary_5 = ucp_Ll)
                 }
-                
+
                 (__ci_expr_logic_6 = (if (if type_ != __ci_expr_ternary_5: 1 else: 0) != 0: 1 else: 0))
-                
+
             }
-            
+
             if (__ci_expr_logic_6 != 0) {
                 (ch = ((((ch as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((ch as c_int) / 128)] * 128) + ((ch as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
             }
-            
-            
+
+
         } else {
             if (1 != 0) {
                 var __ci_expr_ternary_7: c_int = 0
-                
+
                 if (next_to_upper != 0) {
                     (__ci_expr_ternary_7 = 96)
                 } else {
                     (__ci_expr_ternary_7 = 128)
                 }
-                
-                if ((if (((code.tables + ((512 as isize) as usize)) + ((__ci_expr_ternary_7 as isize) as usize))[(ch / 8)] & (1 << (ch % 8))) == 0: 1 else: 0) != 0) {
-                    (ch = (code.tables + ((256 as isize) as usize))[ch])
+
+                if ((if ((unsafe: ((code.tables + ((512 as isize) as usize)) + ((__ci_expr_ternary_7 as isize) as usize))[(ch / 8)]) & (1 << (ch % 8))) == 0: 1 else: 0) != 0) {
+                    (ch = (unsafe: (code.tables + ((256 as isize) as usize))[ch]))
                 }
-                
-                
+
+
             }
         }
-        
-        
+
+
         if (utf != 0) {
             (chlen = _pcre2_ord2utf_8(ch, (&temp[0] as *mut u8)))
         } else {
             (temp[0] = ch)
-            
+
             (chlen = 1)
-            
+
         }
-        
+
         var __ci_expr_logic_8: c_int = 0
-        
+
         if ((if not (overflow != 0): 1 else: 0) != 0) {
             (__ci_expr_logic_8 = (if (if chlen <= output_cap: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_8 != 0) {
             with_memcpy((output as *i8), ((&temp[0] as *mut u8) as *i8), ((chlen *% 1) as i64))
-            
+
             (output = output + chlen)
-            
+
             (output_cap = output_cap - chlen)
-            
+
         } else {
             (overflow = 1)
-            
+
         }
-        
-        
+
+
         if ((if chlen > ((~(0 as c_ulong)) -% written): 1 else: 0) != 0) {
             return (~(0 as c_ulong))
         }
-        
+
         (written = written + chlen)
-        
+
         (next_to_upper = rest_to_upper)
-        
+
         if (single_char != 0) {
             var rest_len: c_ulong = (((input_end as usize) -% (input as usize)) / sizeof[u8]())
-            
+
             var __ci_expr_logic_9: c_int = 0
-            
+
             if ((if not (overflow != 0): 1 else: 0) != 0) {
                 (__ci_expr_logic_9 = (if (if rest_len <= output_cap: 1 else: 0) != 0: 1 else: 0))
             }
-            
+
             if (__ci_expr_logic_9 != 0) {
                 with_memcpy((output as *i8), (input as *i8), ((rest_len *% 1) as i64))
             }
-            
-            
+
+
             if ((if rest_len > ((~(0 as c_ulong)) -% written): 1 else: 0) != 0) {
                 return (~(0 as c_ulong))
             }
-            
+
             (written = written + rest_len)
-            
+
             return written
-            
+
         }
-        
+
     }
 
     return written
@@ -1351,163 +1351,163 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
         1 | 2 | 3 =>
             if ((if state.single_char == 0: 1 else: 0) != 0) {
                 (rc = substitute_case_callout(input, input_len, output, output_cap, state.to_case, substitute_case_callout_data))
-                
+
                 if ((if state.to_case == 3: 1 else: 0) != 0) {
                     (state.to_case = 1)
                 }
-                
+
                 return rc
-                
+
             }
-            
+
             (ch1_to_case = state.to_case)
-            
+
             (rest_to_case = 0)
-            
+
         4 =>
             (ch1_to_case = 1)
-            
+
             (rest_to_case = 2)
-            
+
         _ =>
             while true {
                 if (not (0 != 0)) {
                     break
                 }
             }
-            
+
             return 0
-            
+
             if ((if state.single_char == 0: 1 else: 0) != 0) {
                 (rc = substitute_case_callout(input, input_len, output, output_cap, state.to_case, substitute_case_callout_data))
-                
+
                 if ((if state.to_case == 3: 1 else: 0) != 0) {
                     (state.to_case = 1)
                 }
-                
+
                 return rc
-                
+
             }
-            
+
             (ch1_to_case = state.to_case)
-            
+
             (rest_to_case = 0)
-            
-            
+
+
 
     var ch_end: *const u8 = input
-    
+
     var ch: c_uint
-    
+
     var __ci_expr_old_0: *const u8 = ch_end
-    
+
     (ch_end = ch_end + 1)
-    
+
     (ch = (unsafe: *__ci_expr_old_0))
-    
-    
+
+
     var __ci_expr_logic_1: c_int = 0
-    
+
     if (utf != 0) {
         (__ci_expr_logic_1 = (if (if ch >= 192: 1 else: 0) != 0: 1 else: 0))
     }
-    
+
     if (__ci_expr_logic_1 != 0) {
         if ((if (ch & 32) == 0: 1 else: 0) != 0) {
             var __ci_expr_old_2: *const u8 = ch_end
-            
+
             (ch_end = ch_end + 1)
-            
+
             (ch = ((ch & 31) << 6) | ((unsafe: *__ci_expr_old_2) & 63))
-            
+
         } else {
             if ((if (ch & 16) == 0: 1 else: 0) != 0) {
-                (ch = (((ch & 15) << 12) | (((unsafe: *ch_end) & 63) << 6)) | (ch_end[1] & 63))
-                
+                (ch = (((ch & 15) << 12) | (((unsafe: *ch_end) & 63) << 6)) | ((unsafe: ch_end[1]) & 63))
+
                 (ch_end = ch_end + 2)
-                
+
             } else {
                 if ((if (ch & 8) == 0: 1 else: 0) != 0) {
-                    (ch = ((((ch & 7) << 18) | (((unsafe: *ch_end) & 63) << 12)) | ((ch_end[1] & 63) << 6)) | (ch_end[2] & 63))
-                    
+                    (ch = ((((ch & 7) << 18) | (((unsafe: *ch_end) & 63) << 12)) | (((unsafe: ch_end[1]) & 63) << 6)) | ((unsafe: ch_end[2]) & 63))
+
                     (ch_end = ch_end + 3)
-                    
+
                 } else {
                     if ((if (ch & 4) == 0: 1 else: 0) != 0) {
-                        (ch = (((((ch & 3) << 24) | (((unsafe: *ch_end) & 63) << 18)) | ((ch_end[1] & 63) << 12)) | ((ch_end[2] & 63) << 6)) | (ch_end[3] & 63))
-                        
+                        (ch = (((((ch & 3) << 24) | (((unsafe: *ch_end) & 63) << 18)) | (((unsafe: ch_end[1]) & 63) << 12)) | (((unsafe: ch_end[2]) & 63) << 6)) | ((unsafe: ch_end[3]) & 63))
+
                         (ch_end = ch_end + 4)
-                        
+
                     } else {
-                        (ch = ((((((ch & 1) << 30) | (((unsafe: *ch_end) & 63) << 24)) | ((ch_end[1] & 63) << 18)) | ((ch_end[2] & 63) << 12)) | ((ch_end[3] & 63) << 6)) | (ch_end[4] & 63))
-                        
+                        (ch = ((((((ch & 1) << 30) | (((unsafe: *ch_end) & 63) << 24)) | (((unsafe: ch_end[1]) & 63) << 18)) | (((unsafe: ch_end[2]) & 63) << 12)) | (((unsafe: ch_end[3]) & 63) << 6)) | ((unsafe: ch_end[4]) & 63))
+
                         (ch_end = ch_end + 5)
-                        
+
                     }
                 }
             }
         }
-        
+
     }
-    
-    
+
+
     ch
-    
+
     while true {
         if (not (0 != 0)) {
             break
         }
     }
-    
+
     (ch1_len = ((ch_end as usize) -% (input as usize)) / sizeof[u8]())
-    
+
     with_memcpy(((&ch1[0] as *mut u8) as *i8), (input as *i8), ((ch1_len *% 1) as i64))
-    
+
 
     (rest = input + ch1_len)
 
     (rest_len = (input_len -% ch1_len))
 
     var ch1_cap: c_ulong
-    
+
     var max_ch1_cap: c_ulong
-    
+
     (ch1_cap = ch1_len)
-    
+
     while true {
         if (not (0 != 0)) {
             break
         }
     }
-    
+
     (max_ch1_cap = (output_cap -% rest_len))
-    
+
     while (1 != 0) {
         (rc = substitute_case_callout((&ch1[0] as *mut u8), ch1_len, output, ch1_cap, ch1_to_case, substitute_case_callout_data))
-        
+
         if ((if rc == (~(0 as c_ulong)): 1 else: 0) != 0) {
             return rc
         }
-        
+
         if ((if rc <= ch1_cap: 1 else: 0) != 0) {
             break
         }
-        
+
         if ((if rc > max_ch1_cap: 1 else: 0) != 0) {
             (ch1_overflow = 1)
-            
+
             break
-            
+
         }
-        
+
         with_memmove(((input_output + rc) as *i8), (rest as *i8), ((rest_len *% 1) as i64))
-        
+
         (rest = input + rc)
-        
+
         (ch1_cap = rc)
-        
+
     }
-    
+
 
     if ((if rest_to_case == 0: 1 else: 0) != 0) {
         if ((if not (ch1_overflow != 0): 1 else: 0) != 0) {
@@ -1516,65 +1516,65 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
                     break
                 }
             }
-            
+
             with_memmove(((output + rc) as *i8), (rest as *i8), ((rest_len *% 1) as i64))
-            
+
         }
-        
+
         (rc2 = rest_len)
-        
+
         (state.to_case = 0)
-        
+
     } else {
         var dummy: [1]u8
-        
+
         var __ci_expr_ternary_3: *mut u8 = null
-        
+
         if (ch1_overflow != 0) {
             (__ci_expr_ternary_3 = (&dummy[0] as *mut u8))
         } else {
             (__ci_expr_ternary_3 = output + rc)
         }
-        
+
         var __ci_expr_ternary_4: c_ulong = 0
-        
+
         if (ch1_overflow != 0) {
             (__ci_expr_ternary_4 = 0)
         } else {
             (__ci_expr_ternary_4 = (output_cap -% rc))
         }
-        
+
         (rc2 = substitute_case_callout(rest, rest_len, __ci_expr_ternary_3, __ci_expr_ternary_4, rest_to_case, substitute_case_callout_data))
-        
-        
+
+
         if ((if rc2 == (~(0 as c_ulong)): 1 else: 0) != 0) {
             return rc2
         }
-        
+
         var __ci_expr_logic_5: c_int = 0
-        
+
         if ((if not (ch1_overflow != 0): 1 else: 0) != 0) {
             (__ci_expr_logic_5 = (if (if rc2 > (output_cap -% rc): 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_5 != 0) {
             (rest_overflow = 1)
         }
-        
-        
+
+
         var __ci_expr_logic_6: c_int = 0
-        
+
         if (ch1_overflow != 0) {
             (__ci_expr_logic_6 = (if (if rc2 < rest_len: 1 else: 0) != 0: 1 else: 0))
         }
-        
+
         if (__ci_expr_logic_6 != 0) {
             (rc2 = rest_len)
         }
-        
-        
+
+
         (state.to_case = 2)
-        
+
     }
 
     if ((if rc2 > ((~(0 as c_ulong)) -% rc): 1 else: 0) != 0) {
@@ -1592,4 +1592,3 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
     return (rc +% rc2)
 
 }
-
