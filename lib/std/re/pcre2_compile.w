@@ -102,7 +102,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                     (__ci_expr_ternary_0 = 7)
                 }
                 (optim_flags__goto_10320_10 = __ci_expr_ternary_0)
-                (cworkspace__goto_10333_14 = ((c16workspace__goto_10332_10 as *mut u8)))
+                (cworkspace__goto_10333_14 = ((&c16workspace__goto_10332_10[0] as *mut u8)))
                 if ((if errorptr == null: 1 else: 0) != 0) {
                     if ((if erroroffset != null: 1 else: 0) != 0) {
                         ((unsafe: *erroroffset) = 0)

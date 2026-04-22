@@ -1134,11 +1134,19 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.check_closure(node) as TypeId
 
     if kind == NodeKind.NK_CAST:
-        self.check_expr_with_expected(self.ast.get_data0(node), 0 as TypeId)
+        let src_tid = self.check_expr_with_expected(self.ast.get_data0(node), 0 as TypeId)
         let cast_tid = self.resolve_type_expr(self.ast.get_data1(node))
         // Store resolved cast type so MIR lowering can read it without
         // calling resolve_type_expr (which would add_type on a shallow-copied Sema).
         self.typed_expr_types.insert(node, cast_tid as i32)
+        if src_tid != 0 and cast_tid != 0:
+            let src_resolved = self.resolve_alias(src_tid)
+            let cast_resolved = self.resolve_alias(cast_tid)
+            let src_kind = self.get_type_kind(src_resolved)
+            let cast_kind = self.get_type_kind(cast_resolved)
+            if src_kind == TypeKind.TY_ARRAY and cast_kind == TypeKind.TY_PTR:
+                self.emit_error("arrays do not decay to pointers; use &array[0] as *T", node)
+                return 0 as TypeId
         return cast_tid
 
     if kind == NodeKind.NK_PIPELINE:

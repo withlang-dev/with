@@ -4836,6 +4836,10 @@ fn ci_lower_expr_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &m
                 let target_cxtype = with_ci_cursor_type(session, cursor)
                 let target_ty_id = ci_type_from_libclang(session, target_cxtype, types)
                 if (target_ty_id as i32) != 0:
+                    if types.kind(target_ty_id) == CiTypeKind.CT_POINTER:
+                        let decayed_id = ci_decay_array_value_expr(session, inner_child, inner_id, target_ty_id, exprs, types)
+                        if (decayed_id as i32) != (inner_id as i32):
+                            return decayed_id
                     return ci_cast_if_needed(target_ty_id, inner_id, inner_child, session, exprs, types)
         return 0 as CiExprId
 
@@ -6434,7 +6438,11 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                 let target_ty = ci_type_from_libclang(session, with_ci_cursor_type(session, cursor), types)
                 if (target_ty as i32) == 0:
                     return ci_value_ir_invalid()
-                let casted = ci_cast_if_needed(target_ty, inner.value_expr, inner_child, session, exprs, types)
+                var casted = inner.value_expr
+                if types.kind(target_ty) == CiTypeKind.CT_POINTER:
+                    casted = ci_decay_array_value_expr(session, inner_child, inner.value_expr, target_ty, exprs, types)
+                if (casted as i32) == (inner.value_expr as i32):
+                    casted = ci_cast_if_needed(target_ty, inner.value_expr, inner_child, session, exprs, types)
                 return CiValueExprIR {
                     setup_stmt: inner.setup_stmt,
                     value_expr: casted,
