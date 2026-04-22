@@ -16,6 +16,37 @@ die() {
     exit 1
 }
 
+ensure_generated_dependencies() {
+    local generated_dir="$1"
+    local compile_w="$generated_dir/pcre2_compile.w"
+    [ -f "$compile_w" ] || return 0
+    if grep -Fq 'use std.re.pcre2_auto_possess' "$compile_w"; then
+        return 0
+    fi
+
+    local tmp
+    tmp="$(mktemp "${TMPDIR:-/tmp}/pcre2-compile-imports.XXXXXX")"
+    CLEANUP_FILES+=("$tmp")
+    awk '
+        NR == 2 && $0 == "use std.re.defs" {
+            print
+            print "use std.re.pcre2_auto_possess"
+            print "use std.re.pcre2_chkdint"
+            print "use std.re.pcre2_compile_cgroup"
+            print "use std.re.pcre2_compile_class"
+            print "use std.re.pcre2_find_bracket"
+            print "use std.re.pcre2_newline"
+            print "use std.re.pcre2_ord2utf"
+            print "use std.re.pcre2_string_utils"
+            print "use std.re.pcre2_study"
+            print "use std.re.pcre2_valid_utf"
+            next
+        }
+        { print }
+    ' "$compile_w" > "$tmp"
+    mv "$tmp" "$compile_w"
+}
+
 usage() {
     cat >&2 <<'EOF'
 usage:
@@ -35,6 +66,7 @@ count_generated_errors() {
     [ -x "$with_bin" ] || die "missing compiler binary: $with_bin"
     [ -d "$raw_dir" ] || die "missing raw migration directory: $raw_dir"
     [ -d "$generated_dir" ] || die "missing generated directory: $generated_dir"
+    ensure_generated_dependencies "$generated_dir"
 
     local tf_base tf
     tf_base="$(mktemp "${TMPDIR:-/tmp}/pcre2-check.XXXXXX")"

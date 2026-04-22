@@ -6,28 +6,28 @@ fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr:
 
     if (utf != 0) {
         (c = (unsafe: *ptr))
-        
+
         if ((if c >= 192: 1 else: 0) != 0) {
             if ((if (c & 32) == 0: 1 else: 0) != 0) {
-                (c = ((c & 31) << 6) | (ptr[1] & 63))
+                (c = ((c & 31) << 6) | ((unsafe: ptr[1]) & 63))
             } else {
                 if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                    (c = (((c & 15) << 12) | ((ptr[1] & 63) << 6)) | (ptr[2] & 63))
+                    (c = (((c & 15) << 12) | (((unsafe: ptr[1]) & 63) << 6)) | ((unsafe: ptr[2]) & 63))
                 } else {
                     if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                        (c = ((((c & 7) << 18) | ((ptr[1] & 63) << 12)) | ((ptr[2] & 63) << 6)) | (ptr[3] & 63))
+                        (c = ((((c & 7) << 18) | (((unsafe: ptr[1]) & 63) << 12)) | (((unsafe: ptr[2]) & 63) << 6)) | ((unsafe: ptr[3]) & 63))
                     } else {
                         if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                            (c = (((((c & 3) << 24) | ((ptr[1] & 63) << 18)) | ((ptr[2] & 63) << 12)) | ((ptr[3] & 63) << 6)) | (ptr[4] & 63))
+                            (c = (((((c & 3) << 24) | (((unsafe: ptr[1]) & 63) << 18)) | (((unsafe: ptr[2]) & 63) << 12)) | (((unsafe: ptr[3]) & 63) << 6)) | ((unsafe: ptr[4]) & 63))
                         } else {
-                            (c = ((((((c & 1) << 30) | ((ptr[1] & 63) << 24)) | ((ptr[2] & 63) << 18)) | ((ptr[3] & 63) << 12)) | ((ptr[4] & 63) << 6)) | (ptr[5] & 63))
+                            (c = ((((((c & 1) << 30) | (((unsafe: ptr[1]) & 63) << 24)) | (((unsafe: ptr[2]) & 63) << 18)) | (((unsafe: ptr[3]) & 63) << 12)) | (((unsafe: ptr[4]) & 63) << 6)) | ((unsafe: ptr[5]) & 63))
                         }
                     }
                 }
             }
-            
+
         }
-        
+
     } else {
         (c = (unsafe: *ptr))
     }
@@ -36,140 +36,140 @@ fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr:
         match c:
             10 =>
                 ((unsafe: *lenptr) = 1)
-                
+
                 return 1
-                
+
                 var __ci_expr_ternary_1: c_int = 0
-                
+
                 var __ci_expr_logic_0: c_int = 0
-                
+
                 if ((if ptr < (endptr - ((1 as isize) as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_0 = (if (if (unsafe: ptr[1]) == 10: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_0 != 0) {
                     (__ci_expr_ternary_1 = 2)
                 } else {
                     (__ci_expr_ternary_1 = 1)
                 }
-                
+
                 ((unsafe: *lenptr) = __ci_expr_ternary_1)
-                
-                
+
+
                 return 1
-                
-                
+
+
             13 =>
                 var __ci_expr_ternary_1: c_int = 0
-                
+
                 var __ci_expr_logic_0: c_int = 0
-                
+
                 if ((if ptr < (endptr - ((1 as isize) as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_0 = (if (if (unsafe: ptr[1]) == 10: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_0 != 0) {
                     (__ci_expr_ternary_1 = 2)
                 } else {
                     (__ci_expr_ternary_1 = 1)
                 }
-                
+
                 ((unsafe: *lenptr) = __ci_expr_ternary_1)
-                
-                
+
+
                 return 1
-                
+
                 return 0
-                
+
             _ =>
                 return 0
     } else {
         match c:
             10 | 11 | 12 =>
                 ((unsafe: *lenptr) = 1)
-                
+
                 return 1
-                
+
                 var __ci_expr_ternary_3: c_int = 0
-                
+
                 var __ci_expr_logic_2: c_int = 0
-                
+
                 if ((if ptr < (endptr - ((1 as isize) as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_2 = (if (if (unsafe: ptr[1]) == 10: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_2 != 0) {
                     (__ci_expr_ternary_3 = 2)
                 } else {
                     (__ci_expr_ternary_3 = 1)
                 }
-                
+
                 ((unsafe: *lenptr) = __ci_expr_ternary_3)
-                
-                
+
+
                 return 1
-                
-                
+
+
             13 =>
                 var __ci_expr_ternary_3: c_int = 0
-                
+
                 var __ci_expr_logic_2: c_int = 0
-                
+
                 if ((if ptr < (endptr - ((1 as isize) as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if (if ptr[1] == 10: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_2 = (if (if (unsafe: ptr[1]) == 10: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_2 != 0) {
                     (__ci_expr_ternary_3 = 2)
                 } else {
                     (__ci_expr_ternary_3 = 1)
                 }
-                
+
                 ((unsafe: *lenptr) = __ci_expr_ternary_3)
-                
-                
+
+
                 return 1
-                
+
                 var __ci_expr_ternary_4: c_int = 0
-                
+
                 if (utf != 0) {
                     (__ci_expr_ternary_4 = 2)
                 } else {
                     (__ci_expr_ternary_4 = 1)
                 }
-                
+
                 ((unsafe: *lenptr) = __ci_expr_ternary_4)
-                
-                
+
+
                 return 1
-                
-                
+
+
             133 =>
                 var __ci_expr_ternary_4: c_int = 0
-                
+
                 if (utf != 0) {
                     (__ci_expr_ternary_4 = 2)
                 } else {
                     (__ci_expr_ternary_4 = 1)
                 }
-                
+
                 ((unsafe: *lenptr) = __ci_expr_ternary_4)
-                
-                
+
+
                 return 1
-                
+
                 ((unsafe: *lenptr) = 3)
-                
+
                 return 1
-                
-                
+
+
             8232 | 8233 =>
                 ((unsafe: *lenptr) = 3)
-                
+
                 return 1
-                
+
                 return 0
-                
+
             _ =>
                 return 0
     }
@@ -186,30 +186,30 @@ fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const 
         while ((if ((unsafe: *ptr) & 192) == 128: 1 else: 0) != 0) {
             (ptr = ptr - 1)
         }
-        
+
         (c = (unsafe: *ptr))
-        
+
         if ((if c >= 192: 1 else: 0) != 0) {
             if ((if (c & 32) == 0: 1 else: 0) != 0) {
-                (c = ((c & 31) << 6) | (ptr[1] & 63))
+                (c = ((c & 31) << 6) | ((unsafe: ptr[1]) & 63))
             } else {
                 if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                    (c = (((c & 15) << 12) | ((ptr[1] & 63) << 6)) | (ptr[2] & 63))
+                    (c = (((c & 15) << 12) | (((unsafe: ptr[1]) & 63) << 6)) | ((unsafe: ptr[2]) & 63))
                 } else {
                     if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                        (c = ((((c & 7) << 18) | ((ptr[1] & 63) << 12)) | ((ptr[2] & 63) << 6)) | (ptr[3] & 63))
+                        (c = ((((c & 7) << 18) | (((unsafe: ptr[1]) & 63) << 12)) | (((unsafe: ptr[2]) & 63) << 6)) | ((unsafe: ptr[3]) & 63))
                     } else {
                         if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                            (c = (((((c & 3) << 24) | ((ptr[1] & 63) << 18)) | ((ptr[2] & 63) << 12)) | ((ptr[3] & 63) << 6)) | (ptr[4] & 63))
+                            (c = (((((c & 3) << 24) | (((unsafe: ptr[1]) & 63) << 18)) | (((unsafe: ptr[2]) & 63) << 12)) | (((unsafe: ptr[3]) & 63) << 6)) | ((unsafe: ptr[4]) & 63))
                         } else {
-                            (c = ((((((c & 1) << 30) | ((ptr[1] & 63) << 24)) | ((ptr[2] & 63) << 18)) | ((ptr[3] & 63) << 12)) | ((ptr[4] & 63) << 6)) | (ptr[5] & 63))
+                            (c = ((((((c & 1) << 30) | (((unsafe: ptr[1]) & 63) << 24)) | (((unsafe: ptr[2]) & 63) << 18)) | (((unsafe: ptr[3]) & 63) << 12)) | (((unsafe: ptr[4]) & 63) << 6)) | ((unsafe: ptr[5]) & 63))
                         }
                     }
                 }
             }
-            
+
         }
-        
+
     } else {
         (c = (unsafe: *ptr))
     }
@@ -218,113 +218,112 @@ fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const 
         match c:
             10 =>
                 var __ci_expr_ternary_1: c_int = 0
-                
+
                 var __ci_expr_logic_0: c_int = 0
-                
+
                 if ((if ptr > startptr: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if ptr[-1] == 13: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_0 = (if (if (unsafe: ptr[-1]) == 13: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_0 != 0) {
                     (__ci_expr_ternary_1 = 2)
                 } else {
                     (__ci_expr_ternary_1 = 1)
                 }
-                
+
                 ((unsafe: *lenptr) = __ci_expr_ternary_1)
-                
-                
+
+
                 return 1
-                
+
                 ((unsafe: *lenptr) = 1)
-                
+
                 return 1
-                
-                
+
+
             13 =>
                 ((unsafe: *lenptr) = 1)
-                
+
                 return 1
-                
+
                 return 0
-                
+
             _ =>
                 return 0
     } else {
         match c:
             10 =>
                 var __ci_expr_ternary_3: c_int = 0
-                
+
                 var __ci_expr_logic_2: c_int = 0
-                
+
                 if ((if ptr > startptr: 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if (if ptr[-1] == 13: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_2 = (if (if (unsafe: ptr[-1]) == 13: 1 else: 0) != 0: 1 else: 0))
                 }
-                
+
                 if (__ci_expr_logic_2 != 0) {
                     (__ci_expr_ternary_3 = 2)
                 } else {
                     (__ci_expr_ternary_3 = 1)
                 }
-                
+
                 ((unsafe: *lenptr) = __ci_expr_ternary_3)
-                
-                
+
+
                 return 1
-                
+
                 ((unsafe: *lenptr) = 1)
-                
+
                 return 1
-                
-                
+
+
             11 | 12 | 13 =>
                 ((unsafe: *lenptr) = 1)
-                
+
                 return 1
-                
+
                 var __ci_expr_ternary_4: c_int = 0
-                
+
                 if (utf != 0) {
                     (__ci_expr_ternary_4 = 2)
                 } else {
                     (__ci_expr_ternary_4 = 1)
                 }
-                
+
                 ((unsafe: *lenptr) = __ci_expr_ternary_4)
-                
-                
+
+
                 return 1
-                
-                
+
+
             133 =>
                 var __ci_expr_ternary_4: c_int = 0
-                
+
                 if (utf != 0) {
                     (__ci_expr_ternary_4 = 2)
                 } else {
                     (__ci_expr_ternary_4 = 1)
                 }
-                
+
                 ((unsafe: *lenptr) = __ci_expr_ternary_4)
-                
-                
+
+
                 return 1
-                
+
                 ((unsafe: *lenptr) = 3)
-                
+
                 return 1
-                
-                
+
+
             8232 | 8233 =>
                 ((unsafe: *lenptr) = 3)
-                
+
                 return 1
-                
+
                 return 0
-                
+
             _ =>
                 return 0
     }
 
 }
-

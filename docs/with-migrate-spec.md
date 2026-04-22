@@ -402,8 +402,8 @@ let ptr: *const u16 = ...
 
 ## Unsafe Wrapping
 
-All pointer dereferences, pointer arithmetic, and raw memory
-operations are wrapped in `unsafe`:
+All pointer dereferences, raw pointer indexing, and raw memory
+access operations are wrapped in `unsafe`:
 
 ```c
 // C
@@ -415,7 +415,7 @@ ptr++;
 ```
 // With
 unsafe { *ptr = 42 }
-unsafe { *(ptr + i) = x }
+unsafe { ptr[i] = x }
 ptr = ptr + 1
 ```
 
@@ -489,9 +489,10 @@ callers (including pcre2test) link against it unchanged.
 
 1. **Semantic preservation by construction.** Every C construct
    maps to a With construct with identical runtime behavior.
-   Pointer arithmetic stays as pointer arithmetic (in `unsafe`).
-   Integer overflow stays as wrapping arithmetic (`+%`). Casts
-   stay as explicit `as` casts.
+   Pointer arithmetic stays as pointer arithmetic in safe code.
+   Raw pointer access stays visibly wrapped in `unsafe`. Integer
+   overflow stays as wrapping arithmetic (`+%`). Casts stay as
+   explicit `as` casts.
 
 2. **No behavior changes.** The translator does not "improve"
    the code. It does not replace `malloc` with safe allocation.

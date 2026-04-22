@@ -8,9 +8,9 @@ fn pcre2_jit_compile_8(code: *mut pcre2_real_code_8, options: c_uint) -> c_int {
         if ((if options != 512: 1 else: 0) != 0) {
             return -45
         }
-        
+
         return -68
-        
+
     }
 
     if ((if code == null: 1 else: 0) != 0) {
@@ -24,9 +24,9 @@ fn pcre2_jit_compile_8(code: *mut pcre2_real_code_8, options: c_uint) -> c_int {
     if ((if (options & 256) != 0: 1 else: 0) != 0) {
         if ((if (re.overall_options & 67108864) == 0: 1 else: 0) != 0) {
             (re.overall_options = re.overall_options | 67108864)
-            
+
         }
-        
+
     }
 
     return -45
@@ -47,9 +47,9 @@ fn pcre2_jit_match_8(code: *const pcre2_real_code_8, subject: *const u8, length:
     mcontext
 
     (match_data.rc = -45)
-    
+
     return match_data.rc
-    
+
 
 }
 
@@ -108,4 +108,3 @@ fn _pcre2_jit_get_target_8() -> *const i8 {
     return (&"JIT is not supported"[0] as *mut c_char)
 
 }
-

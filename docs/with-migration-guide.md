@@ -1603,7 +1603,7 @@ sqlite3_open(c":memory:".ptr, &mut db)
 ```
 
 `c_import` parses C headers at compile time and makes all `struct`s, `enum`s, `#define` macros, and functions instantly available as With symbols. 
-Imported C functions are directly callable; `unsafe` is still required for raw pointer dereference and pointer arithmetic.
+Imported C functions are directly callable; `unsafe` is still required for raw pointer dereference and raw pointer indexing.
 
 ## Classes and Methods
 

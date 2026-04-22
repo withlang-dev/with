@@ -1234,7 +1234,7 @@ c_import("sqlite3.h", link: "sqlite3")
 
 `c_import` is the explicit safety opt-in. Imported C functions are
 callable directly. `unsafe` remains required for raw pointer
-operations (`*p`, pointer arithmetic, transmutes). For manually
+access operations (`*p`, `p[i]`) and transmutes. For manually
 declared `extern "C"` symbols (outside `c_import`), keep the
 call-site `unsafe` requirement.
 
