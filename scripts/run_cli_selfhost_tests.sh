@@ -874,8 +874,11 @@ EOF
     return
   fi
 
+  local find_char_count
+  find_char_count="$(grep -Fc 'fn string_find_char(' "$generated_dir/defs.w" || true)"
   if ! grep -Fq 'let issue140_owned_table:' "$generated_dir/defs.w" \
-    || grep -Fq 'issue140_unused_external' "$generated_dir/defs.w"; then
+    || grep -Fq 'issue140_unused_external' "$generated_dir/defs.w" \
+    || [[ "$find_char_count" != "1" ]]; then
     echo "FAIL(cli-selfhost-migrate-output) shared_defs_ownerless_extern"
     echo "--- defs.w"
     sed -n '1,200p' "$generated_dir/defs.w" || true
