@@ -65,7 +65,7 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                 (req_cu2__goto_3368_13 = 0)
                 (start_bits__goto_3370_16 = ((null as *const u8)))
                 (mb__goto_3377_18 = ((&mut actual_match_block__goto_3376_17 as *mut dfa_match_block_8)))
-                (rws__goto_3385_13 = ((base_recursion_workspace__goto_3384_5 as *mut RWS_anchor)))
+                (rws__goto_3385_13 = ((&base_recursion_workspace__goto_3384_5[0] as *mut RWS_anchor)))
                 (rws__goto_3385_13.next = ((null as *mut RWS_anchor)))
                 if (__goto_pending != 0) {
                     continue

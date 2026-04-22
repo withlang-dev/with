@@ -1,5 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
+use std.re.pcre2_xclass
 
 fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -> c_int {
     var code = __param_code
