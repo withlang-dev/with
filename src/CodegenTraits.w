@@ -1283,6 +1283,143 @@ fn Codegen.exact_int_expr_to_f64(self: Codegen, node: i32) -> f64:
         out = -out
     out
 
+fn Codegen.unwrap_const_expr_node(self: Codegen, node: i32) -> i32:
+    var cur = node
+    while cur != 0:
+        let kind = self.pool.kind(cur)
+        if kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST:
+            cur = self.pool.get_data0(cur)
+            continue
+        break
+    cur
+
+fn Codegen.coerce_const_value_to_type(self: Codegen, value: i64, expected_ty: i64) -> i64:
+    if value == 0 or expected_ty == 0:
+        return 0
+    let actual_ty = wl_type_of(value)
+    if actual_ty == expected_ty:
+        return value
+    if wl_get_type_kind(actual_ty) == wl_pointer_type_kind() and wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
+        return wl_const_bitcast(value, expected_ty)
+    0
+
+fn Codegen.try_eval_const_pointer_llvm(self: Codegen, node: i32, expected_tid: i32) -> i64:
+    if node == 0 or expected_tid <= 0:
+        return 0
+    let resolved = self.sema.resolve_alias(expected_tid as TypeId)
+    let ptr_ty = self.sema_type_to_llvm(resolved)
+    if ptr_ty == 0:
+        return 0
+
+    let cur = self.unwrap_const_expr_node(node)
+    if cur == 0:
+        return 0
+    let kind = self.pool.kind(cur)
+    if kind == NodeKind.NK_NULL_LIT:
+        return wl_const_null(ptr_ty)
+
+    if kind == NodeKind.NK_IDENT:
+        let sym = self.pool.get_data0(cur)
+        let fn_val = self.fn_values.get(sym)
+        if fn_val.is_some():
+            return self.coerce_const_value_to_type(fn_val.unwrap() as i64, ptr_ty)
+        return 0
+
+    if kind == NodeKind.NK_UNARY:
+        let uop = self.pool.get_data0(cur)
+        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF:
+            let target = self.unwrap_const_expr_node(self.pool.get_data1(cur))
+            if target == 0:
+                return 0
+            if self.pool.kind(target) == NodeKind.NK_IDENT:
+                let target_sym = self.pool.get_data0(target)
+                let global = self.module_constants.get(target_sym)
+                if global.is_some():
+                    return self.coerce_const_value_to_type(global.unwrap() as i64, ptr_ty)
+                return 0
+            if self.pool.kind(target) == NodeKind.NK_INDEX:
+                let base = self.unwrap_const_expr_node(self.pool.get_data0(target))
+                let idx_node = self.pool.get_data1(target)
+                let idx_val = self.try_eval_const_int(idx_node)
+                if idx_val != 0:
+                    return 0
+                if base != 0 and self.pool.kind(base) == NodeKind.NK_IDENT:
+                    let base_sym = self.pool.get_data0(base)
+                    let global = self.module_constants.get(base_sym)
+                    if global.is_some():
+                        return self.coerce_const_value_to_type(global.unwrap() as i64, ptr_ty)
+                return 0
+
+    let ptr_zero = self.try_eval_const_int(cur)
+    if ptr_zero == 0:
+        return wl_const_null(ptr_ty)
+    0
+
+fn Codegen.struct_literal_field_value_node(self: Codegen, lit_node: i32, field_name: i32, field_index: i32) -> i32:
+    if lit_node == 0 or self.pool.kind(lit_node) != NodeKind.NK_STRUCT_LIT:
+        return 0
+    let field_start = self.pool.get_data1(lit_node)
+    let lit_field_count = self.pool.get_data2(lit_node)
+    let want_text = self.intern.resolve(field_name)
+    for li in 0..lit_field_count:
+        let lit_name = self.pool.get_extra(field_start + li * 2)
+        let lit_value = self.pool.get_extra(field_start + li * 2 + 1)
+        if lit_name == 0:
+            if li == field_index:
+                return lit_value
+        else if lit_name == field_name:
+            return lit_value
+        else if want_text.len() > 0 and self.intern.resolve(lit_name) == want_text:
+            return lit_value
+    0
+
+fn Codegen.try_eval_const_struct_llvm(self: Codegen, node: i32, expected_tid: i32) -> i64:
+    if node == 0 or expected_tid <= 0:
+        return 0
+    let cur = self.unwrap_const_expr_node(node)
+    if cur == 0 or self.pool.kind(cur) != NodeKind.NK_STRUCT_LIT:
+        return 0
+    let resolved = self.sema.resolve_alias(expected_tid as TypeId)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return 0
+    let struct_ty = self.sema_type_to_llvm(resolved)
+    if struct_ty == 0 or wl_get_type_kind(struct_ty) != wl_struct_type_kind():
+        return 0
+    let struct_idx = self.find_struct_index_by_type(struct_ty)
+    if struct_idx < 0:
+        return 0
+
+    let llvm_field_count = wl_count_struct_elem_types(struct_ty)
+    let fields: Vec[i64] = Vec.new()
+    for li in 0..llvm_field_count:
+        let llvm_field_ty = wl_struct_get_type_at(struct_ty, li)
+        fields.push(self.build_default_value(llvm_field_ty))
+
+    let te_start = self.sema.get_type_d1(resolved)
+    let source_field_count = self.sema.get_type_d2(resolved)
+    for fi in 0..source_field_count:
+        let field_name = self.sema.type_extra.get((te_start + fi * 3) as i64)
+        let field_tid = self.sema.type_extra.get((te_start + fi * 3 + 1) as i64)
+        let default_node = self.sema.type_extra.get((te_start + fi * 3 + 2) as i64)
+        let llvm_idx = self.get_llvm_field_index(struct_ty, fi)
+        if llvm_idx < 0 or llvm_idx >= llvm_field_count:
+            return 0
+        let field_llvm_ty = wl_struct_get_type_at(struct_ty, llvm_idx)
+        let value_node = self.struct_literal_field_value_node(cur, field_name, fi)
+        var field_val: i64 = 0
+        if value_node != 0:
+            field_val = self.try_eval_const_llvm(value_node, field_tid)
+        else if default_node != 0:
+            field_val = self.try_eval_const_llvm(default_node, field_tid)
+        else:
+            field_val = self.build_default_value(field_llvm_ty)
+        field_val = self.coerce_const_value_to_type(field_val, field_llvm_ty)
+        if field_val == 0:
+            return 0
+        fields[llvm_idx] = field_val
+
+    wl_const_named_struct(struct_ty, vec_data_i64(&fields), llvm_field_count)
+
 fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
     let kind = self.pool.kind(node)
     if kind == NodeKind.NK_INT_LIT:
@@ -1378,16 +1515,7 @@ fn Codegen.try_eval_const_llvm(self: Codegen, node: i32, expected_tid: i32) -> i
     if node == 0 or expected_tid <= 0:
         return 0
 
-    var cur = node
-    while cur != 0:
-        let kind = self.pool.kind(cur)
-        if kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_GROUPED:
-            cur = self.pool.get_data0(cur)
-            continue
-        if kind == NodeKind.NK_CAST:
-            cur = self.pool.get_data0(cur)
-            continue
-        break
+    var cur = self.unwrap_const_expr_node(node)
 
     if cur == 0:
         return 0
@@ -1420,18 +1548,11 @@ fn Codegen.try_eval_const_llvm(self: Codegen, node: i32, expected_tid: i32) -> i
             elems.push(elem_val)
         return wl_const_array(elem_llvm, vec_data_i64(&elems), elem_count)
 
+    if tk == TypeKind.TY_STRUCT:
+        return self.try_eval_const_struct_llvm(cur, resolved as i32)
+
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
-        if self.pool.kind(cur) == NodeKind.NK_NULL_LIT:
-            let ptr_ty = self.sema_type_to_llvm(resolved)
-            if ptr_ty != 0:
-                return wl_const_null(ptr_ty)
-            return 0
-        let ptr_zero = self.try_eval_const_int(cur)
-        if ptr_zero == 0:
-            let ptr_ty = self.sema_type_to_llvm(resolved)
-            if ptr_ty != 0:
-                return wl_const_null(ptr_ty)
-        return 0
+        return self.try_eval_const_pointer_llvm(cur, resolved as i32)
 
     if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL:
         let exact = self.exact_int_const_llvm(cur, resolved as i32)
@@ -1552,7 +1673,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
 
     if resolved_binding_ty != 0:
         let binding_kind = self.sema.get_type_kind(resolved_binding_ty)
-        if binding_kind == TypeKind.TY_INT or binding_kind == TypeKind.TY_BOOL or binding_kind == TypeKind.TY_FLOAT:
+        if binding_kind == TypeKind.TY_INT or binding_kind == TypeKind.TY_BOOL or binding_kind == TypeKind.TY_FLOAT or binding_kind == TypeKind.TY_STRUCT or binding_kind == TypeKind.TY_ARRAY or binding_kind == TypeKind.TY_PTR or binding_kind == TypeKind.TY_REF:
             let init = self.try_eval_const_llvm(value_node, resolved_binding_ty as i32)
             if init != 0:
                 let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
