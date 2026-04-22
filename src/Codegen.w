@@ -4377,13 +4377,6 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
         if self.pool.kind(decl) == NodeKind.NK_TRAIT_DECL:
             self.collect_trait_info(decl)
 
-    // Pass 0.6: process top-level let declarations as module constants
-    for i in 0..self.pool.decl_count():
-        self.sync_decl_context(i)
-        let decl = self.pool.get_decl(i)
-        if self.pool.kind(decl) == NodeKind.NK_LET_DECL:
-            self.gen_module_constant(decl)
-
     // Pass 1: declare all functions and externs (forward declarations)
     for i in 0..self.pool.decl_count():
         self.sync_decl_context(i)
@@ -4423,6 +4416,15 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
     // Pass 1.25: synthesize trait vtables after all method declarations exist.
     self.generate_trait_vtables()
+
+    // Pass 1.4: process top-level let declarations as module constants.
+    // Function declarations must exist first so global struct initializers can
+    // contain function-pointer fields.
+    for i in 0..self.pool.decl_count():
+        self.sync_decl_context(i)
+        let decl = self.pool.get_decl(i)
+        if self.pool.kind(decl) == NodeKind.NK_LET_DECL:
+            self.gen_module_constant(decl)
 
     // Pass 1.5: detect drop functions
     self.detect_drop_functions()
