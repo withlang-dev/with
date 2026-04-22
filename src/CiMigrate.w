@@ -213,8 +213,6 @@ fn ci_migrate_write_shared_defs(output_dir: str):
     defs = defs ++ "let STRING_VERSION: *const u8 = \"VERSION\"\n"
     defs = defs ++ "let STRING_WEIRD_STARTWORD: *const u8 = \"[:<:]]\"\n"
     defs = defs ++ "let STRING_WEIRD_ENDWORD: *const u8 = \"[:>:]]\"\n"
-    defs = defs ++ "\n// strchr mapping (migrator emits string_find_char for strchr)\n"
-    defs = defs ++ "fn string_find_char(s: *const i8, c: i32) -> *const i8: (memchr((s as *const c_void), c, strlen(s)) as *const i8)\n"
     // Shared declarations collected during migration.
     if g_migrate_shared_decl_buf.len() > 0:
         defs = defs ++ "\n" ++ g_migrate_shared_decl_buf

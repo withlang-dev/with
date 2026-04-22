@@ -273,6 +273,27 @@ fn Sema.is_local_or_prelude_decl(self: Sema, decl_index: i32) -> i32:
         return 1
     0
 
+fn Sema.find_decl_index(self: Sema, node: i32) -> i32:
+    for di in 0..self.ast.decl_count():
+        if self.ast.get_decl(di) == node:
+            return di
+    0 - 1
+
+fn Sema.decls_share_source_file(self: Sema, a: i32, b: i32) -> i32:
+    if a < 0 or b < 0:
+        return 0
+    if a < self.decl_source_file_ids.len() as i32 and b < self.decl_source_file_ids.len() as i32:
+        if self.decl_source_file_ids.get(a as i64) == self.decl_source_file_ids.get(b as i64):
+            return 1
+        return 0
+    if a < self.decl_source_paths.len() as i32 and b < self.decl_source_paths.len() as i32:
+        if self.decl_source_paths.get(a as i64) == self.decl_source_paths.get(b as i64):
+            return 1
+        return 0
+    if self.ast.local_decl_count() < 0:
+        return 1
+    0
+
 fn Sema.build_ci_scoping(self: Sema):
     // Build c_import scoping data. Scoping is active when there are multiple
     // distinct module paths AND at least one c_import-origin declaration exists.
@@ -847,6 +868,15 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     let fn_name = self.ast.get_data0(node)
     if is_local != 0:
         self.set_pretty_symbol(fn_name, self.extract_decl_name_after(node, "fn"))
+    if self.fn_decl_nodes.contains(fn_name):
+        let existing_node = self.fn_decl_nodes.get(fn_name).unwrap()
+        if existing_node != node:
+            let existing_di = self.find_decl_index(existing_node)
+            let current_di = self.find_decl_index(node)
+            if self.decls_share_source_file(existing_di, current_di) != 0:
+                let fn_name_str = self.pool_resolve(fn_name)
+                self.emit_error(f"function '{fn_name_str}' is already defined", node)
+                return
     self.fn_decl_nodes.insert(fn_name, node)
 
     // Look up fn_meta for parameter info

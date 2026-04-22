@@ -54,9 +54,6 @@ let STRING_VERSION: *const u8 = "VERSION"
 let STRING_WEIRD_STARTWORD: *const u8 = "[:<:]]"
 let STRING_WEIRD_ENDWORD: *const u8 = "[:>:]]"
 
-// strchr mapping (migrator emits string_find_char for strchr)
-fn string_find_char(s: *const i8, c: i32) -> *const i8: (memchr((s as *const c_void), c, strlen(s)) as *const i8)
-
 type BOOL = c_int
 
 type PCRE2_UCHAR8 = u8
