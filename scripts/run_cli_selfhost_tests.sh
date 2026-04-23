@@ -2228,10 +2228,81 @@ expect_top_level_help_lists_cli_commands() {
   echo "PASS(cli-selfhost-help) top_level_help"
 }
 
+expect_test_command_runtime_directives() {
+  local case_dir="$tmpdir/test_directives_case"
+  local good_src="$case_dir/test_directives_good.w"
+  local bad_stdout_src="$case_dir/test_directives_bad_stdout.w"
+  local bad_exit_src="$case_dir/test_directives_bad_exit.w"
+  mkdir -p "$case_dir"
+
+  cat >"$good_src" <<'EOF'
+//! expect-exit: 134
+//! expect-stderr: panic: expected boom
+
+fn main:
+    assert(false, "expected boom")
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" test "$good_src"; then
+    echo "FAIL(cli-selfhost-test-directives-good) test_runtime_directives"
+    cat "$tmpdir/out" || true
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  cat >"$bad_stdout_src" <<'EOF'
+//! expect-stdout: missing
+
+fn main:
+    print("ok")
+EOF
+
+  if run_cli "$tmpdir/out" "$tmpdir/err" test "$bad_stdout_src"; then
+    echo "FAIL(cli-selfhost-test-directives-stdout) test_runtime_directives"
+    cat "$tmpdir/out" || true
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/err" "stdout mismatch; missing expected output: missing"; then
+    echo "FAIL(cli-selfhost-test-directives-stdout-diagnostic) test_runtime_directives"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  cat >"$bad_exit_src" <<'EOF'
+//! expect-exit: 7
+
+fn main:
+    print("ok")
+EOF
+
+  if run_cli "$tmpdir/out" "$tmpdir/err" test "$bad_exit_src"; then
+    echo "FAIL(cli-selfhost-test-directives-exit) test_runtime_directives"
+    cat "$tmpdir/out" || true
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/err" "exit code 0, expected 7"; then
+    echo "FAIL(cli-selfhost-test-directives-exit-diagnostic) test_runtime_directives"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-test) test_runtime_directives"
+}
+
 expect_init_in_cwd
 expect_init_named_dir
 expect_pointer_index_is_rejected
 expect_top_level_help_lists_cli_commands
+expect_test_command_runtime_directives
 expect_prelude_output_functions_contract
 expect_emit_obj_global_symbols
 expect_emit_obj_imported_symbols
