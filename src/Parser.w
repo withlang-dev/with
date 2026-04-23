@@ -4983,11 +4983,13 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
         self.advance()
         self.skip_newlines()
         let tuple_patterns: Vec[i32] = Vec.new()
+        var saw_comma = false
         if self.peek() != TokenKind.TK_R_PAREN:
             let p = self.parse_pattern()
             tuple_patterns.push(p as i32)
             self.skip_newlines()
             while self.peek() == TokenKind.TK_COMMA:
+                saw_comma = true
                 self.advance()
                 self.skip_newlines()
                 if self.peek() == TokenKind.TK_R_PAREN:
@@ -4999,6 +5001,8 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
         self.expect(TokenKind.TK_R_PAREN)
         let extra_start = self.pool.extra_len()
         let count = tuple_patterns.len() as i32
+        if count == 1 and not saw_comma:
+            return tuple_patterns.get(0) as NodeId
         for ti in 0..count:
             self.pool.add_extra(tuple_patterns.get(ti as i64))
         return self.pool.add_node(NodeKind.NK_PAT_TUPLE, start, self.prev_end(), extra_start, count, 0)

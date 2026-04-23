@@ -3211,6 +3211,10 @@ match (x, y):
     _      => "elsewhere"
 ```
 
+Parentheses around a single pattern are grouping: `(p)` is the same
+pattern as `p`. A one-element tuple pattern requires a comma: `(p,)`.
+`()` matches the empty tuple.
+
 **Slice patterns:**
 ```
 match items:

@@ -3055,14 +3055,22 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
     if kind == NodeKind.NK_PAT_TUPLE:
         let t_extra = self.ast.get_data0(node)
         let t_count = self.ast.get_data1(node)
-        var elem_start = 0
-        var elem_count = 0
+        if subject_type == 0:
+            return
         let resolved = self.resolve_alias(subject_type)
-        if self.get_type_kind(resolved) == TypeKind.TY_TUPLE:
-            elem_start = self.get_type_d0(resolved)
-            elem_count = self.get_type_d1(resolved)
+        let resolved_kind = self.get_type_kind(resolved)
+        if resolved_kind == TypeKind.TY_ERR:
+            return
+        if resolved_kind != TypeKind.TY_TUPLE:
+            self.emit_error("tuple pattern requires tuple subject", node)
+            return
+        let elem_start = self.get_type_d0(resolved)
+        let elem_count = self.get_type_d1(resolved)
+        if t_count != elem_count:
+            self.emit_error("tuple pattern arity mismatch", node)
+            return
         for ti in 0..t_count:
-            let elem_ty = if ti < elem_count: self.type_extra.get((elem_start + ti) as i64) else: 0
+            let elem_ty = self.type_extra.get((elem_start + ti) as i64)
             self.check_pattern(self.ast.get_extra(t_extra + ti), elem_ty)
         return
 
