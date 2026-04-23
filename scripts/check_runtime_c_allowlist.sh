@@ -2,18 +2,25 @@
 set -euo pipefail
 
 if [ "$#" -eq 0 ]; then
-  echo "usage: $0 runtime/file1.c [runtime/file2.c ...]" >&2
-  exit 1
+  expected=""
+else
+  expected="$(printf '%s\n' "$@" | LC_ALL=C sort)"
 fi
-
-expected="$(printf '%s\n' "$@" | LC_ALL=C sort)"
 actual="$(find runtime -maxdepth 1 -type f -name '*.c' | LC_ALL=C sort)"
 
 if [ "$actual" != "$expected" ]; then
   echo "error: runtime C file allowlist drifted" >&2
   echo "expected:" >&2
-  printf '  %s\n' "$expected" >&2
+  if [ -n "$expected" ]; then
+    printf '%s\n' "$expected" | sed 's/^/  /' >&2
+  else
+    echo "  <none>" >&2
+  fi
   echo "actual:" >&2
-  printf '  %s\n' "$actual" >&2
+  if [ -n "$actual" ]; then
+    printf '%s\n' "$actual" | sed 's/^/  /' >&2
+  else
+    echo "  <none>" >&2
+  fi
   exit 1
 fi
