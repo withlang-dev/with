@@ -1377,6 +1377,78 @@ EOF
   echo "PASS(cli-selfhost-migrate) raw_pointer_index_unsafe"
 }
 
+expect_migrate_small_int_shift_promotion() {
+  local case_dir="$tmpdir/migrate_small_int_shift_promotion_case"
+  local src="$case_dir/small_int_shift_promotion.c"
+  local out_w="$case_dir/small_int_shift_promotion.w"
+  local ir_out="$case_dir/small_int_shift_promotion.ll"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+typedef unsigned char uint8_t;
+typedef unsigned int uint32_t;
+
+uint32_t issue170_shift_promotion(uint8_t *p) {
+  return (p[1] << 8) | p[2];
+}
+
+uint32_t issue170_masked_shift_promotion(uint8_t *p) {
+  return ((p[0] & 63) << 6) | (1 << (p[1] & 7));
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) small_int_shift_promotion"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_regex "$out_w" 'p\[1\].*as c_int\).*<< 8'; then
+    echo "FAIL(cli-selfhost-migrate-output) small_int_shift_promotion"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_regex "$out_w" 'p\[0\].*& 63.*as c_int\).*<< 6'; then
+    echo "FAIL(cli-selfhost-migrate-output) small_int_shift_masked_lhs"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_regex "$out_w" '1 as c_int\).*<<.*p\[1\].*& 7'; then
+    echo "FAIL(cli-selfhost-migrate-output) small_int_shift_literal_lhs"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) small_int_shift_promotion"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$ir_out" "$tmpdir/err" ir "$out_w"; then
+    echo "FAIL(cli-selfhost-ir) small_int_shift_promotion"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if file_has_regex "$ir_out" 'shl i8'; then
+    echo "FAIL(cli-selfhost-ir-output) small_int_shift_promotion"
+    grep -En 'shl i8|shr i8' "$ir_out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) small_int_shift_promotion"
+}
+
 expect_migrate_prefer_brace_no_trailing_ws() {
   local case_dir="$tmpdir/migrate_prefer_brace_ws_case"
   local src="$case_dir/prefer_brace_ws.c"
@@ -2110,6 +2182,7 @@ expect_migrate_tentative_global_owner
 expect_migrate_cross_file_tentative_global_owner
 expect_migrate_noop_pointer_cast_exprs
 expect_migrate_raw_pointer_index_unsafe
+expect_migrate_small_int_shift_promotion
 expect_migrate_prefer_brace_no_trailing_ws
 expect_migrate_typed_cast_macros
 expect_migrate_for_continue_switch_break_semantics

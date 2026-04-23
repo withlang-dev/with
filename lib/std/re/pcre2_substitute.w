@@ -920,18 +920,18 @@ fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes
                         }
                         if ((if c__goto_220_12 >= 192: 1 else: 0) != 0) {
                             if ((if (c__goto_220_12 & 32) == 0: 1 else: 0) != 0) {
-                                (c__goto_220_12 = ((c__goto_220_12 & 31) << 6) | ((unsafe: ptr__goto_205_12[1]) & 63))
+                                (c__goto_220_12 = (((c__goto_220_12 & 31) as c_uint) << 6) | ((unsafe: ptr__goto_205_12[1]) & 63))
                             } else {
                                 if ((if (c__goto_220_12 & 16) == 0: 1 else: 0) != 0) {
-                                    (c__goto_220_12 = (((c__goto_220_12 & 15) << 12) | (((unsafe: ptr__goto_205_12[1]) & 63) << 6)) | ((unsafe: ptr__goto_205_12[2]) & 63))
+                                    (c__goto_220_12 = ((((c__goto_220_12 & 15) as c_uint) << 12) | ((((unsafe: ptr__goto_205_12[1]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_205_12[2]) & 63))
                                 } else {
                                     if ((if (c__goto_220_12 & 8) == 0: 1 else: 0) != 0) {
-                                        (c__goto_220_12 = ((((c__goto_220_12 & 7) << 18) | (((unsafe: ptr__goto_205_12[1]) & 63) << 12)) | (((unsafe: ptr__goto_205_12[2]) & 63) << 6)) | ((unsafe: ptr__goto_205_12[3]) & 63))
+                                        (c__goto_220_12 = (((((c__goto_220_12 & 7) as c_uint) << 18) | ((((unsafe: ptr__goto_205_12[1]) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_205_12[2]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_205_12[3]) & 63))
                                     } else {
                                         if ((if (c__goto_220_12 & 4) == 0: 1 else: 0) != 0) {
-                                            (c__goto_220_12 = (((((c__goto_220_12 & 3) << 24) | (((unsafe: ptr__goto_205_12[1]) & 63) << 18)) | (((unsafe: ptr__goto_205_12[2]) & 63) << 12)) | (((unsafe: ptr__goto_205_12[3]) & 63) << 6)) | ((unsafe: ptr__goto_205_12[4]) & 63))
+                                            (c__goto_220_12 = ((((((c__goto_220_12 & 3) as c_uint) << 24) | ((((unsafe: ptr__goto_205_12[1]) & 63) as c_uint) << 18)) | ((((unsafe: ptr__goto_205_12[2]) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_205_12[3]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_205_12[4]) & 63))
                                         } else {
-                                            (c__goto_220_12 = ((((((c__goto_220_12 & 1) << 30) | (((unsafe: ptr__goto_205_12[1]) & 63) << 24)) | (((unsafe: ptr__goto_205_12[2]) & 63) << 18)) | (((unsafe: ptr__goto_205_12[3]) & 63) << 12)) | (((unsafe: ptr__goto_205_12[4]) & 63) << 6)) | ((unsafe: ptr__goto_205_12[5]) & 63))
+                                            (c__goto_220_12 = (((((((c__goto_220_12 & 1) as c_uint) << 30) | ((((unsafe: ptr__goto_205_12[1]) & 63) as c_uint) << 24)) | ((((unsafe: ptr__goto_205_12[2]) & 63) as c_uint) << 18)) | ((((unsafe: ptr__goto_205_12[3]) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_205_12[4]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_205_12[5]) & 63))
                                         }
                                     }
                                 }
@@ -1056,7 +1056,7 @@ fn read_name_subst(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, ctypes
 }
 
 fn pessimistic_case_inflation(len: c_ulong) -> c_ulong {
-    return ((len >> 3) +% 10)
+    return (((len as c_ulong) >> 3) +% 10)
 
 }
 
@@ -1161,28 +1161,28 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
 
                 (input = input + 1)
 
-                (ch = ((ch & 31) << 6) | ((unsafe: *__ci_expr_old_2) & 63))
+                (ch = (((ch & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_2) & 63))
 
             } else {
                 if ((if (ch & 16) == 0: 1 else: 0) != 0) {
-                    (ch = (((ch & 15) << 12) | (((unsafe: *input) & 63) << 6)) | ((unsafe: input[1]) & 63))
+                    (ch = ((((ch & 15) as c_uint) << 12) | ((((unsafe: *input) & 63) as c_uint) << 6)) | ((unsafe: input[1]) & 63))
 
                     (input = input + 2)
 
                 } else {
                     if ((if (ch & 8) == 0: 1 else: 0) != 0) {
-                        (ch = ((((ch & 7) << 18) | (((unsafe: *input) & 63) << 12)) | (((unsafe: input[1]) & 63) << 6)) | ((unsafe: input[2]) & 63))
+                        (ch = (((((ch & 7) as c_uint) << 18) | ((((unsafe: *input) & 63) as c_uint) << 12)) | ((((unsafe: input[1]) & 63) as c_uint) << 6)) | ((unsafe: input[2]) & 63))
 
                         (input = input + 3)
 
                     } else {
                         if ((if (ch & 4) == 0: 1 else: 0) != 0) {
-                            (ch = (((((ch & 3) << 24) | (((unsafe: *input) & 63) << 18)) | (((unsafe: input[1]) & 63) << 12)) | (((unsafe: input[2]) & 63) << 6)) | ((unsafe: input[3]) & 63))
+                            (ch = ((((((ch & 3) as c_uint) << 24) | ((((unsafe: *input) & 63) as c_uint) << 18)) | ((((unsafe: input[1]) & 63) as c_uint) << 12)) | ((((unsafe: input[2]) & 63) as c_uint) << 6)) | ((unsafe: input[3]) & 63))
 
                             (input = input + 4)
 
                         } else {
-                            (ch = ((((((ch & 1) << 30) | (((unsafe: *input) & 63) << 24)) | (((unsafe: input[1]) & 63) << 18)) | (((unsafe: input[2]) & 63) << 12)) | (((unsafe: input[3]) & 63) << 6)) | ((unsafe: input[4]) & 63))
+                            (ch = (((((((ch & 1) as c_uint) << 30) | ((((unsafe: *input) & 63) as c_uint) << 24)) | ((((unsafe: input[1]) & 63) as c_uint) << 18)) | ((((unsafe: input[2]) & 63) as c_uint) << 12)) | ((((unsafe: input[3]) & 63) as c_uint) << 6)) | ((unsafe: input[4]) & 63))
 
                             (input = input + 5)
 
@@ -1241,7 +1241,7 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
                     (__ci_expr_ternary_7 = 128)
                 }
 
-                if ((if ((unsafe: ((code.tables + ((512 as isize) as usize)) + ((__ci_expr_ternary_7 as isize) as usize))[(ch / 8)]) & (1 << (ch % 8))) == 0: 1 else: 0) != 0) {
+                if ((if ((unsafe: ((code.tables + ((512 as isize) as usize)) + ((__ci_expr_ternary_7 as isize) as usize))[(ch / 8)]) & ((1 as c_uint) << (ch % 8))) == 0: 1 else: 0) != 0) {
                     (ch = (unsafe: (code.tables + ((256 as isize) as usize))[ch]))
                 }
 
@@ -1418,28 +1418,28 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
 
             (ch_end = ch_end + 1)
 
-            (ch = ((ch & 31) << 6) | ((unsafe: *__ci_expr_old_2) & 63))
+            (ch = (((ch & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_2) & 63))
 
         } else {
             if ((if (ch & 16) == 0: 1 else: 0) != 0) {
-                (ch = (((ch & 15) << 12) | (((unsafe: *ch_end) & 63) << 6)) | ((unsafe: ch_end[1]) & 63))
+                (ch = ((((ch & 15) as c_uint) << 12) | ((((unsafe: *ch_end) & 63) as c_uint) << 6)) | ((unsafe: ch_end[1]) & 63))
 
                 (ch_end = ch_end + 2)
 
             } else {
                 if ((if (ch & 8) == 0: 1 else: 0) != 0) {
-                    (ch = ((((ch & 7) << 18) | (((unsafe: *ch_end) & 63) << 12)) | (((unsafe: ch_end[1]) & 63) << 6)) | ((unsafe: ch_end[2]) & 63))
+                    (ch = (((((ch & 7) as c_uint) << 18) | ((((unsafe: *ch_end) & 63) as c_uint) << 12)) | ((((unsafe: ch_end[1]) & 63) as c_uint) << 6)) | ((unsafe: ch_end[2]) & 63))
 
                     (ch_end = ch_end + 3)
 
                 } else {
                     if ((if (ch & 4) == 0: 1 else: 0) != 0) {
-                        (ch = (((((ch & 3) << 24) | (((unsafe: *ch_end) & 63) << 18)) | (((unsafe: ch_end[1]) & 63) << 12)) | (((unsafe: ch_end[2]) & 63) << 6)) | ((unsafe: ch_end[3]) & 63))
+                        (ch = ((((((ch & 3) as c_uint) << 24) | ((((unsafe: *ch_end) & 63) as c_uint) << 18)) | ((((unsafe: ch_end[1]) & 63) as c_uint) << 12)) | ((((unsafe: ch_end[2]) & 63) as c_uint) << 6)) | ((unsafe: ch_end[3]) & 63))
 
                         (ch_end = ch_end + 4)
 
                     } else {
-                        (ch = ((((((ch & 1) << 30) | (((unsafe: *ch_end) & 63) << 24)) | (((unsafe: ch_end[1]) & 63) << 18)) | (((unsafe: ch_end[2]) & 63) << 12)) | (((unsafe: ch_end[3]) & 63) << 6)) | ((unsafe: ch_end[4]) & 63))
+                        (ch = (((((((ch & 1) as c_uint) << 30) | ((((unsafe: *ch_end) & 63) as c_uint) << 24)) | ((((unsafe: ch_end[1]) & 63) as c_uint) << 18)) | ((((unsafe: ch_end[2]) & 63) as c_uint) << 12)) | ((((unsafe: ch_end[3]) & 63) as c_uint) << 6)) | ((unsafe: ch_end[4]) & 63))
 
                         (ch_end = ch_end + 5)
 

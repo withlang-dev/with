@@ -316,7 +316,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                     }
                     if (__ci_expr_logic_1 != 0) {
                         if ((if (c__goto_178_12 & 32) == 0: 1 else: 0) != 0) {
-                            (c__goto_178_12 = ((c__goto_178_12 & 31) << 6) | ((unsafe: posix__goto_154_12[1]) & 63))
+                            (c__goto_178_12 = (((c__goto_178_12 & 31) as c_uint) << 6) | ((unsafe: posix__goto_154_12[1]) & 63))
                             if (__goto_pending != 0) {
                                 break
                             }
@@ -326,7 +326,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                             }
                         } else {
                             if ((if (c__goto_178_12 & 16) == 0: 1 else: 0) != 0) {
-                                (c__goto_178_12 = (((c__goto_178_12 & 15) << 12) | (((unsafe: posix__goto_154_12[1]) & 63) << 6)) | ((unsafe: posix__goto_154_12[2]) & 63))
+                                (c__goto_178_12 = ((((c__goto_178_12 & 15) as c_uint) << 12) | ((((unsafe: posix__goto_154_12[1]) & 63) as c_uint) << 6)) | ((unsafe: posix__goto_154_12[2]) & 63))
                                 if (__goto_pending != 0) {
                                     break
                                 }
@@ -336,7 +336,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                                 }
                             } else {
                                 if ((if (c__goto_178_12 & 8) == 0: 1 else: 0) != 0) {
-                                    (c__goto_178_12 = ((((c__goto_178_12 & 7) << 18) | (((unsafe: posix__goto_154_12[1]) & 63) << 12)) | (((unsafe: posix__goto_154_12[2]) & 63) << 6)) | ((unsafe: posix__goto_154_12[3]) & 63))
+                                    (c__goto_178_12 = (((((c__goto_178_12 & 7) as c_uint) << 18) | ((((unsafe: posix__goto_154_12[1]) & 63) as c_uint) << 12)) | ((((unsafe: posix__goto_154_12[2]) & 63) as c_uint) << 6)) | ((unsafe: posix__goto_154_12[3]) & 63))
                                     if (__goto_pending != 0) {
                                         break
                                     }
@@ -346,7 +346,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                                     }
                                 } else {
                                     if ((if (c__goto_178_12 & 4) == 0: 1 else: 0) != 0) {
-                                        (c__goto_178_12 = (((((c__goto_178_12 & 3) << 24) | (((unsafe: posix__goto_154_12[1]) & 63) << 18)) | (((unsafe: posix__goto_154_12[2]) & 63) << 12)) | (((unsafe: posix__goto_154_12[3]) & 63) << 6)) | ((unsafe: posix__goto_154_12[4]) & 63))
+                                        (c__goto_178_12 = ((((((c__goto_178_12 & 3) as c_uint) << 24) | ((((unsafe: posix__goto_154_12[1]) & 63) as c_uint) << 18)) | ((((unsafe: posix__goto_154_12[2]) & 63) as c_uint) << 12)) | ((((unsafe: posix__goto_154_12[3]) & 63) as c_uint) << 6)) | ((unsafe: posix__goto_154_12[4]) & 63))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -355,7 +355,7 @@ fn convert_posix(pattype: c_uint, pattern: *const u8, __param_plength: c_ulong, 
                                             break
                                         }
                                     } else {
-                                        (c__goto_178_12 = ((((((c__goto_178_12 & 1) << 30) | (((unsafe: posix__goto_154_12[1]) & 63) << 24)) | (((unsafe: posix__goto_154_12[2]) & 63) << 18)) | (((unsafe: posix__goto_154_12[3]) & 63) << 12)) | (((unsafe: posix__goto_154_12[4]) & 63) << 6)) | ((unsafe: posix__goto_154_12[5]) & 63))
+                                        (c__goto_178_12 = (((((((c__goto_178_12 & 1) as c_uint) << 30) | ((((unsafe: posix__goto_154_12[1]) & 63) as c_uint) << 24)) | ((((unsafe: posix__goto_154_12[2]) & 63) as c_uint) << 18)) | ((((unsafe: posix__goto_154_12[3]) & 63) as c_uint) << 12)) | ((((unsafe: posix__goto_154_12[4]) & 63) as c_uint) << 6)) | ((unsafe: posix__goto_154_12[5]) & 63))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -1440,7 +1440,7 @@ fn convert_glob_char_in_class(class_index: c_int, c: u8) -> c_int {
                 return 0
             }
 
-            if ((if ((unsafe: (cbits + ((64 as isize) as usize))[(c / 8)]) & (1 << (c & 7))) != 0: 1 else: 0) != 0) {
+            if ((if ((unsafe: (cbits + ((64 as isize) as usize))[(c / 8)]) & ((1 as c_uint) << (c & 7))) != 0: 1 else: 0) != 0) {
                 return 0
             }
 
@@ -1458,7 +1458,7 @@ fn convert_glob_char_in_class(class_index: c_int, c: u8) -> c_int {
             (cbit = 160)
 
         5 =>
-            if ((if ((unsafe: (cbits + ((288 as isize) as usize))[(c / 8)]) & (1 << (c & 7))) != 0: 1 else: 0) != 0) {
+            if ((if ((unsafe: (cbits + ((288 as isize) as usize))[(c / 8)]) & ((1 as c_uint) << (c & 7))) != 0: 1 else: 0) != 0) {
                 return 1
             }
 
@@ -1515,7 +1515,7 @@ fn convert_glob_char_in_class(class_index: c_int, c: u8) -> c_int {
         _ =>
             return 0
 
-    return (if ((unsafe: (cbits + ((cbit as isize) as usize))[(c / 8)]) & (1 << (c & 7))) != 0: 1 else: 0)
+    return (if ((unsafe: (cbits + ((cbit as isize) as usize))[(c / 8)]) & ((1 as c_uint) << (c & 7))) != 0: 1 else: 0)
 
 }
 
@@ -1635,28 +1635,28 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
 
                 (pattern = pattern + 1)
 
-                (c = ((c & 31) << 6) | ((unsafe: *__ci_expr_old_3) & 63))
+                (c = (((c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_3) & 63))
 
             } else {
                 if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                    (c = (((c & 15) << 12) | (((unsafe: *pattern) & 63) << 6)) | ((unsafe: pattern[1]) & 63))
+                    (c = ((((c & 15) as c_uint) << 12) | ((((unsafe: *pattern) & 63) as c_uint) << 6)) | ((unsafe: pattern[1]) & 63))
 
                     (pattern = pattern + 2)
 
                 } else {
                     if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                        (c = ((((c & 7) << 18) | (((unsafe: *pattern) & 63) << 12)) | (((unsafe: pattern[1]) & 63) << 6)) | ((unsafe: pattern[2]) & 63))
+                        (c = (((((c & 7) as c_uint) << 18) | ((((unsafe: *pattern) & 63) as c_uint) << 12)) | ((((unsafe: pattern[1]) & 63) as c_uint) << 6)) | ((unsafe: pattern[2]) & 63))
 
                         (pattern = pattern + 3)
 
                     } else {
                         if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                            (c = (((((c & 3) << 24) | (((unsafe: *pattern) & 63) << 18)) | (((unsafe: pattern[1]) & 63) << 12)) | (((unsafe: pattern[2]) & 63) << 6)) | ((unsafe: pattern[3]) & 63))
+                            (c = ((((((c & 3) as c_uint) << 24) | ((((unsafe: *pattern) & 63) as c_uint) << 18)) | ((((unsafe: pattern[1]) & 63) as c_uint) << 12)) | ((((unsafe: pattern[2]) & 63) as c_uint) << 6)) | ((unsafe: pattern[3]) & 63))
 
                             (pattern = pattern + 4)
 
                         } else {
-                            (c = ((((((c & 1) << 30) | (((unsafe: *pattern) & 63) << 24)) | (((unsafe: pattern[1]) & 63) << 18)) | (((unsafe: pattern[2]) & 63) << 12)) | (((unsafe: pattern[3]) & 63) << 6)) | ((unsafe: pattern[4]) & 63))
+                            (c = (((((((c & 1) as c_uint) << 30) | ((((unsafe: *pattern) & 63) as c_uint) << 24)) | ((((unsafe: pattern[1]) & 63) as c_uint) << 18)) | ((((unsafe: pattern[2]) & 63) as c_uint) << 12)) | ((((unsafe: pattern[3]) & 63) as c_uint) << 6)) | ((unsafe: pattern[4]) & 63))
 
                             (pattern = pattern + 5)
 
@@ -1781,28 +1781,28 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
 
                         (pattern = pattern + 1)
 
-                        (c = ((c & 31) << 6) | ((unsafe: *__ci_expr_old_12) & 63))
+                        (c = (((c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_12) & 63))
 
                     } else {
                         if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                            (c = (((c & 15) << 12) | (((unsafe: *pattern) & 63) << 6)) | ((unsafe: pattern[1]) & 63))
+                            (c = ((((c & 15) as c_uint) << 12) | ((((unsafe: *pattern) & 63) as c_uint) << 6)) | ((unsafe: pattern[1]) & 63))
 
                             (pattern = pattern + 2)
 
                         } else {
                             if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                                (c = ((((c & 7) << 18) | (((unsafe: *pattern) & 63) << 12)) | (((unsafe: pattern[1]) & 63) << 6)) | ((unsafe: pattern[2]) & 63))
+                                (c = (((((c & 7) as c_uint) << 18) | ((((unsafe: *pattern) & 63) as c_uint) << 12)) | ((((unsafe: pattern[1]) & 63) as c_uint) << 6)) | ((unsafe: pattern[2]) & 63))
 
                                 (pattern = pattern + 3)
 
                             } else {
                                 if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                                    (c = (((((c & 3) << 24) | (((unsafe: *pattern) & 63) << 18)) | (((unsafe: pattern[1]) & 63) << 12)) | (((unsafe: pattern[2]) & 63) << 6)) | ((unsafe: pattern[3]) & 63))
+                                    (c = ((((((c & 3) as c_uint) << 24) | ((((unsafe: *pattern) & 63) as c_uint) << 18)) | ((((unsafe: pattern[1]) & 63) as c_uint) << 12)) | ((((unsafe: pattern[2]) & 63) as c_uint) << 6)) | ((unsafe: pattern[3]) & 63))
 
                                     (pattern = pattern + 4)
 
                                 } else {
-                                    (c = ((((((c & 1) << 30) | (((unsafe: *pattern) & 63) << 24)) | (((unsafe: pattern[1]) & 63) << 18)) | (((unsafe: pattern[2]) & 63) << 12)) | (((unsafe: pattern[3]) & 63) << 6)) | ((unsafe: pattern[4]) & 63))
+                                    (c = (((((((c & 1) as c_uint) << 30) | ((((unsafe: *pattern) & 63) as c_uint) << 24)) | ((((unsafe: pattern[1]) & 63) as c_uint) << 18)) | ((((unsafe: pattern[2]) & 63) as c_uint) << 12)) | ((((unsafe: pattern[3]) & 63) as c_uint) << 6)) | ((unsafe: pattern[4]) & 63))
 
                                     (pattern = pattern + 5)
 
@@ -1846,28 +1846,28 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
 
                             (pattern = pattern + 1)
 
-                            (c = ((c & 31) << 6) | ((unsafe: *__ci_expr_old_16) & 63))
+                            (c = (((c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_16) & 63))
 
                         } else {
                             if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                                (c = (((c & 15) << 12) | (((unsafe: *pattern) & 63) << 6)) | ((unsafe: pattern[1]) & 63))
+                                (c = ((((c & 15) as c_uint) << 12) | ((((unsafe: *pattern) & 63) as c_uint) << 6)) | ((unsafe: pattern[1]) & 63))
 
                                 (pattern = pattern + 2)
 
                             } else {
                                 if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                                    (c = ((((c & 7) << 18) | (((unsafe: *pattern) & 63) << 12)) | (((unsafe: pattern[1]) & 63) << 6)) | ((unsafe: pattern[2]) & 63))
+                                    (c = (((((c & 7) as c_uint) << 18) | ((((unsafe: *pattern) & 63) as c_uint) << 12)) | ((((unsafe: pattern[1]) & 63) as c_uint) << 6)) | ((unsafe: pattern[2]) & 63))
 
                                     (pattern = pattern + 3)
 
                                 } else {
                                     if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                                        (c = (((((c & 3) << 24) | (((unsafe: *pattern) & 63) << 18)) | (((unsafe: pattern[1]) & 63) << 12)) | (((unsafe: pattern[2]) & 63) << 6)) | ((unsafe: pattern[3]) & 63))
+                                        (c = ((((((c & 3) as c_uint) << 24) | ((((unsafe: *pattern) & 63) as c_uint) << 18)) | ((((unsafe: pattern[1]) & 63) as c_uint) << 12)) | ((((unsafe: pattern[2]) & 63) as c_uint) << 6)) | ((unsafe: pattern[3]) & 63))
 
                                         (pattern = pattern + 4)
 
                                     } else {
-                                        (c = ((((((c & 1) << 30) | (((unsafe: *pattern) & 63) << 24)) | (((unsafe: pattern[1]) & 63) << 18)) | (((unsafe: pattern[2]) & 63) << 12)) | (((unsafe: pattern[3]) & 63) << 6)) | ((unsafe: pattern[4]) & 63))
+                                        (c = (((((((c & 1) as c_uint) << 30) | ((((unsafe: *pattern) & 63) as c_uint) << 24)) | ((((unsafe: pattern[1]) & 63) as c_uint) << 18)) | ((((unsafe: pattern[2]) & 63) as c_uint) << 12)) | ((((unsafe: pattern[3]) & 63) as c_uint) << 6)) | ((unsafe: pattern[4]) & 63))
 
                                         (pattern = pattern + 5)
 
@@ -1947,28 +1947,28 @@ fn convert_glob_parse_range(from: *mut *const u8, pattern_end: *const u8, out: *
 
                             (pattern = pattern + 1)
 
-                            (c = ((c & 31) << 6) | ((unsafe: *__ci_expr_old_22) & 63))
+                            (c = (((c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_22) & 63))
 
                         } else {
                             if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                                (c = (((c & 15) << 12) | (((unsafe: *pattern) & 63) << 6)) | ((unsafe: pattern[1]) & 63))
+                                (c = ((((c & 15) as c_uint) << 12) | ((((unsafe: *pattern) & 63) as c_uint) << 6)) | ((unsafe: pattern[1]) & 63))
 
                                 (pattern = pattern + 2)
 
                             } else {
                                 if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                                    (c = ((((c & 7) << 18) | (((unsafe: *pattern) & 63) << 12)) | (((unsafe: pattern[1]) & 63) << 6)) | ((unsafe: pattern[2]) & 63))
+                                    (c = (((((c & 7) as c_uint) << 18) | ((((unsafe: *pattern) & 63) as c_uint) << 12)) | ((((unsafe: pattern[1]) & 63) as c_uint) << 6)) | ((unsafe: pattern[2]) & 63))
 
                                     (pattern = pattern + 3)
 
                                 } else {
                                     if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                                        (c = (((((c & 3) << 24) | (((unsafe: *pattern) & 63) << 18)) | (((unsafe: pattern[1]) & 63) << 12)) | (((unsafe: pattern[2]) & 63) << 6)) | ((unsafe: pattern[3]) & 63))
+                                        (c = ((((((c & 3) as c_uint) << 24) | ((((unsafe: *pattern) & 63) as c_uint) << 18)) | ((((unsafe: pattern[1]) & 63) as c_uint) << 12)) | ((((unsafe: pattern[2]) & 63) as c_uint) << 6)) | ((unsafe: pattern[3]) & 63))
 
                                         (pattern = pattern + 4)
 
                                     } else {
-                                        (c = ((((((c & 1) << 30) | (((unsafe: *pattern) & 63) << 24)) | (((unsafe: pattern[1]) & 63) << 18)) | (((unsafe: pattern[2]) & 63) << 12)) | (((unsafe: pattern[3]) & 63) << 6)) | ((unsafe: pattern[4]) & 63))
+                                        (c = (((((((c & 1) as c_uint) << 30) | ((((unsafe: *pattern) & 63) as c_uint) << 24)) | ((((unsafe: pattern[1]) & 63) as c_uint) << 18)) | ((((unsafe: pattern[2]) & 63) as c_uint) << 12)) | ((((unsafe: pattern[3]) & 63) as c_uint) << 6)) | ((unsafe: pattern[4]) & 63))
 
                                         (pattern = pattern + 5)
 

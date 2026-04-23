@@ -36,28 +36,28 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
 
             (ptr = ptr + 1)
 
-            (c = ((c & 31) << 6) | ((unsafe: *__ci_expr_old_2) & 63))
+            (c = (((c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_2) & 63))
 
         } else {
             if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                (c = (((c & 15) << 12) | (((unsafe: *ptr) & 63) << 6)) | ((unsafe: ptr[1]) & 63))
+                (c = ((((c & 15) as c_uint) << 12) | ((((unsafe: *ptr) & 63) as c_uint) << 6)) | ((unsafe: ptr[1]) & 63))
 
                 (ptr = ptr + 2)
 
             } else {
                 if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                    (c = ((((c & 7) << 18) | (((unsafe: *ptr) & 63) << 12)) | (((unsafe: ptr[1]) & 63) << 6)) | ((unsafe: ptr[2]) & 63))
+                    (c = (((((c & 7) as c_uint) << 18) | ((((unsafe: *ptr) & 63) as c_uint) << 12)) | ((((unsafe: ptr[1]) & 63) as c_uint) << 6)) | ((unsafe: ptr[2]) & 63))
 
                     (ptr = ptr + 3)
 
                 } else {
                     if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                        (c = (((((c & 3) << 24) | (((unsafe: *ptr) & 63) << 18)) | (((unsafe: ptr[1]) & 63) << 12)) | (((unsafe: ptr[2]) & 63) << 6)) | ((unsafe: ptr[3]) & 63))
+                        (c = ((((((c & 3) as c_uint) << 24) | ((((unsafe: *ptr) & 63) as c_uint) << 18)) | ((((unsafe: ptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 6)) | ((unsafe: ptr[3]) & 63))
 
                         (ptr = ptr + 4)
 
                     } else {
-                        (c = ((((((c & 1) << 30) | (((unsafe: *ptr) & 63) << 24)) | (((unsafe: ptr[1]) & 63) << 18)) | (((unsafe: ptr[2]) & 63) << 12)) | (((unsafe: ptr[3]) & 63) << 6)) | ((unsafe: ptr[4]) & 63))
+                        (c = (((((((c & 1) as c_uint) << 30) | ((((unsafe: *ptr) & 63) as c_uint) << 24)) | ((((unsafe: ptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[3]) & 63) as c_uint) << 6)) | ((unsafe: ptr[4]) & 63))
 
                         (ptr = ptr + 5)
 
@@ -121,7 +121,7 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
             }
 
             if (__ci_expr_logic_5 != 0) {
-                (map[(script / 32)] = map[(script / 32)] | (1 << (script % 32)))
+                (map[(script / 32)] = map[(script / 32)] | ((1 as c_uint) << (script % 32)))
             }
 
 
@@ -145,19 +145,19 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
                     if ((if script != 30: 1 else: 0) != 0) {
                         var chspecial: c_uint = 0
 
-                        if ((if (map[(ucp_Bopomofo / 32)] & (1 << (ucp_Bopomofo % 32))) != 0: 1 else: 0) != 0) {
+                        if ((if (map[(ucp_Bopomofo / 32)] & ((1 as c_uint) << (ucp_Bopomofo % 32))) != 0: 1 else: 0) != 0) {
                             (chspecial = chspecial | 1)
                         }
 
-                        if ((if (map[(ucp_Hiragana / 32)] & (1 << (ucp_Hiragana % 32))) != 0: 1 else: 0) != 0) {
+                        if ((if (map[(ucp_Hiragana / 32)] & ((1 as c_uint) << (ucp_Hiragana % 32))) != 0: 1 else: 0) != 0) {
                             (chspecial = chspecial | 2)
                         }
 
-                        if ((if (map[(ucp_Katakana / 32)] & (1 << (ucp_Katakana % 32))) != 0: 1 else: 0) != 0) {
+                        if ((if (map[(ucp_Katakana / 32)] & ((1 as c_uint) << (ucp_Katakana % 32))) != 0: 1 else: 0) != 0) {
                             (chspecial = chspecial | 4)
                         }
 
-                        if ((if (map[(ucp_Hangul / 32)] & (1 << (ucp_Hangul % 32))) != 0: 1 else: 0) != 0) {
+                        if ((if (map[(ucp_Hangul / 32)] & ((1 as c_uint) << (ucp_Hangul % 32))) != 0: 1 else: 0) != 0) {
                             (chspecial = chspecial | 8)
                         }
 
@@ -175,15 +175,15 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
 
                     }
                 3 =>
-                    if ((if (((map[(ucp_Han / 32)] & (1 << (ucp_Han % 32))) +% (map[(ucp_Hiragana / 32)] & (1 << (ucp_Hiragana % 32)))) +% (map[(ucp_Katakana / 32)] & (1 << (ucp_Katakana % 32)))) == 0: 1 else: 0) != 0) {
+                    if ((if (((map[(ucp_Han / 32)] & ((1 as c_uint) << (ucp_Han % 32))) +% (map[(ucp_Hiragana / 32)] & ((1 as c_uint) << (ucp_Hiragana % 32)))) +% (map[(ucp_Katakana / 32)] & ((1 as c_uint) << (ucp_Katakana % 32)))) == 0: 1 else: 0) != 0) {
                         return 0
                     }
                 4 =>
-                    if ((if ((map[(ucp_Han / 32)] & (1 << (ucp_Han % 32))) +% (map[(ucp_Bopomofo / 32)] & (1 << (ucp_Bopomofo % 32)))) == 0: 1 else: 0) != 0) {
+                    if ((if ((map[(ucp_Han / 32)] & ((1 as c_uint) << (ucp_Han % 32))) +% (map[(ucp_Bopomofo / 32)] & ((1 as c_uint) << (ucp_Bopomofo % 32)))) == 0: 1 else: 0) != 0) {
                         return 0
                     }
                 5 =>
-                    if ((if ((map[(ucp_Han / 32)] & (1 << (ucp_Han % 32))) +% (map[(ucp_Hangul / 32)] & (1 << (ucp_Hangul % 32)))) == 0: 1 else: 0) != 0) {
+                    if ((if ((map[(ucp_Han / 32)] & ((1 as c_uint) << (ucp_Han % 32))) +% (map[(ucp_Hangul / 32)] & ((1 as c_uint) << (ucp_Hangul % 32)))) == 0: 1 else: 0) != 0) {
                         return 0
                     }
                 1 =>
@@ -298,28 +298,28 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
 
                 (ptr = ptr + 1)
 
-                (c = ((c & 31) << 6) | ((unsafe: *__ci_expr_old_8) & 63))
+                (c = (((c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_8) & 63))
 
             } else {
                 if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                    (c = (((c & 15) << 12) | (((unsafe: *ptr) & 63) << 6)) | ((unsafe: ptr[1]) & 63))
+                    (c = ((((c & 15) as c_uint) << 12) | ((((unsafe: *ptr) & 63) as c_uint) << 6)) | ((unsafe: ptr[1]) & 63))
 
                     (ptr = ptr + 2)
 
                 } else {
                     if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                        (c = ((((c & 7) << 18) | (((unsafe: *ptr) & 63) << 12)) | (((unsafe: ptr[1]) & 63) << 6)) | ((unsafe: ptr[2]) & 63))
+                        (c = (((((c & 7) as c_uint) << 18) | ((((unsafe: *ptr) & 63) as c_uint) << 12)) | ((((unsafe: ptr[1]) & 63) as c_uint) << 6)) | ((unsafe: ptr[2]) & 63))
 
                         (ptr = ptr + 3)
 
                     } else {
                         if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                            (c = (((((c & 3) << 24) | (((unsafe: *ptr) & 63) << 18)) | (((unsafe: ptr[1]) & 63) << 12)) | (((unsafe: ptr[2]) & 63) << 6)) | ((unsafe: ptr[3]) & 63))
+                            (c = ((((((c & 3) as c_uint) << 24) | ((((unsafe: *ptr) & 63) as c_uint) << 18)) | ((((unsafe: ptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 6)) | ((unsafe: ptr[3]) & 63))
 
                             (ptr = ptr + 4)
 
                         } else {
-                            (c = ((((((c & 1) << 30) | (((unsafe: *ptr) & 63) << 24)) | (((unsafe: ptr[1]) & 63) << 18)) | (((unsafe: ptr[2]) & 63) << 12)) | (((unsafe: ptr[3]) & 63) << 6)) | ((unsafe: ptr[4]) & 63))
+                            (c = (((((((c & 1) as c_uint) << 30) | ((((unsafe: *ptr) & 63) as c_uint) << 24)) | ((((unsafe: ptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[3]) & 63) as c_uint) << 6)) | ((unsafe: ptr[4]) & 63))
 
                             (ptr = ptr + 5)
 

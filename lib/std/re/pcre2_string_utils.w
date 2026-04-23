@@ -35,7 +35,7 @@ fn _pcre2_strcmp_8(__param_str1: *const u8, __param_str2: *const u8) -> c_int {
         (c2 = (unsafe: *__ci_expr_old_2))
 
         if ((if c1 != c2: 1 else: 0) != 0) {
-            return (((if c1 > c2: 1 else: 0) << 1) - 1)
+            return ((((if c1 > c2: 1 else: 0) as c_int) << 1) - 1)
         }
 
     }
@@ -78,7 +78,7 @@ fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) -> c_int
         (c2 = (unsafe: *__ci_expr_old_2))
 
         if ((if c1 != c2: 1 else: 0) != 0) {
-            return (((if c1 > c2: 1 else: 0) << 1) - 1)
+            return ((((if c1 > c2: 1 else: 0) as c_int) << 1) - 1)
         }
 
     }
@@ -156,7 +156,7 @@ fn _pcre2_strncmp_8(__param_str1: *const u8, __param_str2: *const u8, __param_le
 
 
         if ((if c1 != c2: 1 else: 0) != 0) {
-            return (((if c1 > c2: 1 else: 0) << 1) - 1)
+            return ((((if c1 > c2: 1 else: 0) as c_int) << 1) - 1)
         }
 
 
@@ -193,7 +193,7 @@ fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const i8, __param
 
 
         if ((if c1 != c2: 1 else: 0) != 0) {
-            return (((if c1 > c2: 1 else: 0) << 1) - 1)
+            return ((((if c1 > c2: 1 else: 0) as c_int) << 1) - 1)
         }
 
 
