@@ -19,32 +19,45 @@ die() {
 ensure_generated_dependencies() {
     local generated_dir="$1"
     local compile_w="$generated_dir/pcre2_compile.w"
-    [ -f "$compile_w" ] || return 0
-    if grep -Fq 'use std.re.pcre2_auto_possess' "$compile_w"; then
-        return 0
+    if [ -f "$compile_w" ] && ! grep -Fq 'use std.re.pcre2_auto_possess' "$compile_w"; then
+        local tmp
+        tmp="$(mktemp "${TMPDIR:-/tmp}/pcre2-compile-imports.XXXXXX")"
+        CLEANUP_FILES+=("$tmp")
+        awk '
+            NR == 2 && $0 == "use std.re.defs" {
+                print
+                print "use std.re.pcre2_auto_possess"
+                print "use std.re.pcre2_chkdint"
+                print "use std.re.pcre2_compile_cgroup"
+                print "use std.re.pcre2_compile_class"
+                print "use std.re.pcre2_find_bracket"
+                print "use std.re.pcre2_newline"
+                print "use std.re.pcre2_ord2utf"
+                print "use std.re.pcre2_string_utils"
+                print "use std.re.pcre2_study"
+                print "use std.re.pcre2_valid_utf"
+                next
+            }
+            { print }
+        ' "$compile_w" > "$tmp"
+        mv "$tmp" "$compile_w"
     fi
 
-    local tmp
-    tmp="$(mktemp "${TMPDIR:-/tmp}/pcre2-compile-imports.XXXXXX")"
-    CLEANUP_FILES+=("$tmp")
-    awk '
-        NR == 2 && $0 == "use std.re.defs" {
-            print
-            print "use std.re.pcre2_auto_possess"
-            print "use std.re.pcre2_chkdint"
-            print "use std.re.pcre2_compile_cgroup"
-            print "use std.re.pcre2_compile_class"
-            print "use std.re.pcre2_find_bracket"
-            print "use std.re.pcre2_newline"
-            print "use std.re.pcre2_ord2utf"
-            print "use std.re.pcre2_string_utils"
-            print "use std.re.pcre2_study"
-            print "use std.re.pcre2_valid_utf"
-            next
-        }
-        { print }
-    ' "$compile_w" > "$tmp"
-    mv "$tmp" "$compile_w"
+    local auto_possess_w="$generated_dir/pcre2_auto_possess.w"
+    if [ -f "$auto_possess_w" ] && ! grep -Fq 'use std.re.pcre2_xclass' "$auto_possess_w"; then
+        local auto_tmp
+        auto_tmp="$(mktemp "${TMPDIR:-/tmp}/pcre2-auto-possess-imports.XXXXXX")"
+        CLEANUP_FILES+=("$auto_tmp")
+        awk '
+            NR == 2 && $0 == "use std.re.defs" {
+                print
+                print "use std.re.pcre2_xclass"
+                next
+            }
+            { print }
+        ' "$auto_possess_w" > "$auto_tmp"
+        mv "$auto_tmp" "$auto_possess_w"
+    fi
 }
 
 usage() {
@@ -77,14 +90,16 @@ count_generated_errors() {
     local mod errs size
     for mod in $(ls "$generated_dir"/*.w | sed "s|$generated_dir/||;s|\.w||" | sort); do
         [ "$mod" = "defs" ] && continue
-        # defs.w contains the full preamble (C3); module starts with `use std.re.defs`
-        # so skip the import header (lines 1-2) and concat directly after defs.
+        # defs.w contains the full preamble. For this synthetic single-file
+        # check, strip module imports from the checked module body; otherwise
+        # dependency imports pull std.re.defs back in and shadow the inlined
+        # definitions. The promoted files keep their imports unchanged.
         if [ -f "$generated_dir/defs.w" ]; then
             cat "$generated_dir/defs.w" > "$tf"
         else
             head -48 "$raw_dir/pcre2_tables.w" > "$tf"
         fi
-        tail -n +3 "$generated_dir/$mod.w" >> "$tf"
+        awk 'NR <= 2 { next } /^use std\.re\./ { next } { print }' "$generated_dir/$mod.w" >> "$tf"
         printf '\nfn main: print("ok")\n' >> "$tf"
         errs="$("$with_bin" check "$tf" 2>&1 | grep -c 'error:' || true)"
         if [ "$errs" -eq 0 ]; then

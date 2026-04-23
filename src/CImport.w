@@ -2735,9 +2735,94 @@ fn ci_has_stringify(body: str, params: str) -> bool:
 fn ci_type_is_small_int(ty_str: str) -> bool:
     if ty_str == "u8" or ty_str == "i8": return true
     if ty_str == "u16" or ty_str == "i16": return true
+    if ty_str == "uint8_t" or ty_str == "int8_t": return true
+    if ty_str == "uint16_t" or ty_str == "int16_t": return true
     if ty_str == "c_uchar" or ty_str == "c_schar": return true
     if ty_str == "c_ushort" or ty_str == "c_short": return true
     if ty_str == "PCRE2_UCHAR8": return true
+    false
+
+fn ci_shift_lhs_needs_integer_promotion(lhs_ty_str: str, lhs_peeled_ty: str, lhs_expr_ty_str: str) -> bool:
+    ci_type_is_small_int(lhs_ty_str) or ci_type_is_small_int(lhs_peeled_ty) or ci_type_is_small_int(lhs_expr_ty_str)
+
+fn ci_type_is_integer_shift_anchor(ty_str: str) -> bool:
+    if ci_type_is_small_int(ty_str): return true
+    if ty_str == "i32" or ty_str == "u32": return true
+    if ty_str == "i64" or ty_str == "u64": return true
+    if ty_str == "i128" or ty_str == "u128": return true
+    if ty_str == "isize" or ty_str == "usize": return true
+    if ty_str == "c_int" or ty_str == "c_uint": return true
+    if ty_str == "c_long" or ty_str == "c_ulong": return true
+    if ty_str == "c_longlong" or ty_str == "c_ulonglong": return true
+    false
+
+fn ci_index_expr_element_type_is_small_int(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId) -> bool:
+    var cur = id
+    var depth = 0
+    while depth < 8 and exprs.kind(cur) == CiExprKind.CIE_PAREN:
+        cur = (exprs.get_d0(cur)) as CiExprId
+        depth = depth + 1
+    if exprs.kind(cur) != CiExprKind.CIE_INDEX:
+        return false
+    let base = (exprs.get_d0(cur)) as CiExprId
+    let base_ty = exprs.get_type(base)
+    if (base_ty as i32) == 0:
+        return false
+    var elem_ty = 0 as CiTypeId
+    let base_kind = types.kind(base_ty)
+    if base_kind == CiTypeKind.CT_POINTER or base_kind == CiTypeKind.CT_ARRAY:
+        elem_ty = (types.get_d0(base_ty)) as CiTypeId
+    if (elem_ty as i32) == 0:
+        return false
+    ci_type_is_small_int(ci_print_type(types, elem_ty))
+
+fn ci_array_subscript_element_type_is_small_int(session: i64, cursor: i32) -> bool:
+    let peeled = ci_peel_transparent(session, cursor)
+    if with_ci_cursor_kind(session, peeled) != CXK_ARRAY_SUBSCRIPT:
+        return false
+    if with_ci_num_children(session, peeled) < 1:
+        return false
+    let base_cursor = with_ci_child(session, peeled, 0)
+    let base_peeled = ci_peel_transparent(session, base_cursor)
+    let pointee = with_ci_cursor_pointee_type(session, base_cursor)
+    if ci_type_is_small_int(pointee):
+        return true
+    let peeled_pointee = with_ci_cursor_pointee_type(session, base_peeled)
+    if ci_type_is_small_int(peeled_pointee):
+        return true
+    let elem_ty = ci_array_elem_type_from_cursor(session, base_peeled)
+    ci_type_is_small_int(elem_ty)
+
+fn ci_expr_tree_contains_small_int(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, depth: i32) -> bool:
+    if (id as i32) == 0 or depth > 24:
+        return false
+    let expr_ty = exprs.get_type(id)
+    if (expr_ty as i32) != 0 and ci_type_is_small_int(ci_print_type(types, expr_ty)):
+        return true
+    let kind = exprs.kind(id)
+    if kind == CiExprKind.CIE_PAREN:
+        return ci_expr_tree_contains_small_int(exprs, types, (exprs.get_d0(id)) as CiExprId, depth + 1)
+    if kind == CiExprKind.CIE_CAST:
+        let target_ty = (exprs.get_d0(id)) as CiTypeId
+        return (target_ty as i32) != 0 and ci_type_is_small_int(ci_print_type(types, target_ty))
+    if kind == CiExprKind.CIE_INDEX:
+        if ci_index_expr_element_type_is_small_int(exprs, types, id):
+            return true
+        return ci_expr_tree_contains_small_int(exprs, types, (exprs.get_d0(id)) as CiExprId, depth + 1)
+    if kind == CiExprKind.CIE_DEREF:
+        let operand = (exprs.get_d0(id)) as CiExprId
+        let operand_ty = exprs.get_type(operand)
+        if (operand_ty as i32) != 0 and types.kind(operand_ty) == CiTypeKind.CT_POINTER:
+            let pointee = (types.get_d0(operand_ty)) as CiTypeId
+            if (pointee as i32) != 0 and ci_type_is_small_int(ci_print_type(types, pointee)):
+                return true
+        return ci_expr_tree_contains_small_int(exprs, types, operand, depth + 1)
+    if kind == CiExprKind.CIE_BINARY:
+        return ci_expr_tree_contains_small_int(exprs, types, (exprs.get_d1(id)) as CiExprId, depth + 1) or ci_expr_tree_contains_small_int(exprs, types, (exprs.get_d2(id)) as CiExprId, depth + 1)
+    if kind == CiExprKind.CIE_UNARY:
+        return ci_expr_tree_contains_small_int(exprs, types, (exprs.get_d1(id)) as CiExprId, depth + 1)
+    if kind == CiExprKind.CIE_FIELD:
+        return false
     false
 
 fn ci_is_large_decimal(s: str) -> bool:
@@ -5757,6 +5842,7 @@ fn ci_build_binary_value_expr_from_ids(session: i64, cursor: i32, lhs_cursor: i3
     let rhs_peeled_ty = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_peeled))
     let lhs_expr_ty = exprs.get_type(lhs_id)
     let rhs_expr_ty = exprs.get_type(rhs_id)
+    let lhs_expr_ty_str = if (lhs_expr_ty as i32) != 0: ci_print_type(types, lhs_expr_ty) else: ""
     let lhs_expr_is_ptr = (lhs_expr_ty as i32) != 0 and types.kind(lhs_expr_ty) == CiTypeKind.CT_POINTER
     let rhs_expr_is_ptr = (rhs_expr_ty as i32) != 0 and types.kind(rhs_expr_ty) == CiTypeKind.CT_POINTER
     let lhs_expr_is_array = (lhs_expr_ty as i32) != 0 and types.kind(lhs_expr_ty) == CiTypeKind.CT_ARRAY
@@ -5819,12 +5905,34 @@ fn ci_build_binary_value_expr_from_ids(session: i64, cursor: i32, lhs_cursor: i3
 
     var lhs_value = lhs_id
     var rhs_value = rhs_id
+    if op == BO_SHL or op == BO_SHR:
+        let shift_result_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
+        var shift_lhs_anchor_ty_str = ""
+        if ci_type_is_integer_shift_anchor(shift_result_ty_str):
+            shift_lhs_anchor_ty_str = shift_result_ty_str
+        else if ci_shift_lhs_needs_integer_promotion(lhs_ty_str, lhs_peeled_ty, lhs_expr_ty_str) or ci_index_expr_element_type_is_small_int(exprs, types, lhs_id) or ci_array_subscript_element_type_is_small_int(session, lhs_cursor) or ci_expr_tree_contains_small_int(exprs, types, lhs_id, 0):
+            shift_lhs_anchor_ty_str = "c_int"
+        if ci_type_is_small_int(shift_lhs_anchor_ty_str):
+            shift_lhs_anchor_ty_str = "c_int"
+        if shift_lhs_anchor_ty_str.len() > 0:
+            let shift_lhs_anchor_ty = ci_named_type_from_text(types, shift_lhs_anchor_ty_str)
+            if (shift_lhs_anchor_ty as i32) == 0:
+                return 0 as CiExprId
+            lhs_value = exprs.cast(shift_lhs_anchor_ty, lhs_value)
+        else if ci_shift_lhs_needs_integer_promotion(lhs_ty_str, lhs_peeled_ty, lhs_expr_ty_str) or ci_index_expr_element_type_is_small_int(exprs, types, lhs_id) or ci_array_subscript_element_type_is_small_int(session, lhs_cursor) or ci_expr_tree_contains_small_int(exprs, types, lhs_id, 0):
+            let c_int_ty = ci_named_type_from_text(types, "c_int")
+            if (c_int_ty as i32) == 0:
+                return 0 as CiExprId
+            lhs_value = exprs.cast(c_int_ty, lhs_value)
+    if (op == BO_SHL or op == BO_SHR) and exprs.kind(lhs_value) != CiExprKind.CIE_CAST and ci_expr_tree_contains_small_int(exprs, types, rhs_value, 0):
+        let c_int_ty = ci_named_type_from_text(types, "c_int")
+        if (c_int_ty as i32) == 0:
+            return 0 as CiExprId
+        lhs_value = exprs.cast(c_int_ty, lhs_value)
     if (lhs_large or rhs_large) and ci_binary_op_allows_uint_literal_cast(op, operand_unsigned):
         let c_uint_ty = ci_named_type_from_text(types, "c_uint")
         if (c_uint_ty as i32) == 0:
             return 0 as CiExprId
-        if (op == BO_SHL or op == BO_SHR) and ci_type_is_small_int(lhs_ty_str):
-            lhs_value = exprs.cast(c_uint_ty, lhs_value)
         if lhs_large:
             lhs_value = exprs.cast(c_uint_ty, lhs_value)
         if rhs_large:
