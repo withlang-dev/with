@@ -33,6 +33,8 @@ extern fn with_ewrite(s: str) -> void
 extern fn with_system(cmd: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_getenv_str(name: str) -> str
+extern fn with_clock_nanos() -> i64
+extern fn with_getpid() -> i32
 extern fn with_write(s: str) -> void
 extern fn exit(code: i32) -> void
 extern fn with_install_interrupt_handlers() -> void
@@ -414,6 +416,10 @@ fn cleanup_binary_artifacts(bin_path: str):
         return
     let _ = ("rm -f " ++ bin_path) |> with_system
     let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+
+fn test_unique_binary_path(source_file: str) -> str:
+    let base = link_stage_output_path_for_source(source_file)
+    f"{base}.test.{with_getpid()}.{with_clock_nanos()}"
 
 fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, emit_obj_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
     if source_file == "":
@@ -931,7 +937,8 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
     let synthetic_source = maybe_synthesize_test_source(target)
-    let bin_path = if synthetic_source.len() > 0: comp.build_binary_from_source(target, synthetic_source) else: comp.build_binary(target)
+    let test_bin_path = test_unique_binary_path(target)
+    let bin_path = if synthetic_source.len() > 0: comp.build_binary_from_source_to_path(target, synthetic_source, test_bin_path) else: comp.build_binary_to_path(target, test_bin_path)
     if bin_path == "":
         emit_test_stage_error("test build failed", target, "build", "")
         return 1
