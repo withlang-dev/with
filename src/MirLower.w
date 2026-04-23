@@ -3035,13 +3035,29 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
     if pk == NodeKind.NK_PAT_TUPLE:
         let tup_start = self.ast.get_data0(pat_node)
         let tup_count = self.ast.get_data1(pat_node)
+        let tuple_scrut_ty = self.place_local_type(scrutinee_place)
+        let tuple_scrut_resolved = self.sema.resolve_alias(tuple_scrut_ty)
+        if self.sema.get_type_kind(tuple_scrut_resolved) != TypeKind.TY_TUPLE:
+            with_eprint("error: tuple pattern reached MIR lowering with non-tuple subject")
+            self.mark_unsupported()
+            self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
+            return
+        let elem_start = self.sema.get_type_d0(tuple_scrut_resolved)
+        let elem_count = self.sema.get_type_d1(tuple_scrut_resolved)
+        if tup_count != elem_count:
+            with_eprint("error: tuple pattern arity mismatch reached MIR lowering")
+            self.mark_unsupported()
+            self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
+            return
+
         var cur_test_bb = self.cur_bb
         for ti in 0..tup_count:
             let elem_pat = self.ast.get_extra(tup_start + ti)
             let elem_pk = self.ast.kind(elem_pat)
             if elem_pk == NodeKind.NK_PAT_WILDCARD or elem_pk == NodeKind.NK_PAT_IDENT:
                 continue
-            let elem_place = self.body.new_field_place(scrutinee_place, ti, 0)
+            let elem_ty = self.sema.type_extra.get((elem_start + ti) as i64)
+            let elem_place = self.body.new_field_place(scrutinee_place, ti, elem_ty)
             let next_test = self.new_block()
             self.switch_to(cur_test_bb)
             self.lower_pattern_match(elem_place, elem_pat, next_test, fail_bb)
@@ -3183,9 +3199,23 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
     if pk == NodeKind.NK_PAT_TUPLE:
         let t_start = self.ast.get_data0(pat_node)
         let t_count = self.ast.get_data1(pat_node)
+        let tuple_bind_scrut_ty = self.place_local_type(scrutinee_place)
+        let tuple_bind_scrut_resolved = self.sema.resolve_alias(tuple_bind_scrut_ty)
+        if self.sema.get_type_kind(tuple_bind_scrut_resolved) != TypeKind.TY_TUPLE:
+            with_eprint("error: tuple pattern reached MIR binding lowering with non-tuple subject")
+            self.mark_unsupported()
+            return out
+        let elem_start = self.sema.get_type_d0(tuple_bind_scrut_resolved)
+        let elem_count = self.sema.get_type_d1(tuple_bind_scrut_resolved)
+        if t_count != elem_count:
+            with_eprint("error: tuple pattern arity mismatch reached MIR binding lowering")
+            self.mark_unsupported()
+            return out
+
         for ti in 0..t_count:
             let elem_pat = self.ast.get_extra(t_start + ti)
-            let field_place = self.body.new_field_place(scrutinee_place, ti, 0)
+            let elem_ty = self.sema.type_extra.get((elem_start + ti) as i64)
+            let field_place = self.body.new_field_place(scrutinee_place, ti, elem_ty)
             let inner = self.lower_pattern(elem_pat, field_place)
             for i in 0..inner.len() as i32:
                 out.push(inner.get(i as i64))
