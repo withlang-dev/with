@@ -69,6 +69,10 @@ LLVM_LINK_RSP := $(OUT_LIB_DIR)/llvm_link.rsp
 LLVM_CC_FILE := $(OUT_LIB_DIR)/llvm_cc
 LLVM_LINK_STAMP := $(OUT_LIB_DIR)/.llvm-link-ready
 RUNTIME_C_ALLOWLIST_STAMP := $(OUT_GEN_DIR)/.runtime-c-allowlist
+RUNTIME_C_SOURCES := $(wildcard runtime/*.c)
+# C runtime sources are intentionally drained. Keep this list explicit so any
+# new runtime/*.c file is a build failure unless it is deliberately allowlisted.
+RUNTIME_C_ALLOWLIST :=
 REGEX_REF_SOURCES := $(shell find $(REGEX_PCRE2_SRC) -type f 2>/dev/null | sort)
 
 STAGE1_BIN := $(OUT_BIN_DIR)/with-stage1
@@ -136,7 +140,9 @@ RUNTIME_ARTIFACTS := \
 	$(CLANG_BRIDGE_OBJ) \
 	$(LLVM_LINK_STAMP)
 
-# With-language runtime objects (compiled by the With compiler, built after stage2)
+# With-language runtime objects. Bootstrap copies are built by the seed so
+# stage1 can link stage2 from a clean checkout; the canonical compiler refreshes
+# them with stage2 before embedding.
 RT_WITH_ARTIFACTS := $(RT_CORE_OBJ) $(RT_DARWIN_AARCH64_OBJ)
 RT_WITH_REFRESH_STAMP := $(OUT_GEN_DIR)/.runtime-with-refresh
 STRAY_BUILD_ARTIFACTS := \
@@ -364,6 +370,8 @@ BOOTSTRAP_RUNTIME_INPUTS := \
 	rt/fiber_runtime.w \
 	$(FIBER_CORE_SRC) \
 	$(FIBER_ASM_SRC) \
+	rt/rt_core.w \
+	rt/darwin_aarch64.w \
 	rt/llvm_bridge.w \
 	rt/clang_bridge.w \
 	scripts/embed_runtime_objects.sh \
@@ -427,8 +435,8 @@ $(REGEX_PREPARE_STAMP): $(REGEX_RAW_STAMP) | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
 $(COMPAT_RUNTIME_SRC): rt/compat_runtime.w $(EMBEDDED_STDLIB_RUNTIME_SRC) | $(OUT_GEN_DIR)
 	@cat "$(ROOT_DIR)/rt/compat_runtime.w" "$(EMBEDDED_STDLIB_RUNTIME_SRC)" > "$@"
 
-$(RUNTIME_C_ALLOWLIST_STAMP): scripts/check_runtime_c_allowlist.sh $(wildcard runtime/*.c) | $(OUT_GEN_DIR)
-	@bash "$(ROOT_DIR)/scripts/check_runtime_c_allowlist.sh"
+$(RUNTIME_C_ALLOWLIST_STAMP): scripts/check_runtime_c_allowlist.sh $(RUNTIME_C_SOURCES) | $(OUT_GEN_DIR)
+	@bash "$(ROOT_DIR)/scripts/check_runtime_c_allowlist.sh" $(RUNTIME_C_ALLOWLIST)
 	@touch "$@"
 
 $(CIMPORT_STUBS_OBJ): rt/cimport_stubs.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
@@ -464,14 +472,18 @@ $(FIBER_ASM_OBJ): $(FIBER_ASM_SRC) | $(OUT_LIB_DIR)
 	@if [ -z "$(FIBER_ASM_SRC)" ]; then echo "error: unsupported host architecture $(UNAME_M) for fiber_asm.o" >&2; exit 1; fi
 	$(call HOST_COMPILE,)
 
-$(RT_CORE_OBJ): rt/rt_core.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
-	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
+$(RT_CORE_OBJ): rt/rt_core.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
-# Compile With runtime backend to .o using the With compiler (after stage2 exists)
-$(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE2_BIN) | $(OUT_LIB_DIR)
-	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $< --emit-obj --no-prelude -O2 -o $@
+# Compile the With runtime backend to .o with the seed during bootstrap.
+$(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
-$(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) $(COMPAT_RUNTIME_SRC) rt/cimport_stubs.w rt/panic_runtime.w rt/fiber_stubs.w rt/channel_runtime.w rt/fiber_runtime.w $(FIBER_CORE_SRC) | $(OUT_LIB_DIR) $(OUT_GEN_DIR)
+$(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) $(COMPAT_RUNTIME_SRC) rt/cimport_stubs.w rt/panic_runtime.w rt/fiber_stubs.w rt/channel_runtime.w rt/fiber_runtime.w $(FIBER_CORE_SRC) rt/rt_core.w rt/darwin_aarch64.w | $(OUT_LIB_DIR) $(OUT_GEN_DIR)
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/rt_core.w --emit-obj --no-prelude -O2 -o $(RT_CORE_OBJ)
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/darwin_aarch64.w --emit-obj --no-prelude -O2 -o $(RT_DARWIN_AARCH64_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/cimport_stubs.w --emit-obj --no-prelude -O0 -o $(CIMPORT_STUBS_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $(COMPAT_RUNTIME_SRC) --emit-obj --no-prelude -O0 -o $(COMPAT_RUNTIME_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/panic_runtime.w --emit-obj --no-prelude -O0 -o $(PANIC_RUNTIME_OBJ)
@@ -481,7 +493,7 @@ $(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) $(COMPAT_RUNTIME_SRC) rt/cimport_stubs.w
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $(FIBER_CORE_SRC) --emit-obj --no-prelude -O0 -o $(FIBER_OBJ)
 	@touch "$@"
 
-$(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(CIMPORT_STUBS_OBJ) $(COMPAT_RUNTIME_OBJ) $(PANIC_RUNTIME_OBJ) $(FIBER_STUBS_OBJ) $(CHANNEL_RUNTIME_OBJ) $(FIBER_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) | $(OUT_LIB_DIR)
+$(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(CIMPORT_STUBS_OBJ) $(COMPAT_RUNTIME_OBJ) $(PANIC_RUNTIME_OBJ) $(FIBER_STUBS_OBJ) $(CHANNEL_RUNTIME_OBJ) $(FIBER_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) $(RT_WITH_ARTIFACTS) | $(OUT_LIB_DIR)
 	@bash "$(ROOT_DIR)/scripts/embed_runtime_objects.sh" "$(OUT_LIB_DIR)" "$@"
 
 $(EMBEDDED_OBJECTS_OBJ): $(EMBEDDED_OBJECTS_ASM) | $(OUT_LIB_DIR)
