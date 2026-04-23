@@ -1008,7 +1008,14 @@ fn Codegen.mir_build_total_shift(self: Codegen, op: i32, lhs: i64, rhs: i64, is_
         self.had_error = 1
         return wl_get_undef(shift_ty)
 
-    let too_big = wl_build_icmp(self.builder, wl_int_uge(), rhs, wl_const_int(rhs_ty, width as i64, 0))
+    let rhs_width = wl_get_int_type_width(rhs_ty)
+    if rhs_width <= 0:
+        self.had_error = 1
+        return wl_get_undef(shift_ty)
+
+    let cmp_ty = if rhs_width > width: rhs_ty else: shift_ty
+    let rhs_for_cmp = self.coerce_int_ext(rhs, cmp_ty, true)
+    let too_big = wl_build_icmp(self.builder, wl_int_uge(), rhs_for_cmp, wl_const_int(cmp_ty, width as i64, 0))
     let rhs_for_shift = self.coerce_int_ext(rhs, shift_ty, true)
     let masked_count = wl_build_and(self.builder, rhs_for_shift, wl_const_int(shift_ty, (width - 1) as i64, 0))
     let shifted = self.mir_build_raw_shift(op, lhs, masked_count, is_unsigned)
