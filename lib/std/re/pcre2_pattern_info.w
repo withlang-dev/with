@@ -224,13 +224,13 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
 
 
             OP_XCLASS | OP_ECLASS =>
-                (cc = cc + (((((unsafe: cc[1]) as c_int) << 8) | (unsafe: cc[(1 + 1)])) as c_uint))
+                (cc = cc + (((((unsafe: cc[1]) as c_int) << (8 as c_uint)) | (unsafe: cc[(1 + 1)])) as c_uint))
             OP_MARK | OP_COMMIT_ARG | OP_PRUNE_ARG | OP_SKIP_ARG | OP_THEN_ARG =>
                 (cc = cc + (_pcre2_OP_lengths_8[(unsafe: *cc)] + (unsafe: cc[1])))
             OP_CALLOUT =>
-                (cb.pattern_position = ((((((unsafe: cc[1]) as c_int) << 8) | (unsafe: cc[(1 + 1)])) as c_uint)))
+                (cb.pattern_position = ((((((unsafe: cc[1]) as c_int) << (8 as c_uint)) | (unsafe: cc[(1 + 1)])) as c_uint)))
 
-                (cb.next_item_length = ((((((unsafe: cc[(1 + 2)]) as c_int) << 8) | (unsafe: cc[((1 + 2) + 1)])) as c_uint)))
+                (cb.next_item_length = ((((((unsafe: cc[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + 2) + 1)])) as c_uint)))
 
                 (cb.callout_number = (unsafe: cc[(1 + (2 * 2))]))
 
@@ -249,15 +249,15 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
                 (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
 
             OP_CALLOUT_STR =>
-                (cb.pattern_position = ((((((unsafe: cc[1]) as c_int) << 8) | (unsafe: cc[(1 + 1)])) as c_uint)))
+                (cb.pattern_position = ((((((unsafe: cc[1]) as c_int) << (8 as c_uint)) | (unsafe: cc[(1 + 1)])) as c_uint)))
 
-                (cb.next_item_length = ((((((unsafe: cc[(1 + 2)]) as c_int) << 8) | (unsafe: cc[((1 + 2) + 1)])) as c_uint)))
+                (cb.next_item_length = ((((((unsafe: cc[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + 2) + 1)])) as c_uint)))
 
                 (cb.callout_number = 0)
 
-                (cb.callout_string_offset = ((((((unsafe: cc[(1 + (3 * 2))]) as c_int) << 8) | (unsafe: cc[((1 + (3 * 2)) + 1)])) as c_uint)))
+                (cb.callout_string_offset = ((((((unsafe: cc[(1 + (3 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + (3 * 2)) + 1)])) as c_uint)))
 
-                (cb.callout_string_length = (((((((unsafe: cc[(1 + (2 * 2))]) as c_int) << 8) | (unsafe: cc[((1 + (2 * 2)) + 1)])) as c_uint) -% 9) -% 2))
+                (cb.callout_string_length = (((((((unsafe: cc[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + (2 * 2)) + 1)])) as c_uint) -% 9) -% 2))
 
                 (cb.callout_string = (cc + (((1 + (4 * 2)) as isize) as usize)) + ((1 as isize) as usize))
 
@@ -267,7 +267,7 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
                     return rc
                 }
 
-                (cc = cc + (((((unsafe: cc[(1 + (2 * 2))]) as c_int) << 8) | (unsafe: cc[((1 + (2 * 2)) + 1)])) as c_uint))
+                (cc = cc + (((((unsafe: cc[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + (2 * 2)) + 1)])) as c_uint))
 
             _ =>
                 (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])

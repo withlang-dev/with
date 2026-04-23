@@ -848,7 +848,7 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                                         (__ci_expr_logic_35 = (if (if start_bits__goto_3370_16 != null: 1 else: 0) != 0: 1 else: 0))
                                     }
                                     if (__ci_expr_logic_35 != 0) {
-                                        (ok__goto_3745_14 = (if ((unsafe: start_bits__goto_3370_16[(c__goto_3748_23 / 8)]) & ((1 as c_uint) << (c__goto_3748_23 & 7))) != 0: 1 else: 0))
+                                        (ok__goto_3745_14 = (if ((unsafe: start_bits__goto_3370_16[(c__goto_3748_23 / 8)]) & ((1 as c_uint) << ((c__goto_3748_23 & 7) as c_uint))) != 0: 1 else: 0))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -1142,7 +1142,7 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                                             if (__goto_pending != 0) {
                                                 break
                                             }
-                                            if ((if ((unsafe: start_bits__goto_3370_16[(c__goto_3902_20 / 8)]) & ((1 as c_uint) << (c__goto_3902_20 & 7))) != 0: 1 else: 0) != 0) {
+                                            if ((if ((unsafe: start_bits__goto_3370_16[(c__goto_3902_20 / 8)]) & ((1 as c_uint) << ((c__goto_3902_20 & 7) as c_uint))) != 0: 1 else: 0) != 0) {
                                                 break
                                             }
                                             if (__goto_pending != 0) {
@@ -1606,7 +1606,7 @@ fn do_callout_dfa(code: *const u8, offsets: *mut c_ulong, current_subject: *cons
     if ((if (unsafe: code[extracode]) == OP_CALLOUT: 1 else: 0) != 0) {
         (__ci_expr_ternary_0 = ((_pcre2_OP_lengths_8[OP_CALLOUT] as c_ulong)))
     } else {
-        (__ci_expr_ternary_0 = (((((((unsafe: code[(5 +% extracode)]) as c_int) << 8) | (unsafe: code[((5 +% extracode) +% 1)])) as c_uint) as c_ulong)))
+        (__ci_expr_ternary_0 = (((((((unsafe: code[(5 +% extracode)]) as c_int) << (8 as c_uint)) | (unsafe: code[((5 +% extracode) +% 1)])) as c_uint) as c_ulong)))
     }
 
     ((unsafe: *lengthptr) = __ci_expr_ternary_0)
@@ -1622,9 +1622,9 @@ fn do_callout_dfa(code: *const u8, offsets: *mut c_ulong, current_subject: *cons
 
     (cb.current_position = (((((ptr as usize) -% (mb.start_subject as usize)) / sizeof[u8]()) as c_ulong)))
 
-    (cb.pattern_position = ((((((unsafe: code[(1 +% extracode)]) as c_int) << 8) | (unsafe: code[((1 +% extracode) +% 1)])) as c_uint)))
+    (cb.pattern_position = ((((((unsafe: code[(1 +% extracode)]) as c_int) << (8 as c_uint)) | (unsafe: code[((1 +% extracode) +% 1)])) as c_uint)))
 
-    (cb.next_item_length = ((((((unsafe: code[(3 +% extracode)]) as c_int) << 8) | (unsafe: code[((3 +% extracode) +% 1)])) as c_uint)))
+    (cb.next_item_length = ((((((unsafe: code[(3 +% extracode)]) as c_int) << (8 as c_uint)) | (unsafe: code[((3 +% extracode) +% 1)])) as c_uint)))
 
     if ((if (unsafe: code[extracode]) == OP_CALLOUT: 1 else: 0) != 0) {
         (cb.callout_number = (unsafe: code[(5 +% extracode)]))
@@ -1638,7 +1638,7 @@ fn do_callout_dfa(code: *const u8, offsets: *mut c_ulong, current_subject: *cons
     } else {
         (cb.callout_number = 0)
 
-        (cb.callout_string_offset = ((((((unsafe: code[(7 +% extracode)]) as c_int) << 8) | (unsafe: code[((7 +% extracode) +% 1)])) as c_uint)))
+        (cb.callout_string_offset = ((((((unsafe: code[(7 +% extracode)]) as c_int) << (8 as c_uint)) | (unsafe: code[((7 +% extracode) +% 1)])) as c_uint)))
 
         (cb.callout_string = (code + (9 +% extracode)) + ((1 as isize) as usize))
 
@@ -1943,7 +1943,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         continue
                     }
                     while true {
-                        (back__goto_600_12 = (((((((unsafe: end_code__goto_546_12[(2 + 2)]) as c_int) << 8) | (unsafe: end_code__goto_546_12[((2 + 2) + 1)])) as c_uint) as c_ulong)))
+                        (back__goto_600_12 = (((((((unsafe: end_code__goto_546_12[(2 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: end_code__goto_546_12[((2 + 2) + 1)])) as c_uint) as c_ulong)))
                         if (__goto_pending != 0) {
                             break
                         }
@@ -1953,7 +1953,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         if (__goto_pending != 0) {
                             break
                         }
-                        (end_code__goto_546_12 = end_code__goto_546_12 + (((((unsafe: end_code__goto_546_12[1]) as c_int) << 8) | (unsafe: end_code__goto_546_12[(1 + 1)])) as c_uint))
+                        (end_code__goto_546_12 = end_code__goto_546_12 + (((((unsafe: end_code__goto_546_12[1]) as c_int) << (8 as c_uint)) | (unsafe: end_code__goto_546_12[(1 + 1)])) as c_uint))
                         if (__goto_pending != 0) {
                             break
                         }
@@ -2052,7 +2052,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         if ((if revlen__goto_644_14 == 0: 1 else: 0) != 0) {
                             (__ci_expr_ternary_7 = 0)
                         } else {
-                            (__ci_expr_ternary_7 = (((((((unsafe: end_code__goto_546_12[(2 + 2)]) as c_int) << 8) | (unsafe: end_code__goto_546_12[((2 + 2) + 1)])) as c_uint) as c_ulong)))
+                            (__ci_expr_ternary_7 = (((((((unsafe: end_code__goto_546_12[(2 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: end_code__goto_546_12[((2 + 2) + 1)])) as c_uint) as c_ulong)))
                         }
                         (back__goto_645_12 = __ci_expr_ternary_7)
                         if (__goto_pending != 0) {
@@ -2092,7 +2092,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         if (__goto_pending != 0) {
                             break
                         }
-                        (end_code__goto_546_12 = end_code__goto_546_12 + (((((unsafe: end_code__goto_546_12[1]) as c_int) << 8) | (unsafe: end_code__goto_546_12[(1 + 1)])) as c_uint))
+                        (end_code__goto_546_12 = end_code__goto_546_12 + (((((unsafe: end_code__goto_546_12[1]) as c_int) << (8 as c_uint)) | (unsafe: end_code__goto_546_12[(1 + 1)])) as c_uint))
                         if (__goto_pending != 0) {
                             break
                         }
@@ -2117,7 +2117,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     }
                     if (__ci_expr_logic_9 != 0) {
                         while true {
-                            (end_code__goto_546_12 = end_code__goto_546_12 + (((((unsafe: end_code__goto_546_12[1]) as c_int) << 8) | (unsafe: end_code__goto_546_12[(1 + 1)])) as c_uint))
+                            (end_code__goto_546_12 = end_code__goto_546_12 + (((((unsafe: end_code__goto_546_12[1]) as c_int) << (8 as c_uint)) | (unsafe: end_code__goto_546_12[(1 + 1)])) as c_uint))
                             if (__goto_pending != 0) {
                                 break
                             }
@@ -2192,7 +2192,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             if (__goto_pending != 0) {
                                 break
                             }
-                            (end_code__goto_546_12 = end_code__goto_546_12 + (((((unsafe: end_code__goto_546_12[1]) as c_int) << 8) | (unsafe: end_code__goto_546_12[(1 + 1)])) as c_uint))
+                            (end_code__goto_546_12 = end_code__goto_546_12 + (((((unsafe: end_code__goto_546_12[1]) as c_int) << (8 as c_uint)) | (unsafe: end_code__goto_546_12[(1 + 1)])) as c_uint))
                             if (__goto_pending != 0) {
                                 break
                             }
@@ -2296,7 +2296,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         }
                         if (__ci_expr_logic_15 != 0) {
                             if ((if (c__goto_703_12 & 32) == 0: 1 else: 0) != 0) {
-                                (c__goto_703_12 = (((c__goto_703_12 & 31) as c_uint) << 6) | ((unsafe: ptr__goto_545_12[1]) & 63))
+                                (c__goto_703_12 = (((c__goto_703_12 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: ptr__goto_545_12[1]) & 63))
                                 if (__goto_pending != 0) {
                                     break
                                 }
@@ -2306,7 +2306,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
                             } else {
                                 if ((if (c__goto_703_12 & 16) == 0: 1 else: 0) != 0) {
-                                    (c__goto_703_12 = ((((c__goto_703_12 & 15) as c_uint) << 12) | ((((unsafe: ptr__goto_545_12[1]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_545_12[2]) & 63))
+                                    (c__goto_703_12 = ((((c__goto_703_12 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: ptr__goto_545_12[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_545_12[2]) & 63))
                                     if (__goto_pending != 0) {
                                         break
                                     }
@@ -2316,7 +2316,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
                                 } else {
                                     if ((if (c__goto_703_12 & 8) == 0: 1 else: 0) != 0) {
-                                        (c__goto_703_12 = (((((c__goto_703_12 & 7) as c_uint) << 18) | ((((unsafe: ptr__goto_545_12[1]) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_545_12[2]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_545_12[3]) & 63))
+                                        (c__goto_703_12 = (((((c__goto_703_12 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: ptr__goto_545_12[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr__goto_545_12[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_545_12[3]) & 63))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -2326,7 +2326,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
                                     } else {
                                         if ((if (c__goto_703_12 & 4) == 0: 1 else: 0) != 0) {
-                                            (c__goto_703_12 = ((((((c__goto_703_12 & 3) as c_uint) << 24) | ((((unsafe: ptr__goto_545_12[1]) & 63) as c_uint) << 18)) | ((((unsafe: ptr__goto_545_12[2]) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_545_12[3]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_545_12[4]) & 63))
+                                            (c__goto_703_12 = ((((((c__goto_703_12 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: ptr__goto_545_12[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr__goto_545_12[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr__goto_545_12[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_545_12[4]) & 63))
                                             if (__goto_pending != 0) {
                                                 break
                                             }
@@ -2335,7 +2335,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 break
                                             }
                                         } else {
-                                            (c__goto_703_12 = (((((((c__goto_703_12 & 1) as c_uint) << 30) | ((((unsafe: ptr__goto_545_12[1]) & 63) as c_uint) << 24)) | ((((unsafe: ptr__goto_545_12[2]) & 63) as c_uint) << 18)) | ((((unsafe: ptr__goto_545_12[3]) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_545_12[4]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_545_12[5]) & 63))
+                                            (c__goto_703_12 = (((((((c__goto_703_12 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: ptr__goto_545_12[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: ptr__goto_545_12[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr__goto_545_12[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr__goto_545_12[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_545_12[5]) & 63))
                                             if (__goto_pending != 0) {
                                                 break
                                             }
@@ -2484,7 +2484,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
                                 if ((if d__goto_703_15 >= 192: 1 else: 0) != 0) {
                                     if ((if (d__goto_703_15 & 32) == 0: 1 else: 0) != 0) {
-                                        (d__goto_703_15 = (((d__goto_703_15 & 31) as c_uint) << 6) | ((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[1]) & 63))
+                                        (d__goto_703_15 = (((d__goto_703_15 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[1]) & 63))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -2494,7 +2494,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
                                     } else {
                                         if ((if (d__goto_703_15 & 16) == 0: 1 else: 0) != 0) {
-                                            (d__goto_703_15 = ((((d__goto_703_15 & 15) as c_uint) << 12) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[1]) & 63) as c_uint) << 6)) | ((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[2]) & 63))
+                                            (d__goto_703_15 = ((((d__goto_703_15 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[2]) & 63))
                                             if (__goto_pending != 0) {
                                                 break
                                             }
@@ -2504,7 +2504,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             }
                                         } else {
                                             if ((if (d__goto_703_15 & 8) == 0: 1 else: 0) != 0) {
-                                                (d__goto_703_15 = (((((d__goto_703_15 & 7) as c_uint) << 18) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[1]) & 63) as c_uint) << 12)) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[2]) & 63) as c_uint) << 6)) | ((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[3]) & 63))
+                                                (d__goto_703_15 = (((((d__goto_703_15 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[3]) & 63))
                                                 if (__goto_pending != 0) {
                                                     break
                                                 }
@@ -2514,7 +2514,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 }
                                             } else {
                                                 if ((if (d__goto_703_15 & 4) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_703_15 = ((((((d__goto_703_15 & 3) as c_uint) << 24) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[1]) & 63) as c_uint) << 18)) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[2]) & 63) as c_uint) << 12)) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[3]) & 63) as c_uint) << 6)) | ((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[4]) & 63))
+                                                    (d__goto_703_15 = ((((((d__goto_703_15 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[4]) & 63))
                                                     if (__goto_pending != 0) {
                                                         break
                                                     }
@@ -2523,7 +2523,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                         break
                                                     }
                                                 } else {
-                                                    (d__goto_703_15 = (((((((d__goto_703_15 & 1) as c_uint) << 30) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[1]) & 63) as c_uint) << 24)) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[2]) & 63) as c_uint) << 18)) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[3]) & 63) as c_uint) << 12)) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[4]) & 63) as c_uint) << 6)) | ((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[5]) & 63))
+                                                    (d__goto_703_15 = (((((((d__goto_703_15 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: (code__goto_755_16 + ((coptable[codevalue__goto_756_14] as isize) as usize))[5]) & 63))
                                                     if (__goto_pending != 0) {
                                                         break
                                                     }
@@ -2608,7 +2608,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
                                         if ((if __ci_expr_old_20 < wscount: 1 else: 0) != 0) {
-                                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 - ((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int))
+                                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 - ((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -2796,7 +2796,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
                                         if ((if __ci_expr_old_20 < wscount: 1 else: 0) != 0) {
-                                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 - ((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int))
+                                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 - ((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -2984,7 +2984,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
                                         if ((if __ci_expr_old_20 < wscount: 1 else: 0) != 0) {
-                                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 - ((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int))
+                                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 - ((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -3172,7 +3172,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
                                         if ((if __ci_expr_old_20 < wscount: 1 else: 0) != 0) {
-                                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 - ((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int))
+                                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 - ((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -3322,7 +3322,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
                             121 =>
                                 while true {
-                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -3399,7 +3399,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                     }
 
-                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -3447,7 +3447,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                     }
 
-                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -3491,7 +3491,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
 
-                                (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                 while ((if (unsafe: *code__goto_755_16) == OP_ALT: 1 else: 0) != 0) {
                                     var __ci_expr_old_30: c_int = active_count__goto_548_5
@@ -3525,7 +3525,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                     }
 
-                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -3566,7 +3566,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
 
-                                (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                 while ((if (unsafe: *code__goto_755_16) == OP_ALT: 1 else: 0) != 0) {
                                     var __ci_expr_old_30: c_int = active_count__goto_548_5
@@ -3600,7 +3600,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                     }
 
-                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -3641,10 +3641,10 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
 
-                                (code__goto_755_16 = code__goto_755_16 + (1 +% (((((unsafe: code__goto_755_16[2]) as c_int) << 8) | (unsafe: code__goto_755_16[(2 + 1)])) as c_uint)))
+                                (code__goto_755_16 = code__goto_755_16 + (1 +% (((((unsafe: code__goto_755_16[2]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(2 + 1)])) as c_uint)))
 
                                 while ((if (unsafe: *code__goto_755_16) == OP_ALT: 1 else: 0) != 0) {
-                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -3709,10 +3709,10 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
 
-                                (code__goto_755_16 = code__goto_755_16 + (1 +% (((((unsafe: code__goto_755_16[2]) as c_int) << 8) | (unsafe: code__goto_755_16[(2 + 1)])) as c_uint)))
+                                (code__goto_755_16 = code__goto_755_16 + (1 +% (((((unsafe: code__goto_755_16[2]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(2 + 1)])) as c_uint)))
 
                                 while ((if (unsafe: *code__goto_755_16) == OP_ALT: 1 else: 0) != 0) {
-                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -3749,10 +3749,10 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
 
                             169 =>
-                                (code__goto_755_16 = code__goto_755_16 + (1 +% (((((unsafe: code__goto_755_16[2]) as c_int) << 8) | (unsafe: code__goto_755_16[(2 + 1)])) as c_uint)))
+                                (code__goto_755_16 = code__goto_755_16 + (1 +% (((((unsafe: code__goto_755_16[2]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(2 + 1)])) as c_uint)))
 
                                 while ((if (unsafe: *code__goto_755_16) == OP_ALT: 1 else: 0) != 0) {
-                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                    (code__goto_755_16 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5108,18 +5108,18 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                     if (__ci_expr_logic_110 != 0) {
                                         if ((if (d__goto_703_15 & 32) == 0: 1 else: 0) != 0) {
-                                            (d__goto_703_15 = (((d__goto_703_15 & 31) as c_uint) << 6) | ((unsafe: temp__goto_1104_22[1]) & 63))
+                                            (d__goto_703_15 = (((d__goto_703_15 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: temp__goto_1104_22[1]) & 63))
                                         } else {
                                             if ((if (d__goto_703_15 & 16) == 0: 1 else: 0) != 0) {
-                                                (d__goto_703_15 = ((((d__goto_703_15 & 15) as c_uint) << 12) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[2]) & 63))
+                                                (d__goto_703_15 = ((((d__goto_703_15 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[2]) & 63))
                                             } else {
                                                 if ((if (d__goto_703_15 & 8) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_703_15 = (((((d__goto_703_15 & 7) as c_uint) << 18) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 12)) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[3]) & 63))
+                                                    (d__goto_703_15 = (((((d__goto_703_15 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[3]) & 63))
                                                 } else {
                                                     if ((if (d__goto_703_15 & 4) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_703_15 = ((((((d__goto_703_15 & 3) as c_uint) << 24) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 18)) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << 12)) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[4]) & 63))
+                                                        (d__goto_703_15 = ((((((d__goto_703_15 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[4]) & 63))
                                                     } else {
-                                                        (d__goto_703_15 = (((((((d__goto_703_15 & 1) as c_uint) << 30) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 24)) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << 18)) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << 12)) | ((((unsafe: temp__goto_1104_22[4]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[5]) & 63))
+                                                        (d__goto_703_15 = (((((((d__goto_703_15 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: temp__goto_1104_22[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[5]) & 63))
                                                     }
                                                 }
                                             }
@@ -5436,18 +5436,18 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                     if (__ci_expr_logic_110 != 0) {
                                         if ((if (d__goto_703_15 & 32) == 0: 1 else: 0) != 0) {
-                                            (d__goto_703_15 = (((d__goto_703_15 & 31) as c_uint) << 6) | ((unsafe: temp__goto_1104_22[1]) & 63))
+                                            (d__goto_703_15 = (((d__goto_703_15 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: temp__goto_1104_22[1]) & 63))
                                         } else {
                                             if ((if (d__goto_703_15 & 16) == 0: 1 else: 0) != 0) {
-                                                (d__goto_703_15 = ((((d__goto_703_15 & 15) as c_uint) << 12) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[2]) & 63))
+                                                (d__goto_703_15 = ((((d__goto_703_15 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[2]) & 63))
                                             } else {
                                                 if ((if (d__goto_703_15 & 8) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_703_15 = (((((d__goto_703_15 & 7) as c_uint) << 18) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 12)) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[3]) & 63))
+                                                    (d__goto_703_15 = (((((d__goto_703_15 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[3]) & 63))
                                                 } else {
                                                     if ((if (d__goto_703_15 & 4) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_703_15 = ((((((d__goto_703_15 & 3) as c_uint) << 24) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 18)) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << 12)) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[4]) & 63))
+                                                        (d__goto_703_15 = ((((((d__goto_703_15 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[4]) & 63))
                                                     } else {
-                                                        (d__goto_703_15 = (((((((d__goto_703_15 & 1) as c_uint) << 30) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 24)) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << 18)) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << 12)) | ((((unsafe: temp__goto_1104_22[4]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[5]) & 63))
+                                                        (d__goto_703_15 = (((((((d__goto_703_15 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: temp__goto_1104_22[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[5]) & 63))
                                                     }
                                                 }
                                             }
@@ -5764,18 +5764,18 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                     if (__ci_expr_logic_110 != 0) {
                                         if ((if (d__goto_703_15 & 32) == 0: 1 else: 0) != 0) {
-                                            (d__goto_703_15 = (((d__goto_703_15 & 31) as c_uint) << 6) | ((unsafe: temp__goto_1104_22[1]) & 63))
+                                            (d__goto_703_15 = (((d__goto_703_15 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: temp__goto_1104_22[1]) & 63))
                                         } else {
                                             if ((if (d__goto_703_15 & 16) == 0: 1 else: 0) != 0) {
-                                                (d__goto_703_15 = ((((d__goto_703_15 & 15) as c_uint) << 12) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[2]) & 63))
+                                                (d__goto_703_15 = ((((d__goto_703_15 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[2]) & 63))
                                             } else {
                                                 if ((if (d__goto_703_15 & 8) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_703_15 = (((((d__goto_703_15 & 7) as c_uint) << 18) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 12)) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[3]) & 63))
+                                                    (d__goto_703_15 = (((((d__goto_703_15 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[3]) & 63))
                                                 } else {
                                                     if ((if (d__goto_703_15 & 4) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_703_15 = ((((((d__goto_703_15 & 3) as c_uint) << 24) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 18)) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << 12)) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[4]) & 63))
+                                                        (d__goto_703_15 = ((((((d__goto_703_15 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[4]) & 63))
                                                     } else {
-                                                        (d__goto_703_15 = (((((((d__goto_703_15 & 1) as c_uint) << 30) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 24)) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << 18)) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << 12)) | ((((unsafe: temp__goto_1104_22[4]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[5]) & 63))
+                                                        (d__goto_703_15 = (((((((d__goto_703_15 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: temp__goto_1104_22[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[5]) & 63))
                                                     }
                                                 }
                                             }
@@ -6092,18 +6092,18 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                     if (__ci_expr_logic_110 != 0) {
                                         if ((if (d__goto_703_15 & 32) == 0: 1 else: 0) != 0) {
-                                            (d__goto_703_15 = (((d__goto_703_15 & 31) as c_uint) << 6) | ((unsafe: temp__goto_1104_22[1]) & 63))
+                                            (d__goto_703_15 = (((d__goto_703_15 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: temp__goto_1104_22[1]) & 63))
                                         } else {
                                             if ((if (d__goto_703_15 & 16) == 0: 1 else: 0) != 0) {
-                                                (d__goto_703_15 = ((((d__goto_703_15 & 15) as c_uint) << 12) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[2]) & 63))
+                                                (d__goto_703_15 = ((((d__goto_703_15 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[2]) & 63))
                                             } else {
                                                 if ((if (d__goto_703_15 & 8) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_703_15 = (((((d__goto_703_15 & 7) as c_uint) << 18) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 12)) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[3]) & 63))
+                                                    (d__goto_703_15 = (((((d__goto_703_15 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[3]) & 63))
                                                 } else {
                                                     if ((if (d__goto_703_15 & 4) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_703_15 = ((((((d__goto_703_15 & 3) as c_uint) << 24) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 18)) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << 12)) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[4]) & 63))
+                                                        (d__goto_703_15 = ((((((d__goto_703_15 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[4]) & 63))
                                                     } else {
-                                                        (d__goto_703_15 = (((((((d__goto_703_15 & 1) as c_uint) << 30) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << 24)) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << 18)) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << 12)) | ((((unsafe: temp__goto_1104_22[4]) & 63) as c_uint) << 6)) | ((unsafe: temp__goto_1104_22[5]) & 63))
+                                                        (d__goto_703_15 = (((((((d__goto_703_15 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: temp__goto_1104_22[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: temp__goto_1104_22[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: temp__goto_1104_22[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: temp__goto_1104_22[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: temp__goto_1104_22[5]) & 63))
                                                     }
                                                 }
                                             }
@@ -8558,7 +8558,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         if (__ci_expr_logic_199 != 0) {
                                             (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                            if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                            if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                                 var __ci_expr_old_200: c_int = new_count__goto_548_19
 
                                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -8823,7 +8823,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                             (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                            if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                            if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                                 var __ci_expr_old_220: c_int = new_count__goto_548_19
 
                                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -9088,7 +9088,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                             (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                            if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                            if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                                 var __ci_expr_old_220: c_int = new_count__goto_548_19
 
                                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -9353,7 +9353,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                             (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                            if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                            if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                                 var __ci_expr_old_220: c_int = new_count__goto_548_19
 
                                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -11411,7 +11411,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                     (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                    if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                    if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                         var __ci_expr_old_242: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -11585,7 +11585,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                     (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                    if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                    if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                         var __ci_expr_old_242: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -11759,7 +11759,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                     (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                    if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                    if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                         var __ci_expr_old_242: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -11933,7 +11933,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                     (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                    if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                    if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                         var __ci_expr_old_242: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -12271,7 +12271,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_246: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -12447,7 +12447,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_246: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -12623,7 +12623,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_246: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -12799,7 +12799,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_246: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -19116,7 +19116,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if ((if __ci_expr_logic_282 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_283: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -19248,7 +19248,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if ((if __ci_expr_logic_282 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_283: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -19376,7 +19376,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if ((if __ci_expr_logic_282 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_283: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -19503,7 +19503,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     if ((if __ci_expr_logic_282 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_283: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -19690,7 +19690,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -19878,7 +19878,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -20066,7 +20066,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -20254,7 +20254,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -20442,7 +20442,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -20630,7 +20630,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -20814,7 +20814,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -20997,7 +20997,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -21180,7 +21180,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -21363,7 +21363,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -21546,7 +21546,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -21729,7 +21729,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                         (count__goto_759_9 = count__goto_759_9 + 1)
 
-                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
+                                        if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
                                             var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
@@ -21822,7 +21822,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             165 =>
                                 0
                             128 =>
-                                (endasscode__goto_2792_20 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                (endasscode__goto_2792_20 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -21880,7 +21880,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 while ((if (unsafe: *endasscode__goto_2792_20) == OP_ALT: 1 else: 0) != 0) {
-                                    (endasscode__goto_2792_20 = endasscode__goto_2792_20 + (((((unsafe: endasscode__goto_2792_20[1]) as c_int) << 8) | (unsafe: endasscode__goto_2792_20[(1 + 1)])) as c_uint))
+                                    (endasscode__goto_2792_20 = endasscode__goto_2792_20 + (((((unsafe: endasscode__goto_2792_20[1]) as c_int) << (8 as c_uint)) | (unsafe: endasscode__goto_2792_20[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -21968,7 +21968,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             129 =>
-                                (endasscode__goto_2792_20 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                (endasscode__goto_2792_20 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -22026,7 +22026,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 while ((if (unsafe: *endasscode__goto_2792_20) == OP_ALT: 1 else: 0) != 0) {
-                                    (endasscode__goto_2792_20 = endasscode__goto_2792_20 + (((((unsafe: endasscode__goto_2792_20[1]) as c_int) << 8) | (unsafe: endasscode__goto_2792_20[(1 + 1)])) as c_uint))
+                                    (endasscode__goto_2792_20 = endasscode__goto_2792_20 + (((((unsafe: endasscode__goto_2792_20[1]) as c_int) << (8 as c_uint)) | (unsafe: endasscode__goto_2792_20[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -22114,7 +22114,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             130 =>
-                                (endasscode__goto_2792_20 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                (endasscode__goto_2792_20 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -22172,7 +22172,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 while ((if (unsafe: *endasscode__goto_2792_20) == OP_ALT: 1 else: 0) != 0) {
-                                    (endasscode__goto_2792_20 = endasscode__goto_2792_20 + (((((unsafe: endasscode__goto_2792_20[1]) as c_int) << 8) | (unsafe: endasscode__goto_2792_20[(1 + 1)])) as c_uint))
+                                    (endasscode__goto_2792_20 = endasscode__goto_2792_20 + (((((unsafe: endasscode__goto_2792_20[1]) as c_int) << (8 as c_uint)) | (unsafe: endasscode__goto_2792_20[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -22260,7 +22260,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             131 =>
-                                (endasscode__goto_2792_20 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                (endasscode__goto_2792_20 = code__goto_755_16 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -22318,7 +22318,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 while ((if (unsafe: *endasscode__goto_2792_20) == OP_ALT: 1 else: 0) != 0) {
-                                    (endasscode__goto_2792_20 = endasscode__goto_2792_20 + (((((unsafe: endasscode__goto_2792_20[1]) as c_int) << 8) | (unsafe: endasscode__goto_2792_20[(1 + 1)])) as c_uint))
+                                    (endasscode__goto_2792_20 = endasscode__goto_2792_20 + (((((unsafe: endasscode__goto_2792_20[1]) as c_int) << (8 as c_uint)) | (unsafe: endasscode__goto_2792_20[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -22406,7 +22406,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             141 =>
-                                (codelink__goto_2832_13 = (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)))
+                                (codelink__goto_2832_13 = (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -22564,7 +22564,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                     } else {
                                         if ((if condcode__goto_2833_21 == OP_RREF: 1 else: 0) != 0) {
-                                            (value__goto_2876_24 = ((((((unsafe: code__goto_755_16[(2 + 2)]) as c_int) << 8) | (unsafe: code__goto_755_16[((2 + 2) + 1)])) as c_uint)))
+                                            (value__goto_2876_24 = ((((((unsafe: code__goto_755_16[(2 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[((2 + 2) + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -22657,7 +22657,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 break
                                             }
 
-                                            (endasscode__goto_2891_22 = asscode__goto_2890_22 + (((((unsafe: asscode__goto_2890_22[1]) as c_int) << 8) | (unsafe: asscode__goto_2890_22[(1 + 1)])) as c_uint))
+                                            (endasscode__goto_2891_22 = asscode__goto_2890_22 + (((((unsafe: asscode__goto_2890_22[1]) as c_int) << (8 as c_uint)) | (unsafe: asscode__goto_2890_22[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -22715,7 +22715,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             }
 
                                             while ((if (unsafe: *endasscode__goto_2891_22) == OP_ALT: 1 else: 0) != 0) {
-                                                (endasscode__goto_2891_22 = endasscode__goto_2891_22 + (((((unsafe: endasscode__goto_2891_22[1]) as c_int) << 8) | (unsafe: endasscode__goto_2891_22[(1 + 1)])) as c_uint))
+                                                (endasscode__goto_2891_22 = endasscode__goto_2891_22 + (((((unsafe: endasscode__goto_2891_22[1]) as c_int) << (8 as c_uint)) | (unsafe: endasscode__goto_2891_22[(1 + 1)])) as c_uint))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -22845,7 +22845,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             146 =>
-                                (codelink__goto_2832_13 = (((((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)))
+                                (codelink__goto_2832_13 = (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -23003,7 +23003,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                     } else {
                                         if ((if condcode__goto_2833_21 == OP_RREF: 1 else: 0) != 0) {
-                                            (value__goto_2876_24 = ((((((unsafe: code__goto_755_16[(2 + 2)]) as c_int) << 8) | (unsafe: code__goto_755_16[((2 + 2) + 1)])) as c_uint)))
+                                            (value__goto_2876_24 = ((((((unsafe: code__goto_755_16[(2 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[((2 + 2) + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -23096,7 +23096,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                                 break
                                             }
 
-                                            (endasscode__goto_2891_22 = asscode__goto_2890_22 + (((((unsafe: asscode__goto_2890_22[1]) as c_int) << 8) | (unsafe: asscode__goto_2890_22[(1 + 1)])) as c_uint))
+                                            (endasscode__goto_2891_22 = asscode__goto_2890_22 + (((((unsafe: asscode__goto_2890_22[1]) as c_int) << (8 as c_uint)) | (unsafe: asscode__goto_2890_22[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -23154,7 +23154,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             }
 
                                             while ((if (unsafe: *endasscode__goto_2891_22) == OP_ALT: 1 else: 0) != 0) {
-                                                (endasscode__goto_2891_22 = endasscode__goto_2891_22 + (((((unsafe: endasscode__goto_2891_22[1]) as c_int) << 8) | (unsafe: endasscode__goto_2891_22[(1 + 1)])) as c_uint))
+                                                (endasscode__goto_2891_22 = endasscode__goto_2891_22 + (((((unsafe: endasscode__goto_2891_22[1]) as c_int) << (8 as c_uint)) | (unsafe: endasscode__goto_2891_22[(1 + 1)])) as c_uint))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -23290,7 +23290,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     break
                                 }
 
-                                (callpat__goto_2938_20 = start_code__goto_555_12 + (((((unsafe: code__goto_755_16[1]) as c_int) << 8) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
+                                (callpat__goto_2938_20 = start_code__goto_555_12 + (((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -23301,7 +23301,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 if ((if callpat__goto_2938_20 == mb.start_code: 1 else: 0) != 0) {
                                     (__ci_expr_ternary_307 = 0)
                                 } else {
-                                    (__ci_expr_ternary_307 = ((((((unsafe: callpat__goto_2938_20[(1 + 2)]) as c_int) << 8) | (unsafe: callpat__goto_2938_20[((1 + 2) + 1)])) as c_uint)))
+                                    (__ci_expr_ternary_307 = ((((((unsafe: callpat__goto_2938_20[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: callpat__goto_2938_20[((1 + 2) + 1)])) as c_uint)))
                                 }
 
                                 (recno__goto_2939_18 = __ci_expr_ternary_307)
@@ -23769,7 +23769,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                     while true {
-                                        (end_subpattern__goto_3102_22 = end_subpattern__goto_3102_22 + (((((unsafe: end_subpattern__goto_3102_22[1]) as c_int) << 8) | (unsafe: end_subpattern__goto_3102_22[(1 + 1)])) as c_uint))
+                                        (end_subpattern__goto_3102_22 = end_subpattern__goto_3102_22 + (((((unsafe: end_subpattern__goto_3102_22[1]) as c_int) << (8 as c_uint)) | (unsafe: end_subpattern__goto_3102_22[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -24102,7 +24102,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                     while true {
-                                        (end_subpattern__goto_3102_22 = end_subpattern__goto_3102_22 + (((((unsafe: end_subpattern__goto_3102_22[1]) as c_int) << 8) | (unsafe: end_subpattern__goto_3102_22[(1 + 1)])) as c_uint))
+                                        (end_subpattern__goto_3102_22 = end_subpattern__goto_3102_22 + (((((unsafe: end_subpattern__goto_3102_22[1]) as c_int) << (8 as c_uint)) | (unsafe: end_subpattern__goto_3102_22[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -24435,7 +24435,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                     while true {
-                                        (end_subpattern__goto_3102_22 = end_subpattern__goto_3102_22 + (((((unsafe: end_subpattern__goto_3102_22[1]) as c_int) << 8) | (unsafe: end_subpattern__goto_3102_22[(1 + 1)])) as c_uint))
+                                        (end_subpattern__goto_3102_22 = end_subpattern__goto_3102_22 + (((((unsafe: end_subpattern__goto_3102_22[1]) as c_int) << (8 as c_uint)) | (unsafe: end_subpattern__goto_3102_22[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -24768,7 +24768,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                     while true {
-                                        (end_subpattern__goto_3102_22 = end_subpattern__goto_3102_22 + (((((unsafe: end_subpattern__goto_3102_22[1]) as c_int) << 8) | (unsafe: end_subpattern__goto_3102_22[(1 + 1)])) as c_uint))
+                                        (end_subpattern__goto_3102_22 = end_subpattern__goto_3102_22 + (((((unsafe: end_subpattern__goto_3102_22[1]) as c_int) << (8 as c_uint)) | (unsafe: end_subpattern__goto_3102_22[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -25101,7 +25101,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                     while true {
-                                        (end_subpattern__goto_3102_22 = end_subpattern__goto_3102_22 + (((((unsafe: end_subpattern__goto_3102_22[1]) as c_int) << 8) | (unsafe: end_subpattern__goto_3102_22[(1 + 1)])) as c_uint))
+                                        (end_subpattern__goto_3102_22 = end_subpattern__goto_3102_22 + (((((unsafe: end_subpattern__goto_3102_22[1]) as c_int) << (8 as c_uint)) | (unsafe: end_subpattern__goto_3102_22[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -25348,7 +25348,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                     while true {
-                                        (end_subpattern__goto_3170_22 = end_subpattern__goto_3170_22 + (((((unsafe: end_subpattern__goto_3170_22[1]) as c_int) << 8) | (unsafe: end_subpattern__goto_3170_22[(1 + 1)])) as c_uint))
+                                        (end_subpattern__goto_3170_22 = end_subpattern__goto_3170_22 + (((((unsafe: end_subpattern__goto_3170_22[1]) as c_int) << (8 as c_uint)) | (unsafe: end_subpattern__goto_3170_22[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -25385,7 +25385,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                     if (__ci_expr_logic_318 != 0) {
-                                        (__ci_expr_ternary_319 = ((((((end_subpattern__goto_3170_22 as usize) -% (start_code__goto_555_12 as usize)) / sizeof[u8]()) - (((((unsafe: end_subpattern__goto_3170_22[1]) as c_int) << 8) | (unsafe: end_subpattern__goto_3170_22[(1 + 1)])) as c_uint)) as c_int)))
+                                        (__ci_expr_ternary_319 = ((((((end_subpattern__goto_3170_22 as usize) -% (start_code__goto_555_12 as usize)) / sizeof[u8]()) - (((((unsafe: end_subpattern__goto_3170_22[1]) as c_int) << (8 as c_uint)) | (unsafe: end_subpattern__goto_3170_22[(1 + 1)])) as c_uint)) as c_int)))
                                     } else {
                                         (__ci_expr_ternary_319 = -1)
                                     }

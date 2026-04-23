@@ -3303,7 +3303,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
                 let p_size = self.abi_size_of(source_ty)
                 if p_size > 16:
                     actual_param_types.push(ptr_ty)
-                    byval_mask = byval_mask | (1 << (abi_pi as i64))
+                    byval_mask = byval_mask | ((1 as i64) << (abi_pi as u32))
                     byval_types.push(source_ty)
                     continue
             actual_param_types.push(source_ty)
@@ -3519,7 +3519,7 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
             let p_size = self.abi_size_of(orig_ty)
             if p_size > 16:
                 param_types.push(ptr_ty)
-                byval_mask = byval_mask | (1 << (pi as i64))
+                byval_mask = byval_mask | ((1 as i64) << (pi as u32))
                 byval_types.push(orig_ty)
                 continue
         param_types.push(orig_ty)

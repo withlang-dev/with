@@ -1025,7 +1025,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                     }
                     (rcode__goto_11014_16 = find_recurse(codestart__goto_10293_14, utf__goto_10283_6))
                     while ((if rcode__goto_11014_16 != null: 1 else: 0) != 0) {
-                        (groupnumber__goto_11024_12 = (((((((unsafe: rcode__goto_11014_16[1]) as c_int) << 8) | (unsafe: rcode__goto_11014_16[(1 + 1)])) as c_uint) as c_int)))
+                        (groupnumber__goto_11024_12 = (((((((unsafe: rcode__goto_11014_16[1]) as c_int) << (8 as c_uint)) | (unsafe: rcode__goto_11014_16[(1 + 1)])) as c_uint) as c_int)))
                         if (__goto_pending != 0) {
                             break
                         }
@@ -1111,7 +1111,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         if (__goto_pending != 0) {
                             break
                         }
-                        ((unsafe: rcode__goto_11014_16[1]) = ((((((((rgroup__goto_11015_14 as usize) -% (codestart__goto_10293_14 as usize)) / sizeof[u8]()) as c_uint) as c_uint) >> 8) as u8)))
+                        ((unsafe: rcode__goto_11014_16[1]) = ((((((((rgroup__goto_11015_14 as usize) -% (codestart__goto_10293_14 as usize)) / sizeof[u8]()) as c_uint) as c_uint) >> (8 as c_uint)) as u8)))
                         ((unsafe: rcode__goto_11014_16[(1 + 1)]) = (((((((rgroup__goto_11015_14 as usize) -% (codestart__goto_10293_14 as usize)) / sizeof[u8]()) as c_uint) & 255) as u8)))
                         if (__goto_pending != 0) {
                             break
@@ -1656,10 +1656,10 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                     if ((if (c__goto_1498_10 & 32) == 0: 1 else: 0) != 0) {
                         var __ci_expr_old_2: *const u8 = ptr__goto_1497_12
                         (ptr__goto_1497_12 = ptr__goto_1497_12 + 1)
-                        (c__goto_1498_10 = (((c__goto_1498_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_2) & 63))
+                        (c__goto_1498_10 = (((c__goto_1498_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_2) & 63))
                     } else {
                         if ((if (c__goto_1498_10 & 16) == 0: 1 else: 0) != 0) {
-                            (c__goto_1498_10 = ((((c__goto_1498_10 & 15) as c_uint) << 12) | ((((unsafe: *ptr__goto_1497_12) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_1497_12[1]) & 63))
+                            (c__goto_1498_10 = ((((c__goto_1498_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *ptr__goto_1497_12) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_1497_12[1]) & 63))
                             if (__goto_pending != 0) {
                                 continue
                             }
@@ -1669,7 +1669,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                             }
                         } else {
                             if ((if (c__goto_1498_10 & 8) == 0: 1 else: 0) != 0) {
-                                (c__goto_1498_10 = (((((c__goto_1498_10 & 7) as c_uint) << 18) | ((((unsafe: *ptr__goto_1497_12) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_1497_12[1]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_1497_12[2]) & 63))
+                                (c__goto_1498_10 = (((((c__goto_1498_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *ptr__goto_1497_12) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr__goto_1497_12[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_1497_12[2]) & 63))
                                 if (__goto_pending != 0) {
                                     continue
                                 }
@@ -1679,7 +1679,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                 }
                             } else {
                                 if ((if (c__goto_1498_10 & 4) == 0: 1 else: 0) != 0) {
-                                    (c__goto_1498_10 = ((((((c__goto_1498_10 & 3) as c_uint) << 24) | ((((unsafe: *ptr__goto_1497_12) & 63) as c_uint) << 18)) | ((((unsafe: ptr__goto_1497_12[1]) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_1497_12[2]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_1497_12[3]) & 63))
+                                    (c__goto_1498_10 = ((((((c__goto_1498_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *ptr__goto_1497_12) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr__goto_1497_12[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr__goto_1497_12[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_1497_12[3]) & 63))
                                     if (__goto_pending != 0) {
                                         continue
                                     }
@@ -1688,7 +1688,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         continue
                                     }
                                 } else {
-                                    (c__goto_1498_10 = (((((((c__goto_1498_10 & 1) as c_uint) << 30) | ((((unsafe: *ptr__goto_1497_12) & 63) as c_uint) << 24)) | ((((unsafe: ptr__goto_1497_12[1]) & 63) as c_uint) << 18)) | ((((unsafe: ptr__goto_1497_12[2]) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_1497_12[3]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_1497_12[4]) & 63))
+                                    (c__goto_1498_10 = (((((((c__goto_1498_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *ptr__goto_1497_12) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: ptr__goto_1497_12[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr__goto_1497_12[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr__goto_1497_12[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_1497_12[4]) & 63))
                                     if (__goto_pending != 0) {
                                         continue
                                     }
@@ -2050,7 +2050,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                                 break
                                             }
 
-                                            (cc__goto_1498_13 = ((cc__goto_1498_13 as c_uint) << 4) | xc__goto_1652_16)
+                                            (cc__goto_1498_13 = ((cc__goto_1498_13 as c_uint) << (4 as c_uint)) | xc__goto_1652_16)
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -2165,7 +2165,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             continue
                                         }
 
-                                        (cc__goto_1498_13 = ((cc__goto_1498_13 as c_uint) << 4) | xc__goto_1652_16)
+                                        (cc__goto_1498_13 = ((cc__goto_1498_13 as c_uint) << (4 as c_uint)) | xc__goto_1652_16)
 
                                         if (__goto_pending != 0) {
                                             continue
@@ -2182,7 +2182,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             continue
                                         }
 
-                                        (cc__goto_1498_13 = ((cc__goto_1498_13 as c_uint) << 4) | xc__goto_1652_16)
+                                        (cc__goto_1498_13 = ((cc__goto_1498_13 as c_uint) << (4 as c_uint)) | xc__goto_1652_16)
 
                                         if (__goto_pending != 0) {
                                             continue
@@ -2199,7 +2199,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             continue
                                         }
 
-                                        (c__goto_1498_10 = ((cc__goto_1498_13 as c_uint) << 4) | xc__goto_1652_16)
+                                        (c__goto_1498_10 = ((cc__goto_1498_13 as c_uint) << (4 as c_uint)) | xc__goto_1652_16)
 
                                         if (__goto_pending != 0) {
                                             continue
@@ -2245,7 +2245,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         }
 
                                     } else {
-                                        if ((if c__goto_1498_10 > (((4294967295 as c_uint) as c_uint) >> (32 - 8)): 1 else: 0) != 0) {
+                                        if ((if c__goto_1498_10 > (((4294967295 as c_uint) as c_uint) >> ((32 - 8) as c_uint)): 1 else: 0) != 0) {
                                             ((unsafe: *errorcodeptr) = ERR77)
                                         }
                                     }
@@ -4845,7 +4845,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         break
                                     }
 
-                                    (c__goto_1498_10 = (((c__goto_1498_10 as c_uint) << 3) +% (cc__goto_1498_13 -% 48)))
+                                    (c__goto_1498_10 = (((c__goto_1498_10 as c_uint) << (3 as c_uint)) +% (cc__goto_1498_13 -% 48)))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5040,7 +5040,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         continue
                                     }
 
-                                    (c__goto_1498_10 = ((cc__goto_1498_13 as c_uint) << 4) | xc__goto_2033_16)
+                                    (c__goto_1498_10 = ((cc__goto_1498_13 as c_uint) << (4 as c_uint)) | xc__goto_2033_16)
 
                                     if (__goto_pending != 0) {
                                         continue
@@ -5172,7 +5172,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                                 break
                                             }
 
-                                            (c__goto_1498_10 = ((c__goto_1498_10 as c_uint) << 4) | cc__goto_1498_13)
+                                            (c__goto_1498_10 = ((c__goto_1498_10 as c_uint) << (4 as c_uint)) | cc__goto_1498_13)
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -5192,7 +5192,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                                 var __ci_expr_logic_76: c_int = 0
 
                                                 if ((if not (utf__goto_1494_6 != 0): 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_76 = (if (if c__goto_1498_10 > (((4294967295 as c_uint) as c_uint) >> (32 - 8)): 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_76 = (if (if c__goto_1498_10 > (((4294967295 as c_uint) as c_uint) >> ((32 - 8) as c_uint)): 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 (__ci_expr_logic_77 = (if __ci_expr_logic_76 != 0: 1 else: 0))
@@ -5424,7 +5424,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             continue
                                         }
 
-                                        (c__goto_1498_10 = ((c__goto_1498_10 as c_uint) << 4) | cc__goto_1498_13)
+                                        (c__goto_1498_10 = ((c__goto_1498_10 as c_uint) << (4 as c_uint)) | cc__goto_1498_13)
 
                                         if (__goto_pending != 0) {
                                             continue
@@ -5659,7 +5659,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
     }
 
     if ((if (unsafe: *code) == OP_CBRA: 1 else: 0) != 0) {
-        (capnumber = ((((((unsafe: code[(1 + 2)]) as c_int) << 8) | (unsafe: code[((1 + 2) + 1)])) as c_uint)))
+        (capnumber = ((((((unsafe: code[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code[((1 + 2) + 1)])) as c_uint)))
 
         (capitem.number = capnumber)
 
@@ -5671,7 +5671,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
 
     }
 
-    ((unsafe: code[1]) = ((((0 as c_int) >> 8) as u8)))
+    ((unsafe: code[1]) = ((((0 as c_int) >> (8 as c_uint)) as u8)))
 
     ((unsafe: code[(1 + 1)]) = (((0 & 255) as u8)))
 
@@ -5714,7 +5714,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
                 ((unsafe: *__ci_expr_old_5) = 126)
 
 
-                ((unsafe: code[0]) = (lookbehindlength as c_uint) >> 8)
+                ((unsafe: code[0]) = (lookbehindlength as c_uint) >> (8 as c_uint))
 
                 ((unsafe: code[(0 + 1)]) = lookbehindlength & 255)
 
@@ -5731,14 +5731,14 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
                 ((unsafe: *__ci_expr_old_6) = 127)
 
 
-                ((unsafe: code[0]) = (lookbehindminlength as c_uint) >> 8)
+                ((unsafe: code[0]) = (lookbehindminlength as c_uint) >> (8 as c_uint))
 
                 ((unsafe: code[(0 + 1)]) = lookbehindminlength & 255)
 
                 (code = code + 2)
 
 
-                ((unsafe: code[0]) = (lookbehindlength as c_uint) >> 8)
+                ((unsafe: code[0]) = (lookbehindlength as c_uint) >> (8 as c_uint))
 
                 ((unsafe: code[(0 + 1)]) = lookbehindlength & 255)
 
@@ -5854,9 +5854,9 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
                 var branch_length: c_uint = (((((code as usize) -% (last_branch as usize)) / sizeof[u8]()) as c_uint))
 
                 while true {
-                    var prev_length: c_uint = ((((((unsafe: last_branch[1]) as c_int) << 8) | (unsafe: last_branch[(1 + 1)])) as c_uint))
+                    var prev_length: c_uint = ((((((unsafe: last_branch[1]) as c_int) << (8 as c_uint)) | (unsafe: last_branch[(1 + 1)])) as c_uint))
 
-                    ((unsafe: last_branch[1]) = ((((branch_length as c_uint) >> 8) as u8)))
+                    ((unsafe: last_branch[1]) = ((((branch_length as c_uint) >> (8 as c_uint)) as u8)))
 
                     ((unsafe: last_branch[(1 + 1)]) = (((branch_length & 255) as u8)))
 
@@ -5874,7 +5874,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
 
             ((unsafe: *code) = 122)
 
-            ((unsafe: code[1]) = ((((((((code as usize) -% (start_bracket as usize)) / sizeof[u8]()) as c_uint) as c_uint) >> 8) as u8)))
+            ((unsafe: code[1]) = ((((((((code as usize) -% (start_bracket as usize)) / sizeof[u8]()) as c_uint) as c_uint) >> (8 as c_uint)) as u8)))
 
             ((unsafe: code[(1 + 1)]) = (((((((code as usize) -% (start_bracket as usize)) / sizeof[u8]()) as c_uint) & 255) as u8)))
 
@@ -5917,7 +5917,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
         } else {
             ((unsafe: *code) = 121)
 
-            ((unsafe: code[1]) = ((((((((code as usize) -% (last_branch as usize)) / sizeof[u8]()) as c_int) as c_int) >> 8) as u8)))
+            ((unsafe: code[1]) = ((((((((code as usize) -% (last_branch as usize)) / sizeof[u8]()) as c_int) as c_int) >> (8 as c_uint)) as u8)))
 
             ((unsafe: code[(1 + 1)]) = (((((((code as usize) -% (last_branch as usize)) / sizeof[u8]()) as c_int) & 255) as u8)))
 
@@ -6269,7 +6269,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                                     break
                                 }
 
-                                (offset__goto_9593_12 = ((((unsafe: pptr__goto_9592_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_9592_11[2]) as c_ulong))
+                                (offset__goto_9593_12 = ((((unsafe: pptr__goto_9592_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_9592_11[2]) as c_ulong))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -6387,7 +6387,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                                     break
                                 }
 
-                                (offset__goto_9593_12 = ((((unsafe: pptr__goto_9592_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_9592_11[2]) as c_ulong))
+                                (offset__goto_9593_12 = ((((unsafe: pptr__goto_9592_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_9592_11[2]) as c_ulong))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -6517,7 +6517,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
 
                                 (group__goto_9614_12 = (unsafe: *pptr__goto_9592_11) & 65535)
 
-                                (offset__goto_9593_12 = ((((unsafe: pptr__goto_9592_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_9592_11[2]) as c_ulong))
+                                (offset__goto_9593_12 = ((((unsafe: pptr__goto_9592_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_9592_11[2]) as c_ulong))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -6654,7 +6654,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                             2149842944 =>
                                 (group__goto_9614_12 = (unsafe: *pptr__goto_9592_11) & 65535)
 
-                                (offset__goto_9593_12 = ((((unsafe: pptr__goto_9592_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_9592_11[2]) as c_ulong))
+                                (offset__goto_9593_12 = ((((unsafe: pptr__goto_9592_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_9592_11[2]) as c_ulong))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -7219,7 +7219,7 @@ fn set_lookbehind_lengths(pptrptr: *mut *mut c_uint, errcodeptr: *mut c_int, lcp
 
     var variable: c_int = 0
 
-    (offset = ((((unsafe: bptr[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: bptr[2]) as c_ulong))
+    (offset = ((((unsafe: bptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: bptr[2]) as c_ulong))
 
 
     ((unsafe: *pptrptr) = (unsafe: *pptrptr) + 2)
@@ -8027,10 +8027,10 @@ fn get_ucp(ptrptr: *mut *const u8, utf: c_int, negptr: *mut c_int, ptypeptr: *mu
                     if ((if (c__goto_2262_10 & 32) == 0: 1 else: 0) != 0) {
                         var __ci_expr_old_2: *const u8 = ptr__goto_2265_12
                         (ptr__goto_2265_12 = ptr__goto_2265_12 + 1)
-                        (c__goto_2262_10 = (((c__goto_2262_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_2) & 63))
+                        (c__goto_2262_10 = (((c__goto_2262_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_2) & 63))
                     } else {
                         if ((if (c__goto_2262_10 & 16) == 0: 1 else: 0) != 0) {
-                            (c__goto_2262_10 = ((((c__goto_2262_10 & 15) as c_uint) << 12) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_2265_12[1]) & 63))
+                            (c__goto_2262_10 = ((((c__goto_2262_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_2265_12[1]) & 63))
                             if (__goto_pending != 0) {
                                 continue
                             }
@@ -8040,7 +8040,7 @@ fn get_ucp(ptrptr: *mut *const u8, utf: c_int, negptr: *mut c_int, ptypeptr: *mu
                             }
                         } else {
                             if ((if (c__goto_2262_10 & 8) == 0: 1 else: 0) != 0) {
-                                (c__goto_2262_10 = (((((c__goto_2262_10 & 7) as c_uint) << 18) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_2265_12[1]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_2265_12[2]) & 63))
+                                (c__goto_2262_10 = (((((c__goto_2262_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr__goto_2265_12[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_2265_12[2]) & 63))
                                 if (__goto_pending != 0) {
                                     continue
                                 }
@@ -8050,7 +8050,7 @@ fn get_ucp(ptrptr: *mut *const u8, utf: c_int, negptr: *mut c_int, ptypeptr: *mu
                                 }
                             } else {
                                 if ((if (c__goto_2262_10 & 4) == 0: 1 else: 0) != 0) {
-                                    (c__goto_2262_10 = ((((((c__goto_2262_10 & 3) as c_uint) << 24) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << 18)) | ((((unsafe: ptr__goto_2265_12[1]) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_2265_12[2]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_2265_12[3]) & 63))
+                                    (c__goto_2262_10 = ((((((c__goto_2262_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr__goto_2265_12[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr__goto_2265_12[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_2265_12[3]) & 63))
                                     if (__goto_pending != 0) {
                                         continue
                                     }
@@ -8059,7 +8059,7 @@ fn get_ucp(ptrptr: *mut *const u8, utf: c_int, negptr: *mut c_int, ptypeptr: *mu
                                         continue
                                     }
                                 } else {
-                                    (c__goto_2262_10 = (((((((c__goto_2262_10 & 1) as c_uint) << 30) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << 24)) | ((((unsafe: ptr__goto_2265_12[1]) & 63) as c_uint) << 18)) | ((((unsafe: ptr__goto_2265_12[2]) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_2265_12[3]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_2265_12[4]) & 63))
+                                    (c__goto_2262_10 = (((((((c__goto_2262_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: ptr__goto_2265_12[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr__goto_2265_12[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr__goto_2265_12[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_2265_12[4]) & 63))
                                     if (__goto_pending != 0) {
                                         continue
                                     }
@@ -8113,10 +8113,10 @@ fn get_ucp(ptrptr: *mut *const u8, utf: c_int, negptr: *mut c_int, ptypeptr: *mu
                             if ((if (c__goto_2262_10 & 32) == 0: 1 else: 0) != 0) {
                                 var __ci_expr_old_5: *const u8 = ptr__goto_2265_12
                                 (ptr__goto_2265_12 = ptr__goto_2265_12 + 1)
-                                (c__goto_2262_10 = (((c__goto_2262_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_5) & 63))
+                                (c__goto_2262_10 = (((c__goto_2262_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_5) & 63))
                             } else {
                                 if ((if (c__goto_2262_10 & 16) == 0: 1 else: 0) != 0) {
-                                    (c__goto_2262_10 = ((((c__goto_2262_10 & 15) as c_uint) << 12) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_2265_12[1]) & 63))
+                                    (c__goto_2262_10 = ((((c__goto_2262_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_2265_12[1]) & 63))
                                     if (__goto_pending != 0) {
                                         break
                                     }
@@ -8126,7 +8126,7 @@ fn get_ucp(ptrptr: *mut *const u8, utf: c_int, negptr: *mut c_int, ptypeptr: *mu
                                     }
                                 } else {
                                     if ((if (c__goto_2262_10 & 8) == 0: 1 else: 0) != 0) {
-                                        (c__goto_2262_10 = (((((c__goto_2262_10 & 7) as c_uint) << 18) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_2265_12[1]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_2265_12[2]) & 63))
+                                        (c__goto_2262_10 = (((((c__goto_2262_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr__goto_2265_12[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_2265_12[2]) & 63))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -8136,7 +8136,7 @@ fn get_ucp(ptrptr: *mut *const u8, utf: c_int, negptr: *mut c_int, ptypeptr: *mu
                                         }
                                     } else {
                                         if ((if (c__goto_2262_10 & 4) == 0: 1 else: 0) != 0) {
-                                            (c__goto_2262_10 = ((((((c__goto_2262_10 & 3) as c_uint) << 24) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << 18)) | ((((unsafe: ptr__goto_2265_12[1]) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_2265_12[2]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_2265_12[3]) & 63))
+                                            (c__goto_2262_10 = ((((((c__goto_2262_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr__goto_2265_12[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr__goto_2265_12[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_2265_12[3]) & 63))
                                             if (__goto_pending != 0) {
                                                 break
                                             }
@@ -8145,7 +8145,7 @@ fn get_ucp(ptrptr: *mut *const u8, utf: c_int, negptr: *mut c_int, ptypeptr: *mu
                                                 break
                                             }
                                         } else {
-                                            (c__goto_2262_10 = (((((((c__goto_2262_10 & 1) as c_uint) << 30) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << 24)) | ((((unsafe: ptr__goto_2265_12[1]) & 63) as c_uint) << 18)) | ((((unsafe: ptr__goto_2265_12[2]) & 63) as c_uint) << 12)) | ((((unsafe: ptr__goto_2265_12[3]) & 63) as c_uint) << 6)) | ((unsafe: ptr__goto_2265_12[4]) & 63))
+                                            (c__goto_2262_10 = (((((((c__goto_2262_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *ptr__goto_2265_12) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: ptr__goto_2265_12[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr__goto_2265_12[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr__goto_2265_12[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr__goto_2265_12[4]) & 63))
                                             if (__goto_pending != 0) {
                                                 break
                                             }
@@ -8417,7 +8417,7 @@ fn get_ucp(ptrptr: *mut *const u8, utf: c_int, negptr: *mut c_int, ptypeptr: *mu
                     continue
                 }
                 while ((if bot__goto_2264_12 < top__goto_2264_17: 1 else: 0) != 0) {
-                    (i__goto_2263_11 = ((bot__goto_2264_12 +% top__goto_2264_17) as c_ulong) >> 1)
+                    (i__goto_2263_11 = ((bot__goto_2264_12 +% top__goto_2264_17) as c_ulong) >> (1 as c_uint))
                     if (__goto_pending != 0) {
                         break
                     }
@@ -8699,10 +8699,10 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                         if ((if (c__goto_2623_12 & 32) == 0: 1 else: 0) != 0) {
                             var __ci_expr_old_6: *const u8 = p__goto_2624_14
                             (p__goto_2624_14 = p__goto_2624_14 + 1)
-                            (c__goto_2623_12 = (((c__goto_2623_12 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_6) & 63))
+                            (c__goto_2623_12 = (((c__goto_2623_12 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_6) & 63))
                         } else {
                             if ((if (c__goto_2623_12 & 16) == 0: 1 else: 0) != 0) {
-                                (c__goto_2623_12 = ((((c__goto_2623_12 & 15) as c_uint) << 12) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << 6)) | ((unsafe: p__goto_2624_14[1]) & 63))
+                                (c__goto_2623_12 = ((((c__goto_2623_12 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p__goto_2624_14[1]) & 63))
                                 if (__goto_pending != 0) {
                                     continue
                                 }
@@ -8712,7 +8712,7 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                                 }
                             } else {
                                 if ((if (c__goto_2623_12 & 8) == 0: 1 else: 0) != 0) {
-                                    (c__goto_2623_12 = (((((c__goto_2623_12 & 7) as c_uint) << 18) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << 12)) | ((((unsafe: p__goto_2624_14[1]) & 63) as c_uint) << 6)) | ((unsafe: p__goto_2624_14[2]) & 63))
+                                    (c__goto_2623_12 = (((((c__goto_2623_12 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: p__goto_2624_14[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p__goto_2624_14[2]) & 63))
                                     if (__goto_pending != 0) {
                                         continue
                                     }
@@ -8722,7 +8722,7 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                                     }
                                 } else {
                                     if ((if (c__goto_2623_12 & 4) == 0: 1 else: 0) != 0) {
-                                        (c__goto_2623_12 = ((((((c__goto_2623_12 & 3) as c_uint) << 24) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << 18)) | ((((unsafe: p__goto_2624_14[1]) & 63) as c_uint) << 12)) | ((((unsafe: p__goto_2624_14[2]) & 63) as c_uint) << 6)) | ((unsafe: p__goto_2624_14[3]) & 63))
+                                        (c__goto_2623_12 = ((((((c__goto_2623_12 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: p__goto_2624_14[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: p__goto_2624_14[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p__goto_2624_14[3]) & 63))
                                         if (__goto_pending != 0) {
                                             continue
                                         }
@@ -8731,7 +8731,7 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                                             continue
                                         }
                                     } else {
-                                        (c__goto_2623_12 = (((((((c__goto_2623_12 & 1) as c_uint) << 30) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << 24)) | ((((unsafe: p__goto_2624_14[1]) & 63) as c_uint) << 18)) | ((((unsafe: p__goto_2624_14[2]) & 63) as c_uint) << 12)) | ((((unsafe: p__goto_2624_14[3]) & 63) as c_uint) << 6)) | ((unsafe: p__goto_2624_14[4]) & 63))
+                                        (c__goto_2623_12 = (((((((c__goto_2623_12 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: p__goto_2624_14[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: p__goto_2624_14[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: p__goto_2624_14[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p__goto_2624_14[4]) & 63))
                                         if (__goto_pending != 0) {
                                             continue
                                         }
@@ -8807,10 +8807,10 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                             if ((if (c__goto_2623_12 & 32) == 0: 1 else: 0) != 0) {
                                 var __ci_expr_old_10: *const u8 = p__goto_2624_14
                                 (p__goto_2624_14 = p__goto_2624_14 + 1)
-                                (c__goto_2623_12 = (((c__goto_2623_12 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_10) & 63))
+                                (c__goto_2623_12 = (((c__goto_2623_12 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_10) & 63))
                             } else {
                                 if ((if (c__goto_2623_12 & 16) == 0: 1 else: 0) != 0) {
-                                    (c__goto_2623_12 = ((((c__goto_2623_12 & 15) as c_uint) << 12) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << 6)) | ((unsafe: p__goto_2624_14[1]) & 63))
+                                    (c__goto_2623_12 = ((((c__goto_2623_12 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p__goto_2624_14[1]) & 63))
                                     if (__goto_pending != 0) {
                                         break
                                     }
@@ -8820,7 +8820,7 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                                     }
                                 } else {
                                     if ((if (c__goto_2623_12 & 8) == 0: 1 else: 0) != 0) {
-                                        (c__goto_2623_12 = (((((c__goto_2623_12 & 7) as c_uint) << 18) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << 12)) | ((((unsafe: p__goto_2624_14[1]) & 63) as c_uint) << 6)) | ((unsafe: p__goto_2624_14[2]) & 63))
+                                        (c__goto_2623_12 = (((((c__goto_2623_12 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: p__goto_2624_14[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p__goto_2624_14[2]) & 63))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -8830,7 +8830,7 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                                         }
                                     } else {
                                         if ((if (c__goto_2623_12 & 4) == 0: 1 else: 0) != 0) {
-                                            (c__goto_2623_12 = ((((((c__goto_2623_12 & 3) as c_uint) << 24) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << 18)) | ((((unsafe: p__goto_2624_14[1]) & 63) as c_uint) << 12)) | ((((unsafe: p__goto_2624_14[2]) & 63) as c_uint) << 6)) | ((unsafe: p__goto_2624_14[3]) & 63))
+                                            (c__goto_2623_12 = ((((((c__goto_2623_12 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: p__goto_2624_14[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: p__goto_2624_14[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p__goto_2624_14[3]) & 63))
                                             if (__goto_pending != 0) {
                                                 break
                                             }
@@ -8839,7 +8839,7 @@ fn read_name(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, terminator: 
                                                 break
                                             }
                                         } else {
-                                            (c__goto_2623_12 = (((((((c__goto_2623_12 & 1) as c_uint) << 30) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << 24)) | ((((unsafe: p__goto_2624_14[1]) & 63) as c_uint) << 18)) | ((((unsafe: p__goto_2624_14[2]) & 63) as c_uint) << 12)) | ((((unsafe: p__goto_2624_14[3]) & 63) as c_uint) << 6)) | ((unsafe: p__goto_2624_14[4]) & 63))
+                                            (c__goto_2623_12 = (((((((c__goto_2623_12 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *p__goto_2624_14) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: p__goto_2624_14[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: p__goto_2624_14[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: p__goto_2624_14[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p__goto_2624_14[4]) & 63))
                                             if (__goto_pending != 0) {
                                                 break
                                             }
@@ -9436,10 +9436,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             if ((if (c__goto_3115_10 & 32) == 0: 1 else: 0) != 0) {
                                 var __ci_expr_old_6: *const u8 = ptr
                                 (ptr = ptr + 1)
-                                (c__goto_3115_10 = (((c__goto_3115_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_6) & 63))
+                                (c__goto_3115_10 = (((c__goto_3115_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_6) & 63))
                             } else {
                                 if ((if (c__goto_3115_10 & 16) == 0: 1 else: 0) != 0) {
-                                    (c__goto_3115_10 = ((((c__goto_3115_10 & 15) as c_uint) << 12) | ((((unsafe: *ptr) & 63) as c_uint) << 6)) | ((unsafe: ptr[1]) & 63))
+                                    (c__goto_3115_10 = ((((c__goto_3115_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *ptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[1]) & 63))
                                     if (__goto_pending != 0) {
                                         break
                                     }
@@ -9449,7 +9449,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     }
                                 } else {
                                     if ((if (c__goto_3115_10 & 8) == 0: 1 else: 0) != 0) {
-                                        (c__goto_3115_10 = (((((c__goto_3115_10 & 7) as c_uint) << 18) | ((((unsafe: *ptr) & 63) as c_uint) << 12)) | ((((unsafe: ptr[1]) & 63) as c_uint) << 6)) | ((unsafe: ptr[2]) & 63))
+                                        (c__goto_3115_10 = (((((c__goto_3115_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *ptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[2]) & 63))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -9459,7 +9459,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         }
                                     } else {
                                         if ((if (c__goto_3115_10 & 4) == 0: 1 else: 0) != 0) {
-                                            (c__goto_3115_10 = ((((((c__goto_3115_10 & 3) as c_uint) << 24) | ((((unsafe: *ptr) & 63) as c_uint) << 18)) | ((((unsafe: ptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 6)) | ((unsafe: ptr[3]) & 63))
+                                            (c__goto_3115_10 = ((((((c__goto_3115_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *ptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[3]) & 63))
                                             if (__goto_pending != 0) {
                                                 break
                                             }
@@ -9468,7 +9468,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                             }
                                         } else {
-                                            (c__goto_3115_10 = (((((((c__goto_3115_10 & 1) as c_uint) << 30) | ((((unsafe: *ptr) & 63) as c_uint) << 24)) | ((((unsafe: ptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[3]) & 63) as c_uint) << 6)) | ((unsafe: ptr[4]) & 63))
+                                            (c__goto_3115_10 = (((((((c__goto_3115_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *ptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: ptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[4]) & 63))
                                             if (__goto_pending != 0) {
                                                 break
                                             }
@@ -9594,10 +9594,10 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                         if ((if (c__goto_3115_10 & 32) == 0: 1 else: 0) != 0) {
                             var __ci_expr_old_10: *const u8 = ptr
                             (ptr = ptr + 1)
-                            (c__goto_3115_10 = (((c__goto_3115_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_10) & 63))
+                            (c__goto_3115_10 = (((c__goto_3115_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_10) & 63))
                         } else {
                             if ((if (c__goto_3115_10 & 16) == 0: 1 else: 0) != 0) {
-                                (c__goto_3115_10 = ((((c__goto_3115_10 & 15) as c_uint) << 12) | ((((unsafe: *ptr) & 63) as c_uint) << 6)) | ((unsafe: ptr[1]) & 63))
+                                (c__goto_3115_10 = ((((c__goto_3115_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *ptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[1]) & 63))
                                 if (__goto_pending != 0) {
                                     break
                                 }
@@ -9607,7 +9607,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                 }
                             } else {
                                 if ((if (c__goto_3115_10 & 8) == 0: 1 else: 0) != 0) {
-                                    (c__goto_3115_10 = (((((c__goto_3115_10 & 7) as c_uint) << 18) | ((((unsafe: *ptr) & 63) as c_uint) << 12)) | ((((unsafe: ptr[1]) & 63) as c_uint) << 6)) | ((unsafe: ptr[2]) & 63))
+                                    (c__goto_3115_10 = (((((c__goto_3115_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *ptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[2]) & 63))
                                     if (__goto_pending != 0) {
                                         break
                                     }
@@ -9617,7 +9617,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     }
                                 } else {
                                     if ((if (c__goto_3115_10 & 4) == 0: 1 else: 0) != 0) {
-                                        (c__goto_3115_10 = ((((((c__goto_3115_10 & 3) as c_uint) << 24) | ((((unsafe: *ptr) & 63) as c_uint) << 18)) | ((((unsafe: ptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 6)) | ((unsafe: ptr[3]) & 63))
+                                        (c__goto_3115_10 = ((((((c__goto_3115_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *ptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[3]) & 63))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -9626,7 +9626,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                         }
                                     } else {
-                                        (c__goto_3115_10 = (((((((c__goto_3115_10 & 1) as c_uint) << 30) | ((((unsafe: *ptr) & 63) as c_uint) << 24)) | ((((unsafe: ptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[3]) & 63) as c_uint) << 6)) | ((unsafe: ptr[4]) & 63))
+                                        (c__goto_3115_10 = (((((((c__goto_3115_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *ptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: ptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[4]) & 63))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -10336,7 +10336,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
 
                                     (parsed_pattern__goto_3125_11 = parsed_pattern__goto_3125_11 + 1)
 
-                                    ((unsafe: *__ci_expr_old_71) = (((((0 as c_ulong) as c_ulong) >> 32) as c_uint)))
+                                    ((unsafe: *__ci_expr_old_71) = (((((0 as c_ulong) as c_ulong) >> (32 as c_uint)) as c_uint)))
 
 
                                     if (__goto_pending != 0) {
@@ -10650,7 +10650,7 @@ fn first_significant_code(__param_code: *const u8, skipassert: c_int) -> *const 
                 }
 
                 while true {
-                    (code = code + (((((unsafe: code[1]) as c_int) << 8) | (unsafe: code[(1 + 1)])) as c_uint))
+                    (code = code + (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
 
                     if (not ((if (unsafe: *code) == OP_ALT: 1 else: 0) != 0)) {
                         break
@@ -10670,16 +10670,16 @@ fn first_significant_code(__param_code: *const u8, skipassert: c_int) -> *const 
             OP_CALLOUT | OP_CREF | OP_DNCREF | OP_RREF | OP_DNRREF | OP_FALSE | OP_TRUE =>
                 (code = code + _pcre2_OP_lengths_8[(unsafe: *code)])
             OP_CALLOUT_STR =>
-                (code = code + (((((unsafe: code[(1 + (2 * 2))]) as c_int) << 8) | (unsafe: code[((1 + (2 * 2)) + 1)])) as c_uint))
+                (code = code + (((((unsafe: code[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: code[((1 + (2 * 2)) + 1)])) as c_uint))
             OP_SKIPZERO =>
-                (code = code + ((2 +% (((((unsafe: code[2]) as c_int) << 8) | (unsafe: code[(2 + 1)])) as c_uint)) +% 2))
+                (code = code + ((2 +% (((((unsafe: code[2]) as c_int) << (8 as c_uint)) | (unsafe: code[(2 + 1)])) as c_uint)) +% 2))
             OP_COND | OP_SCOND =>
                 var __ci_expr_logic_0: c_int
 
                 if ((if (unsafe: code[(1 + 2)]) != OP_FALSE: 1 else: 0) != 0) {
                     (__ci_expr_logic_0 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_0 = (if (if (unsafe: code[(((((unsafe: code[1]) as c_int) << 8) | (unsafe: code[(1 + 1)])) as c_uint)]) != OP_KET: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_0 = (if (if (unsafe: code[(((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint)]) != OP_KET: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 if (__ci_expr_logic_0 != 0) {
@@ -10687,7 +10687,7 @@ fn first_significant_code(__param_code: *const u8, skipassert: c_int) -> *const 
                 }
 
 
-                (code = code + (((((((unsafe: code[1]) as c_int) << 8) | (unsafe: code[(1 + 1)])) as c_uint) +% 1) +% 2))
+                (code = code + (((((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint) +% 1) +% 2))
 
             OP_MARK | OP_COMMIT_ARG | OP_PRUNE_ARG | OP_SKIP_ARG | OP_THEN_ARG =>
                 (code = code + ((unsafe: code[1]) + _pcre2_OP_lengths_8[(unsafe: *code)]))
@@ -12193,7 +12193,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: code__goto_6093_14[0]) = (oc__goto_6153_17.number as c_int) >> 8)
+                                    ((unsafe: code__goto_6093_14[0]) = (oc__goto_6153_17.number as c_int) >> (8 as c_uint))
 
                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = oc__goto_6153_17.number & 255)
 
@@ -12245,7 +12245,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
 
                             (code__goto_6093_14 = code__goto_6093_14 + 1)
 
-                            ((unsafe: *__ci_expr_old_44) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> 16)])
+                            ((unsafe: *__ci_expr_old_44) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> (16 as c_uint))])
 
 
                         2150891520 =>
@@ -12255,7 +12255,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
 
                             (code__goto_6093_14 = code__goto_6093_14 + 1)
 
-                            ((unsafe: *__ci_expr_old_44) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> 16)])
+                            ((unsafe: *__ci_expr_old_44) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> (16 as c_uint))])
 
 
                         2150629376 =>
@@ -12263,14 +12263,14 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
 
                             (code__goto_6093_14 = code__goto_6093_14 + 1)
 
-                            ((unsafe: *__ci_expr_old_44) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> 16)])
+                            ((unsafe: *__ci_expr_old_44) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> (16 as c_uint))])
 
                         2150563840 =>
                             var __ci_expr_old_44: *mut u8 = code__goto_6093_14
 
                             (code__goto_6093_14 = code__goto_6093_14 + 1)
 
-                            ((unsafe: *__ci_expr_old_44) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> 16)])
+                            ((unsafe: *__ci_expr_old_44) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> (16 as c_uint))])
 
                         2151022592 =>
                             (cb.external_flags = cb.external_flags | 4096)
@@ -12295,7 +12295,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
 
                             (code__goto_6093_14 = code__goto_6093_14 + 1)
 
-                            ((unsafe: *__ci_expr_old_46) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> 16)])
+                            ((unsafe: *__ci_expr_old_46) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> (16 as c_uint))])
 
 
                             (pptr__goto_6084_11 = pptr__goto_6084_11 + 1)
@@ -12397,7 +12397,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
 
                             (code__goto_6093_14 = code__goto_6093_14 + 1)
 
-                            ((unsafe: *__ci_expr_old_46) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> 16)])
+                            ((unsafe: *__ci_expr_old_46) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> (16 as c_uint))])
 
 
                             (pptr__goto_6084_11 = pptr__goto_6084_11 + 1)
@@ -12497,7 +12497,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
 
                             (code__goto_6093_14 = code__goto_6093_14 + 1)
 
-                            ((unsafe: *__ci_expr_old_46) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> 16)])
+                            ((unsafe: *__ci_expr_old_46) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> (16 as c_uint))])
 
 
                             (pptr__goto_6084_11 = pptr__goto_6084_11 + 1)
@@ -12596,7 +12596,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
 
                             (code__goto_6093_14 = code__goto_6093_14 + 1)
 
-                            ((unsafe: *__ci_expr_old_46) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> 16)])
+                            ((unsafe: *__ci_expr_old_46) = verbops[(((meta__goto_6085_10 -% (2150432768 as c_uint)) as c_uint) >> (16 as c_uint))])
 
 
                             (pptr__goto_6084_11 = pptr__goto_6084_11 + 1)
@@ -12773,7 +12773,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
+                                (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -12884,7 +12884,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: code__goto_6093_14[(2 + 2)]) = ((unsafe: pptr__goto_6084_11[1]) as c_uint) >> 8)
+                                    ((unsafe: code__goto_6093_14[(2 + 2)]) = ((unsafe: pptr__goto_6084_11[1]) as c_uint) >> (8 as c_uint))
 
                                     ((unsafe: code__goto_6093_14[((2 + 2) + 1)]) = (unsafe: pptr__goto_6084_11[1]) & 255)
 
@@ -12934,7 +12934,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: code__goto_6093_14[(2 + 2)]) = ((unsafe: pptr__goto_6084_11[1]) as c_uint) >> 8)
+                                    ((unsafe: code__goto_6093_14[(2 + 2)]) = ((unsafe: pptr__goto_6084_11[1]) as c_uint) >> (8 as c_uint))
 
                                     ((unsafe: code__goto_6093_14[((2 + 2) + 1)]) = (unsafe: pptr__goto_6084_11[1]) & 255)
 
@@ -13009,7 +13009,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                ((unsafe: code__goto_6093_14[(2 + 2)]) = (index__goto_6747_18 as c_int) >> 8)
+                                ((unsafe: code__goto_6093_14[(2 + 2)]) = (index__goto_6747_18 as c_int) >> (8 as c_uint))
 
                                 ((unsafe: code__goto_6093_14[((2 + 2) + 1)]) = index__goto_6747_18 & 255)
 
@@ -13018,7 +13018,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                ((unsafe: code__goto_6093_14[((2 + 2) + 2)]) = (count__goto_6747_11 as c_int) >> 8)
+                                ((unsafe: code__goto_6093_14[((2 + 2) + 2)]) = (count__goto_6747_11 as c_int) >> (8 as c_uint))
 
                                 ((unsafe: code__goto_6093_14[(((2 + 2) + 2) + 1)]) = count__goto_6747_11 & 255)
 
@@ -13063,7 +13063,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
+                                (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -13174,7 +13174,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: code__goto_6093_14[(2 + 2)]) = ((unsafe: pptr__goto_6084_11[1]) as c_uint) >> 8)
+                                    ((unsafe: code__goto_6093_14[(2 + 2)]) = ((unsafe: pptr__goto_6084_11[1]) as c_uint) >> (8 as c_uint))
 
                                     ((unsafe: code__goto_6093_14[((2 + 2) + 1)]) = (unsafe: pptr__goto_6084_11[1]) & 255)
 
@@ -13224,7 +13224,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: code__goto_6093_14[(2 + 2)]) = ((unsafe: pptr__goto_6084_11[1]) as c_uint) >> 8)
+                                    ((unsafe: code__goto_6093_14[(2 + 2)]) = ((unsafe: pptr__goto_6084_11[1]) as c_uint) >> (8 as c_uint))
 
                                     ((unsafe: code__goto_6093_14[((2 + 2) + 1)]) = (unsafe: pptr__goto_6084_11[1]) & 255)
 
@@ -13299,7 +13299,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                ((unsafe: code__goto_6093_14[(2 + 2)]) = (index__goto_6747_18 as c_int) >> 8)
+                                ((unsafe: code__goto_6093_14[(2 + 2)]) = (index__goto_6747_18 as c_int) >> (8 as c_uint))
 
                                 ((unsafe: code__goto_6093_14[((2 + 2) + 1)]) = index__goto_6747_18 & 255)
 
@@ -13308,7 +13308,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                ((unsafe: code__goto_6093_14[((2 + 2) + 2)]) = (count__goto_6747_11 as c_int) >> 8)
+                                ((unsafe: code__goto_6093_14[((2 + 2) + 2)]) = (count__goto_6747_11 as c_int) >> (8 as c_uint))
 
                                 ((unsafe: code__goto_6093_14[(((2 + 2) + 2) + 1)]) = count__goto_6747_11 & 255)
 
@@ -13353,7 +13353,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
+                                (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -13464,7 +13464,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: code__goto_6093_14[(2 + 2)]) = ((unsafe: pptr__goto_6084_11[1]) as c_uint) >> 8)
+                                    ((unsafe: code__goto_6093_14[(2 + 2)]) = ((unsafe: pptr__goto_6084_11[1]) as c_uint) >> (8 as c_uint))
 
                                     ((unsafe: code__goto_6093_14[((2 + 2) + 1)]) = (unsafe: pptr__goto_6084_11[1]) & 255)
 
@@ -13514,7 +13514,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: code__goto_6093_14[(2 + 2)]) = ((unsafe: pptr__goto_6084_11[1]) as c_uint) >> 8)
+                                    ((unsafe: code__goto_6093_14[(2 + 2)]) = ((unsafe: pptr__goto_6084_11[1]) as c_uint) >> (8 as c_uint))
 
                                     ((unsafe: code__goto_6093_14[((2 + 2) + 1)]) = (unsafe: pptr__goto_6084_11[1]) & 255)
 
@@ -13589,7 +13589,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                ((unsafe: code__goto_6093_14[(2 + 2)]) = (index__goto_6747_18 as c_int) >> 8)
+                                ((unsafe: code__goto_6093_14[(2 + 2)]) = (index__goto_6747_18 as c_int) >> (8 as c_uint))
 
                                 ((unsafe: code__goto_6093_14[((2 + 2) + 1)]) = index__goto_6747_18 & 255)
 
@@ -13598,7 +13598,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                ((unsafe: code__goto_6093_14[((2 + 2) + 2)]) = (count__goto_6747_11 as c_int) >> 8)
+                                ((unsafe: code__goto_6093_14[((2 + 2) + 2)]) = (count__goto_6747_11 as c_int) >> (8 as c_uint))
 
                                 ((unsafe: code__goto_6093_14[(((2 + 2) + 2) + 1)]) = count__goto_6747_11 & 255)
 
@@ -13627,7 +13627,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                         2148532224 =>
                             (bravalue__goto_6074_5 = OP_COND)
 
-                            (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
+                            (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
 
                             if (__goto_pending != 0) {
                                 break
@@ -13650,7 +13650,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                         2148663296 =>
                             (bravalue__goto_6074_5 = OP_COND)
 
-                            (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
+                            (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
 
                             if (__goto_pending != 0) {
                                 break
@@ -13699,7 +13699,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
 
                             (skipunits__goto_6148_12 = 3)
 
-                            ((unsafe: code__goto_6093_14[(2 + 2)]) = (groupnumber__goto_6150_12 as c_uint) >> 8)
+                            ((unsafe: code__goto_6093_14[(2 + 2)]) = (groupnumber__goto_6150_12 as c_uint) >> (8 as c_uint))
 
                             ((unsafe: code__goto_6093_14[((2 + 2) + 1)]) = groupnumber__goto_6150_12 & 255)
 
@@ -13964,7 +13964,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    (tc__goto_6973_20 = tc__goto_6973_20 + (((((unsafe: tc__goto_6973_20[1]) as c_int) << 8) | (unsafe: tc__goto_6973_20[(1 + 1)])) as c_uint))
+                                    (tc__goto_6973_20 = tc__goto_6973_20 + (((((unsafe: tc__goto_6973_20[1]) as c_int) << (8 as c_uint)) | (unsafe: tc__goto_6973_20[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -14104,7 +14104,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                ((unsafe: code__goto_6093_14[0]) = (((((1 + 2) as c_int) >> 8) as u8)))
+                                ((unsafe: code__goto_6093_14[0]) = (((((1 + 2) as c_int) >> (8 as c_uint)) as u8)))
 
                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = ((((1 + 2) & 255) as u8)))
 
@@ -14126,7 +14126,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                ((unsafe: code__goto_6093_14[0]) = (((((1 + 2) as c_int) >> 8) as u8)))
+                                ((unsafe: code__goto_6093_14[0]) = (((((1 + 2) as c_int) >> (8 as c_uint)) as u8)))
 
                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = ((((1 + 2) & 255) as u8)))
 
@@ -14298,7 +14298,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 break
                             }
 
-                            (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
+                            (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
 
                             if (__goto_pending != 0) {
                                 break
@@ -14381,7 +14381,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             var __ci_expr_ternary_72: c_uint = 0
 
                             if ((if groupnumber__goto_6150_12 < 32: 1 else: 0) != 0) {
-                                (__ci_expr_ternary_72 = (1 as c_uint) << groupnumber__goto_6150_12)
+                                (__ci_expr_ternary_72 = (1 as c_uint) << (groupnumber__goto_6150_12 as c_uint))
                             } else {
                                 (__ci_expr_ternary_72 = 1)
                             }
@@ -14475,7 +14475,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 break
                             }
 
-                            ((unsafe: code__goto_6093_14[0]) = (index__goto_7125_18 as c_int) >> 8)
+                            ((unsafe: code__goto_6093_14[0]) = (index__goto_7125_18 as c_int) >> (8 as c_uint))
 
                             ((unsafe: code__goto_6093_14[(0 + 1)]) = index__goto_7125_18 & 255)
 
@@ -14486,7 +14486,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 break
                             }
 
-                            ((unsafe: code__goto_6093_14[0]) = (count__goto_7125_11 as c_int) >> 8)
+                            ((unsafe: code__goto_6093_14[0]) = (count__goto_7125_11 as c_int) >> (8 as c_uint))
 
                             ((unsafe: code__goto_6093_14[(0 + 1)]) = count__goto_7125_11 & 255)
 
@@ -14536,7 +14536,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 break
                             }
 
-                            (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
+                            (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
 
                             if (__goto_pending != 0) {
                                 break
@@ -14619,7 +14619,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             var __ci_expr_ternary_72: c_uint = 0
 
                             if ((if groupnumber__goto_6150_12 < 32: 1 else: 0) != 0) {
-                                (__ci_expr_ternary_72 = (1 as c_uint) << groupnumber__goto_6150_12)
+                                (__ci_expr_ternary_72 = (1 as c_uint) << (groupnumber__goto_6150_12 as c_uint))
                             } else {
                                 (__ci_expr_ternary_72 = 1)
                             }
@@ -14713,7 +14713,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 break
                             }
 
-                            ((unsafe: code__goto_6093_14[0]) = (index__goto_7125_18 as c_int) >> 8)
+                            ((unsafe: code__goto_6093_14[0]) = (index__goto_7125_18 as c_int) >> (8 as c_uint))
 
                             ((unsafe: code__goto_6093_14[(0 + 1)]) = index__goto_7125_18 & 255)
 
@@ -14724,7 +14724,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 break
                             }
 
-                            ((unsafe: code__goto_6093_14[0]) = (count__goto_7125_11 as c_int) >> 8)
+                            ((unsafe: code__goto_6093_14[0]) = (count__goto_7125_11 as c_int) >> (8 as c_uint))
 
                             ((unsafe: code__goto_6093_14[(0 + 1)]) = count__goto_7125_11 & 255)
 
@@ -14767,12 +14767,12 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                         2147876864 =>
                             ((unsafe: code__goto_6093_14[0]) = 119)
 
-                            ((unsafe: code__goto_6093_14[1]) = (((((unsafe: pptr__goto_6084_11[1]) as c_uint) >> 8) as u8)))
+                            ((unsafe: code__goto_6093_14[1]) = (((((unsafe: pptr__goto_6084_11[1]) as c_uint) >> (8 as c_uint)) as u8)))
 
                             ((unsafe: code__goto_6093_14[(1 + 1)]) = ((((unsafe: pptr__goto_6084_11[1]) & 255) as u8)))
 
 
-                            ((unsafe: code__goto_6093_14[(1 + 2)]) = (((((unsafe: pptr__goto_6084_11[2]) as c_uint) >> 8) as u8)))
+                            ((unsafe: code__goto_6093_14[(1 + 2)]) = (((((unsafe: pptr__goto_6084_11[2]) as c_uint) >> (8 as c_uint)) as u8)))
 
                             ((unsafe: code__goto_6093_14[((1 + 2) + 1)]) = ((((unsafe: pptr__goto_6084_11[2]) & 255) as u8)))
 
@@ -14822,7 +14822,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                ((unsafe: code__goto_6093_14[1]) = (((((unsafe: pptr__goto_6084_11[1]) as c_uint) >> 8) as u8)))
+                                ((unsafe: code__goto_6093_14[1]) = (((((unsafe: pptr__goto_6084_11[1]) as c_uint) >> (8 as c_uint)) as u8)))
 
                                 ((unsafe: code__goto_6093_14[(1 + 1)]) = ((((unsafe: pptr__goto_6084_11[1]) & 255) as u8)))
 
@@ -14831,7 +14831,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                ((unsafe: code__goto_6093_14[(1 + 2)]) = (((((unsafe: pptr__goto_6084_11[2]) as c_uint) >> 8) as u8)))
+                                ((unsafe: code__goto_6093_14[(1 + 2)]) = (((((unsafe: pptr__goto_6084_11[2]) as c_uint) >> (8 as c_uint)) as u8)))
 
                                 ((unsafe: code__goto_6093_14[((1 + 2) + 1)]) = ((((unsafe: pptr__goto_6084_11[2]) & 255) as u8)))
 
@@ -14846,7 +14846,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
+                                (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -14894,7 +14894,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                ((unsafe: code__goto_6093_14[(1 + (3 * 2))]) = ((((((offset__goto_6091_12 +% 1) as c_int) as c_int) >> 8) as u8)))
+                                ((unsafe: code__goto_6093_14[(1 + (3 * 2))]) = ((((((offset__goto_6091_12 +% 1) as c_int) as c_int) >> (8 as c_uint)) as u8)))
 
                                 ((unsafe: code__goto_6093_14[((1 + (3 * 2)) + 1)]) = (((((offset__goto_6091_12 +% 1) as c_int) & 255) as u8)))
 
@@ -14978,7 +14978,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                ((unsafe: code__goto_6093_14[(1 + (2 * 2))]) = ((((((((callout_string__goto_7235_20 as usize) -% (code__goto_6093_14 as usize)) / sizeof[u8]()) as c_int) as c_int) >> 8) as u8)))
+                                ((unsafe: code__goto_6093_14[(1 + (2 * 2))]) = ((((((((callout_string__goto_7235_20 as usize) -% (code__goto_6093_14 as usize)) / sizeof[u8]()) as c_int) as c_int) >> (8 as c_uint)) as u8)))
 
                                 ((unsafe: code__goto_6093_14[((1 + (2 * 2)) + 1)]) = (((((((callout_string__goto_7235_20 as usize) -% (code__goto_6093_14 as usize)) / sizeof[u8]()) as c_int) & 255) as u8)))
 
@@ -15649,7 +15649,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -15668,7 +15668,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -15768,7 +15768,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -15787,7 +15787,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -15887,7 +15887,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -15906,7 +15906,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -16006,7 +16006,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -16025,7 +16025,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -16125,7 +16125,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -16144,7 +16144,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -16244,7 +16244,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -16263,7 +16263,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -16363,7 +16363,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -16382,7 +16382,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -16482,7 +16482,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -16501,7 +16501,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -16694,7 +16694,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: previous__goto_6097_14[1]) = (((((3 +% length__goto_7502_20) as c_ulong) >> 8) as u8)))
+                                    ((unsafe: previous__goto_6097_14[1]) = (((((3 +% length__goto_7502_20) as c_ulong) >> (8 as c_uint)) as u8)))
 
                                     ((unsafe: previous__goto_6097_14[(1 + 1)]) = ((((3 +% length__goto_7502_20) & 255) as u8)))
 
@@ -16709,7 +16709,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: previous__goto_6097_14[(4 +% length__goto_7502_20)]) = (((((3 +% length__goto_7502_20) as c_ulong) >> 8) as u8)))
+                                    ((unsafe: previous__goto_6097_14[(4 +% length__goto_7502_20)]) = (((((3 +% length__goto_7502_20) as c_ulong) >> (8 as c_uint)) as u8)))
 
                                     ((unsafe: previous__goto_6097_14[((4 +% length__goto_7502_20) +% 1)]) = ((((3 +% length__goto_7502_20) & 255) as u8)))
 
@@ -16774,7 +16774,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -16922,7 +16922,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -17161,7 +17161,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -17218,7 +17218,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -17248,7 +17248,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -17258,7 +17258,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -17283,7 +17283,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -17327,7 +17327,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -17405,7 +17405,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -17416,7 +17416,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -17533,7 +17533,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -17681,7 +17681,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -17920,7 +17920,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -17977,7 +17977,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -18007,7 +18007,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -18017,7 +18017,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -18042,7 +18042,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -18086,7 +18086,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -18164,7 +18164,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -18175,7 +18175,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -18291,7 +18291,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -18439,7 +18439,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -18678,7 +18678,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -18735,7 +18735,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -18765,7 +18765,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -18775,7 +18775,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -18800,7 +18800,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -18844,7 +18844,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -18922,7 +18922,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -18933,7 +18933,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -19049,7 +19049,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -19197,7 +19197,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -19436,7 +19436,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -19493,7 +19493,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -19523,7 +19523,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -19533,7 +19533,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -19558,7 +19558,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -19602,7 +19602,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -19680,7 +19680,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -19691,7 +19691,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -19807,7 +19807,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -19955,7 +19955,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -20194,7 +20194,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -20251,7 +20251,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -20281,7 +20281,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -20291,7 +20291,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -20316,7 +20316,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -20360,7 +20360,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -20438,7 +20438,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -20449,7 +20449,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -20565,7 +20565,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -20713,7 +20713,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -20952,7 +20952,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -21009,7 +21009,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -21039,7 +21039,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -21049,7 +21049,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -21074,7 +21074,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -21118,7 +21118,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -21196,7 +21196,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -21207,7 +21207,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -21323,7 +21323,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -21471,7 +21471,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -21710,7 +21710,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -21767,7 +21767,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -21797,7 +21797,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -21807,7 +21807,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -21832,7 +21832,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -21876,7 +21876,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -21954,7 +21954,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -21965,7 +21965,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -22081,7 +22081,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -22229,7 +22229,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -22468,7 +22468,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -22525,7 +22525,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -22555,7 +22555,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -22565,7 +22565,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -22590,7 +22590,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -22634,7 +22634,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -22712,7 +22712,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -22723,7 +22723,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -22839,7 +22839,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -22987,7 +22987,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -23226,7 +23226,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -23283,7 +23283,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -23313,7 +23313,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -23323,7 +23323,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -23348,7 +23348,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -23392,7 +23392,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -23470,7 +23470,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -23481,7 +23481,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -23597,7 +23597,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -23745,7 +23745,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -23984,7 +23984,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -24041,7 +24041,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -24071,7 +24071,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -24081,7 +24081,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -24106,7 +24106,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -24150,7 +24150,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -24228,7 +24228,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -24239,7 +24239,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -24355,7 +24355,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -24503,7 +24503,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -24742,7 +24742,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -24799,7 +24799,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -24829,7 +24829,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -24839,7 +24839,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -24864,7 +24864,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -24908,7 +24908,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -24986,7 +24986,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -24997,7 +24997,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -25113,7 +25113,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -25261,7 +25261,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -25500,7 +25500,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -25557,7 +25557,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -25587,7 +25587,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -25597,7 +25597,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -25622,7 +25622,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -25666,7 +25666,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -25744,7 +25744,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -25755,7 +25755,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -25871,7 +25871,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -26019,7 +26019,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -26258,7 +26258,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -26315,7 +26315,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -26345,7 +26345,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -26355,7 +26355,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -26380,7 +26380,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -26424,7 +26424,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -26502,7 +26502,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -26513,7 +26513,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -26714,7 +26714,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -26768,7 +26768,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = ((repeat_max__goto_6077_26 -% 1) as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = ((repeat_max__goto_6077_26 -% 1) as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = (repeat_max__goto_6077_26 -% 1) & 255)
 
@@ -26797,7 +26797,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                            ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -26907,7 +26907,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                             break
                                                         }
 
-                                                        ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                        ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                         ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -27576,7 +27576,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -27595,7 +27595,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -27695,7 +27695,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -27714,7 +27714,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -27814,7 +27814,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -27833,7 +27833,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -27933,7 +27933,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -27952,7 +27952,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -28052,7 +28052,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -28071,7 +28071,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -28171,7 +28171,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -28190,7 +28190,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -28290,7 +28290,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -28309,7 +28309,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -28409,7 +28409,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -28428,7 +28428,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -28621,7 +28621,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: previous__goto_6097_14[1]) = (((((3 +% length__goto_7502_20) as c_ulong) >> 8) as u8)))
+                                    ((unsafe: previous__goto_6097_14[1]) = (((((3 +% length__goto_7502_20) as c_ulong) >> (8 as c_uint)) as u8)))
 
                                     ((unsafe: previous__goto_6097_14[(1 + 1)]) = ((((3 +% length__goto_7502_20) & 255) as u8)))
 
@@ -28636,7 +28636,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: previous__goto_6097_14[(4 +% length__goto_7502_20)]) = (((((3 +% length__goto_7502_20) as c_ulong) >> 8) as u8)))
+                                    ((unsafe: previous__goto_6097_14[(4 +% length__goto_7502_20)]) = (((((3 +% length__goto_7502_20) as c_ulong) >> (8 as c_uint)) as u8)))
 
                                     ((unsafe: previous__goto_6097_14[((4 +% length__goto_7502_20) +% 1)]) = ((((3 +% length__goto_7502_20) & 255) as u8)))
 
@@ -28701,7 +28701,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -28849,7 +28849,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -29088,7 +29088,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -29145,7 +29145,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -29175,7 +29175,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -29185,7 +29185,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -29210,7 +29210,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -29254,7 +29254,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -29332,7 +29332,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -29343,7 +29343,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -29460,7 +29460,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -29608,7 +29608,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -29847,7 +29847,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -29904,7 +29904,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -29934,7 +29934,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -29944,7 +29944,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -29969,7 +29969,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -30013,7 +30013,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -30091,7 +30091,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -30102,7 +30102,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -30218,7 +30218,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -30366,7 +30366,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -30605,7 +30605,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -30662,7 +30662,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -30692,7 +30692,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -30702,7 +30702,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -30727,7 +30727,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -30771,7 +30771,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -30849,7 +30849,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -30860,7 +30860,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -30976,7 +30976,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -31124,7 +31124,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -31363,7 +31363,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -31420,7 +31420,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -31450,7 +31450,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -31460,7 +31460,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -31485,7 +31485,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -31529,7 +31529,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -31607,7 +31607,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -31618,7 +31618,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -31734,7 +31734,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -31882,7 +31882,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -32121,7 +32121,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -32178,7 +32178,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -32208,7 +32208,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -32218,7 +32218,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -32243,7 +32243,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -32287,7 +32287,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -32365,7 +32365,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -32376,7 +32376,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -32492,7 +32492,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -32640,7 +32640,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -32879,7 +32879,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -32936,7 +32936,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -32966,7 +32966,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -32976,7 +32976,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -33001,7 +33001,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -33045,7 +33045,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -33123,7 +33123,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -33134,7 +33134,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -33250,7 +33250,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -33398,7 +33398,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -33637,7 +33637,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -33694,7 +33694,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -33724,7 +33724,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -33734,7 +33734,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -33759,7 +33759,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -33803,7 +33803,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -33881,7 +33881,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -33892,7 +33892,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -34008,7 +34008,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -34156,7 +34156,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -34395,7 +34395,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -34452,7 +34452,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -34482,7 +34482,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -34492,7 +34492,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -34517,7 +34517,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -34561,7 +34561,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -34639,7 +34639,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -34650,7 +34650,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -34766,7 +34766,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -34914,7 +34914,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -35153,7 +35153,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -35210,7 +35210,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -35240,7 +35240,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -35250,7 +35250,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -35275,7 +35275,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -35319,7 +35319,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -35397,7 +35397,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -35408,7 +35408,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -35524,7 +35524,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -35672,7 +35672,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -35911,7 +35911,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -35968,7 +35968,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -35998,7 +35998,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -36008,7 +36008,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -36033,7 +36033,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -36077,7 +36077,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -36155,7 +36155,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -36166,7 +36166,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -36282,7 +36282,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -36430,7 +36430,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -36669,7 +36669,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -36726,7 +36726,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -36756,7 +36756,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -36766,7 +36766,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -36791,7 +36791,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -36835,7 +36835,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -36913,7 +36913,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -36924,7 +36924,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -37040,7 +37040,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -37188,7 +37188,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -37427,7 +37427,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -37484,7 +37484,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -37514,7 +37514,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -37524,7 +37524,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -37549,7 +37549,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -37593,7 +37593,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -37671,7 +37671,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -37682,7 +37682,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -37798,7 +37798,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -37946,7 +37946,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -38185,7 +38185,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -38242,7 +38242,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -38272,7 +38272,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -38282,7 +38282,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -38307,7 +38307,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -38351,7 +38351,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -38429,7 +38429,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -38440,7 +38440,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -38641,7 +38641,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -38695,7 +38695,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = ((repeat_max__goto_6077_26 -% 1) as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = ((repeat_max__goto_6077_26 -% 1) as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = (repeat_max__goto_6077_26 -% 1) & 255)
 
@@ -38724,7 +38724,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                            ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -38834,7 +38834,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                             break
                                                         }
 
-                                                        ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                        ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                         ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -39503,7 +39503,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -39522,7 +39522,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -39622,7 +39622,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -39641,7 +39641,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -39741,7 +39741,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -39760,7 +39760,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -39860,7 +39860,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -39879,7 +39879,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -39979,7 +39979,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -39998,7 +39998,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -40098,7 +40098,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -40117,7 +40117,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -40217,7 +40217,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -40236,7 +40236,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -40336,7 +40336,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -40355,7 +40355,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -40548,7 +40548,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: previous__goto_6097_14[1]) = (((((3 +% length__goto_7502_20) as c_ulong) >> 8) as u8)))
+                                    ((unsafe: previous__goto_6097_14[1]) = (((((3 +% length__goto_7502_20) as c_ulong) >> (8 as c_uint)) as u8)))
 
                                     ((unsafe: previous__goto_6097_14[(1 + 1)]) = ((((3 +% length__goto_7502_20) & 255) as u8)))
 
@@ -40563,7 +40563,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                         break
                                     }
 
-                                    ((unsafe: previous__goto_6097_14[(4 +% length__goto_7502_20)]) = (((((3 +% length__goto_7502_20) as c_ulong) >> 8) as u8)))
+                                    ((unsafe: previous__goto_6097_14[(4 +% length__goto_7502_20)]) = (((((3 +% length__goto_7502_20) as c_ulong) >> (8 as c_uint)) as u8)))
 
                                     ((unsafe: previous__goto_6097_14[((4 +% length__goto_7502_20) +% 1)]) = ((((3 +% length__goto_7502_20) & 255) as u8)))
 
@@ -40628,7 +40628,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -40776,7 +40776,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -41015,7 +41015,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -41072,7 +41072,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -41102,7 +41102,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -41112,7 +41112,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -41137,7 +41137,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -41181,7 +41181,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -41259,7 +41259,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -41270,7 +41270,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -41387,7 +41387,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -41535,7 +41535,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -41774,7 +41774,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -41831,7 +41831,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -41861,7 +41861,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -41871,7 +41871,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -41896,7 +41896,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -41940,7 +41940,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -42018,7 +42018,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -42029,7 +42029,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -42145,7 +42145,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -42293,7 +42293,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -42532,7 +42532,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -42589,7 +42589,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -42619,7 +42619,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -42629,7 +42629,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -42654,7 +42654,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -42698,7 +42698,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -42776,7 +42776,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -42787,7 +42787,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -42903,7 +42903,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -43051,7 +43051,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -43290,7 +43290,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -43347,7 +43347,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -43377,7 +43377,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -43387,7 +43387,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -43412,7 +43412,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -43456,7 +43456,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -43534,7 +43534,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -43545,7 +43545,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -43661,7 +43661,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -43809,7 +43809,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -44048,7 +44048,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -44105,7 +44105,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -44135,7 +44135,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -44145,7 +44145,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -44170,7 +44170,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -44214,7 +44214,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -44292,7 +44292,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -44303,7 +44303,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -44419,7 +44419,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -44567,7 +44567,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -44806,7 +44806,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -44863,7 +44863,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -44893,7 +44893,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -44903,7 +44903,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -44928,7 +44928,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -44972,7 +44972,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -45050,7 +45050,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -45061,7 +45061,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -45177,7 +45177,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -45325,7 +45325,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -45564,7 +45564,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -45621,7 +45621,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -45651,7 +45651,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -45661,7 +45661,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -45686,7 +45686,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -45730,7 +45730,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -45808,7 +45808,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -45819,7 +45819,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -45935,7 +45935,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -46083,7 +46083,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -46322,7 +46322,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -46379,7 +46379,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -46409,7 +46409,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -46419,7 +46419,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -46444,7 +46444,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -46488,7 +46488,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -46566,7 +46566,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -46577,7 +46577,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -46693,7 +46693,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -46841,7 +46841,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -47080,7 +47080,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -47137,7 +47137,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -47167,7 +47167,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -47177,7 +47177,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -47202,7 +47202,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -47246,7 +47246,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -47324,7 +47324,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -47335,7 +47335,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -47451,7 +47451,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -47599,7 +47599,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -47838,7 +47838,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -47895,7 +47895,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -47925,7 +47925,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -47935,7 +47935,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -47960,7 +47960,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -48004,7 +48004,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -48082,7 +48082,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -48093,7 +48093,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -48209,7 +48209,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -48357,7 +48357,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -48596,7 +48596,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -48653,7 +48653,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -48683,7 +48683,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -48693,7 +48693,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -48718,7 +48718,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -48762,7 +48762,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -48840,7 +48840,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -48851,7 +48851,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -48967,7 +48967,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -49115,7 +49115,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -49354,7 +49354,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -49411,7 +49411,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -49441,7 +49441,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -49451,7 +49451,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -49476,7 +49476,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -49520,7 +49520,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -49598,7 +49598,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -49609,7 +49609,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -49725,7 +49725,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     }
 
                                     if (__ci_expr_logic_107 != 0) {
-                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << 8) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if (unsafe: previous__goto_6097_14[(((((unsafe: previous__goto_6097_14[1]) as c_int) << (8 as c_uint)) | (unsafe: previous__goto_6097_14[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                     }
 
                                     if (__ci_expr_logic_108 != 0) {
@@ -49873,7 +49873,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: previous__goto_6097_14[0]) = ((((linkoffset__goto_7615_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: previous__goto_6097_14[(0 + 1)]) = (((linkoffset__goto_7615_17 & 255) as u8)))
 
@@ -50112,7 +50112,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7719_19 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7719_19 & 255) as u8)))
 
@@ -50169,7 +50169,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << 8) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
+                                            (oldlinkoffset__goto_7735_17 = ((((((unsafe: bra__goto_7737_26[1]) as c_int) << (8 as c_uint)) | (unsafe: bra__goto_7737_26[(1 + 1)])) as c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -50199,7 +50199,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: code__goto_6093_14[0]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -50209,7 +50209,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> 8) as u8)))
+                                            ((unsafe: bra__goto_7737_26[1]) = ((((linkoffset__goto_7736_17 as c_int) >> (8 as c_uint)) as u8)))
 
                                             ((unsafe: bra__goto_7737_26[(1 + 1)]) = (((linkoffset__goto_7736_17 & 255) as u8)))
 
@@ -50234,7 +50234,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                             break
                                         }
 
-                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << 8) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
+                                        (bracode__goto_7775_24 = ketcode__goto_7774_24 - (((((unsafe: ketcode__goto_7774_24[1]) as c_int) << (8 as c_uint)) | (unsafe: ketcode__goto_7774_24[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -50278,7 +50278,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 var __ci_expr_logic_126: c_int = 0
 
                                                 if ((if (unsafe: *bracode__goto_7775_24) == OP_COND: 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << 8) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
+                                                    (__ci_expr_logic_126 = (if (if (unsafe: bracode__goto_7775_24[(((((unsafe: bracode__goto_7775_24[1]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_7775_24[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0: 1 else: 0))
                                                 }
 
                                                 if (__ci_expr_logic_126 != 0) {
@@ -50356,7 +50356,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: code__goto_6093_14[0]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: code__goto_6093_14[(0 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -50367,7 +50367,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                         break
                                                     }
 
-                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> 8) as u8)))
+                                                    ((unsafe: bracode__goto_7775_24[1]) = ((((nlen__goto_7814_21 as c_int) >> (8 as c_uint)) as u8)))
 
                                                     ((unsafe: bracode__goto_7775_24[(1 + 1)]) = (((nlen__goto_7814_21 & 255) as u8)))
 
@@ -50568,7 +50568,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -50622,7 +50622,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                     break
                                                 }
 
-                                                ((unsafe: code__goto_6093_14[0]) = ((repeat_max__goto_6077_26 -% 1) as c_uint) >> 8)
+                                                ((unsafe: code__goto_6093_14[0]) = ((repeat_max__goto_6077_26 -% 1) as c_uint) >> (8 as c_uint))
 
                                                 ((unsafe: code__goto_6093_14[(0 + 1)]) = (repeat_max__goto_6077_26 -% 1) & 255)
 
@@ -50651,7 +50651,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                 break
                                             }
 
-                                            ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> 8)
+                                            ((unsafe: code__goto_6093_14[0]) = (repeat_min__goto_6077_10 as c_uint) >> (8 as c_uint))
 
                                             ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_min__goto_6077_10 & 255)
 
@@ -50761,7 +50761,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                                             break
                                                         }
 
-                                                        ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> 8)
+                                                        ((unsafe: code__goto_6093_14[0]) = (repeat_max__goto_6077_26 as c_uint) >> (8 as c_uint))
 
                                                         ((unsafe: code__goto_6093_14[(0 + 1)]) = repeat_max__goto_6077_26 & 255)
 
@@ -50875,7 +50875,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             if ((if meta_arg__goto_6085_16 < 10: 1 else: 0) != 0) {
                                 (offset__goto_6091_12 = cb.small_ref_offset[meta_arg__goto_6085_16])
                             } else {
-                                (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
+                                (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -50932,7 +50932,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             ((unsafe: *__ci_expr_old_150) = __ci_expr_ternary_151)
 
 
-                            ((unsafe: code__goto_6093_14[0]) = (meta_arg__goto_6085_16 as c_uint) >> 8)
+                            ((unsafe: code__goto_6093_14[0]) = (meta_arg__goto_6085_16 as c_uint) >> (8 as c_uint))
 
                             ((unsafe: code__goto_6093_14[(0 + 1)]) = meta_arg__goto_6085_16 & 255)
 
@@ -50967,7 +50967,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             var __ci_expr_ternary_155: c_uint = 0
 
                             if ((if meta_arg__goto_6085_16 < 32: 1 else: 0) != 0) {
-                                (__ci_expr_ternary_155 = (1 as c_uint) << meta_arg__goto_6085_16)
+                                (__ci_expr_ternary_155 = (1 as c_uint) << (meta_arg__goto_6085_16 as c_uint))
                             } else {
                                 (__ci_expr_ternary_155 = 1)
                             }
@@ -50980,7 +50980,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             }
 
                         2149842944 =>
-                            (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
+                            (offset__goto_6091_12 = ((((unsafe: pptr__goto_6084_11[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr__goto_6084_11[2]) as c_ulong))
 
                             if (__goto_pending != 0) {
                                 break
@@ -51016,7 +51016,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
 
                             ((unsafe: *code__goto_6093_14) = 118)
 
-                            ((unsafe: code__goto_6093_14[1]) = ((((meta_arg__goto_6085_16 as c_uint) >> 8) as u8)))
+                            ((unsafe: code__goto_6093_14[1]) = ((((meta_arg__goto_6085_16 as c_uint) >> (8 as c_uint)) as u8)))
 
                             ((unsafe: code__goto_6093_14[(1 + 1)]) = (((meta_arg__goto_6085_16 & 255) as u8)))
 
@@ -51103,7 +51103,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
 
                             (skipunits__goto_6148_12 = 2)
 
-                            ((unsafe: code__goto_6093_14[(1 + 2)]) = (meta_arg__goto_6085_16 as c_uint) >> 8)
+                            ((unsafe: code__goto_6093_14[(1 + 2)]) = (meta_arg__goto_6085_16 as c_uint) >> (8 as c_uint))
 
                             ((unsafe: code__goto_6093_14[((1 + 2) + 1)]) = meta_arg__goto_6085_16 & 255)
 
@@ -51157,7 +51157,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             if (__ci_expr_logic_159 != 0) {
                                 (pptr__goto_6084_11 = pptr__goto_6084_11 + 1)
 
-                                (ptype__goto_8297_16 = ((unsafe: *pptr__goto_6084_11) as c_uint) >> 16)
+                                (ptype__goto_8297_16 = ((unsafe: *pptr__goto_6084_11) as c_uint) >> (16 as c_uint))
 
 
                                 if (__goto_pending != 0) {
@@ -51845,12 +51845,12 @@ fn is_anchored(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_bl
             }
 
             if (__ci_expr_logic_5 != 0) {
-                var n: c_int = ((((((unsafe: scode[(1 + 2)]) as c_int) << 8) | (unsafe: scode[((1 + 2) + 1)])) as c_uint))
+                var n: c_int = ((((((unsafe: scode[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: scode[((1 + 2) + 1)])) as c_uint))
 
                 var new_map: c_uint = with 0 as __ci_expr_seq_49 {
                     var __ci_expr_ternary_6: c_uint = 0
                     if ((if n < 32: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_6 = (1 as c_uint) << n)
+                        (__ci_expr_ternary_6 = (1 as c_uint) << (n as c_uint))
                     } else {
                         (__ci_expr_ternary_6 = 1)
                     }
@@ -51885,7 +51885,7 @@ fn is_anchored(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_bl
                     }
 
                     if (__ci_expr_logic_8 != 0) {
-                        if ((if (unsafe: scode[(((((unsafe: scode[1]) as c_int) << 8) | (unsafe: scode[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0) {
+                        if ((if (unsafe: scode[(((((unsafe: scode[1]) as c_int) << (8 as c_uint)) | (unsafe: scode[(1 + 1)])) as c_uint)]) != OP_ALT: 1 else: 0) != 0) {
                             return 0
                         }
 
@@ -51990,7 +51990,7 @@ fn is_anchored(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_bl
 
         }
 
-        (code = code + (((((unsafe: code[1]) as c_int) << 8) | (unsafe: code[(1 + 1)])) as c_uint))
+        (code = code + (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
 
         if (not ((if (unsafe: *code) == OP_ALT: 1 else: 0) != 0)) {
             break
@@ -52016,7 +52016,7 @@ fn is_startline(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_b
                 (scode = scode + _pcre2_OP_lengths_8[OP_CALLOUT])
             } else {
                 if ((if (unsafe: *scode) == OP_CALLOUT_STR: 1 else: 0) != 0) {
-                    (scode = scode + (((((unsafe: scode[(1 + (2 * 2))]) as c_int) << 8) | (unsafe: scode[((1 + (2 * 2)) + 1)])) as c_uint))
+                    (scode = scode + (((((unsafe: scode[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: scode[((1 + (2 * 2)) + 1)])) as c_uint))
                 }
             }
 
@@ -52029,7 +52029,7 @@ fn is_startline(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_b
                     }
 
                     while true {
-                        (scode = scode + (((((unsafe: scode[1]) as c_int) << 8) | (unsafe: scode[(1 + 1)])) as c_uint))
+                        (scode = scode + (((((unsafe: scode[1]) as c_int) << (8 as c_uint)) | (unsafe: scode[(1 + 1)])) as c_uint))
 
                         if (not ((if (unsafe: *scode) == OP_ALT: 1 else: 0) != 0)) {
                             break
@@ -52101,12 +52101,12 @@ fn is_startline(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_b
             }
 
             if (__ci_expr_logic_5 != 0) {
-                var n: c_int = ((((((unsafe: scode[(1 + 2)]) as c_int) << 8) | (unsafe: scode[((1 + 2) + 1)])) as c_uint))
+                var n: c_int = ((((((unsafe: scode[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: scode[((1 + 2) + 1)])) as c_uint))
 
                 var new_map: c_uint = with 0 as __ci_expr_seq_69 {
                     var __ci_expr_ternary_6: c_uint = 0
                     if ((if n < 32: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_6 = (1 as c_uint) << n)
+                        (__ci_expr_ternary_6 = (1 as c_uint) << (n as c_uint))
                     } else {
                         (__ci_expr_ternary_6 = 1)
                     }
@@ -52220,7 +52220,7 @@ fn is_startline(__param_code: *const u8, bracket_map: c_uint, cb: *mut compile_b
 
         }
 
-        (code = code + (((((unsafe: code[1]) as c_int) << 8) | (unsafe: code[(1 + 1)])) as c_uint))
+        (code = code + (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
 
         if (not ((if (unsafe: *code) == OP_ALT: 1 else: 0) != 0)) {
             break
@@ -52254,10 +52254,10 @@ fn find_recurse(__param_code: *mut u8, utf: c_int) -> *mut u8 {
         }
 
         if (__ci_expr_logic_0 != 0) {
-            (code = code + (((((unsafe: code[1]) as c_int) << 8) | (unsafe: code[(1 + 1)])) as c_uint))
+            (code = code + (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
         } else {
             if ((if c == OP_CALLOUT_STR: 1 else: 0) != 0) {
-                (code = code + (((((unsafe: code[(1 + (2 * 2))]) as c_int) << 8) | (unsafe: code[((1 + (2 * 2)) + 1)])) as c_uint))
+                (code = code + (((((unsafe: code[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: code[((1 + (2 * 2)) + 1)])) as c_uint))
             } else {
                 match c:
                     OP_TYPESTAR | OP_TYPEMINSTAR | OP_TYPEPLUS | OP_TYPEMINPLUS | OP_TYPEQUERY | OP_TYPEMINQUERY | OP_TYPEPOSSTAR | OP_TYPEPOSPLUS | OP_TYPEPOSQUERY =>
@@ -52486,7 +52486,7 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
             _ =>
                 return 0
 
-        (code = code + (((((unsafe: code[1]) as c_int) << 8) | (unsafe: code[(1 + 1)])) as c_uint))
+        (code = code + (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
 
         if (not ((if (unsafe: *code) == OP_ALT: 1 else: 0) != 0)) {
             break
@@ -52572,7 +52572,7 @@ fn parsed_skip(__param_pptr: *mut c_uint, skiptype: c_uint) -> *mut c_uint {
 
                 }
 
-        (meta = ((meta as c_uint) >> 16) & 32767)
+        (meta = ((meta as c_uint) >> (16 as c_uint)) & 32767)
 
         if ((if meta >= (73 * sizeof[u8]()): 1 else: 0) != 0) {
             return null

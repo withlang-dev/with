@@ -609,21 +609,21 @@ fn exact_int_low_mask(bits: i32) -> i64:
         return 0 - 1
     if bits == 63:
         return 9223372036854775807
-    ((1 as i64) << bits) - 1
+    ((1 as i64) << (bits as u32)) - 1
 
 fn exact_int_pow2_word(bit: i32) -> i64:
     if bit < 0 or bit >= 64:
         return 0
     if bit == 63:
         return exact_int_sign_bit()
-    (1 as i64) << bit
+    (1 as i64) << (bit as u32)
 
 fn exact_int_logical_shr_word(value: i64, shift: i32) -> i64:
     if shift <= 0:
         return value
     if shift >= 64:
         return 0
-    (value >> shift) & exact_int_low_mask(64 - shift)
+    (value >> (shift as u32)) & exact_int_low_mask(64 - shift)
 
 fn exact_int_shl_word(value: i64, shift: i32) -> i64:
     if shift <= 0:

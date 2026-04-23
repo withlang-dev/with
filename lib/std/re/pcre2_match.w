@@ -937,7 +937,7 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                                         (__ci_expr_logic_42 = (if (if start_bits__goto_6978_16 != null: 1 else: 0) != 0: 1 else: 0))
                                     }
                                     if (__ci_expr_logic_42 != 0) {
-                                        (ok__goto_7659_14 = (if ((unsafe: start_bits__goto_6978_16[(c__goto_7662_23 / 8)]) & ((1 as c_uint) << (c__goto_7662_23 & 7))) != 0: 1 else: 0))
+                                        (ok__goto_7659_14 = (if ((unsafe: start_bits__goto_6978_16[(c__goto_7662_23 / 8)]) & ((1 as c_uint) << ((c__goto_7662_23 & 7) as c_uint))) != 0: 1 else: 0))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -1245,7 +1245,7 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                                             if (__goto_pending != 0) {
                                                 break
                                             }
-                                            if ((if ((unsafe: start_bits__goto_6978_16[(c__goto_7823_20 / 8)]) & ((1 as c_uint) << (c__goto_7823_20 & 7))) != 0: 1 else: 0) != 0) {
+                                            if ((if ((unsafe: start_bits__goto_6978_16[(c__goto_7823_20 / 8)]) & ((1 as c_uint) << ((c__goto_7823_20 & 7) as c_uint))) != 0: 1 else: 0) != 0) {
                                                 break
                                             }
                                             if (__goto_pending != 0) {
@@ -2023,7 +2023,7 @@ fn do_callout(F: *mut heapframe, mb: *mut match_block_8, lengthptr: *mut c_ulong
     if ((if (unsafe: *F.ecode) == OP_CALLOUT: 1 else: 0) != 0) {
         (__ci_expr_ternary_0 = _pcre2_OP_lengths_8[OP_CALLOUT])
     } else {
-        (__ci_expr_ternary_0 = ((((((unsafe: F.ecode[(1 + (2 * 2))]) as c_int) << 8) | (unsafe: F.ecode[((1 + (2 * 2)) + 1)])) as c_uint)))
+        (__ci_expr_ternary_0 = ((((((unsafe: F.ecode[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: F.ecode[((1 + (2 * 2)) + 1)])) as c_uint)))
     }
 
     ((unsafe: *lengthptr) = __ci_expr_ternary_0)
@@ -2047,9 +2047,9 @@ fn do_callout(F: *mut heapframe, mb: *mut match_block_8, lengthptr: *mut c_ulong
 
     (cb.current_position = (((((F.eptr as usize) -% (mb.start_subject as usize)) / sizeof[u8]()) as c_ulong)))
 
-    (cb.pattern_position = ((((((unsafe: F.ecode[1]) as c_int) << 8) | (unsafe: F.ecode[(1 + 1)])) as c_uint)))
+    (cb.pattern_position = ((((((unsafe: F.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F.ecode[(1 + 1)])) as c_uint)))
 
-    (cb.next_item_length = ((((((unsafe: F.ecode[(1 + 2)]) as c_int) << 8) | (unsafe: F.ecode[((1 + 2) + 1)])) as c_uint)))
+    (cb.next_item_length = ((((((unsafe: F.ecode[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: F.ecode[((1 + 2) + 1)])) as c_uint)))
 
     if ((if (unsafe: *F.ecode) == OP_CALLOUT: 1 else: 0) != 0) {
         (cb.callout_number = (unsafe: F.ecode[(1 + (2 * 2))]))
@@ -2063,7 +2063,7 @@ fn do_callout(F: *mut heapframe, mb: *mut match_block_8, lengthptr: *mut c_ulong
     } else {
         (cb.callout_number = 0)
 
-        (cb.callout_string_offset = ((((((unsafe: F.ecode[(1 + (3 * 2))]) as c_int) << 8) | (unsafe: F.ecode[((1 + (3 * 2)) + 1)])) as c_uint)))
+        (cb.callout_string_offset = ((((((unsafe: F.ecode[(1 + (3 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: F.ecode[((1 + (3 * 2)) + 1)])) as c_uint)))
 
         (cb.callout_string = (F.ecode + (((1 + (4 * 2)) as isize) as usize)) + ((1 as isize) as usize))
 
@@ -2187,28 +2187,28 @@ fn match_ref(offset: c_ulong, caseless: c_int, caseopts: c_int, F: *mut heapfram
 
                             (eptr = eptr + 1)
 
-                            (c = (((c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_4) & 63))
+                            (c = (((c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_4) & 63))
 
                         } else {
                             if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                                (c = ((((c & 15) as c_uint) << 12) | ((((unsafe: *eptr) & 63) as c_uint) << 6)) | ((unsafe: eptr[1]) & 63))
+                                (c = ((((c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: eptr[1]) & 63))
 
                                 (eptr = eptr + 2)
 
                             } else {
                                 if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                                    (c = (((((c & 7) as c_uint) << 18) | ((((unsafe: *eptr) & 63) as c_uint) << 12)) | ((((unsafe: eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: eptr[2]) & 63))
+                                    (c = (((((c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: eptr[2]) & 63))
 
                                     (eptr = eptr + 3)
 
                                 } else {
                                     if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                                        (c = ((((((c & 3) as c_uint) << 24) | ((((unsafe: *eptr) & 63) as c_uint) << 18)) | ((((unsafe: eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: eptr[3]) & 63))
+                                        (c = ((((((c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: eptr[3]) & 63))
 
                                         (eptr = eptr + 4)
 
                                     } else {
-                                        (c = (((((((c & 1) as c_uint) << 30) | ((((unsafe: *eptr) & 63) as c_uint) << 24)) | ((((unsafe: eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: eptr[4]) & 63))
+                                        (c = (((((((c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: eptr[4]) & 63))
 
                                         (eptr = eptr + 5)
 
@@ -2232,28 +2232,28 @@ fn match_ref(offset: c_ulong, caseless: c_int, caseopts: c_int, F: *mut heapfram
 
                             (p = p + 1)
 
-                            (d = (((d & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_6) & 63))
+                            (d = (((d & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_6) & 63))
 
                         } else {
                             if ((if (d & 16) == 0: 1 else: 0) != 0) {
-                                (d = ((((d & 15) as c_uint) << 12) | ((((unsafe: *p) & 63) as c_uint) << 6)) | ((unsafe: p[1]) & 63))
+                                (d = ((((d & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *p) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p[1]) & 63))
 
                                 (p = p + 2)
 
                             } else {
                                 if ((if (d & 8) == 0: 1 else: 0) != 0) {
-                                    (d = (((((d & 7) as c_uint) << 18) | ((((unsafe: *p) & 63) as c_uint) << 12)) | ((((unsafe: p[1]) & 63) as c_uint) << 6)) | ((unsafe: p[2]) & 63))
+                                    (d = (((((d & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *p) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: p[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p[2]) & 63))
 
                                     (p = p + 3)
 
                                 } else {
                                     if ((if (d & 4) == 0: 1 else: 0) != 0) {
-                                        (d = ((((((d & 3) as c_uint) << 24) | ((((unsafe: *p) & 63) as c_uint) << 18)) | ((((unsafe: p[1]) & 63) as c_uint) << 12)) | ((((unsafe: p[2]) & 63) as c_uint) << 6)) | ((unsafe: p[3]) & 63))
+                                        (d = ((((((d & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *p) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: p[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: p[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p[3]) & 63))
 
                                         (p = p + 4)
 
                                     } else {
-                                        (d = (((((((d & 1) as c_uint) << 30) | ((((unsafe: *p) & 63) as c_uint) << 24)) | ((((unsafe: p[1]) & 63) as c_uint) << 18)) | ((((unsafe: p[2]) & 63) as c_uint) << 12)) | ((((unsafe: p[3]) & 63) as c_uint) << 6)) | ((unsafe: p[4]) & 63))
+                                        (d = (((((((d & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *p) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: p[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: p[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: p[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p[4]) & 63))
 
                                         (p = p + 5)
 
@@ -2484,7 +2484,7 @@ fn recurse_update_offsets(F: *mut heapframe, P: *mut heapframe) {
     var ecode: *const u8 = F.ecode
 
     while true {
-        (diff = ((((((((unsafe: ecode[1]) as c_int) << 8) | (unsafe: ecode[(1 + 1)])) as c_uint) as c_uint) << 1) -% offset))
+        (diff = ((((((((unsafe: ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode[(1 + 1)])) as c_uint) as c_uint) << (1 as c_uint)) -% offset))
 
         (ecode = ecode + (1 + 2))
 
@@ -3910,7 +3910,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -3924,7 +3924,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -3938,7 +3938,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -3952,7 +3952,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -3965,7 +3965,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -4384,7 +4384,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -4398,7 +4398,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -4412,7 +4412,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -4426,7 +4426,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -4439,7 +4439,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -4533,11 +4533,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                            (dc__goto_1182_18 = (((dc__goto_1182_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_31) & 63))
+                                            (dc__goto_1182_18 = (((dc__goto_1182_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_31) & 63))
 
                                         } else {
                                             if ((if (dc__goto_1182_18 & 16) == 0: 1 else: 0) != 0) {
-                                                (dc__goto_1182_18 = ((((dc__goto_1182_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                (dc__goto_1182_18 = ((((dc__goto_1182_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -4551,7 +4551,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (dc__goto_1182_18 & 8) == 0: 1 else: 0) != 0) {
-                                                    (dc__goto_1182_18 = (((((dc__goto_1182_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                    (dc__goto_1182_18 = (((((dc__goto_1182_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -4565,7 +4565,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (dc__goto_1182_18 & 4) == 0: 1 else: 0) != 0) {
-                                                        (dc__goto_1182_18 = ((((((dc__goto_1182_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                        (dc__goto_1182_18 = ((((((dc__goto_1182_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -4578,7 +4578,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                         }
 
                                                     } else {
-                                                        (dc__goto_1182_18 = (((((((dc__goto_1182_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                        (dc__goto_1182_18 = (((((((dc__goto_1182_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -4908,11 +4908,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                        (ch__goto_1235_16 = (((ch__goto_1235_16 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_37) & 63))
+                                        (ch__goto_1235_16 = (((ch__goto_1235_16 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_37) & 63))
 
                                     } else {
                                         if ((if (ch__goto_1235_16 & 16) == 0: 1 else: 0) != 0) {
-                                            (ch__goto_1235_16 = ((((ch__goto_1235_16 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                            (ch__goto_1235_16 = ((((ch__goto_1235_16 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -4926,7 +4926,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (ch__goto_1235_16 & 8) == 0: 1 else: 0) != 0) {
-                                                (ch__goto_1235_16 = (((((ch__goto_1235_16 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                                (ch__goto_1235_16 = (((((ch__goto_1235_16 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -4940,7 +4940,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (ch__goto_1235_16 & 4) == 0: 1 else: 0) != 0) {
-                                                    (ch__goto_1235_16 = ((((((ch__goto_1235_16 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                    (ch__goto_1235_16 = ((((((ch__goto_1235_16 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -4953,7 +4953,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (ch__goto_1235_16 = (((((((ch__goto_1235_16 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (ch__goto_1235_16 = (((((((ch__goto_1235_16 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -4997,11 +4997,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_39) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_39) & 63))
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -5015,7 +5015,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -5029,7 +5029,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -5042,7 +5042,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -5430,11 +5430,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                        (ch__goto_1235_16 = (((ch__goto_1235_16 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_37) & 63))
+                                        (ch__goto_1235_16 = (((ch__goto_1235_16 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_37) & 63))
 
                                     } else {
                                         if ((if (ch__goto_1235_16 & 16) == 0: 1 else: 0) != 0) {
-                                            (ch__goto_1235_16 = ((((ch__goto_1235_16 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                            (ch__goto_1235_16 = ((((ch__goto_1235_16 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -5448,7 +5448,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (ch__goto_1235_16 & 8) == 0: 1 else: 0) != 0) {
-                                                (ch__goto_1235_16 = (((((ch__goto_1235_16 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                                (ch__goto_1235_16 = (((((ch__goto_1235_16 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -5462,7 +5462,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (ch__goto_1235_16 & 4) == 0: 1 else: 0) != 0) {
-                                                    (ch__goto_1235_16 = ((((((ch__goto_1235_16 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                    (ch__goto_1235_16 = ((((((ch__goto_1235_16 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -5475,7 +5475,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (ch__goto_1235_16 = (((((((ch__goto_1235_16 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (ch__goto_1235_16 = (((((((ch__goto_1235_16 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -5519,11 +5519,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_39) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_39) & 63))
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -5537,7 +5537,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -5551,7 +5551,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -5564,7 +5564,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -5846,7 +5846,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             }
 
                         OP_EXACT =>
-                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.fields.char_repeat.min = F__goto_690_12.fields.char_repeat.max)
 
@@ -5857,7 +5857,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             __goto_pending = 1
 
                         OP_EXACTI =>
-                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.fields.char_repeat.min = F__goto_690_12.fields.char_repeat.max)
 
@@ -5872,7 +5872,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (F__goto_690_12.fields.char_repeat.min = 0)
 
-                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
@@ -5884,7 +5884,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (F__goto_690_12.fields.char_repeat.min = 0)
 
-                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
@@ -5896,7 +5896,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (F__goto_690_12.fields.char_repeat.min = 0)
 
-                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
@@ -5908,7 +5908,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (F__goto_690_12.fields.char_repeat.min = 0)
 
-                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
@@ -5920,7 +5920,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (F__goto_690_12.fields.char_repeat.min = 0)
 
-                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
@@ -5932,7 +5932,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (F__goto_690_12.fields.char_repeat.min = 0)
 
-                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.char_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
@@ -6054,7 +6054,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -6068,7 +6068,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -6082,7 +6082,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -6096,7 +6096,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -6109,7 +6109,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -7121,7 +7121,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -7135,7 +7135,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -7149,7 +7149,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -7163,7 +7163,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -7176,7 +7176,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -8188,7 +8188,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -8202,7 +8202,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -8216,7 +8216,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -8230,7 +8230,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -8243,7 +8243,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -9255,7 +9255,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -9269,7 +9269,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -9283,7 +9283,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -9297,7 +9297,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -9310,7 +9310,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -10322,7 +10322,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -10336,7 +10336,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -10350,7 +10350,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -10364,7 +10364,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -10377,7 +10377,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -11389,7 +11389,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -11403,7 +11403,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -11417,7 +11417,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -11431,7 +11431,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -11444,7 +11444,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -12456,7 +12456,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -12470,7 +12470,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -12484,7 +12484,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -12498,7 +12498,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -12511,7 +12511,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -13523,7 +13523,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -13537,7 +13537,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -13551,7 +13551,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -13565,7 +13565,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -13578,7 +13578,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -14590,7 +14590,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -14604,7 +14604,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -14618,7 +14618,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -14632,7 +14632,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -14645,7 +14645,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -15657,7 +15657,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -15671,7 +15671,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -15685,7 +15685,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -15699,7 +15699,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -15712,7 +15712,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -16724,7 +16724,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -16738,7 +16738,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -16752,7 +16752,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -16766,7 +16766,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -16779,7 +16779,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -17791,7 +17791,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                 if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                     if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -17805,7 +17805,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -17819,7 +17819,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -17833,7 +17833,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -17846,7 +17846,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[5]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -18816,7 +18816,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             }
 
                         OP_NOTEXACT =>
-                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.fields.charnot_repeat.min = F__goto_690_12.fields.charnot_repeat.max)
 
@@ -18827,7 +18827,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             __goto_pending = 1
 
                         OP_NOTEXACTI =>
-                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.fields.charnot_repeat.min = F__goto_690_12.fields.charnot_repeat.max)
 
@@ -18840,7 +18840,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                         OP_NOTUPTO =>
                             (F__goto_690_12.fields.charnot_repeat.min = 0)
 
-                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (reptype__goto_714_10 = 1)
 
@@ -18852,7 +18852,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                         OP_NOTUPTOI =>
                             (F__goto_690_12.fields.charnot_repeat.min = 0)
 
-                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (reptype__goto_714_10 = 1)
 
@@ -18864,7 +18864,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                         OP_NOTMINUPTO =>
                             (F__goto_690_12.fields.charnot_repeat.min = 0)
 
-                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (reptype__goto_714_10 = 0)
 
@@ -18876,7 +18876,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                         OP_NOTMINUPTOI =>
                             (F__goto_690_12.fields.charnot_repeat.min = 0)
 
-                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (reptype__goto_714_10 = 0)
 
@@ -18962,7 +18962,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (F__goto_690_12.fields.charnot_repeat.min = 0)
 
-                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
@@ -18974,7 +18974,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (F__goto_690_12.fields.charnot_repeat.min = 0)
 
-                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.charnot_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
@@ -19022,11 +19022,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_75) & 63))
+                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_75) & 63))
 
                                 } else {
                                     if ((if (F__goto_690_12.fields.charnot_repeat.c & 16) == 0: 1 else: 0) != 0) {
-                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -19040,7 +19040,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (F__goto_690_12.fields.charnot_repeat.c & 8) == 0: 1 else: 0) != 0) {
-                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -19054,7 +19054,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (F__goto_690_12.fields.charnot_repeat.c & 4) == 0: 1 else: 0) != 0) {
-                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -19067,7 +19067,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -19223,11 +19223,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_81) & 63))
+                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_81) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1757_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -19241,7 +19241,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1757_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -19255,7 +19255,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1757_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -19268,7 +19268,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -19598,7 +19598,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1839_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1839_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -19612,7 +19612,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1839_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -19626,7 +19626,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1839_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -19640,7 +19640,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1839_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -19653,7 +19653,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -19953,11 +19953,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_95) & 63))
+                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_95) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1899_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -19971,7 +19971,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1899_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -19985,7 +19985,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1899_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -19998,7 +19998,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -20310,7 +20310,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1977_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1977_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -20324,7 +20324,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1977_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -20338,7 +20338,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1977_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -20352,7 +20352,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1977_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -20365,7 +20365,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -20585,11 +20585,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_75) & 63))
+                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_75) & 63))
 
                                 } else {
                                     if ((if (F__goto_690_12.fields.charnot_repeat.c & 16) == 0: 1 else: 0) != 0) {
-                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -20603,7 +20603,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (F__goto_690_12.fields.charnot_repeat.c & 8) == 0: 1 else: 0) != 0) {
-                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -20617,7 +20617,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (F__goto_690_12.fields.charnot_repeat.c & 4) == 0: 1 else: 0) != 0) {
-                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -20630,7 +20630,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -20786,11 +20786,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_81) & 63))
+                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_81) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1757_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -20804,7 +20804,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1757_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -20818,7 +20818,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1757_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -20831,7 +20831,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -21161,7 +21161,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1839_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1839_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -21175,7 +21175,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1839_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -21189,7 +21189,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1839_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -21203,7 +21203,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1839_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -21216,7 +21216,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -21516,11 +21516,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_95) & 63))
+                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_95) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1899_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -21534,7 +21534,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1899_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -21548,7 +21548,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1899_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -21561,7 +21561,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -21873,7 +21873,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1977_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1977_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -21887,7 +21887,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1977_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -21901,7 +21901,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1977_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -21915,7 +21915,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1977_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -21928,7 +21928,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -22148,11 +22148,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_75) & 63))
+                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_75) & 63))
 
                                 } else {
                                     if ((if (F__goto_690_12.fields.charnot_repeat.c & 16) == 0: 1 else: 0) != 0) {
-                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -22166,7 +22166,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (F__goto_690_12.fields.charnot_repeat.c & 8) == 0: 1 else: 0) != 0) {
-                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -22180,7 +22180,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (F__goto_690_12.fields.charnot_repeat.c & 4) == 0: 1 else: 0) != 0) {
-                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -22193,7 +22193,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -22349,11 +22349,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_81) & 63))
+                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_81) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1757_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -22367,7 +22367,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1757_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -22381,7 +22381,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1757_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -22394,7 +22394,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -22724,7 +22724,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1839_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1839_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -22738,7 +22738,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1839_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -22752,7 +22752,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1839_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -22766,7 +22766,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1839_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -22779,7 +22779,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -23079,11 +23079,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_95) & 63))
+                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_95) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1899_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -23097,7 +23097,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1899_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -23111,7 +23111,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1899_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -23124,7 +23124,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -23436,7 +23436,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1977_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1977_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -23450,7 +23450,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1977_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -23464,7 +23464,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1977_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -23478,7 +23478,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1977_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -23491,7 +23491,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -23711,11 +23711,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_75) & 63))
+                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_75) & 63))
 
                                 } else {
                                     if ((if (F__goto_690_12.fields.charnot_repeat.c & 16) == 0: 1 else: 0) != 0) {
-                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -23729,7 +23729,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (F__goto_690_12.fields.charnot_repeat.c & 8) == 0: 1 else: 0) != 0) {
-                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -23743,7 +23743,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (F__goto_690_12.fields.charnot_repeat.c & 4) == 0: 1 else: 0) != 0) {
-                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -23756,7 +23756,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -23912,11 +23912,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_81) & 63))
+                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_81) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1757_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -23930,7 +23930,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1757_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -23944,7 +23944,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1757_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -23957,7 +23957,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -24287,7 +24287,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1839_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1839_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -24301,7 +24301,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1839_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -24315,7 +24315,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1839_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -24329,7 +24329,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1839_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -24342,7 +24342,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -24642,11 +24642,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_95) & 63))
+                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_95) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1899_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -24660,7 +24660,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1899_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -24674,7 +24674,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1899_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -24687,7 +24687,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -24999,7 +24999,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1977_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1977_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -25013,7 +25013,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1977_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -25027,7 +25027,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1977_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -25041,7 +25041,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1977_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -25054,7 +25054,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -25274,11 +25274,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_75) & 63))
+                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_75) & 63))
 
                                 } else {
                                     if ((if (F__goto_690_12.fields.charnot_repeat.c & 16) == 0: 1 else: 0) != 0) {
-                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -25292,7 +25292,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (F__goto_690_12.fields.charnot_repeat.c & 8) == 0: 1 else: 0) != 0) {
-                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -25306,7 +25306,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (F__goto_690_12.fields.charnot_repeat.c & 4) == 0: 1 else: 0) != 0) {
-                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -25319,7 +25319,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -25475,11 +25475,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_81) & 63))
+                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_81) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1757_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -25493,7 +25493,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1757_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -25507,7 +25507,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1757_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -25520,7 +25520,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -25850,7 +25850,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1839_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1839_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -25864,7 +25864,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1839_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -25878,7 +25878,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1839_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -25892,7 +25892,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1839_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -25905,7 +25905,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -26205,11 +26205,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_95) & 63))
+                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_95) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1899_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -26223,7 +26223,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1899_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -26237,7 +26237,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1899_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -26250,7 +26250,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -26562,7 +26562,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1977_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1977_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -26576,7 +26576,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1977_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -26590,7 +26590,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1977_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -26604,7 +26604,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1977_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -26617,7 +26617,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -26837,11 +26837,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_75) & 63))
+                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_75) & 63))
 
                                 } else {
                                     if ((if (F__goto_690_12.fields.charnot_repeat.c & 16) == 0: 1 else: 0) != 0) {
-                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -26855,7 +26855,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (F__goto_690_12.fields.charnot_repeat.c & 8) == 0: 1 else: 0) != 0) {
-                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -26869,7 +26869,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (F__goto_690_12.fields.charnot_repeat.c & 4) == 0: 1 else: 0) != 0) {
-                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -26882,7 +26882,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -27038,11 +27038,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_81) & 63))
+                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_81) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1757_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -27056,7 +27056,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1757_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -27070,7 +27070,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1757_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -27083,7 +27083,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -27413,7 +27413,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1839_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1839_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -27427,7 +27427,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1839_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -27441,7 +27441,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1839_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -27455,7 +27455,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1839_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -27468,7 +27468,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -27768,11 +27768,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_95) & 63))
+                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_95) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1899_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -27786,7 +27786,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1899_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -27800,7 +27800,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1899_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -27813,7 +27813,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -28125,7 +28125,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1977_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1977_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -28139,7 +28139,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1977_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -28153,7 +28153,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1977_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -28167,7 +28167,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1977_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -28180,7 +28180,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -28400,11 +28400,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_75) & 63))
+                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_75) & 63))
 
                                 } else {
                                     if ((if (F__goto_690_12.fields.charnot_repeat.c & 16) == 0: 1 else: 0) != 0) {
-                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -28418,7 +28418,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (F__goto_690_12.fields.charnot_repeat.c & 8) == 0: 1 else: 0) != 0) {
-                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -28432,7 +28432,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (F__goto_690_12.fields.charnot_repeat.c & 4) == 0: 1 else: 0) != 0) {
-                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -28445,7 +28445,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -28601,11 +28601,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_81) & 63))
+                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_81) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1757_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -28619,7 +28619,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1757_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -28633,7 +28633,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1757_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -28646,7 +28646,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -28976,7 +28976,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1839_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1839_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -28990,7 +28990,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1839_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -29004,7 +29004,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1839_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -29018,7 +29018,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1839_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -29031,7 +29031,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -29331,11 +29331,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_95) & 63))
+                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_95) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1899_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -29349,7 +29349,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1899_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -29363,7 +29363,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1899_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -29376,7 +29376,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -29688,7 +29688,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1977_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1977_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -29702,7 +29702,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1977_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -29716,7 +29716,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1977_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -29730,7 +29730,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1977_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -29743,7 +29743,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -29963,11 +29963,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_75) & 63))
+                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_75) & 63))
 
                                 } else {
                                     if ((if (F__goto_690_12.fields.charnot_repeat.c & 16) == 0: 1 else: 0) != 0) {
-                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -29981,7 +29981,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (F__goto_690_12.fields.charnot_repeat.c & 8) == 0: 1 else: 0) != 0) {
-                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -29995,7 +29995,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (F__goto_690_12.fields.charnot_repeat.c & 4) == 0: 1 else: 0) != 0) {
-                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -30008,7 +30008,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -30164,11 +30164,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_81) & 63))
+                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_81) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1757_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -30182,7 +30182,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1757_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -30196,7 +30196,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1757_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -30209,7 +30209,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -30539,7 +30539,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1839_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1839_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -30553,7 +30553,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1839_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -30567,7 +30567,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1839_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -30581,7 +30581,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1839_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -30594,7 +30594,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -30894,11 +30894,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_95) & 63))
+                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_95) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1899_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -30912,7 +30912,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1899_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -30926,7 +30926,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1899_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -30939,7 +30939,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -31251,7 +31251,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1977_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1977_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -31265,7 +31265,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1977_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -31279,7 +31279,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1977_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -31293,7 +31293,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1977_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -31306,7 +31306,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -31526,11 +31526,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_75) & 63))
+                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_75) & 63))
 
                                 } else {
                                     if ((if (F__goto_690_12.fields.charnot_repeat.c & 16) == 0: 1 else: 0) != 0) {
-                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -31544,7 +31544,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (F__goto_690_12.fields.charnot_repeat.c & 8) == 0: 1 else: 0) != 0) {
-                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -31558,7 +31558,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (F__goto_690_12.fields.charnot_repeat.c & 4) == 0: 1 else: 0) != 0) {
-                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -31571,7 +31571,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -31727,11 +31727,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_81) & 63))
+                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_81) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1757_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -31745,7 +31745,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1757_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -31759,7 +31759,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1757_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -31772,7 +31772,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -32102,7 +32102,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1839_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1839_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -32116,7 +32116,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1839_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -32130,7 +32130,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1839_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -32144,7 +32144,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1839_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -32157,7 +32157,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -32457,11 +32457,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_95) & 63))
+                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_95) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1899_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -32475,7 +32475,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1899_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -32489,7 +32489,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1899_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -32502,7 +32502,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -32814,7 +32814,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1977_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1977_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -32828,7 +32828,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1977_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -32842,7 +32842,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1977_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -32856,7 +32856,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1977_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -32869,7 +32869,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -33089,11 +33089,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_75) & 63))
+                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_75) & 63))
 
                                 } else {
                                     if ((if (F__goto_690_12.fields.charnot_repeat.c & 16) == 0: 1 else: 0) != 0) {
-                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -33107,7 +33107,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (F__goto_690_12.fields.charnot_repeat.c & 8) == 0: 1 else: 0) != 0) {
-                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -33121,7 +33121,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (F__goto_690_12.fields.charnot_repeat.c & 4) == 0: 1 else: 0) != 0) {
-                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -33134,7 +33134,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -33290,11 +33290,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_81) & 63))
+                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_81) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1757_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -33308,7 +33308,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1757_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -33322,7 +33322,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1757_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -33335,7 +33335,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -33665,7 +33665,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1839_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1839_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -33679,7 +33679,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1839_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -33693,7 +33693,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1839_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -33707,7 +33707,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1839_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -33720,7 +33720,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -34020,11 +34020,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_95) & 63))
+                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_95) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1899_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -34038,7 +34038,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1899_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -34052,7 +34052,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1899_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -34065,7 +34065,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -34377,7 +34377,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1977_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1977_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -34391,7 +34391,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1977_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -34405,7 +34405,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1977_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -34419,7 +34419,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1977_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -34432,7 +34432,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -34652,11 +34652,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_75) & 63))
+                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_75) & 63))
 
                                 } else {
                                     if ((if (F__goto_690_12.fields.charnot_repeat.c & 16) == 0: 1 else: 0) != 0) {
-                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -34670,7 +34670,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (F__goto_690_12.fields.charnot_repeat.c & 8) == 0: 1 else: 0) != 0) {
-                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -34684,7 +34684,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (F__goto_690_12.fields.charnot_repeat.c & 4) == 0: 1 else: 0) != 0) {
-                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -34697,7 +34697,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -34853,11 +34853,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_81) & 63))
+                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_81) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1757_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -34871,7 +34871,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1757_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -34885,7 +34885,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1757_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -34898,7 +34898,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -35228,7 +35228,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1839_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1839_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -35242,7 +35242,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1839_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -35256,7 +35256,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1839_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -35270,7 +35270,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1839_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -35283,7 +35283,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -35583,11 +35583,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_95) & 63))
+                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_95) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1899_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -35601,7 +35601,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1899_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -35615,7 +35615,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1899_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -35628,7 +35628,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -35940,7 +35940,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1977_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1977_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -35954,7 +35954,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1977_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -35968,7 +35968,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1977_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -35982,7 +35982,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1977_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -35995,7 +35995,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -36215,11 +36215,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
-                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_75) & 63))
+                                    (F__goto_690_12.fields.charnot_repeat.c = (((F__goto_690_12.fields.charnot_repeat.c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_75) & 63))
 
                                 } else {
                                     if ((if (F__goto_690_12.fields.charnot_repeat.c & 16) == 0: 1 else: 0) != 0) {
-                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
+                                        (F__goto_690_12.fields.charnot_repeat.c = ((((F__goto_690_12.fields.charnot_repeat.c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -36233,7 +36233,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (F__goto_690_12.fields.charnot_repeat.c & 8) == 0: 1 else: 0) != 0) {
-                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
+                                            (F__goto_690_12.fields.charnot_repeat.c = (((((F__goto_690_12.fields.charnot_repeat.c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -36247,7 +36247,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (F__goto_690_12.fields.charnot_repeat.c & 4) == 0: 1 else: 0) != 0) {
-                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = ((((((F__goto_690_12.fields.charnot_repeat.c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -36260,7 +36260,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
+                                                (F__goto_690_12.fields.charnot_repeat.c = (((((((F__goto_690_12.fields.charnot_repeat.c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.ecode) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.ecode[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.ecode[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -36416,11 +36416,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_81) & 63))
+                                                (d__goto_1757_18 = (((d__goto_1757_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_81) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1757_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1757_18 = ((((d__goto_1757_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -36434,7 +36434,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1757_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1757_18 = (((((d__goto_1757_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -36448,7 +36448,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1757_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1757_18 = ((((((d__goto_1757_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -36461,7 +36461,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1757_18 = (((((((d__goto_1757_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -36791,7 +36791,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1839_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1839_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1839_20 = (((d__goto_1839_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -36805,7 +36805,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1839_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1839_20 = ((((d__goto_1839_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -36819,7 +36819,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1839_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1839_20 = (((((d__goto_1839_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -36833,7 +36833,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1839_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1839_20 = ((((((d__goto_1839_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -36846,7 +36846,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1839_20 = (((((((d__goto_1839_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -37146,11 +37146,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_95) & 63))
+                                                (d__goto_1899_18 = (((d__goto_1899_18 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_95) & 63))
 
                                             } else {
                                                 if ((if (d__goto_1899_18 & 16) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1899_18 = ((((d__goto_1899_18 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -37164,7 +37164,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1899_18 & 8) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1899_18 = (((((d__goto_1899_18 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -37178,7 +37178,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1899_18 & 4) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1899_18 = ((((((d__goto_1899_18 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -37191,7 +37191,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                             }
 
                                                         } else {
-                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                            (d__goto_1899_18 = (((((((d__goto_1899_18 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -37503,7 +37503,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             if ((if d__goto_1977_20 >= 192: 1 else: 0) != 0) {
                                                 if ((if (d__goto_1977_20 & 32) == 0: 1 else: 0) != 0) {
-                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                    (d__goto_1977_20 = (((d__goto_1977_20 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -37517,7 +37517,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                 } else {
                                                     if ((if (d__goto_1977_20 & 16) == 0: 1 else: 0) != 0) {
-                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                        (d__goto_1977_20 = ((((d__goto_1977_20 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                         if (__goto_pending != 0) {
                                                             break
@@ -37531,7 +37531,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                     } else {
                                                         if ((if (d__goto_1977_20 & 8) == 0: 1 else: 0) != 0) {
-                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                            (d__goto_1977_20 = (((((d__goto_1977_20 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -37545,7 +37545,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (d__goto_1977_20 & 4) == 0: 1 else: 0) != 0) {
-                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                (d__goto_1977_20 = ((((((d__goto_1977_20 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -37558,7 +37558,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                 }
 
                                                             } else {
-                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                                (d__goto_1977_20 = (((((((d__goto_1977_20 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -37839,11 +37839,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_107) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_107) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -37857,7 +37857,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -37871,7 +37871,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -37884,7 +37884,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -38045,11 +38045,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_107) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_107) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -38063,7 +38063,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -38077,7 +38077,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -38090,7 +38090,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -38251,11 +38251,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_107) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_107) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -38269,7 +38269,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -38283,7 +38283,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -38296,7 +38296,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -38457,11 +38457,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_107) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_107) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -38475,7 +38475,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -38489,7 +38489,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -38502,7 +38502,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -38663,11 +38663,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_107) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_107) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -38681,7 +38681,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -38695,7 +38695,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -38708,7 +38708,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -38869,11 +38869,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_113) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_113) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -38887,7 +38887,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -38901,7 +38901,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -38914,7 +38914,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -39077,11 +39077,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_119) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_119) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -39095,7 +39095,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -39109,7 +39109,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -39122,7 +39122,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -39283,11 +39283,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_125) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_125) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -39301,7 +39301,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -39315,7 +39315,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -39328,7 +39328,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -39491,11 +39491,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_131) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_131) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -39509,7 +39509,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -39523,7 +39523,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -39536,7 +39536,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -39697,11 +39697,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_137) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_137) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -39715,7 +39715,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -39729,7 +39729,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -39742,7 +39742,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -39905,11 +39905,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_143) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_143) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -39923,7 +39923,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -39937,7 +39937,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -39950,7 +39950,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -40353,11 +40353,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_150) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_150) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -40371,7 +40371,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -40385,7 +40385,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -40398,7 +40398,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -40986,11 +40986,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_155) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_155) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -41004,7 +41004,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -41018,7 +41018,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -41031,7 +41031,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -41223,11 +41223,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_160) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_160) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -41241,7 +41241,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -41255,7 +41255,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -41268,7 +41268,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -41568,11 +41568,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_165) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_165) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -41586,7 +41586,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -41600,7 +41600,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -41613,7 +41613,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -41781,11 +41781,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_170) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_170) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -41799,7 +41799,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -41813,7 +41813,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -41826,7 +41826,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -41952,11 +41952,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_170) & 63))
+                                    (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_170) & 63))
 
                                 } else {
                                     if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                        (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -41970,7 +41970,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                            (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -41984,7 +41984,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -41997,7 +41997,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                 }
 
                                             } else {
-                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -42126,11 +42126,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_176) & 63))
+                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_176) & 63))
 
                                     } else {
                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -42144,7 +42144,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                         } else {
                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -42158,7 +42158,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                             } else {
                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -42171,7 +42171,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                     }
 
                                                 } else {
-                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -42279,7 +42279,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + 1)
 
                         OP_TYPEEXACT =>
-                            (F__goto_690_12.fields.type_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.type_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.fields.type_repeat.min = F__goto_690_12.fields.type_repeat.max)
 
@@ -42292,7 +42292,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                         OP_TYPEUPTO =>
                             (F__goto_690_12.fields.type_repeat.min = 0)
 
-                            (F__goto_690_12.fields.type_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.type_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             var __ci_expr_ternary_179: c_int = 0
 
@@ -42313,7 +42313,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                         OP_TYPEMINUPTO =>
                             (F__goto_690_12.fields.type_repeat.min = 0)
 
-                            (F__goto_690_12.fields.type_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.type_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             var __ci_expr_ternary_179: c_int = 0
 
@@ -42372,7 +42372,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (F__goto_690_12.fields.type_repeat.min = 0)
 
-                            (F__goto_690_12.fields.type_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.type_repeat.max = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
@@ -42548,11 +42548,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_223) & 63))
+                                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_223) & 63))
 
                                                     } else {
                                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -42566,7 +42566,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -42580,7 +42580,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                             } else {
                                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                                     if (__goto_pending != 0) {
                                                                         break
@@ -42593,7 +42593,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                     }
 
                                                                 } else {
-                                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                     if (__goto_pending != 0) {
                                                                         break
@@ -42936,11 +42936,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_223) & 63))
+                                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_223) & 63))
 
                                                     } else {
                                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -42954,7 +42954,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -42968,7 +42968,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                             } else {
                                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                                     if (__goto_pending != 0) {
                                                                         break
@@ -42981,7 +42981,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                     }
 
                                                                 } else {
-                                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                     if (__goto_pending != 0) {
                                                                         break
@@ -43324,11 +43324,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_223) & 63))
+                                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_223) & 63))
 
                                                     } else {
                                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -43342,7 +43342,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -43356,7 +43356,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                             } else {
                                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                                     if (__goto_pending != 0) {
                                                                         break
@@ -43369,7 +43369,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                     }
 
                                                                 } else {
-                                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                     if (__goto_pending != 0) {
                                                                         break
@@ -43712,11 +43712,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_223) & 63))
+                                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_223) & 63))
 
                                                     } else {
                                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -43730,7 +43730,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -43744,7 +43744,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                             } else {
                                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                                     if (__goto_pending != 0) {
                                                                         break
@@ -43757,7 +43757,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                     }
 
                                                                 } else {
-                                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                     if (__goto_pending != 0) {
                                                                         break
@@ -44100,11 +44100,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_223) & 63))
+                                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_223) & 63))
 
                                                     } else {
                                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -44118,7 +44118,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -44132,7 +44132,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                             } else {
                                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                                     if (__goto_pending != 0) {
                                                                         break
@@ -44145,7 +44145,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                     }
 
                                                                 } else {
-                                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                     if (__goto_pending != 0) {
                                                                         break
@@ -44488,11 +44488,11 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         (F__goto_690_12.eptr = F__goto_690_12.eptr + 1)
 
-                                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_223) & 63))
+                                                        (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_223) & 63))
 
                                                     } else {
                                                         if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                                            (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
 
                                                             if (__goto_pending != 0) {
                                                                 break
@@ -44506,7 +44506,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                         } else {
                                                             if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                                (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
 
                                                                 if (__goto_pending != 0) {
                                                                     break
@@ -44520,7 +44520,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                                             } else {
                                                                 if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                                    (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
 
                                                                     if (__goto_pending != 0) {
                                                                         break
@@ -44533,7 +44533,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                                                     }
 
                                                                 } else {
-                                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                                    (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *F__goto_690_12.eptr) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
 
                                                                     if (__goto_pending != 0) {
                                                                         break
@@ -44721,13 +44721,13 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.byte2 = ((__ci_expr_ternary_462 as u8)))
 
 
-                            (count__goto_5254_11 = ((((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint)))
+                            (count__goto_5254_11 = ((((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint)))
 
                             if (__goto_pending != 0) {
                                 break
                             }
 
-                            (slot__goto_5255_18 = mb.name_table + ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint) *% mb.name_entry_size))
+                            (slot__goto_5255_18 = mb.name_table + ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint) *% mb.name_entry_size))
 
                             if (__goto_pending != 0) {
                                 break
@@ -44757,7 +44757,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     break
                                 }
 
-                                (F__goto_690_12.fields.ref_repeat.offset = ((((((((unsafe: slot__goto_5255_18[0]) as c_int) << 8) | (unsafe: slot__goto_5255_18[(0 + 1)])) as c_uint) as c_uint) << 1) -% 2))
+                                (F__goto_690_12.fields.ref_repeat.offset = ((((((((unsafe: slot__goto_5255_18[0]) as c_int) << (8 as c_uint)) | (unsafe: slot__goto_5255_18[(0 + 1)])) as c_uint) as c_uint) << (1 as c_uint)) -% 2))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -44811,13 +44811,13 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.byte2 = ((__ci_expr_ternary_462 as u8)))
 
 
-                            (count__goto_5254_11 = ((((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint)))
+                            (count__goto_5254_11 = ((((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint)))
 
                             if (__goto_pending != 0) {
                                 break
                             }
 
-                            (slot__goto_5255_18 = mb.name_table + ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint) *% mb.name_entry_size))
+                            (slot__goto_5255_18 = mb.name_table + ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint) *% mb.name_entry_size))
 
                             if (__goto_pending != 0) {
                                 break
@@ -44847,7 +44847,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     break
                                 }
 
-                                (F__goto_690_12.fields.ref_repeat.offset = ((((((((unsafe: slot__goto_5255_18[0]) as c_int) << 8) | (unsafe: slot__goto_5255_18[(0 + 1)])) as c_uint) as c_uint) << 1) -% 2))
+                                (F__goto_690_12.fields.ref_repeat.offset = ((((((((unsafe: slot__goto_5255_18[0]) as c_int) << (8 as c_uint)) | (unsafe: slot__goto_5255_18[(0 + 1)])) as c_uint) as c_uint) << (1 as c_uint)) -% 2))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -44901,7 +44901,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.byte2 = __ci_expr_ternary_466)
 
 
-                            (F__goto_690_12.fields.ref_repeat.offset = ((((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint) as c_uint) << 1) -% 2))
+                            (F__goto_690_12.fields.ref_repeat.offset = ((((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint) as c_uint) << (1 as c_uint)) -% 2))
 
                             var __ci_expr_ternary_467: c_int = 0
 
@@ -45260,7 +45260,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.byte2 = __ci_expr_ternary_466)
 
 
-                            (F__goto_690_12.fields.ref_repeat.offset = ((((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint) as c_uint) << 1) -% 2))
+                            (F__goto_690_12.fields.ref_repeat.offset = ((((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint) as c_uint) << (1 as c_uint)) -% 2))
 
                             var __ci_expr_ternary_467: c_int = 0
 
@@ -45617,7 +45617,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             }
 
                             while true {
-                                (next_ecode__goto_5516_18 = next_ecode__goto_5516_18 + (((((unsafe: next_ecode__goto_5516_18[1]) as c_int) << 8) | (unsafe: next_ecode__goto_5516_18[(1 + 1)])) as c_uint))
+                                (next_ecode__goto_5516_18 = next_ecode__goto_5516_18 + (((((unsafe: next_ecode__goto_5516_18[1]) as c_int) << (8 as c_uint)) | (unsafe: next_ecode__goto_5516_18[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -45680,7 +45680,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                         OP_CBRAPOS =>
                             (F__goto_690_12.byte2 = 0)
 
-                            (number__goto_713_10 = ((((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint)))
+                            (number__goto_713_10 = ((((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint)))
 
                             (F__goto_690_12.fields.op_brapos.frame_type = 65536 | number__goto_713_10)
 
@@ -45767,7 +45767,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                         OP_SCBRAPOS =>
                             (F__goto_690_12.byte2 = 0)
 
-                            (number__goto_713_10 = ((((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint)))
+                            (number__goto_713_10 = ((((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint)))
 
                             (F__goto_690_12.fields.op_brapos.frame_type = 65536 | number__goto_713_10)
 
@@ -45880,13 +45880,13 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
                         OP_CBRA =>
-                            (F__goto_690_12.fields.op_bra.frame_type = 65536 | (((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint))
+                            (F__goto_690_12.fields.op_bra.frame_type = 65536 | (((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint))
 
                             __pc = 64
                             __goto_pending = 1
 
                         OP_SCBRA =>
-                            (F__goto_690_12.fields.op_bra.frame_type = 65536 | (((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint))
+                            (F__goto_690_12.fields.op_bra.frame_type = 65536 | (((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint))
 
                             __pc = 64
                             __goto_pending = 1
@@ -45894,14 +45894,14 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                         OP_ONCE =>
                             (F__goto_690_12.fields.op_bra.frame_type = 131072)
 
-                            (bracode__goto_702_12 = mb.start_code + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                            (bracode__goto_702_12 = mb.start_code + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                             var __ci_expr_ternary_477: c_uint = 0
 
                             if ((if bracode__goto_702_12 == mb.start_code: 1 else: 0) != 0) {
                                 (__ci_expr_ternary_477 = 0)
                             } else {
-                                (__ci_expr_ternary_477 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                (__ci_expr_ternary_477 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
                             }
 
                             (number__goto_713_10 = __ci_expr_ternary_477)
@@ -45986,7 +45986,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.fields.op_recurse.frame_type = 262144 | number__goto_713_10)
 
                             while true {
-                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -46005,14 +46005,14 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                         OP_SCRIPT_RUN =>
                             (F__goto_690_12.fields.op_bra.frame_type = 131072)
 
-                            (bracode__goto_702_12 = mb.start_code + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                            (bracode__goto_702_12 = mb.start_code + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                             var __ci_expr_ternary_477: c_uint = 0
 
                             if ((if bracode__goto_702_12 == mb.start_code: 1 else: 0) != 0) {
                                 (__ci_expr_ternary_477 = 0)
                             } else {
-                                (__ci_expr_ternary_477 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                (__ci_expr_ternary_477 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
                             }
 
                             (number__goto_713_10 = __ci_expr_ternary_477)
@@ -46097,7 +46097,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.fields.op_recurse.frame_type = 262144 | number__goto_713_10)
 
                             while true {
-                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -46116,14 +46116,14 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                         OP_SBRA =>
                             (F__goto_690_12.fields.op_bra.frame_type = 131072)
 
-                            (bracode__goto_702_12 = mb.start_code + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                            (bracode__goto_702_12 = mb.start_code + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                             var __ci_expr_ternary_477: c_uint = 0
 
                             if ((if bracode__goto_702_12 == mb.start_code: 1 else: 0) != 0) {
                                 (__ci_expr_ternary_477 = 0)
                             } else {
-                                (__ci_expr_ternary_477 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                (__ci_expr_ternary_477 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
                             }
 
                             (number__goto_713_10 = __ci_expr_ternary_477)
@@ -46208,7 +46208,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.fields.op_recurse.frame_type = 262144 | number__goto_713_10)
 
                             while true {
-                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -46225,14 +46225,14 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
 
                         OP_RECURSE =>
-                            (bracode__goto_702_12 = mb.start_code + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                            (bracode__goto_702_12 = mb.start_code + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                             var __ci_expr_ternary_477: c_uint = 0
 
                             if ((if bracode__goto_702_12 == mb.start_code: 1 else: 0) != 0) {
                                 (__ci_expr_ternary_477 = 0)
                             } else {
-                                (__ci_expr_ternary_477 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                (__ci_expr_ternary_477 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
                             }
 
                             (number__goto_713_10 = __ci_expr_ternary_477)
@@ -46317,7 +46317,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.fields.op_recurse.frame_type = 262144 | number__goto_713_10)
 
                             while true {
-                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -46334,7 +46334,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                         OP_ASSERT =>
                             while true {
-                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -46350,7 +46350,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                         OP_ASSERTBACK =>
                             while true {
-                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -46366,7 +46366,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                         OP_ASSERT_NA =>
                             while true {
-                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -46382,7 +46382,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                         OP_ASSERTBACK_NA =>
                             while true {
-                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -46429,7 +46429,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                         break
                                     }
 
-                                    (offset__goto_703_12 = ((((((((unsafe: ecode__goto_5870_18[1]) as c_int) << 8) | (unsafe: ecode__goto_5870_18[(1 + 1)])) as c_uint) as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = ((((((((unsafe: ecode__goto_5870_18[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_5870_18[(1 + 1)])) as c_uint) as c_uint) << (1 as c_uint)) -% 2))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -46499,13 +46499,13 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     break
                                 }
 
-                                (count__goto_5871_11 = ((((((unsafe: ecode__goto_5870_18[(1 + 2)]) as c_int) << 8) | (unsafe: ecode__goto_5870_18[((1 + 2) + 1)])) as c_uint)))
+                                (count__goto_5871_11 = ((((((unsafe: ecode__goto_5870_18[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_5870_18[((1 + 2) + 1)])) as c_uint)))
 
                                 if (__goto_pending != 0) {
                                     break
                                 }
 
-                                (slot__goto_5872_18 = mb.name_table + ((((((unsafe: ecode__goto_5870_18[1]) as c_int) << 8) | (unsafe: ecode__goto_5870_18[(1 + 1)])) as c_uint) *% mb.name_entry_size))
+                                (slot__goto_5872_18 = mb.name_table + ((((((unsafe: ecode__goto_5870_18[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_5870_18[(1 + 1)])) as c_uint) *% mb.name_entry_size))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -46524,7 +46524,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                 }
 
                                 while ((if count__goto_5871_11 > 0: 1 else: 0) != 0) {
-                                    (offset__goto_703_12 = ((((((((unsafe: slot__goto_5872_18[0]) as c_int) << 8) | (unsafe: slot__goto_5872_18[(0 + 1)])) as c_uint) as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = ((((((((unsafe: slot__goto_5872_18[0]) as c_int) << (8 as c_uint)) | (unsafe: slot__goto_5872_18[(0 + 1)])) as c_uint) as c_uint) << (1 as c_uint)) -% 2))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -46643,7 +46643,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (mb.moptions = mb.moptions & (~2))
 
                             while true {
-                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -46774,7 +46774,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + length__goto_704_12)
 
                         OP_COND =>
-                            (F__goto_690_12.fields.op_cond.length = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.op_cond.length = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             if ((if (unsafe: F__goto_690_12.ecode[F__goto_690_12.fields.op_cond.length]) != OP_ALT: 1 else: 0) != 0) {
                                 (F__goto_690_12.fields.op_cond.length = F__goto_690_12.fields.op_cond.length - 3)
@@ -46890,7 +46890,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             }
 
                         OP_SCOND =>
-                            (F__goto_690_12.fields.op_cond.length = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.op_cond.length = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             if ((if (unsafe: F__goto_690_12.ecode[F__goto_690_12.fields.op_cond.length]) != OP_ALT: 1 else: 0) != 0) {
                                 (F__goto_690_12.fields.op_cond.length = F__goto_690_12.fields.op_cond.length - 3)
@@ -47006,7 +47006,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             }
 
                         OP_REVERSE =>
-                            (number__goto_713_10 = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (number__goto_713_10 = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
                             if (utf__goto_724_6 != 0) {
                                 while ((if number__goto_713_10 > 0: 1 else: 0) != 0) {
@@ -47121,9 +47121,9 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
                         OP_VREVERSE =>
-                            (F__goto_690_12.fields.op_vreverse.min = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.op_vreverse.min = ((((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint)))
 
-                            (F__goto_690_12.fields.op_vreverse.max = ((((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint)))
+                            (F__goto_690_12.fields.op_vreverse.max = ((((((unsafe: F__goto_690_12.ecode[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[((1 + 2) + 1)])) as c_uint)))
 
                             if (utf__goto_724_6 != 0) {
                                 (i__goto_711_10 = 0)
@@ -47290,7 +47290,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (branch_end__goto_700_12 = F__goto_690_12.ecode)
 
                             while true {
-                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -47307,7 +47307,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (branch_end__goto_700_12 = F__goto_690_12.ecode)
 
                             while true {
-                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                                (F__goto_690_12.ecode = F__goto_690_12.ecode + (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -47320,7 +47320,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             }
 
                         OP_KET =>
-                            (bracode__goto_702_12 = F__goto_690_12.ecode - (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                            (bracode__goto_702_12 = F__goto_690_12.ecode - (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                             if ((if branch_end__goto_700_12 == null: 1 else: 0) != 0) {
                                 (branch_end__goto_700_12 = F__goto_690_12.ecode)
@@ -47328,8 +47328,8 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (branch_start__goto_701_12 = bracode__goto_702_12)
 
-                            while ((if (branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << 8) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint)) != branch_end__goto_700_12: 1 else: 0) != 0) {
-                                (branch_start__goto_701_12 = branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << 8) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint))
+                            while ((if (branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << (8 as c_uint)) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint)) != branch_end__goto_700_12: 1 else: 0) != 0) {
+                                (branch_start__goto_701_12 = branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << (8 as c_uint)) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -47626,7 +47626,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     (F__goto_690_12.back_frame = (((F__goto_690_12 as *mut c_char) as usize) -% ((P__goto_692_12 as *mut c_char) as usize)) / sizeof[c_char]())
 
                                     while true {
-                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << 8) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
+                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -47664,7 +47664,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     (F__goto_690_12.back_frame = (((F__goto_690_12 as *mut c_char) as usize) -% ((P__goto_692_12 as *mut c_char) as usize)) / sizeof[c_char]())
 
                                     while true {
-                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << 8) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
+                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -47695,7 +47695,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     (F__goto_690_12.back_frame = (((F__goto_690_12 as *mut c_char) as usize) -% ((P__goto_692_12 as *mut c_char) as usize)) / sizeof[c_char]())
 
                                     while true {
-                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << 8) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
+                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -47943,7 +47943,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                         }
                                     }
                                 OP_CBRA =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -47999,7 +47999,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -48012,7 +48012,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     }
 
                                 OP_CBRAPOS =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -48068,7 +48068,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -48081,7 +48081,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     }
 
                                 OP_SCBRA =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -48137,7 +48137,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -48150,7 +48150,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     }
 
                                 OP_SCBRAPOS =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -48206,7 +48206,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -48279,7 +48279,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
                         OP_KETRMIN =>
-                            (bracode__goto_702_12 = F__goto_690_12.ecode - (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                            (bracode__goto_702_12 = F__goto_690_12.ecode - (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                             if ((if branch_end__goto_700_12 == null: 1 else: 0) != 0) {
                                 (branch_end__goto_700_12 = F__goto_690_12.ecode)
@@ -48287,8 +48287,8 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (branch_start__goto_701_12 = bracode__goto_702_12)
 
-                            while ((if (branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << 8) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint)) != branch_end__goto_700_12: 1 else: 0) != 0) {
-                                (branch_start__goto_701_12 = branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << 8) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint))
+                            while ((if (branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << (8 as c_uint)) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint)) != branch_end__goto_700_12: 1 else: 0) != 0) {
+                                (branch_start__goto_701_12 = branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << (8 as c_uint)) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -48585,7 +48585,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     (F__goto_690_12.back_frame = (((F__goto_690_12 as *mut c_char) as usize) -% ((P__goto_692_12 as *mut c_char) as usize)) / sizeof[c_char]())
 
                                     while true {
-                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << 8) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
+                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -48623,7 +48623,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     (F__goto_690_12.back_frame = (((F__goto_690_12 as *mut c_char) as usize) -% ((P__goto_692_12 as *mut c_char) as usize)) / sizeof[c_char]())
 
                                     while true {
-                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << 8) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
+                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -48654,7 +48654,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     (F__goto_690_12.back_frame = (((F__goto_690_12 as *mut c_char) as usize) -% ((P__goto_692_12 as *mut c_char) as usize)) / sizeof[c_char]())
 
                                     while true {
-                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << 8) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
+                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -48902,7 +48902,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                         }
                                     }
                                 OP_CBRA =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -48958,7 +48958,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -48971,7 +48971,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     }
 
                                 OP_CBRAPOS =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -49027,7 +49027,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -49040,7 +49040,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     }
 
                                 OP_SCBRA =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -49096,7 +49096,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -49109,7 +49109,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     }
 
                                 OP_SCBRAPOS =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -49165,7 +49165,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -49238,7 +49238,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
                         OP_KETRMAX =>
-                            (bracode__goto_702_12 = F__goto_690_12.ecode - (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                            (bracode__goto_702_12 = F__goto_690_12.ecode - (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                             if ((if branch_end__goto_700_12 == null: 1 else: 0) != 0) {
                                 (branch_end__goto_700_12 = F__goto_690_12.ecode)
@@ -49246,8 +49246,8 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (branch_start__goto_701_12 = bracode__goto_702_12)
 
-                            while ((if (branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << 8) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint)) != branch_end__goto_700_12: 1 else: 0) != 0) {
-                                (branch_start__goto_701_12 = branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << 8) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint))
+                            while ((if (branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << (8 as c_uint)) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint)) != branch_end__goto_700_12: 1 else: 0) != 0) {
+                                (branch_start__goto_701_12 = branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << (8 as c_uint)) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -49544,7 +49544,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     (F__goto_690_12.back_frame = (((F__goto_690_12 as *mut c_char) as usize) -% ((P__goto_692_12 as *mut c_char) as usize)) / sizeof[c_char]())
 
                                     while true {
-                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << 8) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
+                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -49582,7 +49582,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     (F__goto_690_12.back_frame = (((F__goto_690_12 as *mut c_char) as usize) -% ((P__goto_692_12 as *mut c_char) as usize)) / sizeof[c_char]())
 
                                     while true {
-                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << 8) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
+                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -49613,7 +49613,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     (F__goto_690_12.back_frame = (((F__goto_690_12 as *mut c_char) as usize) -% ((P__goto_692_12 as *mut c_char) as usize)) / sizeof[c_char]())
 
                                     while true {
-                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << 8) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
+                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -49861,7 +49861,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                         }
                                     }
                                 OP_CBRA =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -49917,7 +49917,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -49930,7 +49930,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     }
 
                                 OP_CBRAPOS =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -49986,7 +49986,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -49999,7 +49999,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     }
 
                                 OP_SCBRA =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -50055,7 +50055,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -50068,7 +50068,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     }
 
                                 OP_SCBRAPOS =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -50124,7 +50124,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -50197,7 +50197,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             (F__goto_690_12.ecode = F__goto_690_12.ecode + (1 + 2))
 
                         OP_KETRPOS =>
-                            (bracode__goto_702_12 = F__goto_690_12.ecode - (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << 8) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
+                            (bracode__goto_702_12 = F__goto_690_12.ecode - (((((unsafe: F__goto_690_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: F__goto_690_12.ecode[(1 + 1)])) as c_uint))
 
                             if ((if branch_end__goto_700_12 == null: 1 else: 0) != 0) {
                                 (branch_end__goto_700_12 = F__goto_690_12.ecode)
@@ -50205,8 +50205,8 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                             (branch_start__goto_701_12 = bracode__goto_702_12)
 
-                            while ((if (branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << 8) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint)) != branch_end__goto_700_12: 1 else: 0) != 0) {
-                                (branch_start__goto_701_12 = branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << 8) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint))
+                            while ((if (branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << (8 as c_uint)) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint)) != branch_end__goto_700_12: 1 else: 0) != 0) {
+                                (branch_start__goto_701_12 = branch_start__goto_701_12 + (((((unsafe: branch_start__goto_701_12[1]) as c_int) << (8 as c_uint)) | (unsafe: branch_start__goto_701_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -50503,7 +50503,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     (F__goto_690_12.back_frame = (((F__goto_690_12 as *mut c_char) as usize) -% ((P__goto_692_12 as *mut c_char) as usize)) / sizeof[c_char]())
 
                                     while true {
-                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << 8) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
+                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -50541,7 +50541,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     (F__goto_690_12.back_frame = (((F__goto_690_12 as *mut c_char) as usize) -% ((P__goto_692_12 as *mut c_char) as usize)) / sizeof[c_char]())
 
                                     while true {
-                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << 8) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
+                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -50572,7 +50572,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     (F__goto_690_12.back_frame = (((F__goto_690_12 as *mut c_char) as usize) -% ((P__goto_692_12 as *mut c_char) as usize)) / sizeof[c_char]())
 
                                     while true {
-                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << 8) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
+                                        (y__goto_6441_18 = ((((((unsafe: P__goto_692_12.ecode[1]) as c_int) << (8 as c_uint)) | (unsafe: P__goto_692_12.ecode[(1 + 1)])) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -50820,7 +50820,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                         }
                                     }
                                 OP_CBRA =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -50876,7 +50876,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -50889,7 +50889,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     }
 
                                 OP_CBRAPOS =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -50945,7 +50945,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -50958,7 +50958,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     }
 
                                 OP_SCBRA =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -51014,7 +51014,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -51027,7 +51027,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                                     }
 
                                 OP_SCBRAPOS =>
-                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << 8) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
+                                    (number__goto_713_10 = ((((((unsafe: bracode__goto_702_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: bracode__goto_702_12[((1 + 2) + 1)])) as c_uint)))
 
                                     if ((if F__goto_690_12.current_recurse == number__goto_713_10: 1 else: 0) != 0) {
                                         (P__goto_692_12 = ((((N__goto_691_12 as *mut c_char) - frame_size) as *mut heapframe)))
@@ -51083,7 +51083,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     }
 
-                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << 1) -% 2))
+                                    (offset__goto_703_12 = (((number__goto_713_10 as c_uint) << (1 as c_uint)) -% 2))
 
                                     (F__goto_690_12.capture_last = number__goto_713_10)
 
@@ -51891,18 +51891,18 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                         if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: lastptr__goto_6708_18[1]) & 63))
+                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: lastptr__goto_6708_18[1]) & 63))
                                         } else {
                                             if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[2]) & 63))
+                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[2]) & 63))
                                             } else {
                                                 if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 12)) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[3]) & 63))
+                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[3]) & 63))
                                                 } else {
                                                     if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 18)) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << 12)) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[4]) & 63))
+                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[4]) & 63))
                                                     } else {
-                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 24)) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << 18)) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << 12)) | ((((unsafe: lastptr__goto_6708_18[4]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[5]) & 63))
+                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[5]) & 63))
                                                     }
                                                 }
                                             }
@@ -52101,18 +52101,18 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                         if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
                                         } else {
                                             if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
                                             } else {
                                                 if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
                                                 } else {
                                                     if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
                                                     } else {
-                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
                                                     }
                                                 }
                                             }
@@ -52293,18 +52293,18 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                         if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: lastptr__goto_6708_18[1]) & 63))
+                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: lastptr__goto_6708_18[1]) & 63))
                                         } else {
                                             if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[2]) & 63))
+                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[2]) & 63))
                                             } else {
                                                 if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 12)) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[3]) & 63))
+                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[3]) & 63))
                                                 } else {
                                                     if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 18)) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << 12)) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[4]) & 63))
+                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[4]) & 63))
                                                     } else {
-                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 24)) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << 18)) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << 12)) | ((((unsafe: lastptr__goto_6708_18[4]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[5]) & 63))
+                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[5]) & 63))
                                                     }
                                                 }
                                             }
@@ -52503,18 +52503,18 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                         if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
                                         } else {
                                             if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
                                             } else {
                                                 if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
                                                 } else {
                                                     if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
                                                     } else {
-                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
                                                     }
                                                 }
                                             }
@@ -52695,18 +52695,18 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                         if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: lastptr__goto_6708_18[1]) & 63))
+                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: lastptr__goto_6708_18[1]) & 63))
                                         } else {
                                             if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[2]) & 63))
+                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[2]) & 63))
                                             } else {
                                                 if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 12)) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[3]) & 63))
+                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[3]) & 63))
                                                 } else {
                                                     if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 18)) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << 12)) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[4]) & 63))
+                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[4]) & 63))
                                                     } else {
-                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 24)) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << 18)) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << 12)) | ((((unsafe: lastptr__goto_6708_18[4]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[5]) & 63))
+                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[5]) & 63))
                                                     }
                                                 }
                                             }
@@ -52905,18 +52905,18 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                         if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
                                         } else {
                                             if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
                                             } else {
                                                 if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
                                                 } else {
                                                     if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
                                                     } else {
-                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
                                                     }
                                                 }
                                             }
@@ -53097,18 +53097,18 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                         if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: lastptr__goto_6708_18[1]) & 63))
+                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: lastptr__goto_6708_18[1]) & 63))
                                         } else {
                                             if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[2]) & 63))
+                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[2]) & 63))
                                             } else {
                                                 if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 12)) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[3]) & 63))
+                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[3]) & 63))
                                                 } else {
                                                     if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 18)) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << 12)) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[4]) & 63))
+                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[4]) & 63))
                                                     } else {
-                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << 24)) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << 18)) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << 12)) | ((((unsafe: lastptr__goto_6708_18[4]) & 63) as c_uint) << 6)) | ((unsafe: lastptr__goto_6708_18[5]) & 63))
+                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: lastptr__goto_6708_18[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: lastptr__goto_6708_18[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: lastptr__goto_6708_18[5]) & 63))
                                                     }
                                                 }
                                             }
@@ -53307,18 +53307,18 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                                     if ((if fc__goto_712_10 >= 192: 1 else: 0) != 0) {
                                         if ((if (fc__goto_712_10 & 32) == 0: 1 else: 0) != 0) {
-                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << 6) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
+                                            (fc__goto_712_10 = (((fc__goto_712_10 & 31) as c_uint) << (6 as c_uint)) | ((unsafe: F__goto_690_12.eptr[1]) & 63))
                                         } else {
                                             if ((if (fc__goto_712_10 & 16) == 0: 1 else: 0) != 0) {
-                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << 12) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
+                                                (fc__goto_712_10 = ((((fc__goto_712_10 & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[2]) & 63))
                                             } else {
                                                 if ((if (fc__goto_712_10 & 8) == 0: 1 else: 0) != 0) {
-                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << 18) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
+                                                    (fc__goto_712_10 = (((((fc__goto_712_10 & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[3]) & 63))
                                                 } else {
                                                     if ((if (fc__goto_712_10 & 4) == 0: 1 else: 0) != 0) {
-                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << 24) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
+                                                        (fc__goto_712_10 = ((((((fc__goto_712_10 & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[4]) & 63))
                                                     } else {
-                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << 30) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << 6)) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
+                                                        (fc__goto_712_10 = (((((((fc__goto_712_10 & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: F__goto_690_12.eptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: F__goto_690_12.eptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: F__goto_690_12.eptr[5]) & 63))
                                                     }
                                                 }
                                             }

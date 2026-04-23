@@ -1404,21 +1404,21 @@ EOF
     return
   fi
 
-  if ! file_has_regex "$out_w" 'p\[1\].*as c_int\).*<< 8'; then
+  if ! file_has_regex "$out_w" 'p\[1\].*as c_int\).*<< \(8 as c_uint\)'; then
     echo "FAIL(cli-selfhost-migrate-output) small_int_shift_promotion"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
     return
   fi
 
-  if ! file_has_regex "$out_w" 'p\[0\].*& 63.*as c_int\).*<< 6'; then
+  if ! file_has_regex "$out_w" 'p\[0\].*& 63.*as c_int\).*<< \(6 as c_uint\)'; then
     echo "FAIL(cli-selfhost-migrate-output) small_int_shift_masked_lhs"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
     return
   fi
 
-  if ! file_has_regex "$out_w" '1 as c_int\).*<<.*p\[1\].*& 7'; then
+  if ! file_has_regex "$out_w" '1 as c_int\).*<<.*p\[1\].*& 7\) as c_uint'; then
     echo "FAIL(cli-selfhost-migrate-output) small_int_shift_literal_lhs"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
@@ -1447,6 +1447,81 @@ EOF
   fi
 
   echo "PASS(cli-selfhost-migrate) small_int_shift_promotion"
+}
+
+expect_shift_count_check_prevents_llvm_poison() {
+  local case_dir="$tmpdir/shift_count_check_case"
+  local src="$case_dir/shift_count_check.w"
+  local ir_out="$case_dir/shift_count_check.ll"
+  local opt_out="$case_dir/shift_count_check.opt.ll"
+  local opt_bin="${OPT:-/usr/local/llvm/bin/opt}"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+fn issue171_shift(p: *mut u8) -> u32:
+    (((unsafe: p[1]) << 8) | (unsafe: p[2])) as u32
+
+fn main:
+    var buf: [3]u8 = [0, 1, 2]
+    let got = issue171_shift(&mut buf[0] as *mut u8)
+    print(f"got {got}")
+EOF
+
+  if ! run_cli "$ir_out" "$tmpdir/err" ir "$src"; then
+    echo "FAIL(cli-selfhost-ir) shift_count_check"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ ! -x "$opt_bin" ]]; then
+    echo "FAIL(cli-selfhost-opt-missing) shift_count_check"
+    echo "missing LLVM opt at $opt_bin"
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! "$opt_bin" -O1 -S "$ir_out" -o "$opt_out" >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-opt) shift_count_check"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if file_has_regex "$opt_out" 'with_fmt_i32\(i32 (undef|poison)\)'; then
+    echo "FAIL(cli-selfhost-opt-output) shift_count_check"
+    grep -En 'undef|poison|with_fmt_i32' "$opt_out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$src" -O1; then
+    echo "FAIL(cli-selfhost-run) shift_count_check"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if ! file_has_literal "$tmpdir/out" "got 2"; then
+    echo "FAIL(cli-selfhost-run-output) shift_count_check"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$src" --release -O2; then
+    echo "FAIL(cli-selfhost-release-run) shift_count_check"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if ! file_has_literal "$tmpdir/out" "got 2"; then
+    echo "FAIL(cli-selfhost-release-run-output) shift_count_check"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-opt) shift_count_check"
 }
 
 expect_migrate_prefer_brace_no_trailing_ws() {
@@ -2183,6 +2258,7 @@ expect_migrate_cross_file_tentative_global_owner
 expect_migrate_noop_pointer_cast_exprs
 expect_migrate_raw_pointer_index_unsafe
 expect_migrate_small_int_shift_promotion
+expect_shift_count_check_prevents_llvm_poison
 expect_migrate_prefer_brace_no_trailing_ws
 expect_migrate_typed_cast_macros
 expect_migrate_for_continue_switch_break_semantics

@@ -28,7 +28,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
 
     if ((if ((unsafe: *__ci_expr_old_0) & 2) != 0: 1 else: 0) != 0) {
         if ((if c < 256: 1 else: 0) != 0) {
-            return (if ((unsafe: data[(c / 8)]) & ((1 as c_uint) << (c & 7))) != 0: 1 else: 0)
+            return (if ((unsafe: data[(c / 8)]) & ((1 as c_uint) << ((c & 7) as c_uint))) != 0: 1 else: 0)
         }
 
         (data = data + (32 / sizeof[u8]()))
@@ -103,7 +103,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
                     if ((if (unsafe: data[1]) == prop.script: 1 else: 0) != 0) {
                         (__ci_expr_logic_6 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_6 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: data[1]) / 32)]) & ((1 as c_uint) << ((unsafe: data[1]) % 32))) != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_6 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: data[1]) / 32)]) & ((1 as c_uint) << (((unsafe: data[1]) % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     (ok = __ci_expr_logic_6)
@@ -210,11 +210,11 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
 
                     }
                 11 =>
-                    if ((if (if ((prop.scriptx_bidiclass as c_int) >> 11) == (unsafe: data[1]): 1 else: 0) == isprop: 1 else: 0) != 0) {
+                    if ((if (if ((prop.scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe: data[1]): 1 else: 0) == isprop: 1 else: 0) != 0) {
                         return not_negated
                     }
                 12 =>
-                    (ok = (if ((unsafe: ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + (((prop.bprops & 4095) as isize) as usize))[((unsafe: data[1]) / 32)]) & ((1 as c_uint) << ((unsafe: data[1]) % 32))) != 0: 1 else: 0))
+                    (ok = (if ((unsafe: ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + (((prop.bprops & 4095) as isize) as usize))[((unsafe: data[1]) / 32)]) & ((1 as c_uint) << (((unsafe: data[1]) % 32) as c_uint))) != 0: 1 else: 0))
 
                     if ((if ok == isprop: 1 else: 0) != 0) {
                         return not_negated
@@ -498,28 +498,28 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
 
                         (data = data + 1)
 
-                        (x = (((x & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_42) & 63))
+                        (x = (((x & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_42) & 63))
 
                     } else {
                         if ((if (x & 16) == 0: 1 else: 0) != 0) {
-                            (x = ((((x & 15) as c_uint) << 12) | ((((unsafe: *data) & 63) as c_uint) << 6)) | ((unsafe: data[1]) & 63))
+                            (x = ((((x & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *data) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: data[1]) & 63))
 
                             (data = data + 2)
 
                         } else {
                             if ((if (x & 8) == 0: 1 else: 0) != 0) {
-                                (x = (((((x & 7) as c_uint) << 18) | ((((unsafe: *data) & 63) as c_uint) << 12)) | ((((unsafe: data[1]) & 63) as c_uint) << 6)) | ((unsafe: data[2]) & 63))
+                                (x = (((((x & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *data) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: data[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: data[2]) & 63))
 
                                 (data = data + 3)
 
                             } else {
                                 if ((if (x & 4) == 0: 1 else: 0) != 0) {
-                                    (x = ((((((x & 3) as c_uint) << 24) | ((((unsafe: *data) & 63) as c_uint) << 18)) | ((((unsafe: data[1]) & 63) as c_uint) << 12)) | ((((unsafe: data[2]) & 63) as c_uint) << 6)) | ((unsafe: data[3]) & 63))
+                                    (x = ((((((x & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *data) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: data[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: data[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: data[3]) & 63))
 
                                     (data = data + 4)
 
                                 } else {
-                                    (x = (((((((x & 1) as c_uint) << 30) | ((((unsafe: *data) & 63) as c_uint) << 24)) | ((((unsafe: data[1]) & 63) as c_uint) << 18)) | ((((unsafe: data[2]) & 63) as c_uint) << 12)) | ((((unsafe: data[3]) & 63) as c_uint) << 6)) | ((unsafe: data[4]) & 63))
+                                    (x = (((((((x & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *data) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: data[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: data[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: data[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: data[4]) & 63))
 
                                     (data = data + 5)
 
@@ -577,28 +577,28 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
 
                         (data = data + 1)
 
-                        (y = (((y & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_46) & 63))
+                        (y = (((y & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_46) & 63))
 
                     } else {
                         if ((if (y & 16) == 0: 1 else: 0) != 0) {
-                            (y = ((((y & 15) as c_uint) << 12) | ((((unsafe: *data) & 63) as c_uint) << 6)) | ((unsafe: data[1]) & 63))
+                            (y = ((((y & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *data) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: data[1]) & 63))
 
                             (data = data + 2)
 
                         } else {
                             if ((if (y & 8) == 0: 1 else: 0) != 0) {
-                                (y = (((((y & 7) as c_uint) << 18) | ((((unsafe: *data) & 63) as c_uint) << 12)) | ((((unsafe: data[1]) & 63) as c_uint) << 6)) | ((unsafe: data[2]) & 63))
+                                (y = (((((y & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *data) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: data[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: data[2]) & 63))
 
                                 (data = data + 3)
 
                             } else {
                                 if ((if (y & 4) == 0: 1 else: 0) != 0) {
-                                    (y = ((((((y & 3) as c_uint) << 24) | ((((unsafe: *data) & 63) as c_uint) << 18)) | ((((unsafe: data[1]) & 63) as c_uint) << 12)) | ((((unsafe: data[2]) & 63) as c_uint) << 6)) | ((unsafe: data[3]) & 63))
+                                    (y = ((((((y & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *data) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: data[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: data[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: data[3]) & 63))
 
                                     (data = data + 4)
 
                                 } else {
-                                    (y = (((((((y & 1) as c_uint) << 30) | ((((unsafe: *data) & 63) as c_uint) << 24)) | ((((unsafe: data[1]) & 63) as c_uint) << 18)) | ((((unsafe: data[2]) & 63) as c_uint) << 12)) | ((((unsafe: data[3]) & 63) as c_uint) << 6)) | ((unsafe: data[4]) & 63))
+                                    (y = (((((((y & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *data) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: data[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: data[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: data[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: data[4]) & 63))
 
                                     (data = data + 5)
 
@@ -638,11 +638,11 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
     }
 
 
-    (type_ = ((((unsafe: data[0]) as c_int) << 8) as c_uint) | (unsafe: data[1]))
+    (type_ = ((((unsafe: data[0]) as c_int) << (8 as c_uint)) as c_uint) | (unsafe: data[1]))
 
     (data = data + 2)
 
-    (next_char = char_lists_end - (((((((unsafe: data[0]) as c_int) << 8) | (unsafe: data[(0 + 1)])) as c_uint) as c_uint) << 1))
+    (next_char = char_lists_end - (((((((unsafe: data[0]) as c_int) << (8 as c_uint)) | (unsafe: data[(0 + 1)])) as c_uint) as c_uint) << (1 as c_uint)))
 
     (type_ = type_ & 4095)
 
@@ -668,16 +668,16 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
 
         }
 
-        (next_char = next_char + ((max_index as c_uint) << 1))
+        (next_char = next_char + ((max_index as c_uint) << (1 as c_uint)))
 
-        (type_ = type_ >> 3)
+        (type_ = type_ >> (3 as c_uint))
 
     }
 
     if ((if c < 65536: 1 else: 0) != 0) {
         (max_index = type_ & 3)
 
-        (c = (((((c as c_uint) << 1) | 1) as c_ushort)))
+        (c = (((((c as c_uint) << (1 as c_uint)) | 1) as c_ushort)))
 
         if ((if max_index == 3: 1 else: 0) != 0) {
             (max_index = (unsafe: *(next_char as *const c_ushort)))
@@ -728,7 +728,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
         (max_index = max_index - 1)
 
         while (1 != 0) {
-            var mid_index: c_uint = (((min_index +% max_index) as c_uint) >> 1)
+            var mid_index: c_uint = (((min_index +% max_index) as c_uint) >> (1 as c_uint))
 
             (value = (unsafe: (next_char as *const c_ushort)[mid_index]))
 
@@ -770,9 +770,9 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
 
     }
 
-    (next_char = next_char + ((max_index as c_uint) << 1))
+    (next_char = next_char + ((max_index as c_uint) << (1 as c_uint)))
 
-    (type_ = type_ >> 3)
+    (type_ = type_ >> (3 as c_uint))
 
     while true {
         if (not (0 != 0)) {
@@ -782,7 +782,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
 
     (max_index = type_ & 3)
 
-    (c = ((c as c_uint) << 1) | 1)
+    (c = ((c as c_uint) << (1 as c_uint)) | 1)
 
     if ((if max_index == 3: 1 else: 0) != 0) {
         (max_index = (unsafe: *(next_char as *const c_uint)))
@@ -827,7 +827,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
     (max_index = max_index - 1)
 
     while (1 != 0) {
-        var mid_index_1: c_uint = (((min_index +% max_index) as c_uint) >> 1)
+        var mid_index_1: c_uint = (((min_index +% max_index) as c_uint) >> (1 as c_uint))
 
         (value = (unsafe: (next_char as *const c_uint)[mid_index_1]))
 
@@ -884,7 +884,7 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
 
     if ((if (flags & 1) != 0: 1 else: 0) != 0) {
         if ((if c < 256: 1 else: 0) != 0) {
-            return (if ((unsafe: ptr[(c / 8)]) & ((1 as c_uint) << (c & 7))) != 0: 1 else: 0)
+            return (if ((unsafe: ptr[(c / 8)]) & ((1 as c_uint) << ((c & 7) as c_uint))) != 0: 1 else: 0)
         }
 
         (ptr = ptr + (32 / sizeof[u8]()))
@@ -896,7 +896,7 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
             1 =>
                 (ptr = ptr + 1)
 
-                (stack = ((stack as c_uint) >> 1) & (stack | (~1)))
+                (stack = ((stack as c_uint) >> (1 as c_uint)) & (stack | (~1)))
 
                 while true {
                     if (not (0 != 0)) {
@@ -909,7 +909,7 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
             2 =>
                 (ptr = ptr + 1)
 
-                (stack = ((stack as c_uint) >> 1) | (stack & 1))
+                (stack = ((stack as c_uint) >> (1 as c_uint)) | (stack & 1))
 
                 while true {
                     if (not (0 != 0)) {
@@ -922,7 +922,7 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
             3 =>
                 (ptr = ptr + 1)
 
-                (stack = ((stack as c_uint) >> 1) ^ (stack & 1))
+                (stack = ((stack as c_uint) >> (1 as c_uint)) ^ (stack & 1))
 
                 while true {
                     if (not (0 != 0)) {
@@ -946,9 +946,9 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
             5 =>
                 var matched: c_uint = _pcre2_xclass_8(c, ((ptr + ((1 as isize) as usize)) + ((2 as isize) as usize)), char_lists_end, utf)
 
-                (ptr = ptr + (((((unsafe: ptr[1]) as c_int) << 8) | (unsafe: ptr[(1 + 1)])) as c_uint))
+                (ptr = ptr + (((((unsafe: ptr[1]) as c_int) << (8 as c_uint)) | (unsafe: ptr[(1 + 1)])) as c_uint))
 
-                (stack = ((stack as c_uint) << 1) | matched)
+                (stack = ((stack as c_uint) << (1 as c_uint)) | matched)
 
                 (stack_depth = stack_depth + 1)
 

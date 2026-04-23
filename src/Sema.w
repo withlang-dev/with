@@ -1617,6 +1617,19 @@ fn Sema.numeric_literal_expected_type(self: Sema, node: i32) -> i32:
         self.emit_error("integer literal does not fit expected type", node)
     expected
 
+fn Sema.shift_count_literal_type(self: Sema, node: i32) -> i32:
+    if self.ast.kind(node) != NodeKind.NK_INT_LIT:
+        return self.ty_u32 as i32
+    if self.literal_suffix_type(self.ast.literal_suffix(node)) != 0:
+        return 0
+    if self.int_literal_fits_type(node, self.ty_u32 as i32):
+        return self.ty_u32 as i32
+    if self.int_literal_fits_type(node, self.ty_u64 as i32):
+        return self.ty_u64 as i32
+    if self.int_literal_fits_type(node, self.ty_u128 as i32):
+        return self.ty_u128 as i32
+    self.ty_u128 as i32
+
 fn Sema.float_literal_expected_type(self: Sema) -> i32:
     if self.has_expected_type == 0 or self.expected_expr_type == 0:
         return 0

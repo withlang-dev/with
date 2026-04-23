@@ -29,7 +29,7 @@ fn test_shift_chain:
     assert(z == 4)
 
 fn test_shift_powers_of_two:
-    var i = 0
+    var i: u32 = 0
     var val = 1
     while i < 10:
         assert(val == (1 << i))
@@ -58,10 +58,10 @@ fn test_shift_in_expression:
     assert((flags & (1 << 1)) == 0)
     assert((flags & (1 << 2)) != 0)
 
-fn set_bit(val: i32, bit: i32) -> i32:
+fn set_bit(val: i32, bit: u32) -> i32:
     val | (1 << bit)
 
-fn clear_bit(val: i32, bit: i32) -> i32:
+fn clear_bit(val: i32, bit: u32) -> i32:
     val & ~(1 << bit)
 
 fn test_bit_set_clear:

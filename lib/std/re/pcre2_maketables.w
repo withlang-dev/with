@@ -88,47 +88,47 @@ fn pcre2_maketables_8(gcontext: *mut pcre2_real_general_context_8) -> *const u8 
 
     while ((if i < 256: 1 else: 0) != 0) {
         if (is_digit(i) != 0) {
-            ((unsafe: p[(64 + (i / 8))]) = (unsafe: p[(64 + (i / 8))]) | ((1 as c_uint) << (i & 7)))
+            ((unsafe: p[(64 + (i / 8))]) = (unsafe: p[(64 + (i / 8))]) | ((1 as c_uint) << ((i & 7) as c_uint)))
         }
 
         if (is_upper(i) != 0) {
-            ((unsafe: p[(96 + (i / 8))]) = (unsafe: p[(96 + (i / 8))]) | ((1 as c_uint) << (i & 7)))
+            ((unsafe: p[(96 + (i / 8))]) = (unsafe: p[(96 + (i / 8))]) | ((1 as c_uint) << ((i & 7) as c_uint)))
         }
 
         if (is_lower(i) != 0) {
-            ((unsafe: p[(128 + (i / 8))]) = (unsafe: p[(128 + (i / 8))]) | ((1 as c_uint) << (i & 7)))
+            ((unsafe: p[(128 + (i / 8))]) = (unsafe: p[(128 + (i / 8))]) | ((1 as c_uint) << ((i & 7) as c_uint)))
         }
 
         if (is_alnum(i) != 0) {
-            ((unsafe: p[(160 + (i / 8))]) = (unsafe: p[(160 + (i / 8))]) | ((1 as c_uint) << (i & 7)))
+            ((unsafe: p[(160 + (i / 8))]) = (unsafe: p[(160 + (i / 8))]) | ((1 as c_uint) << ((i & 7) as c_uint)))
         }
 
         if ((if i == 95: 1 else: 0) != 0) {
-            ((unsafe: p[(160 + (i / 8))]) = (unsafe: p[(160 + (i / 8))]) | ((1 as c_uint) << (i & 7)))
+            ((unsafe: p[(160 + (i / 8))]) = (unsafe: p[(160 + (i / 8))]) | ((1 as c_uint) << ((i & 7) as c_uint)))
         }
 
         if (is_space(i) != 0) {
-            ((unsafe: p[(0 + (i / 8))]) = (unsafe: p[(0 + (i / 8))]) | ((1 as c_uint) << (i & 7)))
+            ((unsafe: p[(0 + (i / 8))]) = (unsafe: p[(0 + (i / 8))]) | ((1 as c_uint) << ((i & 7) as c_uint)))
         }
 
         if (is_xdigit(i) != 0) {
-            ((unsafe: p[(32 + (i / 8))]) = (unsafe: p[(32 + (i / 8))]) | ((1 as c_uint) << (i & 7)))
+            ((unsafe: p[(32 + (i / 8))]) = (unsafe: p[(32 + (i / 8))]) | ((1 as c_uint) << ((i & 7) as c_uint)))
         }
 
         if ((if is_print(i) and (not is_space(i)): 1 else: 0) != 0) {
-            ((unsafe: p[(192 + (i / 8))]) = (unsafe: p[(192 + (i / 8))]) | ((1 as c_uint) << (i & 7)))
+            ((unsafe: p[(192 + (i / 8))]) = (unsafe: p[(192 + (i / 8))]) | ((1 as c_uint) << ((i & 7) as c_uint)))
         }
 
         if (is_print(i) != 0) {
-            ((unsafe: p[(224 + (i / 8))]) = (unsafe: p[(224 + (i / 8))]) | ((1 as c_uint) << (i & 7)))
+            ((unsafe: p[(224 + (i / 8))]) = (unsafe: p[(224 + (i / 8))]) | ((1 as c_uint) << ((i & 7) as c_uint)))
         }
 
         if ((if (is_print(i) and (not is_alnum(i))) and (not is_space(i)): 1 else: 0) != 0) {
-            ((unsafe: p[(256 + (i / 8))]) = (unsafe: p[(256 + (i / 8))]) | ((1 as c_uint) << (i & 7)))
+            ((unsafe: p[(256 + (i / 8))]) = (unsafe: p[(256 + (i / 8))]) | ((1 as c_uint) << ((i & 7) as c_uint)))
         }
 
         if ((if (i < 32) or (i == 127): 1 else: 0) != 0) {
-            ((unsafe: p[(288 + (i / 8))]) = (unsafe: p[(288 + (i / 8))]) | ((1 as c_uint) << (i & 7)))
+            ((unsafe: p[(288 + (i / 8))]) = (unsafe: p[(288 + (i / 8))]) | ((1 as c_uint) << ((i & 7) as c_uint)))
         }
 
 
