@@ -7859,7 +7859,8 @@ fn ci_lower_stmt_goto_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, expr
                 child_id = decl_ir.stmt_id
             else:
                 child_id = ci_lower_stmt_goto_ir(session, child, stmts, exprs, types, block_scope, label_map, loop_depth)
-                if (child_id as i32) == 0 and with_ci_cursor_kind(session, child) != CXK_NULL_STMT:
+                let child_kind = with_ci_cursor_kind(session, child)
+                if (child_id as i32) == 0 and child_kind != CXK_NULL_STMT and child_kind != CXK_LABEL_STMT:
                     return 0 as CiStmtId
             if (child_id as i32) != 0:
                 child_ids.push(child_id as i32)
@@ -7959,6 +7960,10 @@ fn ci_lower_stmt_goto_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, expr
             return 0 as CiStmtId
         let body_id = ci_lower_stmt_goto_ir(session, with_ci_child(session, cursor, 0), stmts, exprs, types, scope, label_map, loop_depth + 1)
         if (body_id as i32) == 0:
+            let do_cond_cursor = with_ci_child(session, cursor, 1)
+            if with_ci_cursor_kind(session, do_cond_cursor) == CXK_INT_LITERAL and with_ci_eval_int_value(session, do_cond_cursor) == 0:
+                let noop_start = stmts.extra.len() as i32
+                return stmts.block(noop_start, 0)
             return 0 as CiStmtId
         let pending_break = ci_goto_pending_guard_ir(stmts, exprs, loop_depth + 1)
         let prepared_cond = ci_prepare_stmt_condition_ir(session, with_ci_child(session, cursor, 1), stmts, exprs, types, scope)
