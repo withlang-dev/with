@@ -29,6 +29,7 @@ extern fn with_str_starts_with(s: str, prefix: str) -> i32
 extern fn with_str_contains(s: str, needle: str) -> i32
 extern fn with_str_slice(s: str, start: i64, end: i64) -> str
 extern fn with_eprint(s: str) -> void
+extern fn with_ewrite(s: str) -> void
 extern fn with_system(cmd: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_getenv_str(name: str) -> str
@@ -69,6 +70,19 @@ type TestDiscovery {
     test_names: Vec[str],
 }
 
+type TestDirectives {
+    expect_stdout: Vec[str],
+    expect_stderr: Vec[str],
+    has_expect_exit: bool,
+    expect_exit: i32,
+}
+
+type TestRunResult {
+    rc: i32,
+    stdout: str,
+    stderr: str,
+}
+
 type BenchDiscovery {
     parse_ok: bool,
     has_main: bool,
@@ -77,6 +91,14 @@ type BenchDiscovery {
 
 fn empty_test_discovery -> TestDiscovery:
     TestDiscovery { parse_ok: false, has_main: false, test_names: Vec.new() }
+
+fn empty_test_directives -> TestDirectives:
+    TestDirectives {
+        expect_stdout: Vec.new(),
+        expect_stderr: Vec.new(),
+        has_expect_exit: false,
+        expect_exit: 0,
+    }
 
 fn cli_options_default -> CliOptions:
     CliOptions {
@@ -730,6 +752,57 @@ fn maybe_synthesize_test_source(target: str) -> str:
         return ""
     synthesize_test_main_source(text, discovery.test_names)
 
+fn test_parse_i32(text: str) -> i32:
+    var sign = 1
+    var i = 0
+    if text.len() > 0 and text.byte_at(0) == 45:
+        sign = -1
+        i = 1
+    var value = 0
+    while i < text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            break
+        value = value * 10 + (ch - 48)
+        i = i + 1
+    value * sign
+
+fn parse_test_directives_for_target(target: str) -> TestDirectives:
+    var result = empty_test_directives()
+    let text = with_fs_read_file(target)
+    if text.len() == 0:
+        return result
+
+    let expect_stdout_prefix = "//! expect-stdout: "
+    let expect_stderr_prefix = "//! expect-stderr: "
+    let expect_exit_prefix = "//! expect-exit: "
+    var start = 0
+    var i = 0
+    while i <= text.len() as i32:
+        let at_end = i == text.len() as i32
+        let ch = if at_end: 10 else: text.byte_at(i as i64)
+        if ch == 10:
+            var line = text.slice(start as i64, i as i64)
+            if line.len() > 0 and line.byte_at(line.len() as i64 - 1) == 13:
+                line = line.slice(0, line.len() - 1)
+            if with_str_starts_with(line, expect_stdout_prefix) != 0:
+                result.expect_stdout.push(line.slice(expect_stdout_prefix.len(), line.len()))
+            else if with_str_starts_with(line, expect_stderr_prefix) != 0:
+                result.expect_stderr.push(line.slice(expect_stderr_prefix.len(), line.len()))
+            else if with_str_starts_with(line, expect_exit_prefix) != 0:
+                result.has_expect_exit = true
+                result.expect_exit = test_parse_i32(line.slice(expect_exit_prefix.len(), line.len()))
+            else if with_str_starts_with(line, "//!") != 0:
+                let _ = 0
+            else:
+                return result
+            start = i + 1
+        i = i + 1
+    result
+
+fn test_directives_have_run_expectations(directives: TestDirectives) -> bool:
+    directives.has_expect_exit or directives.expect_stdout.len() > 0 or directives.expect_stderr.len() > 0
+
 fn test_shell_quote(text: str) -> str:
     var out = "'"
     var run_start = 0
@@ -796,20 +869,63 @@ fn print_test_summary(target: str, passed: i32, failed: i32, quiet: bool):
         return
     with_eprint(f"error: {failed} of {passed + failed} tests failed in {target}")
 
-fn run_test_binary(bin_path: str, quiet: bool) -> i32:
-    var cmd = test_shell_quote(bin_path)
-    if quiet:
-        cmd = "WITH_TEST_SHORT=1 " ++ cmd
-    with_system(cmd)
+fn test_capture_suffix(test_name: str) -> str:
+    if test_name.len() > 0:
+        return "." ++ test_name
+    ".run"
 
-fn run_named_test_binary(bin_path: str, test_name: str, quiet: bool) -> i32:
-    var cmd = "WITH_TEST_FILTER=" ++ test_shell_quote(test_name) ++ " " ++ test_shell_quote(bin_path)
+fn run_test_process(bin_path: str, test_name: str, quiet: bool) -> TestRunResult:
+    let suffix = test_capture_suffix(test_name)
+    let out_path = bin_path ++ suffix ++ ".stdout"
+    let err_path = bin_path ++ suffix ++ ".stderr"
+    let _ = ("rm -f " ++ test_shell_quote(out_path) ++ " " ++ test_shell_quote(err_path)) |> with_system
+    var cmd = test_shell_quote(bin_path)
+    if test_name.len() > 0:
+        cmd = "WITH_TEST_FILTER=" ++ test_shell_quote(test_name) ++ " " ++ cmd
     if quiet:
         cmd = "WITH_TEST_SHORT=1 " ++ cmd
-    with_system(cmd)
+    let rc = with_system(cmd ++ " > " ++ test_shell_quote(out_path) ++ " 2> " ++ test_shell_quote(err_path))
+    let stdout = with_fs_read_file(out_path)
+    let stderr = with_fs_read_file(err_path)
+    let _cleanup = ("rm -f " ++ test_shell_quote(out_path) ++ " " ++ test_shell_quote(err_path)) |> with_system
+    if not quiet:
+        if stdout.len() > 0:
+            with_write(stdout)
+        if stderr.len() > 0:
+            with_ewrite(stderr)
+    TestRunResult { rc, stdout, stderr }
+
+fn test_validate_output(stream_name: str, actual: str, expected_values: Vec[str], target: str, test_name: str) -> bool:
+    for ei in 0..expected_values.len() as i32:
+        let expected = expected_values.get(ei as i64)
+        if with_str_contains(actual, expected) == 0:
+            emit_test_stage_error(stream_name ++ " mismatch; missing expected output: " ++ expected, target, "run", test_name)
+            return false
+    true
+
+fn validate_test_run(result: TestRunResult, directives: TestDirectives, target: str, test_name: str) -> bool:
+    if directives.has_expect_exit:
+        if result.rc != directives.expect_exit:
+            emit_test_stage_error(f"exit code {result.rc}, expected {directives.expect_exit}", target, "run", test_name)
+            return false
+    else if result.rc != 0:
+        emit_test_stage_error(f"exit code {result.rc}", target, "run", test_name)
+        return false
+    if not test_validate_output("stdout", result.stdout, directives.expect_stdout, target, test_name):
+        return false
+    if not test_validate_output("stderr", result.stderr, directives.expect_stderr, target, test_name):
+        return false
+    true
+
+fn run_test_binary_checked(bin_path: str, target: str, test_name: str, quiet: bool, directives: TestDirectives) -> i32:
+    let result = run_test_process(bin_path, test_name, quiet)
+    if validate_test_run(result, directives, target, test_name):
+        return 0
+    1
 
 fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str) -> i32:
     let discovery = discover_tests_for_target(target)
+    let directives = parse_test_directives_for_target(target)
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
@@ -820,13 +936,21 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
         emit_test_stage_error("test build failed", target, "build", "")
         return 1
     if discovery.parse_ok and not discovery.has_main and discovery.test_names.len() > 0:
+        if test_directives_have_run_expectations(directives) and filter.len() == 0:
+            let rc = run_test_binary_checked(bin_path, target, "", quiet and not verbose, directives)
+            cleanup_binary_artifacts(bin_path)
+            if rc == 0:
+                print_test_summary(target, discovery.test_names.len() as i32, 0, quiet and not verbose)
+                return 0
+            print_test_summary(target, 0, 1, quiet and not verbose)
+            return 1
         var passed = 0
         var failed = 0
         for ti in 0..discovery.test_names.len() as i32:
             let test_name = discovery.test_names.get(ti as i64)
             if filter.len() > 0 and with_str_contains(test_name, filter) == 0:
                 continue
-            let rc = run_named_test_binary(bin_path, test_name, quiet and not verbose)
+            let rc = run_test_binary_checked(bin_path, target, test_name, quiet and not verbose, empty_test_directives())
             if rc == 0:
                 passed = passed + 1
                 if verbose:
@@ -835,18 +959,16 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
                 failed = failed + 1
                 if verbose:
                     with_eprint("FAIL " ++ test_name)
-                emit_test_stage_error("test failed", target, "run", test_name)
         cleanup_binary_artifacts(bin_path)
         print_test_summary(target, passed, failed, quiet and not verbose)
         if failed == 0:
             return 0
         return 1
-    let run_rc = run_test_binary(bin_path, quiet and not verbose)
+    let run_rc = run_test_binary_checked(bin_path, target, "", quiet and not verbose, directives)
     cleanup_binary_artifacts(bin_path)
     if run_rc == 0:
         print_test_summary(target, 1, 0, quiet and not verbose)
         return 0
-    emit_test_stage_error("test failed", target, "run", "")
     print_test_summary(target, 0, 1, quiet and not verbose)
     run_rc
 

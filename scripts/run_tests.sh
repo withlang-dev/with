@@ -10,7 +10,7 @@ set -euo pipefail
 #   ./scripts/run_tests.sh test/compile_errors/*.w # run error tests
 #
 # Test files use header directives:
-#   //! expect-stdout: <text>   — build+run, check stdout contains <text>
+#   //! expect-stdout: <text>   — test mode should run and see stdout containing <text>
 #   //! expect-check-fail: <msg> — check mode should fail with <msg>
 #   //! expect-build-fail: <msg> — build mode should fail with <msg>
 #   //! check-only               — only run check mode (no build/run)
@@ -156,16 +156,10 @@ profile_test_phases() {
   elif [[ -n "$TEST_EXPECT_CHECK_STDOUT" || "$TEST_CHECK_ONLY" -eq 1 ]]; then
     WITH_PROFILE=1 timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
   else
-    WITH_PROFILE=1 timeout "$RUN_TIMEOUT_SECS" "$COMPILER" run $debug_args $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
-    local stem="${file%.w}"
-    rm -f "$stem" "${stem}.o" 2>/dev/null || true
+    WITH_PROFILE=1 timeout "$RUN_TIMEOUT_SECS" "$COMPILER" test $debug_args $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
   fi
 
-  if [[ "$rc" -ne 0 && -z "$TEST_EXPECT_EXIT" && -z "$TEST_EXPECT_CHECK_FAIL" && -z "$TEST_EXPECT_BUILD_FAIL" ]]; then
-    rm -rf "$my_tmp"
-    return 1
-  fi
-  if [[ -n "$TEST_EXPECT_EXIT" && "$rc" -ne "$TEST_EXPECT_EXIT" ]]; then
+  if [[ -z "$TEST_EXPECT_CHECK_FAIL" && -z "$TEST_EXPECT_BUILD_FAIL" && "$rc" -ne 0 ]]; then
     rm -rf "$my_tmp"
     return 1
   fi
@@ -279,42 +273,14 @@ run_single_test() {
     return
   fi
 
-  # Case 4: build+run
+  # Case 4: positive tests. `with test` owns executable directives
+  # (expect-stdout, expect-stderr, expect-exit) and also supports
+  # attribute-only tests with no fn main.
   local rc=0
-  timeout "$RUN_TIMEOUT_SECS" "$COMPILER" run $debug_args $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
-
-  # Clean up artifacts
-  local stem="${file%.w}"
-  rm -f "$stem" "${stem}.o" 2>/dev/null || true
+  timeout "$RUN_TIMEOUT_SECS" "$COMPILER" test $debug_args $TEST_EXTRA_ARGS "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
 
   if [[ "$rc" -eq 124 ]]; then
     _emit_result "FAIL $name (timeout after ${RUN_TIMEOUT_SECS}s)"
-    rm -rf "$my_tmp"
-    return
-  fi
-
-  if [[ -n "$TEST_EXPECT_EXIT" ]]; then
-    # Expected non-zero exit code (e.g. panic tests, stack overflow)
-    if [[ "$rc" -ne "$TEST_EXPECT_EXIT" ]]; then
-      _emit_result "FAIL $name (exit code $rc, expected $TEST_EXPECT_EXIT)"
-      rm -rf "$my_tmp"
-      return
-    fi
-    if [[ -n "$TEST_EXPECT_STDOUT" ]] && ! grep -Fq "$TEST_EXPECT_STDOUT" "$my_tmp/out"; then
-      local got
-      got="$(head -1 "$my_tmp/out" 2>/dev/null || echo "(empty)")"
-      _emit_result "FAIL $name (stdout mismatch, expected: $TEST_EXPECT_STDOUT, got: $got)"
-      rm -rf "$my_tmp"
-      return
-    fi
-    if [[ -n "$TEST_EXPECT_STDERR" ]] && ! grep -Fq "$TEST_EXPECT_STDERR" "$my_tmp/err"; then
-      local got_err
-      got_err="$(head -1 "$my_tmp/err" 2>/dev/null || echo "(empty)")"
-      _emit_result "FAIL $name (stderr mismatch, expected: $TEST_EXPECT_STDERR, got: $got_err)"
-      rm -rf "$my_tmp"
-      return
-    fi
-    _emit_result "PASS $name"
     rm -rf "$my_tmp"
     return
   fi
@@ -327,20 +293,7 @@ run_single_test() {
     return
   fi
 
-  # If no expect-stdout directive, pass on exit 0
-  if [[ -z "$TEST_EXPECT_STDOUT" ]]; then
-    _emit_result "PASS $name"
-    rm -rf "$my_tmp"
-    return
-  fi
-
-  if grep -Fq "$TEST_EXPECT_STDOUT" "$my_tmp/out"; then
-    _emit_result "PASS $name"
-  else
-    local got
-    got="$(head -1 "$my_tmp/out" 2>/dev/null || echo "(empty)")"
-    _emit_result "FAIL $name (stdout mismatch, expected: $TEST_EXPECT_STDOUT, got: $got)"
-  fi
+  _emit_result "PASS $name"
   rm -rf "$my_tmp"
 }
 
