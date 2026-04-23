@@ -248,7 +248,7 @@ fn fiber_set_panic_msg_len(f: i64, value: i32):
     store_i32(f, FIBER_OFF_PANIC_MSG_LEN, value)
 
 fn fiber_compose_id(slot: i32, generation: u32) -> i32:
-    ((generation as i32) << FIBER_SLOT_BITS) | slot
+    ((generation as i32) << (FIBER_SLOT_BITS as u32)) | slot
 
 fn fiber_slot_from_id(fiber_id: i32) -> i32:
     if fiber_id <= 0:

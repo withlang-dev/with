@@ -763,7 +763,7 @@ Examples:
 var acc: u64 = 0          // 0 is inferred as u64
 take_u32(42)              // 42 is inferred as u32
 let y = x + 1             // if x is u64, 1 is inferred as u64
-let z = x >> 31           // shift amount inherits x's integer type
+let z = x >> 31           // shift amount defaults independently to u32
 fn zero() -> u64: 0       // tail literal is inferred as u64
 let p = Point { x: 0, y: 0 } // field literals infer from field types
 ```
@@ -887,9 +887,25 @@ let y: u32 = 0x80000000
 y >> 1          // 0x40000000 (logical: zero-filled)
 ```
 
-**Shift amount:** The right operand must be non-negative and less
-than the bit width of the left operand. Shifting by ≥ bit width is
-undefined behavior in release mode and a panic in debug mode.
+**Shift operations:** The shift operators `<<` (left shift) and `>>`
+(right shift) take a left operand of any integer type and a right
+operand of any unsigned integer type. A signed right operand is a type
+error; callers must cast explicitly.
+
+When the right operand is less than the bit width of the left operand,
+the shift has its usual arithmetic meaning.
+
+When the right operand is greater than or equal to the bit width of the
+left operand, the result is defined as follows:
+
+- Left shift (`<<`) produces `0`.
+- Logical right shift (`>>` on an unsigned value) produces `0`.
+- Arithmetic right shift (`>>` on a signed value) produces `0` for
+  non-negative values and `-1` for negative values (the sign bit
+  repeated).
+
+Shift operations are defined for all well-typed inputs and cannot cause
+undefined behavior.
 
 **Rotation:**
 
@@ -3047,7 +3063,6 @@ assert <| is_valid <| parse(input)
 
 `<<` (left shift) and `>>` (right shift) are binary operators at
 precedence level 9, between bitwise operators and additive operators.
-They follow C/Rust/Zig semantics:
 
 ```
 let flags = 1 << 4          // 16

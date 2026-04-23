@@ -203,7 +203,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                 (once_fudge__goto_112_10 = 0)
                 (had_recurse__goto_113_6 = 0)
                 (dupcapused__goto_114_6 = (if (re.flags & 2097152) != 0: 1 else: 0))
-                (nextbranch__goto_115_12 = code + (((((unsafe: code[1]) as c_int) << 8) | (unsafe: code[(1 + 1)])) as c_uint))
+                (nextbranch__goto_115_12 = code + (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
                 (cc__goto_116_12 = (code + ((1 as isize) as usize)) + ((2 as isize) as usize))
                 var __ci_expr_logic_0: c_int = 0
                 if ((if (unsafe: *code) >= OP_SBRA: 1 else: 0) != 0) {
@@ -255,7 +255,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                     }
                     match op__goto_138_15:
                         OP_COND =>
-                            (cs__goto_139_14 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (cs__goto_139_14 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             if ((if (unsafe: *cs__goto_139_14) != OP_ALT: 1 else: 0) != 0) {
                                 (cc__goto_116_12 = (cs__goto_139_14 + ((1 as isize) as usize)) + ((2 as isize) as usize))
@@ -276,7 +276,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             __goto_pending = 1
 
                         OP_SCOND =>
-                            (cs__goto_139_14 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (cs__goto_139_14 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             if ((if (unsafe: *cs__goto_139_14) != OP_ALT: 1 else: 0) != 0) {
                                 (cc__goto_116_12 = (cs__goto_139_14 + ((1 as isize) as usize)) + ((2 as isize) as usize))
@@ -334,7 +334,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -359,7 +359,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -383,7 +383,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -407,7 +407,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -431,7 +431,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -455,7 +455,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -470,7 +470,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
                         OP_CBRA =>
-                            (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << 8) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
+                            (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
 
                             var __ci_expr_logic_4: c_int
 
@@ -507,7 +507,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_cap_d__goto_109_5)
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -522,7 +522,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
                         OP_SCBRA =>
-                            (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << 8) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
+                            (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
 
                             var __ci_expr_logic_4: c_int
 
@@ -559,7 +559,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_cap_d__goto_109_5)
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -574,7 +574,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
                         OP_CBRAPOS =>
-                            (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << 8) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
+                            (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
 
                             var __ci_expr_logic_4: c_int
 
@@ -611,7 +611,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_cap_d__goto_109_5)
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -626,7 +626,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
                         OP_SCBRAPOS =>
-                            (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << 8) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
+                            (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
 
                             var __ci_expr_logic_4: c_int
 
@@ -663,7 +663,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_cap_d__goto_109_5)
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -715,7 +715,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             }
 
 
-                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
@@ -757,7 +757,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             }
 
 
-                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
@@ -799,7 +799,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             }
 
 
-                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
@@ -841,7 +841,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             }
 
 
-                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
@@ -883,7 +883,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             }
 
 
-                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
@@ -925,7 +925,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             }
 
 
-                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
@@ -935,7 +935,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
                         OP_ASSERT =>
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -951,7 +951,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
                         OP_ASSERT_NOT =>
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -967,7 +967,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
                         OP_ASSERTBACK =>
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -983,7 +983,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
                         OP_ASSERTBACK_NOT =>
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -999,7 +999,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
                         OP_ASSERT_NA =>
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -1015,7 +1015,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
                         OP_ASSERT_SCS =>
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -1031,7 +1031,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
                         OP_ASSERTBACK_NA =>
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -1088,12 +1088,12 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                         OP_UCP_WORD_BOUNDARY =>
                             (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
                         OP_CALLOUT_STR =>
-                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[(1 + (2 * 2))]) as c_int) << 8) | (unsafe: cc__goto_116_12[((1 + (2 * 2)) + 1)])) as c_uint))
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + (2 * 2)) + 1)])) as c_uint))
                         OP_BRAZERO =>
                             (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -1111,7 +1111,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -1129,7 +1129,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -1147,7 +1147,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
 
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -1484,7 +1484,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
 
                         OP_EXACT =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             (cc__goto_116_12 = cc__goto_116_12 + (2 + 2))
 
@@ -1500,7 +1500,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
 
                         OP_EXACTI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             (cc__goto_116_12 = cc__goto_116_12 + (2 + 2))
 
@@ -1516,7 +1516,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
 
                         OP_NOTEXACT =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             (cc__goto_116_12 = cc__goto_116_12 + (2 + 2))
 
@@ -1532,7 +1532,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
 
                         OP_NOTEXACTI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             (cc__goto_116_12 = cc__goto_116_12 + (2 + 2))
 
@@ -1548,7 +1548,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
 
                         OP_TYPEEXACT =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             var __ci_expr_ternary_13: c_int = 0
 
@@ -1818,7 +1818,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             }
 
                             if (__ci_expr_logic_16 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
                             } else {
                                 (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
                             }
@@ -1853,17 +1853,17 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 OP_CRPOSQUERY =>
                                     (cc__goto_116_12 = cc__goto_116_12 + 1)
                                 OP_CRRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                     (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
 
                                 OP_CRMINRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                     (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
 
                                 OP_CRPOSRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                     (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
 
@@ -1880,7 +1880,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             }
 
                             if (__ci_expr_logic_16 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
                             } else {
                                 (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
                             }
@@ -1915,17 +1915,17 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 OP_CRPOSQUERY =>
                                     (cc__goto_116_12 = cc__goto_116_12 + 1)
                                 OP_CRRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                     (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
 
                                 OP_CRMINRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                     (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
 
                                 OP_CRPOSRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                     (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
 
@@ -1942,7 +1942,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             }
 
                             if (__ci_expr_logic_16 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
                             } else {
                                 (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
                             }
@@ -1977,17 +1977,17 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 OP_CRPOSQUERY =>
                                     (cc__goto_116_12 = cc__goto_116_12 + 1)
                                 OP_CRRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                     (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
 
                                 OP_CRMINRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                     (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
 
                                 OP_CRPOSRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                     (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
 
@@ -2004,7 +2004,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             }
 
                             if (__ci_expr_logic_16 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
                             } else {
                                 (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
                             }
@@ -2039,17 +2039,17 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 OP_CRPOSQUERY =>
                                     (cc__goto_116_12 = cc__goto_116_12 + 1)
                                 OP_CRRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                     (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
 
                                 OP_CRMINRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                     (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
 
                                 OP_CRPOSRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                                     (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
 
@@ -2064,13 +2064,13 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             }
 
                             if (__ci_expr_logic_17 != 0) {
-                                (count__goto_481_11 = ((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << 8) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint)))
+                                (count__goto_481_11 = ((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint)))
 
                                 if (__goto_pending != 0) {
                                     break
                                 }
 
-                                (slot__goto_482_18 = ((re as *const u8) + sizeof[pcre2_real_code_8]()) + ((((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint) *% re.name_entry_size))
+                                (slot__goto_482_18 = ((re as *const u8) + sizeof[pcre2_real_code_8]()) + ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint) *% re.name_entry_size))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -2091,7 +2091,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                         break
                                     }
 
-                                    (recno__goto_137_15 = ((((((unsafe: slot__goto_482_18[0]) as c_int) << 8) | (unsafe: slot__goto_482_18[(0 + 1)])) as c_uint)))
+                                    (recno__goto_137_15 = ((((((unsafe: slot__goto_482_18[0]) as c_int) << (8 as c_uint)) | (unsafe: slot__goto_482_18[(0 + 1)])) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -2124,7 +2124,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                         }
 
                                         while true {
-                                            (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << 8) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
+                                            (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -2335,13 +2335,13 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             }
 
                             if (__ci_expr_logic_17 != 0) {
-                                (count__goto_481_11 = ((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << 8) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint)))
+                                (count__goto_481_11 = ((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint)))
 
                                 if (__goto_pending != 0) {
                                     break
                                 }
 
-                                (slot__goto_482_18 = ((re as *const u8) + sizeof[pcre2_real_code_8]()) + ((((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint) *% re.name_entry_size))
+                                (slot__goto_482_18 = ((re as *const u8) + sizeof[pcre2_real_code_8]()) + ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint) *% re.name_entry_size))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -2362,7 +2362,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                         break
                                     }
 
-                                    (recno__goto_137_15 = ((((((unsafe: slot__goto_482_18[0]) as c_int) << 8) | (unsafe: slot__goto_482_18[(0 + 1)])) as c_uint)))
+                                    (recno__goto_137_15 = ((((((unsafe: slot__goto_482_18[0]) as c_int) << (8 as c_uint)) | (unsafe: slot__goto_482_18[(0 + 1)])) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -2395,7 +2395,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                         }
 
                                         while true {
-                                            (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << 8) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
+                                            (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -2599,7 +2599,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                             __goto_pending = 1
 
                         OP_REF =>
-                            (recno__goto_137_15 = ((((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint)))
+                            (recno__goto_137_15 = ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint)))
 
                             var __ci_expr_logic_22: c_int = 0
 
@@ -2635,7 +2635,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                     }
 
                                     while true {
-                                        (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << 8) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
+                                        (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -2817,7 +2817,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
 
                         OP_REFI =>
-                            (recno__goto_137_15 = ((((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint)))
+                            (recno__goto_137_15 = ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint)))
 
                             var __ci_expr_logic_22: c_int = 0
 
@@ -2853,7 +2853,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                     }
 
                                     while true {
-                                        (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << 8) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
+                                        (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -3035,12 +3035,12 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
 
                         OP_RECURSE =>
-                            (ce__goto_139_18 = startcode + (((((unsafe: cc__goto_116_12[1]) as c_int) << 8) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                            (ce__goto_139_18 = startcode + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
                             (cs__goto_139_14 = ce__goto_139_18)
 
 
-                            (recno__goto_137_15 = ((((((unsafe: cs__goto_139_14[(1 + 2)]) as c_int) << 8) | (unsafe: cs__goto_139_14[((1 + 2) + 1)])) as c_uint)))
+                            (recno__goto_137_15 = ((((((unsafe: cs__goto_139_14[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cs__goto_139_14[((1 + 2) + 1)])) as c_uint)))
 
                             if ((if recno__goto_137_15 == prev_recurse_recno__goto_110_5: 1 else: 0) != 0) {
                                 (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_recurse_d__goto_111_5)
@@ -3051,7 +3051,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
                             } else {
                                 while true {
-                                    (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << 8) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
+                                    (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -3722,7 +3722,7 @@ fn set_table_bit(re: *mut pcre2_real_code_8, __param_p: *const u8, caseless: c_i
 
     ucp
 
-    (re.start_bitmap[(c / 8)] = re.start_bitmap[(c / 8)] | ((1 as c_uint) << (c & 7)))
+    (re.start_bitmap[(c / 8)] = re.start_bitmap[(c / 8)] | ((1 as c_uint) << ((c & 7) as c_uint)))
 
     if (utf != 0) {
         if ((if c >= 192: 1 else: 0) != 0) {
@@ -3731,28 +3731,28 @@ fn set_table_bit(re: *mut pcre2_real_code_8, __param_p: *const u8, caseless: c_i
 
                 (p = p + 1)
 
-                (c = (((c & 31) as c_uint) << 6) | ((unsafe: *__ci_expr_old_1) & 63))
+                (c = (((c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_1) & 63))
 
             } else {
                 if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                    (c = ((((c & 15) as c_uint) << 12) | ((((unsafe: *p) & 63) as c_uint) << 6)) | ((unsafe: p[1]) & 63))
+                    (c = ((((c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: *p) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p[1]) & 63))
 
                     (p = p + 2)
 
                 } else {
                     if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                        (c = (((((c & 7) as c_uint) << 18) | ((((unsafe: *p) & 63) as c_uint) << 12)) | ((((unsafe: p[1]) & 63) as c_uint) << 6)) | ((unsafe: p[2]) & 63))
+                        (c = (((((c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: *p) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: p[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p[2]) & 63))
 
                         (p = p + 3)
 
                     } else {
                         if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                            (c = ((((((c & 3) as c_uint) << 24) | ((((unsafe: *p) & 63) as c_uint) << 18)) | ((((unsafe: p[1]) & 63) as c_uint) << 12)) | ((((unsafe: p[2]) & 63) as c_uint) << 6)) | ((unsafe: p[3]) & 63))
+                            (c = ((((((c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: *p) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: p[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: p[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p[3]) & 63))
 
                             (p = p + 4)
 
                         } else {
-                            (c = (((((((c & 1) as c_uint) << 30) | ((((unsafe: *p) & 63) as c_uint) << 24)) | ((((unsafe: p[1]) & 63) as c_uint) << 18)) | ((((unsafe: p[2]) & 63) as c_uint) << 12)) | ((((unsafe: p[3]) & 63) as c_uint) << 6)) | ((unsafe: p[4]) & 63))
+                            (c = (((((((c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: *p) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: p[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: p[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: p[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: p[4]) & 63))
 
                             (p = p + 5)
 
@@ -3782,17 +3782,17 @@ fn set_table_bit(re: *mut pcre2_real_code_8, __param_p: *const u8, caseless: c_i
 
                 _pcre2_ord2utf_8(c, (&buff[0] as *mut u8))
 
-                (re.start_bitmap[(buff[0] / 8)] = re.start_bitmap[(buff[0] / 8)] | ((1 as c_uint) << (buff[0] & 7)))
+                (re.start_bitmap[(buff[0] / 8)] = re.start_bitmap[(buff[0] / 8)] | ((1 as c_uint) << ((buff[0] & 7) as c_uint)))
 
             } else {
                 if ((if c < 256: 1 else: 0) != 0) {
-                    (re.start_bitmap[(c / 8)] = re.start_bitmap[(c / 8)] | ((1 as c_uint) << (c & 7)))
+                    (re.start_bitmap[(c / 8)] = re.start_bitmap[(c / 8)] | ((1 as c_uint) << ((c & 7) as c_uint)))
                 }
             }
 
         } else {
             if (1 != 0) {
-                (re.start_bitmap[((unsafe: re.tables[(256 +% c)]) / 8)] = re.start_bitmap[((unsafe: re.tables[(256 +% c)]) / 8)] | ((1 as c_uint) << ((unsafe: re.tables[(256 +% c)]) & 7)))
+                (re.start_bitmap[((unsafe: re.tables[(256 +% c)]) / 8)] = re.start_bitmap[((unsafe: re.tables[(256 +% c)]) / 8)] | ((1 as c_uint) << (((unsafe: re.tables[(256 +% c)]) & 7) as c_uint)))
             }
         }
 
@@ -3823,12 +3823,12 @@ fn set_type_bits(re: *mut pcre2_real_code_8, cbit_type: c_int, table_limit: c_ui
     (c = 128)
 
     while ((if c < 256: 1 else: 0) != 0) {
-        if ((if ((unsafe: re.tables[(512 +% (c / 8))]) & ((1 as c_uint) << (c & 7))) != 0: 1 else: 0) != 0) {
+        if ((if ((unsafe: re.tables[(512 +% (c / 8))]) & ((1 as c_uint) << ((c & 7) as c_uint))) != 0: 1 else: 0) != 0) {
             var buff: [6]u8
 
             _pcre2_ord2utf_8(c, (&buff[0] as *mut u8))
 
-            (re.start_bitmap[(buff[0] / 8)] = re.start_bitmap[(buff[0] / 8)] | ((1 as c_uint) << (buff[0] & 7)))
+            (re.start_bitmap[(buff[0] / 8)] = re.start_bitmap[(buff[0] / 8)] | ((1 as c_uint) << ((buff[0] & 7) as c_uint)))
 
         }
 
@@ -3893,11 +3893,11 @@ fn study_char_list(__param_code: *const u8, start_bitmap: *mut u8, char_lists_en
     var end: u8
 
 
-    (type_ = ((((unsafe: code[0]) as c_int) << 8) as c_uint) | (unsafe: code[1]))
+    (type_ = ((((unsafe: code[0]) as c_int) << (8 as c_uint)) as c_uint) | (unsafe: code[1]))
 
     (code = code + 2)
 
-    (next_char = char_lists_end - (((((((unsafe: code[0]) as c_int) << 8) | (unsafe: code[(0 + 1)])) as c_uint) as c_uint) << 1))
+    (next_char = char_lists_end - (((((((unsafe: code[0]) as c_int) << (8 as c_uint)) | (unsafe: code[(0 + 1)])) as c_uint) as c_uint) << (1 as c_uint)))
 
     (type_ = type_ & 4095)
 
@@ -3939,7 +3939,7 @@ fn study_char_list(__param_code: *const u8, start_bitmap: *mut u8, char_lists_en
             }
 
             if ((if (range_end & 1) != 0: 1 else: 0) != 0) {
-                (range_end = (char_list_add +% ((range_end as c_uint) >> 1)))
+                (range_end = (char_list_add +% ((range_end as c_uint) >> (1 as c_uint))))
 
                 _pcre2_ord2utf_8(range_end, (&end_buffer[0] as *mut u8))
 
@@ -3951,7 +3951,7 @@ fn study_char_list(__param_code: *const u8, start_bitmap: *mut u8, char_lists_en
                     (start = start_buffer[0])
 
                     while ((if start <= end: 1 else: 0) != 0) {
-                        ((unsafe: start_bitmap[(start / 8)]) = (unsafe: start_bitmap[(start / 8)]) | ((1 as c_uint) << (start & 7)))
+                        ((unsafe: start_bitmap[(start / 8)]) = (unsafe: start_bitmap[(start / 8)]) | ((1 as c_uint) << ((start & 7) as c_uint)))
 
                         (start = start + 1)
 
@@ -3959,13 +3959,13 @@ fn study_char_list(__param_code: *const u8, start_bitmap: *mut u8, char_lists_en
 
 
                 } else {
-                    ((unsafe: start_bitmap[(end / 8)]) = (unsafe: start_bitmap[(end / 8)]) | ((1 as c_uint) << (end & 7)))
+                    ((unsafe: start_bitmap[(end / 8)]) = (unsafe: start_bitmap[(end / 8)]) | ((1 as c_uint) << ((end & 7) as c_uint)))
                 }
 
                 (range_start = (~(0 as c_uint)))
 
             } else {
-                (range_start = (char_list_add +% ((range_end as c_uint) >> 1)))
+                (range_start = (char_list_add +% ((range_end as c_uint) >> (1 as c_uint))))
             }
 
             (item_count = item_count - 1)
@@ -3974,7 +3974,7 @@ fn study_char_list(__param_code: *const u8, start_bitmap: *mut u8, char_lists_en
 
         (list_ind = list_ind + 1)
 
-        (type_ = type_ >> 3)
+        (type_ = type_ >> (3 as c_uint))
 
         if ((if range_start == (~(0 as c_uint)): 1 else: 0) != 0) {
             if ((if (type_ & 4) != 0: 1 else: 0) != 0) {
@@ -4003,7 +4003,7 @@ fn study_char_list(__param_code: *const u8, start_bitmap: *mut u8, char_lists_en
                 (start = start_buffer[0])
 
                 while ((if start <= end: 1 else: 0) != 0) {
-                    ((unsafe: start_bitmap[(start / 8)]) = (unsafe: start_bitmap[(start / 8)]) | ((1 as c_uint) << (start & 7)))
+                    ((unsafe: start_bitmap[(start / 8)]) = (unsafe: start_bitmap[(start / 8)]) | ((1 as c_uint) << ((start & 7) as c_uint)))
 
                     (start = start + 1)
 
@@ -4294,9 +4294,9 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                     }
 
                                     if ((if c__goto_1096_10 > 255: 1 else: 0) != 0) {
-                                        (re.start_bitmap[(255 / 8)] = re.start_bitmap[(255 / 8)] | ((1 as c_uint) << (255 & 7)))
+                                        (re.start_bitmap[(255 / 8)] = re.start_bitmap[(255 / 8)] | ((1 as c_uint) << ((255 & 7) as c_uint)))
                                     } else {
-                                        (re.start_bitmap[(c__goto_1096_10 / 8)] = re.start_bitmap[(c__goto_1096_10 / 8)] | ((1 as c_uint) << (c__goto_1096_10 & 7)))
+                                        (re.start_bitmap[(c__goto_1096_10 / 8)] = re.start_bitmap[(c__goto_1096_10 / 8)] | ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint)))
                                     }
 
                                     if (__goto_pending != 0) {
@@ -4325,10 +4325,10 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                             OP_NOT_UCP_WORD_BOUNDARY =>
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
                             OP_ASSERT =>
-                                (ncode__goto_1119_16 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                (ncode__goto_1119_16 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                 while ((if (unsafe: *ncode__goto_1119_16) == OP_ALT: 1 else: 0) != 0) {
-                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[1]) as c_int) << 8) | (unsafe: ncode__goto_1119_16[(1 + 1)])) as c_uint))
+                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | (unsafe: ncode__goto_1119_16[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -4459,7 +4459,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 } else {
                                     if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                         while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -4488,10 +4488,10 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
 
                             OP_ASSERT_NA =>
-                                (ncode__goto_1119_16 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                (ncode__goto_1119_16 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                 while ((if (unsafe: *ncode__goto_1119_16) == OP_ALT: 1 else: 0) != 0) {
-                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[1]) as c_int) << 8) | (unsafe: ncode__goto_1119_16[(1 + 1)])) as c_uint))
+                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | (unsafe: ncode__goto_1119_16[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -4622,7 +4622,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 } else {
                                     if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                         while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -4663,7 +4663,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 } else {
                                     if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                         while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -4703,7 +4703,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 } else {
                                     if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                         while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -4743,7 +4743,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 } else {
                                     if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                         while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -4783,7 +4783,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 } else {
                                     if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                         while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -4823,7 +4823,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 } else {
                                     if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                         while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -4863,7 +4863,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 } else {
                                     if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                         while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -4903,7 +4903,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 } else {
                                     if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                         while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -4943,7 +4943,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 } else {
                                     if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                         while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -4983,7 +4983,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 } else {
                                     if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                         while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -5023,7 +5023,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 } else {
                                     if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                         while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -5066,10 +5066,10 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                             OP_CALLOUT =>
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + _pcre2_OP_lengths_8[OP_CALLOUT])
                             OP_CALLOUT_STR =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[(1 + (2 * 2))]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[((1 + (2 * 2)) + 1)])) as c_uint))
+                                (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[((1 + (2 * 2)) + 1)])) as c_uint))
                             OP_ASSERT_NOT =>
                                 while true {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5085,7 +5085,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                             OP_ASSERTBACK =>
                                 while true {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5101,7 +5101,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                             OP_ASSERTBACK_NOT =>
                                 while true {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5117,7 +5117,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                             OP_ASSERTBACK_NA =>
                                 while true {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5133,7 +5133,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                             OP_ASSERT_SCS =>
                                 while true {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5175,7 +5175,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
 
                                 while true {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5217,7 +5217,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
 
                                 while true {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5259,7 +5259,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
 
                                 while true {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5277,7 +5277,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
 
                                 while true {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5384,37 +5384,37 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 (try_next__goto_1110_8 = 0)
 
                             OP_HSPACE =>
-                                (re.start_bitmap[(9 / 8)] = re.start_bitmap[(9 / 8)] | ((1 as c_uint) << (9 & 7)))
+                                (re.start_bitmap[(9 / 8)] = re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
 
-                                (re.start_bitmap[(32 / 8)] = re.start_bitmap[(32 / 8)] | ((1 as c_uint) << (32 & 7)))
+                                (re.start_bitmap[(32 / 8)] = re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
 
                                 if (utf != 0) {
-                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << (194 & 7)))
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
                                     }
 
-                                    (re.start_bitmap[(225 / 8)] = re.start_bitmap[(225 / 8)] | ((1 as c_uint) << (225 & 7)))
+                                    (re.start_bitmap[(225 / 8)] = re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
                                     }
 
-                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << (226 & 7)))
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
                                     }
 
-                                    (re.start_bitmap[(227 / 8)] = re.start_bitmap[(227 / 8)] | ((1 as c_uint) << (227 & 7)))
+                                    (re.start_bitmap[(227 / 8)] = re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
                                     }
 
                                 } else {
-                                    (re.start_bitmap[(160 / 8)] = re.start_bitmap[(160 / 8)] | ((1 as c_uint) << (160 & 7)))
+                                    (re.start_bitmap[(160 / 8)] = re.start_bitmap[(160 / 8)] | ((1 as c_uint) << ((160 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5425,29 +5425,29 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 (try_next__goto_1110_8 = 0)
 
                             OP_ANYNL =>
-                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << (10 & 7)))
+                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
 
-                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << (11 & 7)))
+                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
 
-                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << (12 & 7)))
+                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
 
-                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << (13 & 7)))
+                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
 
                                 if (utf != 0) {
-                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << (194 & 7)))
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
                                     }
 
-                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << (226 & 7)))
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
                                     }
 
                                 } else {
-                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << (133 & 7)))
+                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5458,29 +5458,29 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 (try_next__goto_1110_8 = 0)
 
                             OP_VSPACE =>
-                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << (10 & 7)))
+                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
 
-                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << (11 & 7)))
+                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
 
-                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << (12 & 7)))
+                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
 
-                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << (13 & 7)))
+                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
 
                                 if (utf != 0) {
-                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << (194 & 7)))
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
                                     }
 
-                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << (226 & 7)))
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
                                     }
 
                                 } else {
-                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << (133 & 7)))
+                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -5611,7 +5611,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 }
 
                                 if ((if (unsafe: *tcode__goto_1111_14) == OP_XCLASS: 1 else: 0) != 0) {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
                                 } else {
                                     (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
 
@@ -5653,14 +5653,14 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         (c__goto_1096_10 = 128)
 
                                         while ((if c__goto_1096_10 < 256: 1 else: 0) != 0) {
-                                            if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << (c__goto_1096_10 & 7))) != 0: 1 else: 0) != 0) {
-                                                (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> 6) | 192)
+                                            if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint))) != 0: 1 else: 0) != 0) {
+                                                (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> (6 as c_uint)) | 192)
 
                                                 if (__goto_pending != 0) {
                                                     break
                                                 }
 
-                                                (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << (d__goto_1845_19 & 7)))
+                                                (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << ((d__goto_1845_19 & 7) as c_uint)))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -5737,7 +5737,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                 }
 
                                 if ((if (unsafe: *tcode__goto_1111_14) == OP_XCLASS: 1 else: 0) != 0) {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
                                 } else {
                                     (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
 
@@ -5779,14 +5779,14 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         (c__goto_1096_10 = 128)
 
                                         while ((if c__goto_1096_10 < 256: 1 else: 0) != 0) {
-                                            if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << (c__goto_1096_10 & 7))) != 0: 1 else: 0) != 0) {
-                                                (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> 6) | 192)
+                                            if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint))) != 0: 1 else: 0) != 0) {
+                                                (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> (6 as c_uint)) | 192)
 
                                                 if (__goto_pending != 0) {
                                                     break
                                                 }
 
-                                                (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << (d__goto_1845_19 & 7)))
+                                                (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << ((d__goto_1845_19 & 7) as c_uint)))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -5847,7 +5847,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                             OP_CLASS =>
                                 if ((if (unsafe: *tcode__goto_1111_14) == OP_XCLASS: 1 else: 0) != 0) {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << 8) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
                                 } else {
                                     (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
 
@@ -5889,14 +5889,14 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         (c__goto_1096_10 = 128)
 
                                         while ((if c__goto_1096_10 < 256: 1 else: 0) != 0) {
-                                            if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << (c__goto_1096_10 & 7))) != 0: 1 else: 0) != 0) {
-                                                (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> 6) | 192)
+                                            if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint))) != 0: 1 else: 0) != 0) {
+                                                (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> (6 as c_uint)) | 192)
 
                                                 if (__goto_pending != 0) {
                                                     break
                                                 }
 
-                                                (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << (d__goto_1845_19 & 7)))
+                                                (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << ((d__goto_1845_19 & 7) as c_uint)))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -5966,7 +5966,7 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                     if (__goto_pending != 0) {
                         break
                     }
-                    (code = code + (((((unsafe: code[1]) as c_int) << 8) | (unsafe: code[(1 + 1)])) as c_uint))
+                    (code = code + (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
                     if (__goto_pending != 0) {
                         break
                     }

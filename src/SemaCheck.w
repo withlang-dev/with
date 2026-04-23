@@ -1545,11 +1545,14 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
             else:
                 if rhs == 0:
                     rhs = self.check_expr(rhs_node)
+    else if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
+        lhs = self.check_expr(lhs_node)
+        let shift_count_ty = if rhs_is_num_lit: self.shift_count_literal_type(rhs_node) else: 0
+        rhs = self.check_expr_with_expected(rhs_node, shift_count_ty as TypeId)
     else if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL or op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD or
        op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_MUL_WRAP or
        op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL_SAT or
-       op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR or
-       op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
+       op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR:
         if lhs_is_num_lit and rhs_is_num_lit:
             lhs = self.check_expr(lhs_node)
             rhs = self.check_expr(rhs_node)
@@ -1661,8 +1664,22 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         self.emit_error("arithmetic operator requires numeric operands", node)
         return 0
 
+    // Shifts use the left operand width and require an unsigned count.
+    if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
+        let lhs_numeric = self.numeric_operand_type(lhs as i32)
+        let lhs_resolved = self.resolve_alias(lhs_numeric as TypeId)
+        if self.get_type_kind(lhs_resolved) != TypeKind.TY_INT:
+            self.emit_error("shift left operand must be integer", node)
+            return 0
+        let rhs_numeric = self.numeric_operand_type(rhs as i32)
+        let rhs_resolved = self.resolve_alias(rhs_numeric as TypeId)
+        if self.get_type_kind(rhs_resolved) != TypeKind.TY_INT or self.get_type_d1(rhs_resolved) != 0:
+            self.emit_error("shift count must be unsigned integer", node)
+            return 0
+        return lhs as i32
+
     // Bitwise
-    if op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR or op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
+    if op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR:
         return lhs as i32
 
     // Wrapping arithmetic

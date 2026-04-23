@@ -5223,6 +5223,12 @@ fn ci_compound_to_ci_binop(op: i32) -> i32:
     if op == BO_SHR_ASSIGN: return CiBinOp.CIBO_SHR
     0 - 1
 
+fn ci_cast_shift_count_expr(types: &mut CiTypePool, exprs: &mut CiExprPool, rhs: CiExprId) -> CiExprId:
+    let c_uint_ty = ci_named_type_from_text(types, "c_uint")
+    if (c_uint_ty as i32) == 0:
+        return 0 as CiExprId
+    exprs.cast(c_uint_ty, rhs)
+
 fn ci_lower_compound_assign(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
@@ -5239,7 +5245,12 @@ fn ci_lower_compound_assign(session: i64, cursor: i32, exprs: &mut CiExprPool, t
     let rhs_id = ci_lower_expr_ir(session, rhs_cursor, exprs, types, scope)
     if (rhs_id as i32) == 0:
         return 0 as CiExprId
-    exprs.add(CiExprKind.CIE_COMPOUND_ASSIGN, base_op, lhs_id as i32, rhs_id as i32, 0 as CiTypeId)
+    var rhs_value = rhs_id
+    if base_op == CiBinOp.CIBO_SHL or base_op == CiBinOp.CIBO_SHR:
+        rhs_value = ci_cast_shift_count_expr(types, exprs, rhs_value)
+        if (rhs_value as i32) == 0:
+            return 0 as CiExprId
+    exprs.add(CiExprKind.CIE_COMPOUND_ASSIGN, base_op, lhs_id as i32, rhs_value as i32, 0 as CiTypeId)
 
 fn ci_lower_unary_simple(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
@@ -5937,6 +5948,10 @@ fn ci_build_binary_value_expr_from_ids(session: i64, cursor: i32, lhs_cursor: i3
             lhs_value = exprs.cast(c_uint_ty, lhs_value)
         if rhs_large:
             rhs_value = exprs.cast(c_uint_ty, rhs_value)
+    if op == BO_SHL or op == BO_SHR:
+        rhs_value = ci_cast_shift_count_expr(types, exprs, rhs_value)
+        if (rhs_value as i32) == 0:
+            return 0 as CiExprId
 
     let is_unsigned = with_ci_type_is_unsigned(session, cursor)
     var ci_op: i32 = 0
@@ -6450,8 +6465,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                     return ci_value_ir_invalid()
                 if ci_type_is_small_int(lhs_ty_str) or ci_is_large_decimal(ci_print_expr(exprs, types, lhs.value_expr, 0, 0)):
                     lhs_value = exprs.cast(c_uint_ty, lhs_value)
-                if ci_is_large_decimal(ci_print_expr(exprs, types, rhs.value_expr, 0, 0)):
-                    rhs_value = exprs.cast(c_uint_ty, rhs_value)
+                rhs_value = exprs.cast(c_uint_ty, rhs_value)
             let rhs_expr = exprs.binary(ci_op, lhs_value, rhs_value, 0 as CiTypeId)
             let assign_stmt = stmts.assign(lhs.value_expr, rhs_expr)
             return CiValueExprIR {

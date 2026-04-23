@@ -10,7 +10,7 @@ fn _pcre2_compile_get_hash_from_name8(name: *const u8, length: c_uint) -> c_usho
         }
     }
 
-    (hash = (((((unsafe: name[0]) & 127) | ((((unsafe: name[(length -% 1)]) & 255) as c_int) << 7)) as c_ushort)))
+    (hash = (((((unsafe: name[0]) & 127) | ((((unsafe: name[(length -% 1)]) & 255) as c_int) << (7 as c_uint))) as c_ushort)))
 
     while true {
         if (not (0 != 0)) {
@@ -130,7 +130,7 @@ fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut 
     (tablecount = tablecount + duplicate_count)
 
     while (1 != 0) {
-        ((unsafe: slot[0]) = (ng.number as c_uint) >> 8)
+        ((unsafe: slot[0]) = (ng.number as c_uint) >> (8 as c_uint))
 
         ((unsafe: slot[(0 + 1)]) = ng.number & 255)
 
@@ -217,12 +217,12 @@ fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexpt
     while true {
         (count = count + 1)
 
-        (groupnumber = ((((((unsafe: slot[0]) as c_int) << 8) | (unsafe: slot[(0 + 1)])) as c_uint)))
+        (groupnumber = ((((((unsafe: slot[0]) as c_int) << (8 as c_uint)) | (unsafe: slot[(0 + 1)])) as c_uint)))
 
         var __ci_expr_ternary_1: c_uint = 0
 
         if ((if groupnumber < 32: 1 else: 0) != 0) {
-            (__ci_expr_ternary_1 = (1 as c_uint) << groupnumber)
+            (__ci_expr_ternary_1 = (1 as c_uint) << (groupnumber as c_uint))
         } else {
             (__ci_expr_ternary_1 = 1)
         }
@@ -292,14 +292,14 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
         return null
     }
 
-    (size = (((cb.bracount +% 1) +% 7) as c_uint) >> 3)
+    (size = (((cb.bracount +% 1) +% 7) as c_uint) >> (3 as c_uint))
 
     (captures = ((cb.cx.memctl.malloc(size, cb.cx.memctl.memory_data) as *mut u8)))
 
     if ((if captures == null: 1 else: 0) != 0) {
         ((unsafe: *errorcodeptr) = ERR21)
 
-        (cb.erroroffset = ((((unsafe: pptr[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr[2]) as c_ulong))
+        (cb.erroroffset = ((((unsafe: pptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr[2]) as c_ulong))
 
 
         return null
@@ -336,7 +336,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
                         continue
                     }
 
-                    (capture_ptr = captures + ((ng.number as c_uint) >> 3))
+                    (capture_ptr = captures + ((ng.number as c_uint) >> (3 as c_uint)))
 
                     while true {
                         if (not (0 != 0)) {
@@ -344,7 +344,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
                         }
                     }
 
-                    (bit = ((((1 as c_int) << (ng.number & 7)) as u8)))
+                    (bit = ((((1 as c_int) << ((ng.number & 7) as c_uint)) as u8)))
 
                     if ((if ((unsafe: *capture_ptr) & bit) == 0: 1 else: 0) != 0) {
                         ((unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit)
@@ -395,7 +395,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
                         continue
                     }
 
-                    (capture_ptr = captures + ((ng.number as c_uint) >> 3))
+                    (capture_ptr = captures + ((ng.number as c_uint) >> (3 as c_uint)))
 
                     while true {
                         if (not (0 != 0)) {
@@ -403,7 +403,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
                         }
                     }
 
-                    (bit = ((((1 as c_int) << (ng.number & 7)) as u8)))
+                    (bit = ((((1 as c_int) << ((ng.number & 7) as c_uint)) as u8)))
 
                     if ((if ((unsafe: *capture_ptr) & bit) == 0: 1 else: 0) != 0) {
                         ((unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit)
@@ -435,7 +435,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
 
                 (pptr = pptr + 2)
 
-                (capture_ptr = captures + (((unsafe: pptr[-1]) as c_uint) >> 3))
+                (capture_ptr = captures + (((unsafe: pptr[-1]) as c_uint) >> (3 as c_uint)))
 
                 while true {
                     if (not (0 != 0)) {
@@ -443,7 +443,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
                     }
                 }
 
-                (bit = ((((1 as c_int) << ((unsafe: pptr[-1]) & 7)) as u8)))
+                (bit = ((((1 as c_int) << (((unsafe: pptr[-1]) & 7) as c_uint)) as u8)))
 
                 if ((if ((unsafe: *capture_ptr) & bit) != 0: 1 else: 0) != 0) {
                     ((unsafe: pptr[-1]) = 0)
@@ -462,7 +462,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
             2149122048 =>
                 (pptr = pptr + 2)
 
-                (capture_ptr = captures + (((unsafe: pptr[-1]) as c_uint) >> 3))
+                (capture_ptr = captures + (((unsafe: pptr[-1]) as c_uint) >> (3 as c_uint)))
 
                 while true {
                     if (not (0 != 0)) {
@@ -470,7 +470,7 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
                     }
                 }
 
-                (bit = ((((1 as c_int) << ((unsafe: pptr[-1]) & 7)) as u8)))
+                (bit = ((((1 as c_int) << (((unsafe: pptr[-1]) & 7) as c_uint)) as u8)))
 
                 if ((if ((unsafe: *capture_ptr) & bit) != 0: 1 else: 0) != 0) {
                     ((unsafe: pptr[-1]) = 0)
@@ -689,7 +689,7 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
 
     (captures = (((args + ((1 as isize) as usize)) as *mut c_ushort)))
 
-    (i = (((size as c_ulong) >> 1) -% 1))
+    (i = (((size as c_ulong) >> (1 as c_uint)) -% 1))
 
     while (1 != 0) {
         do_heapify_u16(captures, size, i)
@@ -774,7 +774,7 @@ fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset
 
         match ((unsafe: *pptr) & (4294901760 as c_uint)):
             2148925440 =>
-                (offset = ((((unsafe: pptr[1]) as c_ulong) as c_ulong) << 32) | ((unsafe: pptr[2]) as c_ulong))
+                (offset = ((((unsafe: pptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr[2]) as c_ulong))
 
                 (pptr = pptr + 2)
 
@@ -969,7 +969,7 @@ fn do_heapify_u16(captures: *mut c_ushort, size: c_ulong, __param_i: c_ulong) {
     while (1 != 0) {
         (max = i)
 
-        (left = (((i as c_ulong) << 1) +% 1))
+        (left = (((i as c_ulong) << (1 as c_uint)) +% 1))
 
         (right = (left +% 1))
 

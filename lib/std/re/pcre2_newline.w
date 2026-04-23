@@ -9,18 +9,18 @@ fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr:
 
         if ((if c >= 192: 1 else: 0) != 0) {
             if ((if (c & 32) == 0: 1 else: 0) != 0) {
-                (c = (((c & 31) as c_uint) << 6) | ((unsafe: ptr[1]) & 63))
+                (c = (((c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: ptr[1]) & 63))
             } else {
                 if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                    (c = ((((c & 15) as c_uint) << 12) | ((((unsafe: ptr[1]) & 63) as c_uint) << 6)) | ((unsafe: ptr[2]) & 63))
+                    (c = ((((c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: ptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[2]) & 63))
                 } else {
                     if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                        (c = (((((c & 7) as c_uint) << 18) | ((((unsafe: ptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 6)) | ((unsafe: ptr[3]) & 63))
+                        (c = (((((c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: ptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[3]) & 63))
                     } else {
                         if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                            (c = ((((((c & 3) as c_uint) << 24) | ((((unsafe: ptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[3]) & 63) as c_uint) << 6)) | ((unsafe: ptr[4]) & 63))
+                            (c = ((((((c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: ptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[4]) & 63))
                         } else {
-                            (c = (((((((c & 1) as c_uint) << 30) | ((((unsafe: ptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: ptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[4]) & 63) as c_uint) << 6)) | ((unsafe: ptr[5]) & 63))
+                            (c = (((((((c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: ptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: ptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[5]) & 63))
                         }
                     }
                 }
@@ -191,18 +191,18 @@ fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const 
 
         if ((if c >= 192: 1 else: 0) != 0) {
             if ((if (c & 32) == 0: 1 else: 0) != 0) {
-                (c = (((c & 31) as c_uint) << 6) | ((unsafe: ptr[1]) & 63))
+                (c = (((c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: ptr[1]) & 63))
             } else {
                 if ((if (c & 16) == 0: 1 else: 0) != 0) {
-                    (c = ((((c & 15) as c_uint) << 12) | ((((unsafe: ptr[1]) & 63) as c_uint) << 6)) | ((unsafe: ptr[2]) & 63))
+                    (c = ((((c & 15) as c_uint) << (12 as c_uint)) | ((((unsafe: ptr[1]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[2]) & 63))
                 } else {
                     if ((if (c & 8) == 0: 1 else: 0) != 0) {
-                        (c = (((((c & 7) as c_uint) << 18) | ((((unsafe: ptr[1]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 6)) | ((unsafe: ptr[3]) & 63))
+                        (c = (((((c & 7) as c_uint) << (18 as c_uint)) | ((((unsafe: ptr[1]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr[2]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[3]) & 63))
                     } else {
                         if ((if (c & 4) == 0: 1 else: 0) != 0) {
-                            (c = ((((((c & 3) as c_uint) << 24) | ((((unsafe: ptr[1]) & 63) as c_uint) << 18)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[3]) & 63) as c_uint) << 6)) | ((unsafe: ptr[4]) & 63))
+                            (c = ((((((c & 3) as c_uint) << (24 as c_uint)) | ((((unsafe: ptr[1]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr[2]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr[3]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[4]) & 63))
                         } else {
-                            (c = (((((((c & 1) as c_uint) << 30) | ((((unsafe: ptr[1]) & 63) as c_uint) << 24)) | ((((unsafe: ptr[2]) & 63) as c_uint) << 18)) | ((((unsafe: ptr[3]) & 63) as c_uint) << 12)) | ((((unsafe: ptr[4]) & 63) as c_uint) << 6)) | ((unsafe: ptr[5]) & 63))
+                            (c = (((((((c & 1) as c_uint) << (30 as c_uint)) | ((((unsafe: ptr[1]) & 63) as c_uint) << (24 as c_uint))) | ((((unsafe: ptr[2]) & 63) as c_uint) << (18 as c_uint))) | ((((unsafe: ptr[3]) & 63) as c_uint) << (12 as c_uint))) | ((((unsafe: ptr[4]) & 63) as c_uint) << (6 as c_uint))) | ((unsafe: ptr[5]) & 63))
                         }
                     }
                 }

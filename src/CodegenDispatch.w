@@ -895,7 +895,7 @@ fn Codegen.mir_eval_operand(self: Codegen, body: MirBody, operand_id: i32, expec
                 loaded = wl_build_lshr(self.builder, loaded, bp_shift)
             // Mask to field width
             if bp_bit_width < bp_total_bits:
-                let bp_mask = wl_const_int(ptr_ty, ((1 as i64) << (bp_bit_width as i64)) - 1, 0)
+                let bp_mask = wl_const_int(ptr_ty, ((1 as i64) << (bp_bit_width as u32)) - 1, 0)
                 loaded = wl_build_and(self.builder, loaded, bp_mask)
             // Truncate to field type
             let bp_field_ty = wl_int_type_n(self.context, bp_bit_width)
@@ -990,6 +990,36 @@ fn Codegen.coerce_float_operand_to(self: Codegen, val: i64, target_ty: i64) -> i
         return wl_build_fp_cast(self.builder, val, target_ty)
     val
 
+fn Codegen.mir_build_raw_shift(self: Codegen, op: i32, l: i64, r: i64, is_unsigned: bool) -> i64:
+    if op == BinaryOp.OP_SHL:
+        return wl_build_shl(self.builder, l, r)
+    if is_unsigned:
+        return wl_build_lshr(self.builder, l, r)
+    wl_build_ashr(self.builder, l, r)
+
+fn Codegen.mir_build_total_shift(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsigned: bool) -> i64:
+    let shift_ty = wl_type_of(lhs)
+    let rhs_ty = wl_type_of(rhs)
+    if wl_get_type_kind(shift_ty) != wl_integer_type_kind() or wl_get_type_kind(rhs_ty) != wl_integer_type_kind():
+        self.had_error = 1
+        return wl_get_undef(wl_i32_type(self.context))
+    let width = wl_get_int_type_width(shift_ty)
+    if width <= 0:
+        self.had_error = 1
+        return wl_get_undef(shift_ty)
+
+    let too_big = wl_build_icmp(self.builder, wl_int_uge(), rhs, wl_const_int(rhs_ty, width as i64, 0))
+    let rhs_for_shift = self.coerce_int_ext(rhs, shift_ty, true)
+    let masked_count = wl_build_and(self.builder, rhs_for_shift, wl_const_int(shift_ty, (width - 1) as i64, 0))
+    let shifted = self.mir_build_raw_shift(op, lhs, masked_count, is_unsigned)
+
+    if op == BinaryOp.OP_SHL or is_unsigned:
+        return wl_build_select(self.builder, too_big, wl_const_int(shift_ty, 0, 0), shifted)
+
+    let sign_count = wl_const_int(shift_ty, (width - 1) as i64, 0)
+    let sign_fill = wl_build_ashr(self.builder, lhs, sign_count)
+    wl_build_select(self.builder, too_big, sign_fill, shifted)
+
 fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsigned: bool, lhs_sema: i32, rhs_sema: i32) -> i64:
     let lk = wl_get_type_kind(wl_type_of(lhs))
     let rk = wl_get_type_kind(wl_type_of(rhs))
@@ -1045,6 +1075,9 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
             if cmp_kind == wl_struct_type_kind() or cmp_kind == wl_array_type_kind():
                 return self.compare_aggregate_eq(lhs, rhs, op)
 
+    if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
+        return self.mir_build_total_shift(op, lhs, rhs, is_unsigned)
+
     // Coerce both operands to the wider integer type (never truncate)
     let lty = wl_type_of(lhs)
     let rty = wl_type_of(rhs)
@@ -1092,14 +1125,14 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
         // Clamp using saturating add of 0 in the original width (truncate + sat)
         // Actually: just truncate and check for overflow with icmp
         if is_unsigned:
-            let ms_max_val = wl_const_int(ms_dbl_ty, ((1 as i64) << (ms_width as i64)) - 1, 0)
+            let ms_max_val = wl_const_int(ms_dbl_ty, ((1 as i64) << (ms_width as u32)) - 1, 0)
             let ms_overflow = wl_build_icmp(self.builder, wl_int_ugt(), ms_wide_result, ms_max_val)
             let ms_clamped = wl_build_select(self.builder, ms_overflow, ms_max_val, ms_wide_result)
             return wl_build_trunc(self.builder, ms_clamped, wider_ty)
         else:
             let ms_half = ms_width as i64 - 1
-            let ms_max_val = wl_const_int(ms_dbl_ty, ((1 as i64) << ms_half) - 1, 0)
-            let ms_min_val = wl_const_int(ms_dbl_ty, -((1 as i64) << ms_half), 1)
+            let ms_max_val = wl_const_int(ms_dbl_ty, ((1 as i64) << (ms_half as u32)) - 1, 0)
+            let ms_min_val = wl_const_int(ms_dbl_ty, -((1 as i64) << (ms_half as u32)), 1)
             let ms_too_big = wl_build_icmp(self.builder, wl_int_sgt(), ms_wide_result, ms_max_val)
             let ms_too_small = wl_build_icmp(self.builder, wl_int_slt(), ms_wide_result, ms_min_val)
             let ms_clamped_hi = wl_build_select(self.builder, ms_too_big, ms_max_val, ms_wide_result)
@@ -1137,10 +1170,6 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
     if op == BinaryOp.OP_AND or op == BinaryOp.OP_BIT_AND: return wl_build_and(self.builder, l, r)
     if op == BinaryOp.OP_OR or op == BinaryOp.OP_BIT_OR: return wl_build_or(self.builder, l, r)
     if op == BinaryOp.OP_BIT_XOR: return wl_build_xor(self.builder, l, r)
-    if op == BinaryOp.OP_SHL: return wl_build_shl(self.builder, l, r)
-    if op == BinaryOp.OP_SHR:
-        if is_unsigned: return wl_build_lshr(self.builder, l, r)
-        return wl_build_ashr(self.builder, l, r)
     if op == BinaryOp.OP_CONCAT: return self.mir_str_concat(lhs, rhs)
     with_eprint("error: unsupported MIR binary op '" ++ mir_binop_name(op) ++ "' reached LLVM codegen")
     self.had_error = 1
@@ -2118,7 +2147,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                     // Mask to field width, shift to position (MSB-first layout)
                     let bp_shift_amt = bp_total_bits - bp_bit_offset - bp_bit_width
                     if bp_bit_width < bp_total_bits:
-                        let bp_mask = wl_const_int(struct_ty, ((1 as i64) << (bp_bit_width as i64)) - 1, 0)
+                        let bp_mask = wl_const_int(struct_ty, ((1 as i64) << (bp_bit_width as u32)) - 1, 0)
                         field_val = wl_build_and(self.builder, field_val, bp_mask)
                     if bp_shift_amt > 0:
                         let bp_shift = wl_const_int(struct_ty, bp_shift_amt as i64, 0)
@@ -2292,8 +2321,8 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
             // Load current backing value
             let bp_sold = wl_build_load(self.builder, bp_sbacking_ty, dst_ptr)
             // Clear field bits
-            let bp_sfield_mask = ((1 as i64) << (bp_sbit_width as i64)) - 1
-            let bp_sclear_mask_val = (bp_sfield_mask << (bp_sshift_amt as i64)) ^ (-1 as i64)
+            let bp_sfield_mask = ((1 as i64) << (bp_sbit_width as u32)) - 1
+            let bp_sclear_mask_val = (bp_sfield_mask << (bp_sshift_amt as u32)) ^ (-1 as i64)
             let bp_sclear_mask = wl_const_int(bp_sbacking_ty, bp_sclear_mask_val, 0)
             let bp_scleared = wl_build_and(self.builder, bp_sold, bp_sclear_mask)
             // Extend new value to backing width and shift into position
@@ -5716,7 +5745,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
             expected_ty = param_types.get(abi_param_offset as i64)
 
         // Byval: large struct param → alloca + store + pass pointer
-        if (abi_byval_mask & (1 << (ai as i64))) != 0:
+        if (abi_byval_mask & ((1 as i64) << (ai as u32))) != 0:
             let val = self.mir_eval_operand(body, operand_id, 0)
             let val_ty = wl_type_of(val)
             if wl_get_type_kind(val_ty) == wl_pointer_type_kind():
@@ -6113,7 +6142,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
         let param_val = wl_get_param(function, actual_pi)
         var param_type = wl_type_of(param_val)
         let alloca = self.create_entry_alloca(param_type)
-        if (fn_byval_mask & (1 << (pi as i64))) != 0:
+        if (fn_byval_mask & ((1 as i64) << (pi as u32))) != 0:
             if pi < fn_byval_types.len() as i32 and fn_byval_types.get(pi as i64) != 0:
                 param_type = fn_byval_types.get(pi as i64)
             let byval_alloca = self.create_entry_alloca(param_type)
@@ -6406,7 +6435,7 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
         let param_val = wl_get_param(function, actual_pi)
         var param_type = wl_type_of(param_val)
         let alloca = self.create_entry_alloca(param_type)
-        if (fn_byval_mask & (1 << (pi as i64))) != 0:
+        if (fn_byval_mask & ((1 as i64) << (pi as u32))) != 0:
             if pi < fn_byval_types.len() as i32 and fn_byval_types.get(pi as i64) != 0:
                 param_type = fn_byval_types.get(pi as i64)
             let byval_alloca = self.create_entry_alloca(param_type)

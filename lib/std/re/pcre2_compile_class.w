@@ -67,7 +67,7 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
                 if ((if prop.script == pdata: 1 else: 0) != 0) {
                     (__ci_expr_logic_2 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_2 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop.scriptx_bidiclass & 1023) as isize) as usize))[(pdata / 32)]) & ((1 as c_uint) << (pdata % 32))) != 0: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_2 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop.scriptx_bidiclass & 1023) as isize) as usize))[(pdata / 32)]) & ((1 as c_uint) << ((pdata % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 (set_bit = __ci_expr_logic_2)
@@ -152,9 +152,9 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
                 (set_bit = __ci_expr_logic_9)
 
             11 =>
-                (set_bit = (if ((prop.scriptx_bidiclass as c_int) >> 11) == pdata: 1 else: 0))
+                (set_bit = (if ((prop.scriptx_bidiclass as c_int) >> (11 as c_uint)) == pdata: 1 else: 0))
             12 =>
-                (set_bit = (if ((unsafe: ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + (((prop.bprops & 4095) as isize) as usize))[(pdata / 32)]) & ((1 as c_uint) << (pdata % 32))) != 0: 1 else: 0))
+                (set_bit = (if ((unsafe: ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + (((prop.bprops & 4095) as isize) as usize))[(pdata / 32)]) & ((1 as c_uint) << ((pdata % 32) as c_uint))) != 0: 1 else: 0))
             14 =>
                 (chartype = prop.chartype)
 
@@ -278,7 +278,7 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
         }
 
         if (set_bit != 0) {
-            ((unsafe: *classbits) = (unsafe: *classbits) | (((1 as c_int) << (c & 7)) as u8))
+            ((unsafe: *classbits) = (unsafe: *classbits) | (((1 as c_int) << ((c & 7) as c_uint)) as u8))
         }
 
         if ((if (c & 7) == 7: 1 else: 0) != 0) {
@@ -566,7 +566,7 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                     if (__goto_pending != 0) {
                         continue
                     }
-                    ((unsafe: previous__goto_1707_16[1]) = ((((((((code__goto_1077_14 as usize) -% (previous__goto_1707_16 as usize)) / sizeof[u8]()) as c_int) as c_int) >> 8) as u8)))
+                    ((unsafe: previous__goto_1707_16[1]) = ((((((((code__goto_1077_14 as usize) -% (previous__goto_1707_16 as usize)) / sizeof[u8]()) as c_int) as c_int) >> (8 as c_uint)) as u8)))
                     ((unsafe: previous__goto_1707_16[(1 + 1)]) = (((((((code__goto_1077_14 as usize) -% (previous__goto_1707_16 as usize)) / sizeof[u8]()) as c_int) & 255) as u8)))
                     if (__goto_pending != 0) {
                         continue
@@ -859,7 +859,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                     ((unsafe: *__ci_expr_old_9) = 112)
 
 
-                    ((unsafe: code[0]) = ((((((1 + 2) + 1) as c_int) >> 8) as u8)))
+                    ((unsafe: code[0]) = ((((((1 + 2) + 1) as c_int) >> (8 as c_uint)) as u8)))
 
                     ((unsafe: code[(0 + 1)]) = (((((1 + 2) + 1) & 255) as u8)))
 
@@ -916,7 +916,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                     ((unsafe: *__ci_expr_old_12) = 112)
 
 
-                    ((unsafe: code[0]) = (((((required_len_1 as c_int) as c_int) >> 8) as u8)))
+                    ((unsafe: code[0]) = (((((required_len_1 as c_int) as c_int) >> (8 as c_uint)) as u8)))
 
                     ((unsafe: code[(0 + 1)]) = ((((required_len_1 as c_int) & 255) as u8)))
 
@@ -981,7 +981,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
             ((unsafe: *__ci_expr_old_16) = 113)
 
 
-            ((unsafe: code[0]) = ((((((1 + 2) + 1) as c_int) >> 8) as u8)))
+            ((unsafe: code[0]) = ((((((1 + 2) + 1) as c_int) >> (8 as c_uint)) as u8)))
 
             ((unsafe: code[(0 + 1)]) = (((((1 + 2) + 1) & 255) as u8)))
 
@@ -1009,7 +1009,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
 
             }
 
-            ((unsafe: previous[1]) = ((((((((code as usize) -% (previous as usize)) / sizeof[u8]()) as c_int) as c_int) >> 8) as u8)))
+            ((unsafe: previous[1]) = ((((((((code as usize) -% (previous as usize)) / sizeof[u8]()) as c_int) as c_int) >> (8 as c_uint)) as u8)))
 
             ((unsafe: previous[(1 + 1)]) = (((((((code as usize) -% (previous as usize)) / sizeof[u8]()) as c_int) & 255) as u8)))
 
@@ -1040,7 +1040,7 @@ fn do_heapify(buffer: *mut c_uint, size: c_ulong, __param_i: c_ulong) {
     while (1 != 0) {
         (max = i)
 
-        (left = (((i as c_ulong) << 1) +% 2))
+        (left = (((i as c_ulong) << (1 as c_uint)) +% 2))
 
         (right = (left +% 2))
 
@@ -1100,7 +1100,7 @@ fn get_nocase_range(c: c_uint) -> *const c_uint {
     }
 
     while (1 != 0) {
-        (middle = (((left +% right) as c_uint) >> 1) | 1)
+        (middle = (((left +% right) as c_uint) >> (1 as c_uint)) | 1)
 
         if ((if _pcre2_ucd_nocase_ranges_8[middle] <= c: 1 else: 0) != 0) {
             (left = (middle +% 1))
@@ -1483,7 +1483,7 @@ fn parse_class(__param_ptr: *mut c_uint, options: c_uint, __param_buffer: *mut c
                         var __ci_expr_logic_0: c_int = 0
 
                         if ((if meta_arg == 16: 1 else: 0) != 0) {
-                            (__ci_expr_logic_0 = (if (if (((unsafe: *ptr) as c_uint) >> 16) == 13: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_0 = (if (if (((unsafe: *ptr) as c_uint) >> (16 as c_uint)) == 13: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         if (__ci_expr_logic_0 != 0) {
@@ -1713,7 +1713,7 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
         return cranges
     }
 
-    (i = ((((range_list_size as c_ulong) >> 2) -% 1) as c_ulong) << 1)
+    (i = ((((range_list_size as c_ulong) >> (2 as c_uint)) -% 1) as c_ulong) << (1 as c_uint))
 
     while (1 != 0) {
         do_heapify(buffer, range_list_size, i)
@@ -1860,11 +1860,11 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
                 (next_char = next_char - 1)
 
                 if ((if char_list_start < 65536: 1 else: 0) != 0) {
-                    ((unsafe: *next_char) = (((((range_end as c_uint) << 1) | 1) as c_ushort)))
+                    ((unsafe: *next_char) = (((((range_end as c_uint) << (1 as c_uint)) | 1) as c_ushort)))
                 } else {
                     (next_char = next_char - 1)
 
-                    ((unsafe: *(next_char as *mut c_uint)) = ((range_end as c_uint) << 1) | 1)
+                    ((unsafe: *(next_char as *mut c_uint)) = ((range_end as c_uint) << (1 as c_uint)) | 1)
 
                 }
 
@@ -1878,16 +1878,16 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
                     (next_char = next_char - 1)
 
                     if ((if char_list_start < 65536: 1 else: 0) != 0) {
-                        ((unsafe: *next_char) = ((((range_start as c_uint) << 1) as c_ushort)))
+                        ((unsafe: *next_char) = ((((range_start as c_uint) << (1 as c_uint)) as c_ushort)))
                     } else {
                         (next_char = next_char - 1)
 
-                        ((unsafe: *(next_char as *mut c_uint)) = (range_start as c_uint) << 1)
+                        ((unsafe: *(next_char as *mut c_uint)) = (range_start as c_uint) << (1 as c_uint))
 
                     }
 
                 } else {
-                    (cranges.char_lists_types = cranges.char_lists_types | ((4 as c_int) << tmp2))
+                    (cranges.char_lists_types = cranges.char_lists_types | ((4 as c_int) << (tmp2 as c_uint)))
                 }
 
             }
@@ -1928,11 +1928,11 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
                 (next_char = next_char - 1)
 
                 if ((if char_list_start < 65536: 1 else: 0) != 0) {
-                    ((unsafe: *next_char) = (((((range_end as c_uint) << 1) | 1) as c_ushort)))
+                    ((unsafe: *next_char) = (((((range_end as c_uint) << (1 as c_uint)) | 1) as c_ushort)))
                 } else {
                     (next_char = next_char - 1)
 
-                    ((unsafe: *(next_char as *mut c_uint)) = ((range_end as c_uint) << 1) | 1)
+                    ((unsafe: *(next_char as *mut c_uint)) = ((range_end as c_uint) << (1 as c_uint)) | 1)
 
                 }
 
@@ -1944,12 +1944,12 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
 
             }
 
-            (cranges.char_lists_types = cranges.char_lists_types | ((4 as c_int) << tmp2))
+            (cranges.char_lists_types = cranges.char_lists_types | ((4 as c_int) << (tmp2 as c_uint)))
 
         }
 
         if ((if tmp1 >= 3: 1 else: 0) != 0) {
-            (cranges.char_lists_types = cranges.char_lists_types | ((3 as c_int) << tmp2))
+            (cranges.char_lists_types = cranges.char_lists_types | ((3 as c_int) << (tmp2 as c_uint)))
 
             (next_char = next_char - 1)
 
@@ -1963,7 +1963,7 @@ fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_u
             }
 
         } else {
-            (cranges.char_lists_types = cranges.char_lists_types | ((tmp1 as c_uint) << tmp2))
+            (cranges.char_lists_types = cranges.char_lists_types | ((tmp1 as c_uint) << (tmp2 as c_uint)))
         }
 
         var __ci_expr_logic_6: c_int
@@ -2088,7 +2088,7 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
                     }
 
 
-                    ((unsafe: classbits[(((unsafe: cb.fcc[c]) as c_int) >> 3)]) = (unsafe: classbits[(((unsafe: cb.fcc[c]) as c_int) >> 3)]) | (((1 as c_uint) << ((unsafe: cb.fcc[c]) & 7)) as u8))
+                    ((unsafe: classbits[(((unsafe: cb.fcc[c]) as c_int) >> (3 as c_uint))]) = (unsafe: classbits[(((unsafe: cb.fcc[c]) as c_int) >> (3 as c_uint))]) | (((1 as c_uint) << (((unsafe: cb.fcc[c]) & 7) as c_uint)) as u8))
 
 
                     (c = c + 1)
@@ -2115,7 +2115,7 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
                     var co: c_uint = ((((c as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((c as c_int) / 128)] * 128) + ((c as c_int) % 128))] as isize) as usize)).other_case) as c_uint))
 
                     if ((if co <= 255: 1 else: 0) != 0) {
-                        ((unsafe: classbits[((co as c_uint) >> 3)]) = (unsafe: classbits[((co as c_uint) >> 3)]) | (((1 as c_uint) << (co & 7)) as u8))
+                        ((unsafe: classbits[((co as c_uint) >> (3 as c_uint))]) = (unsafe: classbits[((co as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << ((co & 7) as c_uint)) as u8))
                     }
 
 
@@ -2130,7 +2130,7 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
             (c = start)
 
             while ((if c <= classbits_end: 1 else: 0) != 0) {
-                ((unsafe: classbits[(((unsafe: cb.fcc[c]) as c_int) >> 3)]) = (unsafe: classbits[(((unsafe: cb.fcc[c]) as c_int) >> 3)]) | (((1 as c_uint) << ((unsafe: cb.fcc[c]) & 7)) as u8))
+                ((unsafe: classbits[(((unsafe: cb.fcc[c]) as c_int) >> (3 as c_uint))]) = (unsafe: classbits[(((unsafe: cb.fcc[c]) as c_int) >> (3 as c_uint))]) | (((1 as c_uint) << (((unsafe: cb.fcc[c]) & 7) as c_uint)) as u8))
 
                 (c = c + 1)
 
@@ -2141,15 +2141,15 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
 
     }
 
-    (byte_start = ((start +% 7) as c_uint) >> 3)
+    (byte_start = ((start +% 7) as c_uint) >> (3 as c_uint))
 
-    (byte_end = ((classbits_end +% 1) as c_uint) >> 3)
+    (byte_end = ((classbits_end +% 1) as c_uint) >> (3 as c_uint))
 
     if ((if byte_start >= byte_end: 1 else: 0) != 0) {
         (c = start)
 
         while ((if c <= classbits_end: 1 else: 0) != 0) {
-            ((unsafe: classbits[((c as c_uint) >> 3)]) = (unsafe: classbits[((c as c_uint) >> 3)]) | (((1 as c_uint) << (c & 7)) as u8))
+            ((unsafe: classbits[((c as c_uint) >> (3 as c_uint))]) = (unsafe: classbits[((c as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << ((c & 7) as c_uint)) as u8))
 
             (c = c + 1)
 
@@ -2170,14 +2170,14 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
     }
 
 
-    (byte_start = byte_start << 3)
+    (byte_start = byte_start << (3 as c_uint))
 
-    (byte_end = byte_end << 3)
+    (byte_end = byte_end << (3 as c_uint))
 
     (c = start)
 
     while ((if c < byte_start: 1 else: 0) != 0) {
-        ((unsafe: classbits[((c as c_uint) >> 3)]) = (unsafe: classbits[((c as c_uint) >> 3)]) | (((1 as c_uint) << (c & 7)) as u8))
+        ((unsafe: classbits[((c as c_uint) >> (3 as c_uint))]) = (unsafe: classbits[((c as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << ((c & 7) as c_uint)) as u8))
 
         (c = c + 1)
 
@@ -2187,7 +2187,7 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
     (c = byte_end)
 
     while ((if c <= classbits_end: 1 else: 0) != 0) {
-        ((unsafe: classbits[((c as c_uint) >> 3)]) = (unsafe: classbits[((c as c_uint) >> 3)]) | (((1 as c_uint) << (c & 7)) as u8))
+        ((unsafe: classbits[((c as c_uint) >> (3 as c_uint))]) = (unsafe: classbits[((c as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << ((c & 7) as c_uint)) as u8))
 
         (c = c + 1)
 

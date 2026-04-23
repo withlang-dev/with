@@ -19,10 +19,10 @@ fn _pcre2_find_bracket_8(__param_code: *const u8, utf: c_int, number: c_int) -> 
         }
 
         if (__ci_expr_logic_0 != 0) {
-            (code = code + (((((unsafe: code[1]) as c_int) << 8) | (unsafe: code[(1 + 1)])) as c_uint))
+            (code = code + (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
         } else {
             if ((if c == OP_CALLOUT_STR: 1 else: 0) != 0) {
-                (code = code + (((((unsafe: code[(1 + (2 * 2))]) as c_int) << 8) | (unsafe: code[((1 + (2 * 2)) + 1)])) as c_uint))
+                (code = code + (((((unsafe: code[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: code[((1 + (2 * 2)) + 1)])) as c_uint))
             } else {
                 var __ci_expr_logic_1: c_int
 
@@ -65,7 +65,7 @@ fn _pcre2_find_bracket_8(__param_code: *const u8, utf: c_int, number: c_int) -> 
                     }
 
                     if (__ci_expr_logic_4 != 0) {
-                        var n: c_int = (((((((unsafe: code[(1 + 2)]) as c_int) << 8) | (unsafe: code[((1 + 2) + 1)])) as c_uint) as c_int))
+                        var n: c_int = (((((((unsafe: code[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code[((1 + 2) + 1)])) as c_uint) as c_int))
 
                         if ((if n == number: 1 else: 0) != 0) {
                             return code

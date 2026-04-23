@@ -30,7 +30,7 @@ fn _pcre2_ord2utf_8(__param_cvalue: c_uint, __param_buffer: *mut u8) -> c_uint {
         ((unsafe: *__ci_expr_old_0) = 128 | (cvalue & 63))
 
 
-        (cvalue = cvalue >> 6)
+        (cvalue = cvalue >> (6 as c_uint))
 
 
         (j = j - 1)

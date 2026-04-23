@@ -29,7 +29,7 @@ fn pcre2_substring_copy_byname_8(match_data: *mut pcre2_real_match_data_8, strin
     (entry = first)
 
     while ((if entry <= last: 1 else: 0) != 0) {
-        var n: c_uint = ((((((unsafe: entry[0]) as c_int) << 8) | (unsafe: entry[(0 + 1)])) as c_uint))
+        var n: c_uint = ((((((unsafe: entry[0]) as c_int) << (8 as c_uint)) | (unsafe: entry[(0 + 1)])) as c_uint))
 
         if ((if n < match_data.oveccount: 1 else: 0) != 0) {
             if ((if match_data.ovector[(n *% 2)] != (~(0 as c_ulong)): 1 else: 0) != 0) {
@@ -115,7 +115,7 @@ fn pcre2_substring_get_byname_8(match_data: *mut pcre2_real_match_data_8, string
     (entry = first)
 
     while ((if entry <= last: 1 else: 0) != 0) {
-        var n: c_uint = ((((((unsafe: entry[0]) as c_int) << 8) | (unsafe: entry[(0 + 1)])) as c_uint))
+        var n: c_uint = ((((((unsafe: entry[0]) as c_int) << (8 as c_uint)) | (unsafe: entry[(0 + 1)])) as c_uint))
 
         if ((if n < match_data.oveccount: 1 else: 0) != 0) {
             if ((if match_data.ovector[(n *% 2)] != (~(0 as c_ulong)): 1 else: 0) != 0) {
@@ -199,7 +199,7 @@ fn pcre2_substring_length_byname_8(match_data: *mut pcre2_real_match_data_8, str
     (entry = first)
 
     while ((if entry <= last: 1 else: 0) != 0) {
-        var n: c_uint = ((((((unsafe: entry[0]) as c_int) << 8) | (unsafe: entry[(0 + 1)])) as c_uint))
+        var n: c_uint = ((((((unsafe: entry[0]) as c_int) << (8 as c_uint)) | (unsafe: entry[(0 + 1)])) as c_uint))
 
         if ((if n < match_data.oveccount: 1 else: 0) != 0) {
             if ((if match_data.ovector[(n *% 2)] != (~(0 as c_ulong)): 1 else: 0) != 0) {
@@ -365,7 +365,7 @@ fn pcre2_substring_nametable_scan_8(code: *const pcre2_real_code_8, stringname: 
                 var __ci_expr_ternary_0: c_int = 0
 
                 if ((if first == last: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_0 = (((((((unsafe: entry[0]) as c_int) << 8) | (unsafe: entry[(0 + 1)])) as c_uint) as c_int)))
+                    (__ci_expr_ternary_0 = (((((((unsafe: entry[0]) as c_int) << (8 as c_uint)) | (unsafe: entry[(0 + 1)])) as c_uint) as c_int)))
                 } else {
                     (__ci_expr_ternary_0 = -50)
                 }

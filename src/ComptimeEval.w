@@ -335,6 +335,37 @@ fn ComptimeEvaluator.node_type_or(self: ComptimeEvaluator, node: i32, fallback: 
             return typed
     fallback
 
+fn ComptimeEvaluator.comptime_int_width(self: ComptimeEvaluator, type_id: i32) -> i32:
+    let numeric = self.sema.numeric_operand_type(type_id)
+    let resolved = self.sema.resolve_alias(numeric as TypeId)
+    if self.sema.get_type_kind(resolved) == TypeKind.TY_INT:
+        return self.sema.get_type_d0(resolved)
+    64
+
+fn ComptimeEvaluator.comptime_int_is_unsigned(self: ComptimeEvaluator, type_id: i32) -> bool:
+    let numeric = self.sema.numeric_operand_type(type_id)
+    let resolved = self.sema.resolve_alias(numeric as TypeId)
+    if self.sema.get_type_kind(resolved) == TypeKind.TY_INT:
+        return self.sema.get_type_d1(resolved) == 0
+    false
+
+fn ComptimeEvaluator.eval_shift_value(self: ComptimeEvaluator, op: i32, result_ty: i32, lhs: i64, rhs: i64) -> i64:
+    let width = self.comptime_int_width(result_ty)
+    if rhs < 0 or rhs >= width as i64:
+        if op == BinaryOp.OP_SHL:
+            return 0
+        if self.comptime_int_is_unsigned(result_ty):
+            return 0
+        if lhs < 0:
+            return -1
+        return 0
+    let count = rhs as u32
+    if op == BinaryOp.OP_SHL:
+        return lhs << count
+    if self.comptime_int_is_unsigned(result_ty):
+        return exact_int_logical_shr_word(lhs, rhs as i32)
+    lhs >> count
+
 fn ComptimeEvaluator.static_type_expr(self: ComptimeEvaluator, node: i32) -> i32:
     if node == 0:
         return 0
@@ -996,9 +1027,9 @@ fn ComptimeEvaluator.eval_binary(self: ComptimeEvaluator, diags: &mut Diagnostic
             return self.fail(diags, node, "modulo by zero in comptime")
         return comptime_control_value(comptime_value_int(result_ty, lv % rv))
     if op == BinaryOp.OP_SHL:
-        return comptime_control_value(comptime_value_int(result_ty, lv << rv))
+        return comptime_control_value(comptime_value_int(result_ty, self.eval_shift_value(op, result_ty, lv, rv)))
     if op == BinaryOp.OP_SHR:
-        return comptime_control_value(comptime_value_int(result_ty, lv >> rv))
+        return comptime_control_value(comptime_value_int(result_ty, self.eval_shift_value(op, result_ty, lv, rv)))
     if op == BinaryOp.OP_BIT_AND:
         return comptime_control_value(comptime_value_int(result_ty, lv & rv))
     if op == BinaryOp.OP_BIT_OR:

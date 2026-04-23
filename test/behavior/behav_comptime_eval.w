@@ -50,7 +50,7 @@ fn test_const_in_comparison:
     let y = 2000
     assert(y > MAX_SIZE)
 
-const SHIFT_AMOUNT: i32 = 4
+const SHIFT_AMOUNT: u32 = 4
 
 fn test_const_in_shift:
     let x = 1 << SHIFT_AMOUNT

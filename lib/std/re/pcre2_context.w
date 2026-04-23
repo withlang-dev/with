@@ -185,9 +185,9 @@ fn pcre2_set_optimize_8(ccontext: *mut pcre2_real_compile_context_8, directive: 
 
             if (__ci_expr_logic_0 != 0) {
                 if ((if (directive & 1) != 0: 1 else: 0) != 0) {
-                    (ccontext.optimization_flags = ccontext.optimization_flags & (~((1 as c_uint) << (((directive as c_uint) >> 1) -% 32))))
+                    (ccontext.optimization_flags = ccontext.optimization_flags & (~((1 as c_uint) << ((((directive as c_uint) >> (1 as c_uint)) -% 32) as c_uint))))
                 } else {
-                    (ccontext.optimization_flags = ccontext.optimization_flags | ((1 as c_uint) << (((directive as c_uint) >> 1) -% 32)))
+                    (ccontext.optimization_flags = ccontext.optimization_flags | ((1 as c_uint) << ((((directive as c_uint) >> (1 as c_uint)) -% 32) as c_uint)))
                 }
 
                 return 0
