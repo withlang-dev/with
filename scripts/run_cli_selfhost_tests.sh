@@ -2298,11 +2298,62 @@ EOF
   echo "PASS(cli-selfhost-test) test_runtime_directives"
 }
 
+expect_test_command_parallel_same_source() {
+  local case_dir="$tmpdir/issue173_parallel_test_case"
+  local src="$case_dir/attr_only.w"
+  local jobs=32
+  local failed=0
+  local pids=()
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+@[test]
+fn attr_only:
+    assert(1 == 1)
+EOF
+
+  for i in $(seq 1 "$jobs"); do
+    (
+      local rc=0
+      if runner_exec_capture "$CLI_TIMEOUT_SECS" "$case_dir/$i.out" "$case_dir/$i.err" "$SELFHOST_BIN" test "$src"; then
+        rc=0
+      else
+        rc=$?
+      fi
+      printf '%s\n' "$rc" >"$case_dir/$i.rc"
+    ) &
+    pids+=("$!")
+  done
+
+  for pid in "${pids[@]}"; do
+    if ! wait "$pid"; then
+      failed=1
+    fi
+  done
+
+  for i in $(seq 1 "$jobs"); do
+    if [[ ! -f "$case_dir/$i.rc" ]] || [[ "$(cat "$case_dir/$i.rc")" -ne 0 ]]; then
+      failed=1
+      echo "FAIL(cli-selfhost-test-parallel) issue173 job $i"
+      cat "$case_dir/$i.out" 2>/dev/null || true
+      cat "$case_dir/$i.err" 2>/dev/null || true
+    fi
+  done
+
+  if [[ "$failed" -ne 0 ]]; then
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-test) issue173_parallel_same_source"
+}
+
 expect_init_in_cwd
 expect_init_named_dir
 expect_pointer_index_is_rejected
 expect_top_level_help_lists_cli_commands
 expect_test_command_runtime_directives
+expect_test_command_parallel_same_source
 expect_prelude_output_functions_contract
 expect_emit_obj_global_symbols
 expect_emit_obj_imported_symbols
