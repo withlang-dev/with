@@ -64,6 +64,7 @@ type CiMigratePendingSharedExternVar {
 
 var g_migrate_shared_pending_extern_vars: Vec[CiMigratePendingSharedExternVar] = Vec.new()
 var g_migrate_shared_usage_text: str = ""
+var g_migrate_libc_symbols_used: str = ""
 
 pub fn migrate_set_shared_defs(prefix: str):
     g_migrate_shared_defs_prefix = prefix
@@ -131,6 +132,32 @@ fn ci_migrate_shared_note_output_uses(output: str):
     if not ci_migrate_shared_defs_active():
         return
     g_migrate_shared_usage_text = g_migrate_shared_usage_text ++ "\n" ++ output
+
+fn ci_migrate_libc_reset:
+    g_migrate_libc_symbols_used = ""
+    return
+
+fn ci_migrate_note_libc_symbol(name: str):
+    if name.len() == 0:
+        return
+    let key = "|" ++ name ++ "|"
+    if ci_find_str(g_migrate_libc_symbols_used, key) < 0:
+        g_migrate_libc_symbols_used = g_migrate_libc_symbols_used ++ key
+    return
+
+fn ci_migrate_needs_libc -> bool:
+    g_migrate_libc_symbols_used.len() > 0
+
+fn ci_migrate_insert_libc_use(output: str) -> str:
+    if not ci_migrate_needs_libc():
+        return output
+    if ci_find_str(output, "\nuse std.libc\n") >= 0:
+        return output
+    let header_end = ci_find_str(output, "\n\n")
+    if header_end >= 0:
+        output.slice(0, header_end as i64) ++ "\nuse std.libc" ++ output.slice(header_end as i64, output.len())
+    else:
+        "use std.libc\n\n" ++ output
 
 // Replace all occurrences of needle with replacement, assuming few matches.
 // Unlike ci_str_replace (O(n²) char-by-char concatenation), this is O(n * k)
@@ -482,6 +509,7 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
     g_migrate_macro_values = ""
     g_migrate_macro_session = 0
     ci_migrate_reset_fn_counts()
+    ci_migrate_libc_reset()
     g_migrate_preprocessed_source = ""
     g_migrate_current_input_path = ""
 
@@ -644,6 +672,8 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
     if ci_migrate_shared_defs_active():
         output = ci_replace_sparse(output, "= (-1", "= ((0 -% 1)")
         output = ci_replace_sparse(output, "else: (-1", "else: ((0 -% 1)")
+
+    output = ci_migrate_insert_libc_use(output)
 
     // File-level summary for untranslated functions
     if g_migrate_fn_untranslatable > 0:
