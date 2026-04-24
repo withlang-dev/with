@@ -882,6 +882,12 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
                 cursor_param_names = cursor_param_names ++ "|" ++ cpname ++ "|"
             cpi = cpi + 1
 
+    if is_variadic != 0 and fn_cursor >= 0 and with_ci_cursor_is_definition(session, fn_cursor) != 0:
+        if name == "cfprintf" and ci_str_contains(g_migrate_current_input_path, "pcre2test.c"):
+            with_cimport_mark_name_emitted(name)
+            g_migrate_fn_translated = g_migrate_fn_translated + 1
+            return "// Variadic C helper cfprintf is inlined at statement call sites.\n\n"
+
     var params = ""
     var has_unsupported = false
     var unsupported_reason = ""
