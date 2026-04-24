@@ -6633,7 +6633,8 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
             callee_text = ci_print_expr(exprs, types, callee.value_expr, 0, 0)
             setup = callee.setup_stmt
             let source_callee = ci_call_name_from_source_text(with_ci_cursor_source_text(session, cursor))
-            if source_callee.len() > 0 and not ci_is_c_ident(callee_text):
+            let cursor_callee = ci_call_callee_name(session, with_ci_child(session, cursor, 0))
+            if source_callee.len() > 0 and source_callee == cursor_callee and not ci_is_c_ident(callee_text):
                 let callee_idx = exprs.add_string(ci_escape_reserved(source_callee))
                 callee = ci_value_ir_plain(exprs.ident(callee_idx, 0 as CiTypeId))
                 callee_text = ci_escape_reserved(source_callee)

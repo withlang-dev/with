@@ -2048,6 +2048,80 @@ EOF
   echo "PASS(cli-selfhost-migrate) switch_macro_goto"
 }
 
+expect_migrate_statement_macro_spelling_text() {
+  local case_dir="$tmpdir/migrate_statement_macro_spelling_case"
+  local src="$case_dir/statement_macro_spelling.c"
+  local out_w="$case_dir/statement_macro_spelling.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+#define ASSERT(cond, msg) do { if (!(cond)) { failure = msg; goto EXIT; } } while (0)
+#define CLEAR_HEAP_FRAMES(md, data) do { (md)->memctl.free((md)->heapframes, data); (md)->heapframes = 0; } while (0)
+
+typedef void (*free_fn)(int *, int *);
+
+typedef struct MemCtl {
+  free_fn free;
+} MemCtl;
+
+typedef struct MatchData {
+  MemCtl memctl;
+  int *heapframes;
+} MatchData;
+
+void clear_frames(MatchData *match_data, int *memory_data) {
+  CLEAR_HEAP_FRAMES(match_data, memory_data);
+}
+
+int assert_failure_message(int rc) {
+  const char *failure = 0;
+  ASSERT(rc == 0, "pcre2_config(NULL)");
+EXIT:
+  return failure != 0;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) statement_macro_spelling"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! python3 - "$out_w" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+text = Path(sys.argv[1]).read_text()
+if '"pcre2_config(NULL)"' not in text:
+    raise SystemExit(1)
+if "ASSERT(rc" in text:
+    raise SystemExit(1)
+if re.search(r"match_data\.memctl\.free\([^)]*heapframes[^)]*memory_data", text) is None:
+    raise SystemExit(1)
+if "CLEAR_HEAP_FRAMES(match_data" in text:
+    raise SystemExit(1)
+PY
+  then
+    echo "FAIL(cli-selfhost-migrate-output) statement_macro_spelling"
+    cat "$tmpdir/err" || true
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) statement_macro_spelling"
+    cat "$tmpdir/err" || true
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) statement_macro_spelling"
+}
+
 expect_migrate_recursive_anonymous_records() {
   local case_dir="$tmpdir/migrate_recursive_anonymous_records_case"
   local src="$case_dir/anon_records.c"
@@ -2658,6 +2732,7 @@ expect_migrate_for_continue_switch_break_semantics
 expect_migrate_goto_shadowed_local
 expect_migrate_goto_label_preserves_block_scope
 expect_migrate_switch_macro_goto_terminators
+expect_migrate_statement_macro_spelling_text
 expect_migrate_recursive_anonymous_records
 expect_migrate_ir_roundtrip
 expect_opaque_field_access_is_rejected

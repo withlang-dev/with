@@ -138,6 +138,7 @@ extern fn clang_disposeString(s: CXString)
 // File
 extern fn clang_getFileLocation(loc: CXSourceLocation, file: *mut *mut u8, line: *mut u32, col: *mut u32, offset: *mut u32)
 extern fn clang_getExpansionLocation(loc: CXSourceLocation, file: *mut *mut u8, line: *mut u32, col: *mut u32, offset: *mut u32)
+extern fn clang_getSpellingLocation(loc: CXSourceLocation, file: *mut *mut u8, line: *mut u32, col: *mut u32, offset: *mut u32)
 extern fn clang_getLocationForOffset(tu: *mut u8, file: *mut u8, offset: u32) -> CXSourceLocation
 extern fn clang_getPresumedLocation(loc: CXSourceLocation, filename: *mut CXString, line: *mut u32, col: *mut u32)
 extern fn clang_File_isEqual(f1: *mut u8, f2: *mut u8) -> i32
@@ -2811,6 +2812,11 @@ fn source_location_expansion_offset(loc: CXSourceLocation, file: *mut *mut u8, o
     if (*file as i64) == 0:
         clang_getFileLocation(loc, file, 0 as *mut u32, 0 as *mut u32, offset)
 
+fn source_location_spelling_offset(loc: CXSourceLocation, file: *mut *mut u8, offset: *mut u32):
+    clang_getSpellingLocation(loc, file, 0 as *mut u32, 0 as *mut u32, offset)
+    if (*file as i64) == 0:
+        clang_getFileLocation(loc, file, 0 as *mut u32, 0 as *mut u32, offset)
+
 fn source_range_expansion_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
     var start_file: *mut u8 = 0 as *mut u8
     var end_file: *mut u8 = 0 as *mut u8
@@ -2822,6 +2828,47 @@ fn source_range_expansion_offsets(range: CXSourceRange, file: *mut *mut u8, star
         return 0
     *file = start_file
     1
+
+fn source_range_spelling_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
+    var start_file: *mut u8 = 0 as *mut u8
+    var end_file: *mut u8 = 0 as *mut u8
+    source_location_spelling_offset(clang_getRangeStart(range), &mut start_file, start_off)
+    source_location_spelling_offset(clang_getRangeEnd(range), &mut end_file, end_off)
+    if start_file as i64 == 0 or end_file as i64 == 0:
+        return 0
+    if clang_File_isEqual(start_file, end_file) == 0:
+        return 0
+    *file = start_file
+    1
+
+fn source_range_preferred_text_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
+    var expansion_file: *mut u8 = 0 as *mut u8
+    var expansion_start: u32 = 0
+    var expansion_end: u32 = 0
+    let has_expansion = source_range_expansion_offsets(range, &mut expansion_file, &mut expansion_start, &mut expansion_end)
+
+    var spelling_file: *mut u8 = 0 as *mut u8
+    var spelling_start: u32 = 0
+    var spelling_end: u32 = 0
+    let has_spelling = source_range_spelling_offsets(range, &mut spelling_file, &mut spelling_start, &mut spelling_end)
+
+    if has_spelling != 0 and spelling_end > spelling_start:
+        // Macro cursors often expand to the invocation token. Prefer spelling
+        // when the cursor is wholly in the macro body or wholly in an argument;
+        // avoid mixed body+argument ranges because those span unrelated text.
+        if has_expansion == 0 or clang_File_isEqual(spelling_file, expansion_file) == 0 or spelling_start >= expansion_start or spelling_end <= expansion_start:
+            *file = spelling_file
+            *start_off = spelling_start
+            *end_off = spelling_end
+            return 1
+
+    if has_expansion != 0:
+        *file = expansion_file
+        *start_off = expansion_start
+        *end_off = expansion_end
+        return 1
+
+    0
 
 // Returns the start byte offset of a cursor's source range, or -1 if unavailable.
 // Used by the for-loop handler to classify children as init/cond/inc by position.
@@ -2843,7 +2890,7 @@ fn cursor_source_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> s
     var file: *mut u8 = 0 as *mut u8
     var start_off: u32 = 0
     var end_off: u32 = 0
-    if source_range_expansion_offsets(range, &mut file, &mut start_off, &mut end_off) == 0:
+    if source_range_preferred_text_offsets(range, &mut file, &mut start_off, &mut end_off) == 0:
         return ""
     if end_off <= start_off: return ""
     var buf_size: u64 = 0
@@ -2865,7 +2912,7 @@ fn cursor_token_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> st
     var file: *mut u8 = 0 as *mut u8
     var start_off: u32 = 0
     var end_off: u32 = 0
-    if source_range_expansion_offsets(cursor_range, &mut file, &mut start_off, &mut end_off) == 0:
+    if source_range_preferred_text_offsets(cursor_range, &mut file, &mut start_off, &mut end_off) == 0:
         return ""
     let begin_loc = clang_getLocationForOffset(tu, file, start_off)
     let end_loc = clang_getLocationForOffset(tu, file, end_off)
