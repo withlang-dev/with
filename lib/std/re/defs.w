@@ -1,22 +1,48 @@
 // std.re.defs — shared definitions for migrated PCRE2
 
-fn is_alpha(c: i32) -> bool: (c >= 65 and c <= 90) or (c >= 97 and c <= 122)
-fn is_digit(c: i32) -> bool: c >= 48 and c <= 57
-fn is_space(c: i32) -> bool: c == 32 or c == 9 or c == 10 or c == 13 or c == 12 or c == 11
-fn is_alnum(c: i32) -> bool: is_alpha(c) or is_digit(c)
-fn is_upper(c: i32) -> bool: c >= 65 and c <= 90
-fn is_lower(c: i32) -> bool: c >= 97 and c <= 122
-fn is_xdigit(c: i32) -> bool: (c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)
-fn is_print(c: i32) -> bool: c >= 32 and c <= 126
-fn to_lower(c: i32) -> i32: if c >= 65 and c <= 90: c + 32 else: c
-fn to_upper(c: i32) -> i32: if c >= 97 and c <= 122: c - 32 else: c
+fn is_alpha(c: i32) -> bool {
+    (c >= 65 and c <= 90) or (c >= 97 and c <= 122)
+}
+fn is_digit(c: i32) -> bool {
+    c >= 48 and c <= 57
+}
+fn is_space(c: i32) -> bool {
+    c == 32 or c == 9 or c == 10 or c == 13 or c == 12 or c == 11
+}
+fn is_alnum(c: i32) -> bool {
+    is_alpha(c) or is_digit(c)
+}
+fn is_upper(c: i32) -> bool {
+    c >= 65 and c <= 90
+}
+fn is_lower(c: i32) -> bool {
+    c >= 97 and c <= 122
+}
+fn is_xdigit(c: i32) -> bool {
+    (c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)
+}
+fn is_print(c: i32) -> bool {
+    c >= 32 and c <= 126
+}
+fn to_lower(c: i32) -> i32 {
+    if c >= 65 and c <= 90 { c + 32 } else { c }
+}
+fn to_upper(c: i32) -> i32 {
+    if c >= 97 and c <= 122 { c - 32 } else { c }
+}
 extern fn strlen(s: *const i8) -> i64
 extern fn strcmp(a: *const i8, b: *const i8) -> i32
 extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32
 extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void
-fn string_len(s: *const i8) -> i64: strlen(s)
-fn string_cmp(a: *const i8, b: *const i8) -> i32: strcmp(a, b)
-fn string_find_char(s: *const i8, c: i32) -> *const i8: (memchr((s as *const c_void), c, strlen(s)) as *const i8)
+fn string_len(s: *const i8) -> i64 {
+    strlen(s)
+}
+fn string_cmp(a: *const i8, b: *const i8) -> i32 {
+    strcmp(a, b)
+}
+fn string_find_char(s: *const i8, c: i32) -> *const i8 {
+    (memchr((s as *const c_void), c, strlen(s)) as *const i8)
+}
 
 type c_void = opaque
 type c_char = i8
@@ -793,8 +819,7 @@ type class_ranges { header: compile_data, char_lists_size: c_ulong = 0, char_lis
 
 type recurse_arguments { header: compile_data, size: c_ulong = 0, skip_size: c_ulong = 0 }
 
-// union
-type class_bits_storage { classbits: [32]u8 = [0 as u8; 32], classwords: [8]c_uint = [0 as c_uint; 8] }
+type class_bits_storage = union { classbits: [32]u8 = [0 as u8; 32], classwords: [8]c_uint = [0 as c_uint; 8] }
 
 type compile_block_8 { cx: *mut pcre2_real_compile_context_8 = null, lcc: *const u8 = null, fcc: *const u8 = null, cbits: *const u8 = null, ctypes: *const u8 = null, start_workspace: *mut u8 = null, start_code: *mut u8 = null, start_pattern: *const u8 = null, end_pattern: *const u8 = null, name_table: *mut u8 = null, workspace_size: c_ulong = 0, small_ref_offset: [10]c_ulong = [0 as c_ulong; 10], erroroffset: c_ulong = 0, classbits: class_bits_storage, names_found: c_ushort = 0, name_entry_size: c_ushort = 0, parens_depth: c_ushort = 0, assert_depth: c_ushort = 0, named_groups: *mut named_group_8 = null, named_group_list_size: c_uint = 0, external_options: c_uint = 0, external_flags: c_uint = 0, bracount: c_uint = 0, lastcapture: c_uint = 0, parsed_pattern: *mut c_uint = null, parsed_pattern_end: *mut c_uint = null, groupinfo: *mut c_uint = null, top_backref: c_uint = 0, backref_map: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], class_op_used: [15]u8 = [0 as u8; 15], req_varyopt: c_uint = 0, max_varlookbehind: c_uint = 0, max_lookbehind: c_int = 0, had_accept: c_int = 0, had_pruneorskip: c_int = 0, had_recurse: c_int = 0, dupnames: c_int = 0, first_data: *mut compile_data = null, last_data: *mut compile_data = null, char_lists_size: c_ulong = 0 }
 
@@ -802,8 +827,7 @@ type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
 
 type dfa_recursion_info { prevrec: *mut dfa_recursion_info = null, subject_position: *const u8 = null, last_used_ptr: *const u8 = null, group_num: c_uint = 0 }
 
-// union
-type heapframe_fields_char_repeat_oc { oc: c_uint = 0, occu: [4]u8 = [0 as u8; 4] }
+type heapframe_fields_char_repeat_oc = union { oc: c_uint = 0, occu: [4]u8 = [0 as u8; 4] }
 type heapframe_fields_char_repeat { start_eptr: *const u8 = null, charptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: heapframe_fields_char_repeat_oc }
 type heapframe_fields_charnot_repeat { start_eptr: *const u8 = null, min: c_uint = 0, max: c_uint = 0, c: c_uint = 0, oc: c_uint = 0 }
 type heapframe_fields_class_repeat { start_eptr: *const u8 = null, byte_map_address: *const u8 = null, min: c_uint = 0, max: c_uint = 0 }
@@ -817,8 +841,7 @@ type heapframe_fields_op_recurse { start_branch: *const u8 = null, frame_type: c
 type heapframe_fields_op_assert_scs { saved_end_subject: *const u8 = null, saved_eptr: *const u8 = null, true_end_extra: c_ulong = 0, saved_moptions: c_uint = 0 }
 type heapframe_fields_op_cond { start_branch: *const u8 = null, length: c_ulong = 0 }
 type heapframe_fields_op_vreverse { min: c_uint = 0, max: c_uint = 0 }
-// union
-type heapframe_fields { char_repeat: heapframe_fields_char_repeat, charnot_repeat: heapframe_fields_charnot_repeat, class_repeat: heapframe_fields_class_repeat, xclass_repeat: heapframe_fields_xclass_repeat, eclass_repeat: heapframe_fields_eclass_repeat, type_repeat: heapframe_fields_type_repeat, ref_repeat: heapframe_fields_ref_repeat, op_bra: heapframe_fields_op_bra, op_brapos: heapframe_fields_op_brapos, op_recurse: heapframe_fields_op_recurse, op_assert_scs: heapframe_fields_op_assert_scs, op_cond: heapframe_fields_op_cond, op_vreverse: heapframe_fields_op_vreverse }
+type heapframe_fields = union { char_repeat: heapframe_fields_char_repeat, charnot_repeat: heapframe_fields_charnot_repeat, class_repeat: heapframe_fields_class_repeat, xclass_repeat: heapframe_fields_xclass_repeat, eclass_repeat: heapframe_fields_eclass_repeat, type_repeat: heapframe_fields_type_repeat, ref_repeat: heapframe_fields_ref_repeat, op_bra: heapframe_fields_op_bra, op_brapos: heapframe_fields_op_brapos, op_recurse: heapframe_fields_op_recurse, op_assert_scs: heapframe_fields_op_assert_scs, op_cond: heapframe_fields_op_cond, op_vreverse: heapframe_fields_op_vreverse }
 type heapframe { ecode: *const u8 = null, back_frame: c_ulong = 0, rdepth: c_uint = 0, group_frame_type: c_uint = 0, return_id: u8 = 0, op: u8 = 0, byte1: u8 = 0, byte2: u8 = 0, fields: heapframe_fields, eptr: *const u8 = null, start_match: *const u8 = null, mark: *const u8 = null, recurse_last_used: *const u8 = null, current_recurse: c_uint = 0, capture_last: c_uint = 0, last_group_offset: c_ulong = 0, offset_top: c_ulong = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
 
 type static_assertion_heapframe_size = [1]c_int
@@ -876,12 +899,14 @@ extern fn _pcre2_xclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: c_int) -
 extern fn _pcre2_eclass_8(p0: c_uint, p1: *const u8, p2: *const u8, p3: *const u8, p4: c_int) -> c_int
 
 // untranslatable fn-like macro
-fn ACROSSCHAR() -> Never:
+fn ACROSSCHAR() -> Never {
     comptime_error("untranslatable C macro: ACROSSCHAR")
+}
 let ARG_MAX: c_int = (1024 * 1024)
 // untranslatable fn-like macro
-fn BACKCHAR() -> Never:
+fn BACKCHAR() -> Never {
     comptime_error("untranslatable C macro: BACKCHAR")
+}
 let BC_BASE_MAX: c_int = 99
 let BC_DIM_MAX: c_int = 2048
 let BC_SCALE_MAX: c_int = 99
@@ -892,11 +917,13 @@ let BUS_ADRERR: c_int = 2
 let BUS_NOOP: c_int = 0
 let BUS_OBJERR: c_int = 3
 // untranslatable fn-like macro
-fn BYTES2CU() -> Never:
+fn BYTES2CU() -> Never {
     comptime_error("untranslatable C macro: BYTES2CU")
+}
 // untranslatable fn-like macro
-fn CAST_USER_ADDR_T() -> Never:
+fn CAST_USER_ADDR_T() -> Never {
     comptime_error("untranslatable C macro: CAST_USER_ADDR_T")
+}
 let CHARCLASS_NAME_MAX: c_int = 14
 let CHAR_0: c_int = 48
 let CHAR_1: c_int = 49
@@ -1007,8 +1034,9 @@ let CHAR_x: c_int = 120
 let CHAR_y: c_int = 121
 let CHAR_z: c_int = 122
 let CHILD_MAX: c_int = 266
-fn CHMAX_255[T](c: T) -> T:
+fn CHMAX_255[T](c: T) -> T {
     (c <= 255)
+}
 let CLD_CONTINUED: c_int = 6
 let CLD_DUMPED: c_int = 3
 let CLD_EXITED: c_int = 1
@@ -1021,8 +1049,9 @@ let COMPILE_ERROR_BASE: c_int = 100
 let CONFIGURED_LINK_SIZE: c_int = 2
 let CPUMON_MAKE_FATAL: c_int = 0x1000
 // untranslatable fn-like macro
-fn CU2BYTES() -> Never:
+fn CU2BYTES() -> Never {
     comptime_error("untranslatable C macro: CU2BYTES")
+}
 let DFA_START_RWS_SIZE: c_int = 30720
 let ECLASS_NEST_LIMIT: c_int = 15
 let ECL_AND: c_int = 1
@@ -1044,11 +1073,13 @@ let FIRST_AUTOTAB_OP: c_int = OP_NOT_DIGIT
 let FOOTPRINT_INTERVAL_RESET: c_int = 0x1
 let FOPEN_MAX: c_int = 20
 // untranslatable fn-like macro
-fn FORWARDCHAR() -> Never:
+fn FORWARDCHAR() -> Never {
     comptime_error("untranslatable C macro: FORWARDCHAR")
+}
 // untranslatable fn-like macro
-fn FORWARDCHARTEST() -> Never:
+fn FORWARDCHARTEST() -> Never {
     comptime_error("untranslatable C macro: FORWARDCHARTEST")
+}
 let FPE_FLTDIV: c_int = 1
 let FPE_FLTINV: c_int = 5
 let FPE_FLTOVF: c_int = 2
@@ -1059,61 +1090,79 @@ let FPE_INTDIV: c_int = 7
 let FPE_INTOVF: c_int = 8
 let FPE_NOOP: c_int = 0
 // untranslatable fn-like macro
-fn GET() -> Never:
+fn GET() -> Never {
     comptime_error("untranslatable C macro: GET")
+}
 // untranslatable fn-like macro
-fn GET2() -> Never:
+fn GET2() -> Never {
     comptime_error("untranslatable C macro: GET2")
+}
 // untranslatable fn-like macro
-fn GETCHAR() -> Never:
+fn GETCHAR() -> Never {
     comptime_error("untranslatable C macro: GETCHAR")
+}
 // untranslatable fn-like macro
-fn GETCHARINC() -> Never:
+fn GETCHARINC() -> Never {
     comptime_error("untranslatable C macro: GETCHARINC")
+}
 // untranslatable fn-like macro
-fn GETCHARINCTEST() -> Never:
+fn GETCHARINCTEST() -> Never {
     comptime_error("untranslatable C macro: GETCHARINCTEST")
+}
 // untranslatable fn-like macro
-fn GETCHARLEN() -> Never:
+fn GETCHARLEN() -> Never {
     comptime_error("untranslatable C macro: GETCHARLEN")
+}
 // untranslatable fn-like macro
-fn GETCHARLENTEST() -> Never:
+fn GETCHARLENTEST() -> Never {
     comptime_error("untranslatable C macro: GETCHARLENTEST")
+}
 // untranslatable fn-like macro
-fn GETCHARTEST() -> Never:
+fn GETCHARTEST() -> Never {
     comptime_error("untranslatable C macro: GETCHARTEST")
+}
 // untranslatable fn-like macro
-fn GETUTF8() -> Never:
+fn GETUTF8() -> Never {
     comptime_error("untranslatable C macro: GETUTF8")
+}
 // untranslatable fn-like macro
-fn GETUTF8INC() -> Never:
+fn GETUTF8INC() -> Never {
     comptime_error("untranslatable C macro: GETUTF8INC")
+}
 // untranslatable fn-like macro
-fn GETUTF8LEN() -> Never:
+fn GETUTF8LEN() -> Never {
     comptime_error("untranslatable C macro: GETUTF8LEN")
+}
 // untranslatable fn-like macro
-fn GET_EXTRALEN() -> Never:
+fn GET_EXTRALEN() -> Never {
     comptime_error("untranslatable C macro: GET_EXTRALEN")
+}
 // untranslatable fn-like macro
-fn GET_UCD() -> Never:
+fn GET_UCD() -> Never {
     comptime_error("untranslatable C macro: GET_UCD")
+}
 let GID_MAX: c_uint = 2147483647
-fn HASUTF8EXTRALEN[T](c: T) -> T:
+fn HASUTF8EXTRALEN[T](c: T) -> T {
     (c >= 0xc0)
-fn HAS_EXTRALEN[T](c: T) -> T:
+}
+fn HAS_EXTRALEN[T](c: T) -> T {
     HASUTF8EXTRALEN(c)
+}
 let HAVE_CONFIG_H: c_int = 1
 let HAVE_UNISTD_H: c_int = 1
 let HEAP_LIMIT: c_int = 20000000
 // untranslatable fn-like macro
-fn HTONL() -> Never:
+fn HTONL() -> Never {
     comptime_error("untranslatable C macro: HTONL")
+}
 // untranslatable fn-like macro
-fn HTONLL() -> Never:
+fn HTONLL() -> Never {
     comptime_error("untranslatable C macro: HTONLL")
+}
 // untranslatable fn-like macro
-fn HTONS() -> Never:
+fn HTONS() -> Never {
     comptime_error("untranslatable C macro: HTONS")
+}
 let ILL_BADSTK: c_int = 8
 let ILL_COPROC: c_int = 7
 let ILL_ILLADR: c_int = 5
@@ -1124,24 +1173,29 @@ let ILL_NOOP: c_int = 0
 let ILL_PRVOPC: c_int = 3
 let ILL_PRVREG: c_int = 6
 let IMM2_SIZE: c_int = 2
-fn INT16_C[T](v: T) -> T:
+fn INT16_C[T](v: T) -> T {
     v
+}
 let INT16_MAX: c_int = 32767
 let INT16_MIN: c_int = -32768
-fn INT32_C[T](v: T) -> T:
+fn INT32_C[T](v: T) -> T {
     v
+}
 let INT32_MAX: c_int = 2147483647
 let INT32_MIN: c_int = ((0 - INT32_MAX) - 1)
-fn INT64_C[T](v: T) -> i64:
+fn INT64_C[T](v: T) -> i64 {
     (v as i64)
+}
 let INT64_MAX: c_longlong = 9223372036854775807
 let INT64_MIN: c_longlong = ((0 - INT64_MAX) - 1)
-fn INT8_C[T](v: T) -> T:
+fn INT8_C[T](v: T) -> T {
     v
+}
 let INT8_MAX: c_int = 127
 let INT8_MIN: c_int = -128
-fn INTMAX_C[T](v: T) -> i64:
+fn INTMAX_C[T](v: T) -> i64 {
     (v as i64)
+}
 let INTMAX_MAX: c_long = INTMAX_C(9223372036854775807)
 let INTMAX_MIN: c_long = ((0 - INTMAX_MAX) - 1)
 let INTPTR_MAX: c_long = 9223372036854775807
@@ -1213,8 +1267,9 @@ let IOPOL_VFS_TRIGGER_RESOLVE_DEFAULT: c_int = 0
 let IOPOL_VFS_TRIGGER_RESOLVE_OFF: c_int = 1
 let IOV_MAX: c_int = 1024
 // untranslatable fn-like macro
-fn IS_NEWLINE() -> Never:
+fn IS_NEWLINE() -> Never {
     comptime_error("untranslatable C macro: IS_NEWLINE")
+}
 let LAST_AUTOTAB_LEFT_OP: c_int = OP_EXTUNI
 let LAST_AUTOTAB_RIGHT_OP: c_int = OP_DOLLM
 let LINE_MAX: c_int = 2048
@@ -1232,16 +1287,19 @@ let L_ctermid: c_int = 1024
 let L_tmpnam: c_int = 1024
 let MAGIC_NUMBER: c_ulong = 0x50435245
 // untranslatable fn-like macro
-fn MAPBIT() -> Never:
+fn MAPBIT() -> Never {
     comptime_error("untranslatable C macro: MAPBIT")
+}
 // untranslatable fn-like macro
-fn MAPSET() -> Never:
+fn MAPSET() -> Never {
     comptime_error("untranslatable C macro: MAPSET")
+}
 let MATCH_LIMIT: c_int = 10000000
 let MATCH_LIMIT_DEPTH: c_int = MATCH_LIMIT
 // untranslatable fn-like macro
-fn MAX_255() -> Never:
+fn MAX_255() -> Never {
     comptime_error("untranslatable C macro: MAX_255")
+}
 let MAX_CANON: c_int = 1024
 let MAX_INPUT: c_int = 1024
 let MAX_NAME_COUNT: c_int = 10000
@@ -1267,17 +1325,21 @@ let NL_SETMAX: c_int = 255
 let NL_TEXTMAX: c_int = 2048
 let NOTACHAR: c_int = 0xffffffff
 // untranslatable fn-like macro
-fn NOT_FIRSTCU() -> Never:
+fn NOT_FIRSTCU() -> Never {
     comptime_error("untranslatable C macro: NOT_FIRSTCU")
+}
 // untranslatable fn-like macro
-fn NTOHL() -> Never:
+fn NTOHL() -> Never {
     comptime_error("untranslatable C macro: NTOHL")
+}
 // untranslatable fn-like macro
-fn NTOHLL() -> Never:
+fn NTOHLL() -> Never {
     comptime_error("untranslatable C macro: NTOHLL")
+}
 // untranslatable fn-like macro
-fn NTOHS() -> Never:
+fn NTOHS() -> Never {
     comptime_error("untranslatable C macro: NTOHS")
+}
 let NZERO: c_int = 20
 let OFF_MAX: c_longlong = LLONG_MAX
 let OFF_MIN: c_longlong = LLONG_MIN
@@ -1300,8 +1362,9 @@ let PCRE2_ALT_EXTENDED_CLASS: c_uint = 0x08000000
 let PCRE2_ALT_VERBNAMES: c_uint = 0x00400000
 let PCRE2_ANCHORED: c_uint = 0x80000000
 // untranslatable fn-like macro
-fn PCRE2_ASSERT() -> Never:
+fn PCRE2_ASSERT() -> Never {
     comptime_error("untranslatable C macro: PCRE2_ASSERT")
+}
 let PCRE2_AUTO_CALLOUT: c_uint = 0x00000004
 let PCRE2_AUTO_POSSESS: c_int = 64
 let PCRE2_AUTO_POSSESS_OFF: c_int = 65
@@ -1340,8 +1403,9 @@ let PCRE2_CONVERT_UTF: c_uint = 0x00000001
 let PCRE2_COPY_MATCHED_SUBJECT: c_uint = 0x00004000
 let PCRE2_DATE: c_int = ((2025 - 10) - 21)
 // untranslatable fn-like macro
-fn PCRE2_DEBUG_UNREACHABLE() -> Never:
+fn PCRE2_DEBUG_UNREACHABLE() -> Never {
     comptime_error("untranslatable C macro: PCRE2_DEBUG_UNREACHABLE")
+}
 let PCRE2_DEREF_TABLES: c_uint = 0x00040000
 let PCRE2_DFA_RESTART: c_uint = 0x00000040
 let PCRE2_DFA_SHORTEST: c_uint = 0x00000080
@@ -1574,8 +1638,9 @@ let PCRE2_FIRSTLINE: c_uint = 0x00000100
 let PCRE2_FIRSTMAPSET: c_uint = 0x00000040
 let PCRE2_FIRSTSET: c_uint = 0x00000010
 // untranslatable fn-like macro
-fn PCRE2_GLUE() -> Never:
+fn PCRE2_GLUE() -> Never {
     comptime_error("untranslatable C macro: PCRE2_GLUE")
+}
 let PCRE2_HASACCEPT: c_uint = 0x00800000
 let PCRE2_HASBKC: c_uint = 0x00400000
 let PCRE2_HASBKPORX: c_uint = 0x00100000
@@ -1617,8 +1682,9 @@ let PCRE2_JIT_PARTIAL_HARD: c_uint = 0x00000004
 let PCRE2_JIT_PARTIAL_SOFT: c_uint = 0x00000002
 let PCRE2_JIT_TEST_ALLOC: c_uint = 0x00000200
 // untranslatable fn-like macro
-fn PCRE2_JOIN() -> Never:
+fn PCRE2_JOIN() -> Never {
     comptime_error("untranslatable C macro: PCRE2_JOIN")
+}
 let PCRE2_LASTCASELESS: c_uint = 0x00000100
 let PCRE2_LASTSET: c_uint = 0x00000080
 let PCRE2_LITERAL: c_uint = 0x02000000
@@ -1678,13 +1744,15 @@ let PCRE2_SUBSTITUTE_OVERFLOW_LENGTH: c_uint = 0x00001000
 let PCRE2_SUBSTITUTE_REPLACEMENT_ONLY: c_uint = 0x00020000
 let PCRE2_SUBSTITUTE_UNKNOWN_UNSET: c_uint = 0x00000800
 let PCRE2_SUBSTITUTE_UNSET_EMPTY: c_uint = 0x00000400
-fn PCRE2_SUFFIX[T](a: T) -> T:
+fn PCRE2_SUFFIX[T](a: T) -> T {
     PCRE2_GLUE(a, PCRE2_CODE_UNIT_WIDTH)
+}
 let PCRE2_UCP: c_uint = 0x00020000
 let PCRE2_UNGREEDY: c_uint = 0x00040000
 // untranslatable fn-like macro
-fn PCRE2_UNREACHABLE() -> Never:
+fn PCRE2_UNREACHABLE() -> Never {
     comptime_error("untranslatable C macro: PCRE2_UNREACHABLE")
+}
 let PCRE2_USE_OFFSET_LIMIT: c_uint = 0x00800000
 let PCRE2_UTF: c_uint = 0x00080000
 let PIPE_BUF: c_int = 512
@@ -1704,8 +1772,9 @@ let PRIO_PGRP: c_int = 1
 let PRIO_PROCESS: c_int = 0
 let PRIO_USER: c_int = 2
 // untranslatable fn-like macro
-fn PRIV() -> Never:
+fn PRIV() -> Never {
     comptime_error("untranslatable C macro: PRIV")
+}
 let PRIX16 = "hX"
 let PRIX32 = "X"
 let PRIXFAST16: [3]c_char = PRIX16
@@ -1774,27 +1843,33 @@ let PT_TABSIZE: c_int = PT_ANY
 let PT_UCNC: c_int = 10
 let PT_WORD: c_int = 8
 // untranslatable fn-like macro
-fn PUT() -> Never:
+fn PUT() -> Never {
     comptime_error("untranslatable C macro: PUT")
+}
 // untranslatable fn-like macro
-fn PUT2() -> Never:
+fn PUT2() -> Never {
     comptime_error("untranslatable C macro: PUT2")
+}
 // untranslatable fn-like macro
-fn PUT2INC() -> Never:
+fn PUT2INC() -> Never {
     comptime_error("untranslatable C macro: PUT2INC")
+}
 // untranslatable fn-like macro
-fn PUTCHAR() -> Never:
+fn PUTCHAR() -> Never {
     comptime_error("untranslatable C macro: PUTCHAR")
+}
 // untranslatable fn-like macro
-fn PUTINC() -> Never:
+fn PUTINC() -> Never {
     comptime_error("untranslatable C macro: PUTINC")
+}
 let P_tmpdir = "/var/tmp/"
 let QUAD_MAX: c_longlong = LLONG_MAX
 let QUAD_MIN: c_longlong = LLONG_MIN
 let RAND_MAX: c_int = 0x7fffffff
 // untranslatable fn-like macro
-fn REAL_GET_UCD() -> Never:
+fn REAL_GET_UCD() -> Never {
     comptime_error("untranslatable C macro: REAL_GET_UCD")
+}
 let REFI_FLAG_CASELESS_RESTRICT: c_int = 0x1
 let REFI_FLAG_TURKISH_CASING: c_int = 0x2
 let RENAME_EXCL: c_int = 0x00000004
@@ -1940,11 +2015,13 @@ let SS_DISABLE: c_int = 0x0004
 let SS_ONSTACK: c_int = 0x0001
 let START_FRAMES_SIZE: c_int = 20480
 // untranslatable fn-like macro
-fn STATIC_ASSERT() -> Never:
+fn STATIC_ASSERT() -> Never {
     comptime_error("untranslatable C macro: STATIC_ASSERT")
+}
 // untranslatable fn-like macro
-fn STATIC_ASSERT_JOIN() -> Never:
+fn STATIC_ASSERT_JOIN() -> Never {
     comptime_error("untranslatable C macro: STATIC_ASSERT_JOIN")
+}
 let STR_0 = "\x30"
 let STR_1 = "\x31"
 let STR_2 = "\x32"
@@ -2058,8 +2135,9 @@ let SV_ONSTACK: c_int = SA_ONSTACK
 let SV_RESETHAND: c_int = SA_RESETHAND
 let SV_SIGINFO: c_int = SA_SIGINFO
 // untranslatable fn-like macro
-fn TABLE_GET() -> Never:
+fn TABLE_GET() -> Never {
     comptime_error("untranslatable C macro: TABLE_GET")
+}
 let TARGET_IPHONE_SIMULATOR: c_int = 0
 let TARGET_OS_ARROW: c_int = 1
 let TARGET_OS_BRIDGE: c_int = 0
@@ -2088,68 +2166,88 @@ let TRAP_BRKPT: c_int = 1
 let TRAP_TRACE: c_int = 2
 let TRUE: c_int = 1
 // untranslatable fn-like macro
-fn UCD_ANY_I() -> Never:
+fn UCD_ANY_I() -> Never {
     comptime_error("untranslatable C macro: UCD_ANY_I")
+}
 // untranslatable fn-like macro
-fn UCD_BIDICLASS() -> Never:
+fn UCD_BIDICLASS() -> Never {
     comptime_error("untranslatable C macro: UCD_BIDICLASS")
+}
 // untranslatable fn-like macro
-fn UCD_BIDICLASS_PROP() -> Never:
+fn UCD_BIDICLASS_PROP() -> Never {
     comptime_error("untranslatable C macro: UCD_BIDICLASS_PROP")
+}
 let UCD_BIDICLASS_SHIFT: c_int = 11
 let UCD_BLOCK_SIZE: c_int = 128
 // untranslatable fn-like macro
-fn UCD_BPROPS() -> Never:
+fn UCD_BPROPS() -> Never {
     comptime_error("untranslatable C macro: UCD_BPROPS")
+}
 let UCD_BPROPS_MASK: c_int = 0xfff
 // untranslatable fn-like macro
-fn UCD_BPROPS_PROP() -> Never:
+fn UCD_BPROPS_PROP() -> Never {
     comptime_error("untranslatable C macro: UCD_BPROPS_PROP")
+}
 // untranslatable fn-like macro
-fn UCD_CASESET() -> Never:
+fn UCD_CASESET() -> Never {
     comptime_error("untranslatable C macro: UCD_CASESET")
+}
 // untranslatable fn-like macro
-fn UCD_CATEGORY() -> Never:
+fn UCD_CATEGORY() -> Never {
     comptime_error("untranslatable C macro: UCD_CATEGORY")
+}
 // untranslatable fn-like macro
-fn UCD_CHARTYPE() -> Never:
+fn UCD_CHARTYPE() -> Never {
     comptime_error("untranslatable C macro: UCD_CHARTYPE")
-fn UCD_DOTTED_I[T](ch: T) -> T:
+}
+fn UCD_DOTTED_I[T](ch: T) -> T {
     (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
-fn UCD_FOLD_I_TURKISH[T](ch: T) -> T:
+}
+fn UCD_FOLD_I_TURKISH[T](ch: T) -> T {
     (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
+}
 // untranslatable fn-like macro
-fn UCD_GRAPHBREAK() -> Never:
+fn UCD_GRAPHBREAK() -> Never {
     comptime_error("untranslatable C macro: UCD_GRAPHBREAK")
+}
 // untranslatable fn-like macro
-fn UCD_OTHERCASE() -> Never:
+fn UCD_OTHERCASE() -> Never {
     comptime_error("untranslatable C macro: UCD_OTHERCASE")
+}
 // untranslatable fn-like macro
-fn UCD_SCRIPT() -> Never:
+fn UCD_SCRIPT() -> Never {
     comptime_error("untranslatable C macro: UCD_SCRIPT")
+}
 // untranslatable fn-like macro
-fn UCD_SCRIPTX() -> Never:
+fn UCD_SCRIPTX() -> Never {
     comptime_error("untranslatable C macro: UCD_SCRIPTX")
+}
 let UCD_SCRIPTX_MASK: c_int = 0x3ff
 // untranslatable fn-like macro
-fn UCD_SCRIPTX_PROP() -> Never:
+fn UCD_SCRIPTX_PROP() -> Never {
     comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
+}
 let UCHAR_MAX: c_int = ((127 * 2) + 1)
 let UID_MAX: c_uint = 2147483647
-fn UINT16_C[T](v: T) -> T:
+fn UINT16_C[T](v: T) -> T {
     v
+}
 let UINT16_MAX: c_int = 65535
-fn UINT32_C[T](v: T) -> u32:
+fn UINT32_C[T](v: T) -> u32 {
     (v as u32)
+}
 let UINT32_MAX: c_uint = 4294967295
-fn UINT64_C[T](v: T) -> u64:
+fn UINT64_C[T](v: T) -> u64 {
     (v as u64)
+}
 let UINT64_MAX: c_ulonglong = 18446744073709551615
-fn UINT8_C[T](v: T) -> T:
+fn UINT8_C[T](v: T) -> T {
     v
+}
 let UINT8_MAX: c_int = 255
-fn UINTMAX_C[T](v: T) -> u64:
+fn UINTMAX_C[T](v: T) -> u64 {
     (v as u64)
+}
 let UINTMAX_MAX: c_ulong = UINTMAX_C(18446744073709551615)
 let UINTPTR_MAX: c_ulong = 18446744073709551615
 let UINT_FAST16_MAX: c_int = UINT16_MAX
@@ -2176,29 +2274,36 @@ let WAKEMON_GET_PARAMS: c_int = 0x04
 let WAKEMON_MAKE_FATAL: c_int = 0x10
 let WAKEMON_SET_DEFAULTS: c_int = 0x08
 // untranslatable fn-like macro
-fn WAS_NEWLINE() -> Never:
+fn WAS_NEWLINE() -> Never {
     comptime_error("untranslatable C macro: WAS_NEWLINE")
+}
 let WCONTINUED: c_int = 0x00000010
 // untranslatable fn-like macro
-fn WCOREDUMP() -> Never:
+fn WCOREDUMP() -> Never {
     comptime_error("untranslatable C macro: WCOREDUMP")
+}
 let WCOREFLAG: c_int = 0200
 let WEXITED: c_int = 0x00000004
 // untranslatable fn-like macro
-fn WEXITSTATUS() -> Never:
+fn WEXITSTATUS() -> Never {
     comptime_error("untranslatable C macro: WEXITSTATUS")
+}
 // untranslatable fn-like macro
-fn WIFCONTINUED() -> Never:
+fn WIFCONTINUED() -> Never {
     comptime_error("untranslatable C macro: WIFCONTINUED")
+}
 // untranslatable fn-like macro
-fn WIFEXITED() -> Never:
+fn WIFEXITED() -> Never {
     comptime_error("untranslatable C macro: WIFEXITED")
+}
 // untranslatable fn-like macro
-fn WIFSIGNALED() -> Never:
+fn WIFSIGNALED() -> Never {
     comptime_error("untranslatable C macro: WIFSIGNALED")
+}
 // untranslatable fn-like macro
-fn WIFSTOPPED() -> Never:
+fn WIFSTOPPED() -> Never {
     comptime_error("untranslatable C macro: WIFSTOPPED")
+}
 let WINT_MAX: c_int = INT32_MAX
 let WINT_MIN: c_int = INT32_MIN
 let WITH_PCRE2_CONFIG_H: c_int = 1
@@ -2207,17 +2312,21 @@ let WNOWAIT: c_int = 0x00000020
 let WORD_BIT: c_int = 32
 let WSTOPPED: c_int = 0x00000008
 // untranslatable fn-like macro
-fn WSTOPSIG() -> Never:
+fn WSTOPSIG() -> Never {
     comptime_error("untranslatable C macro: WSTOPSIG")
+}
 // untranslatable fn-like macro
-fn WTERMSIG() -> Never:
+fn WTERMSIG() -> Never {
     comptime_error("untranslatable C macro: WTERMSIG")
+}
 let WUNTRACED: c_int = 0x00000002
-fn W_EXITCODE[T](ret: T, sig: T) -> T:
+fn W_EXITCODE[T](ret: T, sig: T) -> T {
     ((ret << 8) | sig)
+}
 // untranslatable fn-like macro
-fn W_STOPCODE() -> Never:
+fn W_STOPCODE() -> Never {
     comptime_error("untranslatable C macro: W_STOPCODE")
+}
 let XCL_BEGIN_WITH_RANGE: c_int = 0x4
 let XCL_CHAR_END: c_int = 0x1
 let XCL_CHAR_LIST_HIGH_16_ADD: c_int = 0x8000
@@ -2246,8 +2355,9 @@ let XCL_SINGLE: c_int = 1
 let XCL_TYPE_BIT_LEN: c_int = 3
 let XCL_TYPE_MASK: c_int = 0xfff
 // untranslatable fn-like macro
-fn alloca() -> Never:
+fn alloca() -> Never {
     comptime_error("untranslatable C macro: alloca")
+}
 let cbit_cntrl: c_int = 288
 let cbit_digit: c_int = 64
 let cbit_graph: c_int = 192
@@ -2261,8 +2371,9 @@ let cbit_word: c_int = 160
 let cbit_xdigit: c_int = 32
 let cbits_offset: c_int = 512
 // untranslatable fn-like macro
-fn clearerr_unlocked() -> Never:
+fn clearerr_unlocked() -> Never {
     comptime_error("untranslatable C macro: clearerr_unlocked")
+}
 let ctype_digit: c_int = 0x08
 let ctype_lcletter: c_int = 0x04
 let ctype_letter: c_int = 0x02
@@ -2271,63 +2382,83 @@ let ctype_word: c_int = 0x10
 let ctypes_offset: c_int = (cbits_offset + cbit_length)
 let fcc_offset: c_int = 256
 // untranslatable fn-like macro
-fn feof_unlocked() -> Never:
+fn feof_unlocked() -> Never {
     comptime_error("untranslatable C macro: feof_unlocked")
+}
 // untranslatable fn-like macro
-fn ferror_unlocked() -> Never:
+fn ferror_unlocked() -> Never {
     comptime_error("untranslatable C macro: ferror_unlocked")
+}
 // untranslatable fn-like macro
-fn fileno_unlocked() -> Never:
+fn fileno_unlocked() -> Never {
     comptime_error("untranslatable C macro: fileno_unlocked")
+}
 // untranslatable fn-like macro
-fn fropen() -> Never:
+fn fropen() -> Never {
     comptime_error("untranslatable C macro: fropen")
+}
 // untranslatable fn-like macro
-fn fwopen() -> Never:
+fn fwopen() -> Never {
     comptime_error("untranslatable C macro: fwopen")
+}
 // untranslatable fn-like macro
-fn getc_unlocked() -> Never:
+fn getc_unlocked() -> Never {
     comptime_error("untranslatable C macro: getc_unlocked")
+}
 // untranslatable fn-like macro
-fn getchar_unlocked() -> Never:
+fn getchar_unlocked() -> Never {
     comptime_error("untranslatable C macro: getchar_unlocked")
+}
 // untranslatable fn-like macro
-fn htonl() -> Never:
+fn htonl() -> Never {
     comptime_error("untranslatable C macro: htonl")
+}
 // untranslatable fn-like macro
-fn htonll() -> Never:
+fn htonll() -> Never {
     comptime_error("untranslatable C macro: htonll")
+}
 // untranslatable fn-like macro
-fn htons() -> Never:
+fn htons() -> Never {
     comptime_error("untranslatable C macro: htons")
+}
 let lcc_offset: c_int = 0
-fn memccpy() -> Never:
+fn memccpy() -> Never {
     comptime_error("variadic macro — use direct call")
+}
 // untranslatable fn-like macro
-fn ntohl() -> Never:
+fn ntohl() -> Never {
     comptime_error("untranslatable C macro: ntohl")
+}
 // untranslatable fn-like macro
-fn ntohll() -> Never:
+fn ntohll() -> Never {
     comptime_error("untranslatable C macro: ntohll")
+}
 // untranslatable fn-like macro
-fn ntohs() -> Never:
+fn ntohs() -> Never {
     comptime_error("untranslatable C macro: ntohs")
+}
 // untranslatable fn-like macro
-fn offsetof() -> Never:
+fn offsetof() -> Never {
     comptime_error("untranslatable C macro: offsetof")
+}
 // untranslatable fn-like macro
-fn putc_unlocked() -> Never:
+fn putc_unlocked() -> Never {
     comptime_error("untranslatable C macro: putc_unlocked")
+}
 // untranslatable fn-like macro
-fn putchar_unlocked() -> Never:
+fn putchar_unlocked() -> Never {
     comptime_error("untranslatable C macro: putchar_unlocked")
+}
 // untranslatable fn-like macro
-fn sigmask() -> Never:
+fn sigmask() -> Never {
     comptime_error("untranslatable C macro: sigmask")
-fn strlcat() -> Never:
+}
+fn strlcat() -> Never {
     comptime_error("variadic macro — use direct call")
-fn strlcpy() -> Never:
+}
+fn strlcpy() -> Never {
     comptime_error("variadic macro — use direct call")
+}
 let ucd_boolprop_sets_item_size: c_int = 2
 let ucd_script_sets_item_size: c_int = 4
 extern fn _pcre2_ckd_smul_8(p0: *mut c_ulong, p1: c_int, p2: c_int) -> c_int
@@ -2359,11 +2490,13 @@ var posix_meta_escapes: *const i8 = "\x28\x29\x7b\x7d\x31\x32\x33\x34\x35\x36\x3
 var posix_classes: *const i8 = "\x61\x6c\x70\x68\x61\x3a\x6c\x6f\x77\x65\x72\x3a\x75\x70\x70\x65\x72\x3a\x61\x6c\x6e\x75\x6d\x3a\x61\x73\x63\x69\x69\x3a\x62\x6c\x61\x6e\x6b\x3a\x63\x6e\x74\x72\x6c\x3a\x64\x69\x67\x69\x74\x3a\x67\x72\x61\x70\x68\x3a\x70\x72\x69\x6e\x74\x3a\x70\x75\x6e\x63\x74\x3a\x73\x70\x61\x63\x65\x3a\x77\x6f\x72\x64\x3a\x78\x64\x69\x67\x69\x74\x3a"
 
 let DUMMY_BUFFER_SIZE: c_int = 100
-fn ISLOWER[T](c: T) -> T:
+fn ISLOWER[T](c: T) -> T {
     ((c >= CHAR_a) and (c <= CHAR_z))
+}
 // untranslatable fn-like macro
-fn PUTCHARS() -> Never:
+fn PUTCHARS() -> Never {
     comptime_error("untranslatable C macro: PUTCHARS")
+}
 let TYPE_OPTIONS: c_int = 28
 type static_assertion_coptable = [1]c_int
 
@@ -2382,17 +2515,21 @@ let toptable1: [14]u8 = [0, 0, 0, 0, 0, 0, 0x08, 0x08, 0x01, 0x01, 0x10, 0x10, 0
 let toptable2: [14]u8 = [0, 0, 0, 0, 0, 0, 0x08, 0, 0x01, 0, 0x10, 0, 1, 1]
 
 // untranslatable fn-like macro
-fn ADD_ACTIVE() -> Never:
+fn ADD_ACTIVE() -> Never {
     comptime_error("untranslatable C macro: ADD_ACTIVE")
+}
 // untranslatable fn-like macro
-fn ADD_ACTIVE_DATA() -> Never:
+fn ADD_ACTIVE_DATA() -> Never {
     comptime_error("untranslatable C macro: ADD_ACTIVE_DATA")
+}
 // untranslatable fn-like macro
-fn ADD_NEW() -> Never:
+fn ADD_NEW() -> Never {
     comptime_error("untranslatable C macro: ADD_NEW")
+}
 // untranslatable fn-like macro
-fn ADD_NEW_DATA() -> Never:
+fn ADD_NEW_DATA() -> Never {
     comptime_error("untranslatable C macro: ADD_NEW_DATA")
+}
 let OP_ANYNL_EXTRA: c_int = 340
 let OP_EXTUNI_EXTRA: c_int = 320
 let OP_HSPACE_EXTRA: c_int = 360
@@ -2485,14 +2622,17 @@ let rep_max: [11]c_uint = [4294967295, 4294967295, 4294967295, 4294967295, 1, 1,
 let rep_typ: [12]c_uint = [REPTYPE_MAX, REPTYPE_MIN, REPTYPE_MAX, REPTYPE_MIN, REPTYPE_MAX, REPTYPE_MIN, REPTYPE_MAX, REPTYPE_MIN, REPTYPE_POS, REPTYPE_POS, REPTYPE_POS, REPTYPE_POS]
 
 // untranslatable fn-like macro
-fn CHECK_PARTIAL() -> Never:
+fn CHECK_PARTIAL() -> Never {
     comptime_error("untranslatable C macro: CHECK_PARTIAL")
+}
 let GF_CAPTURE: c_uint = 0x00010000
 let GF_CONDASSERT: c_uint = 0x00030000
-fn GF_DATAMASK[T](a: T) -> T:
+fn GF_DATAMASK[T](a: T) -> T {
     (a & 0x0000ffff)
-fn GF_IDMASK[T](a: T) -> T:
+}
+fn GF_IDMASK[T](a: T) -> T {
     (a & 0xffff0000)
+}
 let GF_NOCAPTURE: c_uint = 0x00020000
 let GF_RECURSE: c_uint = 0x00040000
 let MATCH_ACCEPT: c_int = -999
@@ -2508,14 +2648,17 @@ let PUBLIC_JIT_MATCH_OPTIONS: c_int = 1073758271
 let PUBLIC_MATCH_OPTIONS: c_int = 1610899519
 let RECURSE_UNSET: c_uint = 0xffffffff
 // untranslatable fn-like macro
-fn RMATCH() -> Never:
+fn RMATCH() -> Never {
     comptime_error("untranslatable C macro: RMATCH")
+}
 // untranslatable fn-like macro
-fn RRETURN() -> Never:
+fn RRETURN() -> Never {
     comptime_error("untranslatable C macro: RRETURN")
+}
 // untranslatable fn-like macro
-fn SCHECK_PARTIAL() -> Never:
+fn SCHECK_PARTIAL() -> Never {
     comptime_error("untranslatable C macro: SCHECK_PARTIAL")
+}
 let ERR0: c_uint = 100
 let ERR1: c_uint = 101
 let ERR2: c_uint = 102
@@ -2728,25 +2871,30 @@ let opcode_possessify: [120]u8 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 let CLASS_IS_ECLASS: c_int = 0x1
 // untranslatable fn-like macro
-fn CLIST_ALIGN_TO() -> Never:
+fn CLIST_ALIGN_TO() -> Never {
     comptime_error("untranslatable C macro: CLIST_ALIGN_TO")
+}
 let ESCAPES_FIRST: c_int = CHAR_0
 let ESCAPES_LAST: c_int = CHAR_z
 // untranslatable fn-like macro
-fn GETOFFSET() -> Never:
+fn GETOFFSET() -> Never {
     comptime_error("untranslatable C macro: GETOFFSET")
+}
 // untranslatable fn-like macro
-fn GETPLUSOFFSET() -> Never:
+fn GETPLUSOFFSET() -> Never {
     comptime_error("untranslatable C macro: GETPLUSOFFSET")
+}
 // untranslatable fn-like macro
-fn GET_MAX_CHAR_VALUE() -> Never:
+fn GET_MAX_CHAR_VALUE() -> Never {
     comptime_error("untranslatable C macro: GET_MAX_CHAR_VALUE")
+}
 let GI_FIXED_LENGTH_MASK: c_uint = 0x0000ffff
 let GI_NOT_FIXED_LENGTH: c_uint = 0x40000000
 let GI_SET_FIXED_LENGTH: c_uint = 0x80000000
 let GROUPINFO_DEFAULT_SIZE: c_int = 256
-fn IS_DIGIT[T](x: T) -> T:
+fn IS_DIGIT[T](x: T) -> T {
     ((x >= CHAR_0) and (x <= CHAR_9))
+}
 let MAX_GROUP_NUMBER: c_uint = 65535
 let MAX_REPEAT_COUNT: c_uint = 65535
 let MAX_UCHAR_VALUE: c_uint = 0xff
@@ -2771,8 +2919,9 @@ let META_CLASS_EMPTY: c_uint = 0x800b0000
 let META_CLASS_EMPTY_NOT: c_uint = 0x800c0000
 let META_CLASS_END: c_uint = 0x800d0000
 let META_CLASS_NOT: c_uint = 0x800e0000
-fn META_CODE[T](x: T) -> T:
+fn META_CODE[T](x: T) -> T {
     (x & 0xffff0000)
+}
 let META_COMMIT: c_uint = 0x80300000
 let META_COMMIT_ARG: c_uint = 0x80310000
 let META_COND_ASSERT: c_uint = 0x800f0000
@@ -2782,11 +2931,13 @@ let META_COND_NUMBER: c_uint = 0x80120000
 let META_COND_RNAME: c_uint = 0x80130000
 let META_COND_RNUMBER: c_uint = 0x80140000
 let META_COND_VERSION: c_uint = 0x80150000
-fn META_DATA[T](x: T) -> T:
+fn META_DATA[T](x: T) -> T {
     (x & 0x0000ffff)
+}
 // untranslatable fn-like macro
-fn META_DIFF() -> Never:
+fn META_DIFF() -> Never {
     comptime_error("untranslatable C macro: META_DIFF")
+}
 let META_DOLLAR: c_uint = 0x801a0000
 let META_DOT: c_uint = 0x801b0000
 let META_ECLASS_AND: c_uint = 0x80440000
@@ -2833,8 +2984,9 @@ let META_SKIP_ARG: c_uint = 0x80350000
 let META_THEN: c_uint = 0x80360000
 let META_THEN_ARG: c_uint = 0x80370000
 // untranslatable fn-like macro
-fn NAMED_GROUP_GET_HASH() -> Never:
+fn NAMED_GROUP_GET_HASH() -> Never {
     comptime_error("untranslatable C macro: NAMED_GROUP_GET_HASH")
+}
 let NAMED_GROUP_HASH_MASK: c_ushort = (0x7fff as u16)
 let NAMED_GROUP_IS_DUPNAME: c_ushort = (0x8000 as u16)
 let NAMED_GROUP_LIST_SIZE: c_int = 20
@@ -2843,8 +2995,9 @@ let NSF_CONDASSERT: c_uint = 0x0002
 let NSF_RESET: c_uint = 0x0001
 let OFLOW_MAX: c_int = (INT_MAX - 20)
 // untranslatable fn-like macro
-fn PARSED_LITERAL() -> Never:
+fn PARSED_LITERAL() -> Never {
     comptime_error("untranslatable C macro: PARSED_LITERAL")
+}
 let PARSED_PATTERN_DEFAULT_SIZE: c_int = 1024
 let PC_DIGIT: c_int = 7
 let PC_GRAPH: c_int = 8
@@ -2854,31 +3007,38 @@ let PC_XDIGIT: c_int = 13
 let PUBLIC_LITERAL_COMPILE_EXTRA_OPTIONS: c_int = 65676
 let PUBLIC_LITERAL_COMPILE_OPTIONS: c_int = 2147483644
 // untranslatable fn-like macro
-fn PUTOFFSET() -> Never:
+fn PUTOFFSET() -> Never {
     comptime_error("untranslatable C macro: PUTOFFSET")
+}
 // untranslatable fn-like macro
-fn READPLUSOFFSET() -> Never:
+fn READPLUSOFFSET() -> Never {
     comptime_error("untranslatable C macro: READPLUSOFFSET")
+}
 let REPEAT_UNLIMITED: c_uint = (MAX_REPEAT_COUNT + 1)
 let REQ_CASELESS: c_uint = 0x00000001
 let REQ_NONE: c_uint = 0xfffffffe
 let REQ_UNSET: c_uint = 0xffffffff
 let REQ_VARY: c_uint = 0x00000002
 let RSCAN_CACHE_SIZE: c_int = 8
-fn SELECT_VALUE8[T](value8: T, value: T) -> T:
+fn SELECT_VALUE8[T](value8: T, value: T) -> T {
     value8
+}
 // untranslatable fn-like macro
-fn SETBIT() -> Never:
+fn SETBIT() -> Never {
     comptime_error("untranslatable C macro: SETBIT")
+}
 let SIZEOFFSET: c_int = 2
 // untranslatable fn-like macro
-fn SKIPOFFSET() -> Never:
+fn SKIPOFFSET() -> Never {
     comptime_error("untranslatable C macro: SKIPOFFSET")
-fn UPPER_CASE[T](c: T) -> T:
+}
+fn UPPER_CASE[T](c: T) -> T {
     (c - 32)
+}
 let WORK_SIZE_SAFETY_MARGIN: c_int = 100
-fn XDIGIT[T](c: T) -> T:
+fn XDIGIT[T](c: T) -> T {
     xdigitab[c]
+}
 let PUBLIC_JIT_COMPILE_OPTIONS: c_int = 263
 let _pcre2_OP_lengths_8: [173]u8 = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 4, 4, 4, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 4, 4, 4, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 4, 4, 4, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 4, 4, 4, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 4, 4, 4, 2, 2, 2, 4, 1, 1, 1, 1, 1, 1, 5, 5, 1, 1, 1, 5, 33, 33, 0, 0, 3, 4, 5, 6, 3, 6, 0, 3, 3, 3, 3, 3, 3, 5, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 5, 5, 3, 3, 3, 5, 5, 3, 3, 5, 3, 5, 1, 1, 1, 1, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 1, 1, 3, 1, 1, 1, 1]
 
@@ -2910,8 +3070,9 @@ let _pcre2_utt_8: [518]ucp_type_table = [0, 0, 79, 4, 6, 79, ucp_type_table { na
 
 let _pcre2_utt_size_8: c_ulong = 518
 
-fn ARR_SIZE[T](x: T) -> T:
+fn ARR_SIZE[T](x: T) -> T {
     sizeof[T]()
+}
 var _pcre2_unicode_version_8: *const i8 = "17.0.0"
 
 let _pcre2_ucd_caseless_sets_8: [118]c_uint = [0xffffffff, 0x0053, 0x0073, 0x017f, 0xffffffff, 0x01c4, 0x01c5, 0x01c6, 0xffffffff, 0x01c7, 0x01c8, 0x01c9, 0xffffffff, 0x01ca, 0x01cb, 0x01cc, 0xffffffff, 0x01f1, 0x01f2, 0x01f3, 0xffffffff, 0x0345, 0x0399, 0x03b9, 0x1fbe, 0xffffffff, 0x00b5, 0x039c, 0x03bc, 0xffffffff, 0x03a3, 0x03c2, 0x03c3, 0xffffffff, 0x0392, 0x03b2, 0x03d0, 0xffffffff, 0x0398, 0x03b8, 0x03d1, 0x03f4, 0xffffffff, 0x03a6, 0x03c6, 0x03d5, 0xffffffff, 0x03a0, 0x03c0, 0x03d6, 0xffffffff, 0x039a, 0x03ba, 0x03f0, 0xffffffff, 0x03a1, 0x03c1, 0x03f1, 0xffffffff, 0x0395, 0x03b5, 0x03f5, 0xffffffff, 0x0412, 0x0432, 0x1c80, 0xffffffff, 0x0414, 0x0434, 0x1c81, 0xffffffff, 0x041e, 0x043e, 0x1c82, 0xffffffff, 0x0421, 0x0441, 0x1c83, 0xffffffff, 0x0422, 0x0442, 0x1c84, 0x1c85, 0xffffffff, 0x042a, 0x044a, 0x1c86, 0xffffffff, 0x0462, 0x0463, 0x1c87, 0xffffffff, 0x1e60, 0x1e61, 0x1e9b, 0xffffffff, 0x03a9, 0x03c9, 0x2126, 0xffffffff, 0x004b, 0x006b, 0x212a, 0xffffffff, 0x00c5, 0x00e5, 0x212b, 0xffffffff, 0x1c88, 0xa64a, 0xa64b, 0xffffffff, 0x0069, 0x0130, 0xffffffff, 0x0049, 0x0131, 0xffffffff]
@@ -2940,8 +3101,9 @@ let char_list_starts: [3]c_uint = [0x10000, 0x8000, 0x100]
 
 let CHAR_LIST_EXTRA_SIZE: c_int = 3
 // untranslatable fn-like macro
-fn CLASS_END_CASES() -> Never:
+fn CLASS_END_CASES() -> Never {
     comptime_error("untranslatable C macro: CLASS_END_CASES")
+}
 let PARSE_CLASS_CASELESS_UTF: c_int = 0x2
 let PARSE_CLASS_RESTRICTED_UTF: c_int = 0x4
 let PARSE_CLASS_TURKISH_UTF: c_int = 0x8
@@ -2954,20 +3116,25 @@ let XCLASS_REQUIRED: c_int = 0x1
 type case_state { to_case: c_int = 0, single_char: c_int = 0 }
 
 // untranslatable fn-like macro
-fn CHECKCASECPY_BASE() -> Never:
+fn CHECKCASECPY_BASE() -> Never {
     comptime_error("untranslatable C macro: CHECKCASECPY_BASE")
+}
 // untranslatable fn-like macro
-fn CHECKCASECPY_CALLOUT() -> Never:
+fn CHECKCASECPY_CALLOUT() -> Never {
     comptime_error("untranslatable C macro: CHECKCASECPY_CALLOUT")
+}
 // untranslatable fn-like macro
-fn CHECKCASECPY_DEFAULT() -> Never:
+fn CHECKCASECPY_DEFAULT() -> Never {
     comptime_error("untranslatable C macro: CHECKCASECPY_DEFAULT")
+}
 // untranslatable fn-like macro
-fn CHECKMEMCPY() -> Never:
+fn CHECKMEMCPY() -> Never {
     comptime_error("untranslatable C macro: CHECKMEMCPY")
+}
 // untranslatable fn-like macro
-fn DELAYEDFORCECASE() -> Never:
+fn DELAYEDFORCECASE() -> Never {
     comptime_error("untranslatable C macro: DELAYEDFORCECASE")
+}
 let PCRE2_SUBSTITUTE_CASE_NONE: c_int = 0
 let PCRE2_SUBSTITUTE_CASE_REVERSE_TITLE_FIRST: c_int = 4
 let PTR_STACK_SIZE: c_int = 20
@@ -2979,8 +3146,9 @@ let SSB_UNKNOWN: c_uint = 3
 let SSB_TOODEEP: c_uint = 4
 let MAX_CACHE_BACKREF: c_int = 128
 // untranslatable fn-like macro
-fn SET_BIT() -> Never:
+fn SET_BIT() -> Never {
     comptime_error("untranslatable C macro: SET_BIT")
+}
 var _pcre2_default_compile_context_8: pcre2_real_compile_context_8 = pcre2_real_compile_context_8 { memctl: pcre2_memctl { malloc: default_malloc, free: default_free, memory_data: null }, stack_guard: null, stack_guard_data: null, tables: (&_pcre2_default_tables_8[0] as *const u8), max_pattern_length: (0 - (0 as usize) - 1), max_pattern_compiled_length: (0 - (0 as usize) - 1), bsr_convention: 1, newline_convention: 2, parens_nest_limit: 250, extra_options: 0, max_varlookbehind: 255, optimization_flags: 0x00000007 }
 
 var _pcre2_default_match_context_8: pcre2_real_match_context_8 = pcre2_real_match_context_8 { memctl: pcre2_memctl { malloc: default_malloc, free: default_free, memory_data: null }, callout: null, callout_data: null, substitute_callout: null, substitute_callout_data: null, substitute_case_callout: null, substitute_case_callout_data: null, offset_limit: (0 - (0 as usize) - 1), heap_limit: 20000000, match_limit: 10000000, depth_limit: 10000000 }
@@ -2994,10 +3162,12 @@ let compile_error_texts: [5687]u8 = "no error\0\\ at end of pattern\0\\c at end 
 let match_error_texts: [2946]u8 = "no error\0no match\0partial match\0UTF-8 error: 1 byte missing at end\0UTF-8 error: 2 bytes missing at end\0UTF-8 error: 3 bytes missing at end\0UTF-8 error: 4 bytes missing at end\0UTF-8 error: 5 bytes missing at end\0UTF-8 error: byte 2 top bits not 0x80\0UTF-8 error: byte 3 top bits not 0x80\0UTF-8 error: byte 4 top bits not 0x80\0UTF-8 error: byte 5 top bits not 0x80\0UTF-8 error: byte 6 top bits not 0x80\0UTF-8 error: 5-byte character is not allowed (RFC 3629)\0UTF-8 error: 6-byte character is not allowed (RFC 3629)\0UTF-8 error: code points greater than 0x10ffff are not defined\0UTF-8 error: code points 0xd800-0xdfff are not defined\0UTF-8 error: overlong 2-byte sequence\0UTF-8 error: overlong 3-byte sequence\0UTF-8 error: overlong 4-byte sequence\0UTF-8 error: overlong 5-byte sequence\0UTF-8 error: overlong 6-byte sequence\0UTF-8 error: isolated byte with 0x80 bit set\0UTF-8 error: illegal byte (0xfe or 0xff)\0UTF-16 error: missing low surrogate at end\0UTF-16 error: invalid low surrogate\0UTF-16 error: isolated low surrogate\0UTF-32 error: code points 0xd800-0xdfff are not defined\0UTF-32 error: code points greater than 0x10ffff are not defined\0bad data value\0patterns do not all use the same character tables\0magic number missing\0pattern compiled in wrong mode: 8/16/32-bit error\0bad offset value\0bad option value\0invalid replacement string\0bad offset into UTF string\0callout error code\0invalid data in workspace for DFA restart\0too much recursion for DFA matching\0backreference condition or recursion test is not supported for DFA matching\0function is not supported for DFA matching\0pattern contains an item that is not supported for DFA matching\0workspace size exceeded in DFA matching\0internal error - pattern overwritten?\0bad JIT option\0JIT stack limit reached\0match limit exceeded\0no more memory\0unknown substring\0non-unique substring name\0NULL argument passed with non-zero length\0nested recursion at the same subject position\0matching depth limit exceeded\0requested value is not available\0requested value is not set\0offset limit set without PCRE2_USE_OFFSET_LIMIT\0bad escape sequence in replacement string\0expected closing curly bracket in replacement string\0bad substitution in replacement string\0match with end before start or start moved backwards is not supported\0too many replacements (more than INT_MAX)\0bad serialized data\0heap limit exceeded\0invalid syntax\0internal error: duplicate substitution match\0PCRE2_MATCH_INVALID_UTF is not supported for DFA matching\0internal error: invalid substring offset\0feature is not supported by the JIT compiler\0error performing replacement case transformation\0replacement too large (longer than PCRE2_SIZE)\0substitute pattern differs from prior match call\0substitute subject differs from prior match call\0substitute start offset differs from prior match call\0substitute options differ from prior match call\0disallowed use of \\K in lookaround\0replacement $' or $_ not supported with partial match\0"
 
 // stringify macro
-fn STRING() -> Never:
+fn STRING() -> Never {
     comptime_error("stringify macro: STRING")
-fn XSTRING[T](s: T) -> T:
+}
+fn XSTRING[T](s: T) -> T {
     STRING(s)
+}
 let autoposstab: [17][21]u8 = [[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0], [1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1], [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1], [0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0], [0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0], [0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]]
 
 let propposstab: [13][13]u8 = [[3, 0, 0, 0, 0, 3, 1, 1, 0, 0, 0, 0, 0], [0, 2, 4, 0, 0, 9, 10, 10, 11, 0, 0, 0, 0], [0, 5, 2, 0, 0, 15, 16, 16, 17, 0, 0, 0, 0], [0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0], [3, 6, 12, 0, 0, 3, 1, 1, 0, 0, 0, 0, 0], [1, 7, 13, 0, 0, 1, 3, 3, 1, 0, 0, 0, 0], [1, 7, 13, 0, 0, 1, 3, 3, 1, 0, 0, 0, 0], [0, 8, 14, 0, 0, 0, 1, 1, 3, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]

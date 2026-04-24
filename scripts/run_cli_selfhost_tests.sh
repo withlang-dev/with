@@ -464,7 +464,7 @@ int add1(int x) { return x + 1; }
 outer g = { { add1, 0 }, 7 };
 EOF
 
-  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
     echo "FAIL(cli-selfhost-migrate) global_init_list"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
@@ -626,7 +626,7 @@ void f(void) {
 }
 EOF
 
-  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
     echo "FAIL(cli-selfhost-migrate) assignment_compat"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
@@ -998,13 +998,15 @@ use std.re.defs
 
 type BOOL = c_int
 extern fn _pcre2_keep_8(ch: c_uint) -> c_uint
-fn keep_body(flag: c_int) -> c_int:
+fn keep_body(flag: c_int) -> c_int {
     var c__goto_6350_16: c_uint = 0
-    if flag != 0:
+    if flag != 0 {
         (c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))
-    else:
+    } else {
         (c__goto_6350_16 = 1)
+    }
     (c__goto_6350_16 as c_int)
+}
 EOF
 
   # C4: prepare is now a plain copy (raw → generated). No text mutations.
@@ -1014,7 +1016,7 @@ EOF
 
   # Local var c__goto_6350_16 must survive (not a top-level width decl)
   if ! grep -Fq '(c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))' "$generated_dir/pcre2_compile.w" \
-    || ! grep -Fq 'else:' "$generated_dir/pcre2_compile.w"; then
+    || ! grep -Fq '} else {' "$generated_dir/pcre2_compile.w"; then
     echo "FAIL(cli-selfhost-regex-output) width_prunes_whole_decls"
     find "$generated_dir" -maxdepth 1 -type f -print | sort | while read -r f; do
       echo "--- $f"
@@ -1027,7 +1029,7 @@ EOF
   {
     cat "$generated_dir/defs.w"
     tail -n +3 "$generated_dir/pcre2_compile.w"
-    printf '\nfn main: print("ok")\n'
+    printf '\nfn main { print("ok") }\n'
   } >"$wrapper"
 
   if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$wrapper"; then
@@ -1163,7 +1165,7 @@ label:
 }
 EOF
 
-  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
     echo "FAIL(cli-selfhost-migrate) initializer_regressions"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
@@ -1778,6 +1780,274 @@ PY
   echo "PASS(cli-selfhost-migrate) goto_shadowed_local"
 }
 
+expect_migrate_goto_label_preserves_block_scope() {
+  local case_dir="$tmpdir/migrate_goto_label_scope_case"
+  local src="$case_dir/goto_label_scope.c"
+  local out_w="$case_dir/goto_label_scope.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int f(int mode) {
+  int out = 0;
+  switch (mode) {
+    case 1: {
+      int d = mode + 1;
+      goto L;
+    L:
+      out = d;
+      break;
+    }
+    case 2: {
+      int d = 7;
+      out = d;
+      break;
+    }
+    default:
+      out = -1;
+      break;
+  }
+  return out;
+}
+
+int g(int mode) {
+  int out = 0;
+  switch (mode) {
+    case 1:
+      int d = mode + 2;
+      goto G;
+    G:
+      out = d;
+      break;
+    default:
+      out = -1;
+      break;
+  }
+  return out;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) goto_label_scope"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! python3 - "$out_w" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text()
+if "match __pc {" not in text:
+    raise SystemExit(1)
+if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
+    raise SystemExit(1)
+PY
+  then
+    echo "FAIL(cli-selfhost-migrate-output) goto_label_scope"
+    sed -n '1,180p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  cat >>"$out_w" <<'EOF'
+
+fn main() -> i32 {
+    if f(1) != 2 { return 1 }
+    if f(2) != 7 { return 2 }
+    if f(3) != (0 - 1) { return 3 }
+    if g(1) != 3 { return 4 }
+    if g(2) != (0 - 1) { return 5 }
+    0
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$out_w"; then
+    echo "FAIL(cli-selfhost-run) goto_label_scope"
+    cat "$tmpdir/err" || true
+    sed -n '45,140p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) goto_label_scope"
+}
+
+expect_migrate_switch_macro_goto_terminators() {
+  local case_dir="$tmpdir/migrate_switch_macro_goto_case"
+  local src="$case_dir/switch_macro_goto.c"
+  local out_w="$case_dir/switch_macro_goto.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+#define RRETURN(v) do { rrc = v; goto RETURN_SWITCH; } while (0)
+
+int f(int x) {
+  int rrc = 0;
+  switch (x) {
+    case 1:
+      RRETURN(11);
+    case 2:
+      rrc = 22;
+      break;
+    default:
+      rrc = 33;
+      break;
+  }
+RETURN_SWITCH:
+  return rrc;
+}
+
+int g(int x) {
+  int r = 0;
+  switch (x) {
+    case 1:
+      do { r = 1; break; } while (0);
+    case 2:
+      r += 10;
+      break;
+    default:
+      r = 100;
+      break;
+  }
+  return r;
+}
+
+int h(int x) {
+  int rrc = 0;
+  switch (x) {
+    case 1:
+      for (;;) {
+        switch (x) {
+          case 1:
+            break;
+          default:
+            break;
+        }
+        RRETURN(44);
+      }
+    case 2:
+      rrc = 55;
+      break;
+    default:
+      rrc = 66;
+      break;
+  }
+RETURN_SWITCH:
+  return rrc;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) switch_macro_goto"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! python3 - "$out_w" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text()
+if "match __pc {" not in text or "match x {" not in text:
+    raise SystemExit(1)
+if any(re.match(r"^\s*(fn|if|else|while|for|match|unsafe|with)\b.*:\s*$", line) for line in text.splitlines()):
+    raise SystemExit(1)
+
+start = text.find("match x {")
+lines = text[start:].splitlines()
+arm_start = None
+for i, line in enumerate(lines):
+    if re.match(r"^\s*1 => \{\s*$", line):
+        arm_start = i
+        break
+if arm_start is None:
+    raise SystemExit(1)
+
+depth = 0
+arm_lines = []
+for line in lines[arm_start:]:
+    arm_lines.append(line)
+    depth += line.count("{") - line.count("}")
+    if len(arm_lines) > 1 and depth <= 0:
+        break
+
+arm = "\n".join(arm_lines)
+if re.search(r"\(rrc(?:__goto_\d+_\d+)? = 11\)", arm) is None:
+    raise SystemExit(1)
+if re.search(r"\(rrc(?:__goto_\d+_\d+)? = 22\)", arm) is not None:
+    raise SystemExit(1)
+
+h_start = text.find("fn h")
+if h_start < 0:
+    raise SystemExit(1)
+h_match_start = text.find("match x {", h_start)
+if h_match_start < 0:
+    raise SystemExit(1)
+h_lines = text[h_match_start:].splitlines()
+h_arm_start = None
+for i, line in enumerate(h_lines):
+    if re.match(r"^\s*1 => \{\s*$", line):
+        h_arm_start = i
+        break
+if h_arm_start is None:
+    raise SystemExit(1)
+
+depth = 0
+h_arm_lines = []
+for line in h_lines[h_arm_start:]:
+    h_arm_lines.append(line)
+    depth += line.count("{") - line.count("}")
+    if len(h_arm_lines) > 1 and depth <= 0:
+        break
+
+h_arm = "\n".join(h_arm_lines)
+if re.search(r"\(rrc(?:__goto_\d+_\d+)? = 44\)", h_arm) is None:
+    raise SystemExit(1)
+if re.search(r"\(rrc(?:__goto_\d+_\d+)? = 55\)", h_arm) is not None:
+    raise SystemExit(1)
+PY
+  then
+    echo "FAIL(cli-selfhost-migrate-output) switch_macro_goto"
+    sed -n '1,260p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  cat >>"$out_w" <<'EOF'
+
+fn main() -> i32 {
+    if f(1) != 11 { return 1 }
+    if f(2) != 22 { return 2 }
+    if f(3) != 33 { return 3 }
+    if g(1) != 11 { return 4 }
+    if g(2) != 10 { return 5 }
+    if g(3) != 100 { return 6 }
+    if h(1) != 44 { return 7 }
+    if h(2) != 55 { return 8 }
+    if h(3) != 66 { return 9 }
+    0
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$out_w"; then
+    echo "FAIL(cli-selfhost-run) switch_macro_goto"
+    cat "$tmpdir/err" || true
+    sed -n '1,260p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) switch_macro_goto"
+}
+
 expect_migrate_recursive_anonymous_records() {
   local case_dir="$tmpdir/migrate_recursive_anonymous_records_case"
   local src="$case_dir/anon_records.c"
@@ -1808,17 +2078,18 @@ int probe(outer *o) {
 }
 EOF
 
-  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
     echo "FAIL(cli-selfhost-migrate) recursive_anonymous_records"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
     return
   fi
 
-  if ! grep -Fq 'type outer_fields {' "$out_w" \
+  if ! grep -Fq 'type outer_fields = union {' "$out_w" \
     || ! grep -Fq 'type outer_fields_named {' "$out_w" \
-    || ! grep -Fq 'type outer_fields_named_inner {' "$out_w" \
+    || ! grep -Fq 'type outer_fields_named_inner = union {' "$out_w" \
     || ! grep -Fq 'fn probe' "$out_w" \
+    || grep -Eq '^[[:space:]]*(fn|if|else|while|for|match|unsafe|with)\b.*:[[:space:]]*$' "$out_w" \
     || grep -Fq 'type outer = opaque' "$out_w" \
     || grep -Fq 'type outer_fields = opaque' "$out_w" \
     || grep -Fq 'type outer_fields_named = opaque' "$out_w" \
@@ -2385,6 +2656,8 @@ expect_migrate_prefer_brace_no_trailing_ws
 expect_migrate_typed_cast_macros
 expect_migrate_for_continue_switch_break_semantics
 expect_migrate_goto_shadowed_local
+expect_migrate_goto_label_preserves_block_scope
+expect_migrate_switch_macro_goto_terminators
 expect_migrate_recursive_anonymous_records
 expect_migrate_ir_roundtrip
 expect_opaque_field_access_is_rejected

@@ -33,8 +33,8 @@ fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr:
     }
 
     if ((if type_ == 2: 1 else: 0) != 0) {
-        match c:
-            10 =>
+        match c {
+            10 => {
                 ((unsafe: *lenptr) = 1)
 
                 return 1
@@ -59,7 +59,8 @@ fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr:
                 return 1
 
 
-            13 =>
+            },
+            13 => {
                 var __ci_expr_ternary_1: c_int = 0
 
                 var __ci_expr_logic_0: c_int = 0
@@ -81,11 +82,14 @@ fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr:
 
                 return 0
 
-            _ =>
+            },
+            _ => {
                 return 0
+            },
+        }
     } else {
-        match c:
-            10 | 11 | 12 =>
+        match c {
+            10 | 11 | 12 => {
                 ((unsafe: *lenptr) = 1)
 
                 return 1
@@ -110,7 +114,8 @@ fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr:
                 return 1
 
 
-            13 =>
+            },
+            13 => {
                 var __ci_expr_ternary_3: c_int = 0
 
                 var __ci_expr_logic_2: c_int = 0
@@ -144,7 +149,8 @@ fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr:
                 return 1
 
 
-            133 =>
+            },
+            133 => {
                 var __ci_expr_ternary_4: c_int = 0
 
                 if (utf != 0) {
@@ -163,15 +169,19 @@ fn _pcre2_is_newline_8(ptr: *const u8, type_: c_uint, endptr: *const u8, lenptr:
                 return 1
 
 
-            8232 | 8233 =>
+            },
+            8232 | 8233 => {
                 ((unsafe: *lenptr) = 3)
 
                 return 1
 
                 return 0
 
-            _ =>
+            },
+            _ => {
                 return 0
+            },
+        }
     }
 
 }
@@ -215,8 +225,8 @@ fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const 
     }
 
     if ((if type_ == 2: 1 else: 0) != 0) {
-        match c:
-            10 =>
+        match c {
+            10 => {
                 var __ci_expr_ternary_1: c_int = 0
 
                 var __ci_expr_logic_0: c_int = 0
@@ -241,18 +251,22 @@ fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const 
                 return 1
 
 
-            13 =>
+            },
+            13 => {
                 ((unsafe: *lenptr) = 1)
 
                 return 1
 
                 return 0
 
-            _ =>
+            },
+            _ => {
                 return 0
+            },
+        }
     } else {
-        match c:
-            10 =>
+        match c {
+            10 => {
                 var __ci_expr_ternary_3: c_int = 0
 
                 var __ci_expr_logic_2: c_int = 0
@@ -277,7 +291,8 @@ fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const 
                 return 1
 
 
-            11 | 12 | 13 =>
+            },
+            11 | 12 | 13 => {
                 ((unsafe: *lenptr) = 1)
 
                 return 1
@@ -296,7 +311,8 @@ fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const 
                 return 1
 
 
-            133 =>
+            },
+            133 => {
                 var __ci_expr_ternary_4: c_int = 0
 
                 if (utf != 0) {
@@ -315,15 +331,19 @@ fn _pcre2_was_newline_8(__param_ptr: *const u8, type_: c_uint, startptr: *const 
                 return 1
 
 
-            8232 | 8233 =>
+            },
+            8232 | 8233 => {
                 ((unsafe: *lenptr) = 3)
 
                 return 1
 
                 return 0
 
-            _ =>
+            },
+            _ => {
                 return 0
+            },
+        }
     }
 
 }

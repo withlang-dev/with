@@ -88,6 +88,7 @@ GATE1_START=$(python3 -c "import time; print(int(time.time()*1e9))")
 set +e
 "$WITH" migrate "$PCRE2_SRC/" -o "$OUTDIR/" \
     --no-c-export \
+    --prefer-brace \
     --width-slice 8 \
     -I "$PCRE2_SRC" \
     "${DEFINES[@]}" \

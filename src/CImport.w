@@ -685,11 +685,12 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: s
 
     if field_count == 0:
         if is_union:
-            return nested_decls ++ "// union\ntype " ++ ci_escape_reserved(synth_name) ++ " { __pad0: u8 = 0 }\n"
+            return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " = union { __pad0: u8 = 0 }\n"
         return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " { __pad0: u8 = 0 }\n"
 
-    let union_prefix = if is_union: "// union\n" else: ""
-    nested_decls ++ union_prefix ++ "type " ++ ci_escape_reserved(synth_name) ++ " { " ++ fields ++ " }\n"
+    if is_union:
+        return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " = union { " ++ fields ++ " }\n"
+    nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " { " ++ fields ++ " }\n"
 
 // ── Opaque demotion pre-scan ─────────────────────────────────
 // Two-pass analysis: first collect directly demoted types (bitfield, forward
@@ -802,6 +803,11 @@ fn ci_field_type_is_demoted(ftype: str, demoted: str) -> bool:
 
 // ── Function translation ────────────────────────────────────
 
+fn ci_render_generated_fn_body(header: str, body: str) -> str:
+    if migrate_prefer_brace():
+        return header ++ " {\n" ++ body ++ "\n}"
+    header ++ ":\n" ++ body
+
 fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     // B9: fresh per-function temp counter.
     ci_temp_reset()
@@ -837,7 +843,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
                 let actual_pname = if spname.len() > 0: ci_escape_reserved(spname) else: f"p{spi}"
                 si_params = si_params ++ actual_pname ++ ": " ++ sptype
             let si_ret = with_cimport_fn_return_type_translated(session, idx)
-            return "fn " ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret ++ ":\n" ++ body
+            return ci_render_generated_fn_body("fn " ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret, body)
         // Fallback: demote to extern declaration (matching Zig's graceful demotion)
         // The function is still callable — just without the inline body.
         // Fall through to the normal extern fn emission below.
@@ -888,7 +894,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     if has_unsupported:
         let fn_loc = ci_get_decl_location(session, name)
         let fn_loc_comment = if fn_loc.len() > 0: "// " ++ fn_loc ++ "\n" else: ""
-        return fn_loc_comment ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")\n"
+        return fn_loc_comment ++ ci_render_generated_fn_body("fn " ++ safe_name ++ "() -> Never", "    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")") ++ "\n"
 
     let cc = with_cimport_fn_calling_conv(session, idx)
     let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
@@ -1107,7 +1113,7 @@ fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: str, method_na
         pi = pi + 1
 
     let ret_prefix = if ret == "void": "" else: "return "
-    "fn " ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret ++ ":\n    " ++ ret_prefix ++ safe_fn_name ++ "(" ++ call_args ++ ")\n"
+    ci_render_generated_fn_body("fn " ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret, "    " ++ ret_prefix ++ safe_fn_name ++ "(" ++ call_args ++ ")") ++ "\n"
 
 // Emit a constructor wrapper: fn StructName.new(params...) -> Ret: fn_name(params...)
 fn ci_emit_constructor_wrapper(session: i64, idx: i32, struct_name: str, method_name: str) -> str:
@@ -1140,7 +1146,7 @@ fn ci_emit_constructor_wrapper(session: i64, idx: i32, struct_name: str, method_
         params = params ++ actual_name ++ ": " ++ ptype
         call_args = call_args ++ actual_name
         pi = pi + 1
-    "fn " ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret ++ ":\n    " ++ safe_fn_name ++ "(" ++ call_args ++ ")\n"
+    ci_render_generated_fn_body("fn " ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret, "    " ++ safe_fn_name ++ "(" ++ call_args ++ ")") ++ "\n"
 
 fn ci_pointer_type_explicit_mut(ty: str) -> str:
     if ci_starts_with(ty, "*const "):
@@ -1194,7 +1200,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         // Empty struct definition → emit with padding byte for ABI compatibility
         with_cimport_mark_name_emitted(name)
         let safe_name = ci_escape_reserved(name)
-        let empty_rendered = if is_union: "// union\ntype " ++ safe_name ++ " \{ __pad0: u8 = 0 }\n" else: "type " ++ safe_name ++ " \{ __pad0: u8 = 0 }\n"
+        let empty_rendered = if is_union: "type " ++ safe_name ++ " = union \{ __pad0: u8 = 0 }\n" else: "type " ++ safe_name ++ " \{ __pad0: u8 = 0 }\n"
         if ci_migrate_shared_decl_add("type", name, empty_rendered):
             return ""
         return empty_rendered
@@ -1259,14 +1265,16 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
             // Rename the field to _name in field_str by replacing the last occurrence
             field_str = ci_str_replace_last_field(field_str, ci_escape_reserved(accessor_name), "_" ++ ci_escape_reserved(accessor_name))
             // Emit accessor method
-            flex_accessor = "fn " ++ ci_escape_reserved(accessor_name) ++ "(self: *" ++ safe_name ++ ") -> *" ++ elem_type ++ ":\n    unsafe: ((&self._" ++ ci_escape_reserved(accessor_name) ++ ") as *" ++ elem_type ++ ")\n"
+            let accessor_expr = "((&self._" ++ ci_escape_reserved(accessor_name) ++ ") as *" ++ elem_type ++ ")"
+            let accessor_body = if migrate_prefer_brace(): "    unsafe { " ++ accessor_expr ++ " }" else: "    unsafe: " ++ accessor_expr
+            flex_accessor = ci_render_generated_fn_body("fn " ++ ci_escape_reserved(accessor_name) ++ "(self: *" ++ safe_name ++ ") -> *" ++ elem_type, accessor_body) ++ "\n"
 
     let packed_prefix = if is_really_packed: "@[packed]\n" else: ""
     let part1 = "type " ++ safe_name
-    let part2 = part1 ++ " \{ "
+    let part2 = if is_union: part1 ++ " = union \{ " else: part1 ++ " \{ "
     let part3 = part2 ++ field_str
     let decl = part3 ++ " }\n"
-    let rendered = if is_union: anon_decls ++ "// union\n" ++ packed_prefix ++ decl ++ flex_accessor else: anon_decls ++ packed_prefix ++ decl ++ flex_accessor
+    let rendered = anon_decls ++ packed_prefix ++ decl ++ flex_accessor
     if ci_migrate_shared_decl_add("type", name, rendered):
         return ""
     rendered
@@ -1482,7 +1490,7 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
         with_cimport_mark_name_emitted(name)
         let var_loc = ci_get_decl_location(session, name)
         let var_loc_comment = if var_loc.len() > 0: "// " ++ var_loc ++ "\n" else: ""
-        return var_loc_comment ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ reason ++ "\")\n"
+        return var_loc_comment ++ ci_render_generated_fn_body("fn " ++ safe_name ++ "() -> Never", "    comptime_error(\"untranslatable: " ++ reason ++ "\")") ++ "\n"
 
     let is_const = with_cimport_var_is_const(session, idx)
     let is_threadlocal = with_cimport_var_is_threadlocal(session, idx)
@@ -1603,8 +1611,10 @@ fn ci_translate_typedef(session: i64, idx: i32) -> str:
                 fields = fields ++ ci_escape_reserved(actual_fname) ++ ": " ++ ftype
             afi = afi + 1
         with_cimport_mark_name_emitted(name)
-        let union_prefix = if with_cimport_typedef_anon_is_union(session, idx) != 0: "// union\n" else: ""
-        let anon_rendered = union_prefix ++ "type " ++ anon_safe_name ++ " \{ " ++ fields ++ " }\n"
+        let anon_rendered = if with_cimport_typedef_anon_is_union(session, idx) != 0:
+            "type " ++ anon_safe_name ++ " = union \{ " ++ fields ++ " }\n"
+        else:
+            "type " ++ anon_safe_name ++ " \{ " ++ fields ++ " }\n"
         if ci_migrate_shared_decl_add("type", name, anon_rendered):
             return ""
         return anon_rendered
@@ -1694,13 +1704,13 @@ fn ci_translate_macros(session: i64, extern_vars: str, macro_source: str) -> str
                             is_variadic_macro = true
                         vpi = vpi + 1
                     if is_variadic_macro:
-                        let r = "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"variadic macro — use direct call\")"
+                        let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "() -> Never", "    comptime_error(\"variadic macro — use direct call\")")
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"
                         continue
                     // Detect cleanup attribute macros
                     if ci_str_contains(value, "__attribute__((cleanup"):
-                        let r = "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"cleanup attribute — use defer\")"
+                        let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "() -> Never", "    comptime_error(\"cleanup attribute — use defer\")")
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"
                         continue
@@ -1714,7 +1724,7 @@ fn ci_translate_macros(session: i64, extern_vars: str, macro_source: str) -> str
                             let epname = ci_escape_reserved(with_cimport_macro_param_name(session, i, epi))
                             empty_params = empty_params ++ epname ++ ": i32"
                             epi = epi + 1
-                        let r = "fn " ++ safe_name ++ "(" ++ empty_params ++ ") -> void:\n    return"
+                        let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(" ++ empty_params ++ ") -> void", "    return")
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"
                         continue
@@ -1759,11 +1769,11 @@ fn ci_translate_macros(session: i64, extern_vars: str, macro_source: str) -> str
                             let p0 = ci_escape_reserved(with_cimport_macro_param_name(session, i, 0))
                             let body_trimmed = ci_trim(work_value)
                             if body_trimmed == "#" ++ p0 or body_trimmed == "(#" ++ p0 ++ ")":
-                                let r = "fn " ++ safe_name ++ "(x: str) -> str:\n    x"
+                                let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(x: str) -> str", "    x")
                                 if not ci_migrate_shared_decl_add("fn", safe_name, r):
                                     output = output ++ r ++ "\n"
                                 continue
-                        let r = "// stringify macro\nfn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"stringify macro: " ++ name ++ "\")"
+                        let r = "// stringify macro\n" ++ ci_render_generated_fn_body("fn " ++ safe_name ++ "() -> Never", "    comptime_error(\"stringify macro: " ++ name ++ "\")")
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"
                         continue
@@ -1779,11 +1789,11 @@ fn ci_translate_macros(session: i64, extern_vars: str, macro_source: str) -> str
                             let cast_type = ci_infer_cast_return_type(translated)
                             if cast_type.len() > 0:
                                 inferred_ret = cast_type
-                        let r = "fn " ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ inferred_ret ++ ":\n    " ++ translated
+                        let r = ci_render_generated_fn_body("fn " ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ inferred_ret, "    " ++ translated)
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"
                     else:
-                        let r = "// untranslatable fn-like macro\nfn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable C macro: " ++ name ++ "\")"
+                        let r = "// untranslatable fn-like macro\n" ++ ci_render_generated_fn_body("fn " ++ safe_name ++ "() -> Never", "    comptime_error(\"untranslatable C macro: " ++ name ++ "\")")
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"
             continue
@@ -1876,7 +1886,7 @@ fn ci_translate_macros(session: i64, extern_vars: str, macro_source: str) -> str
                         let expr_ty = if cast_expr_ty.len() > 0: cast_expr_ty else: "c_int"
                         if ci_expr_references_var(expr_result, extern_vars):
                             // References a mutable extern var — emit as function
-                            output = output ++ "fn " ++ safe_name ++ "() -> " ++ expr_ty ++ ":\n    " ++ expr_result ++ "\n"
+                            output = output ++ ci_render_generated_fn_body("fn " ++ safe_name ++ "() -> " ++ expr_ty, "    " ++ expr_result) ++ "\n"
                         else:
                             let let_line = "let " ++ safe_name ++ ": " ++ expr_ty ++ " = " ++ expr_result
                             if not ci_migrate_shared_decl_add("let", safe_name, let_line):
@@ -4021,6 +4031,37 @@ fn ci_goto_pending_guard_ir(stmts: &mut CiStmtPool, exprs: &mut CiExprPool, loop
     let body_id = if loop_depth > 0: stmts.break_() else: stmts.continue_()
     stmts.if_stmt(cond_id, body_id, 0 as CiStmtId)
 
+fn ci_goto_state_transfer_ir(stmts: &mut CiStmtPool, state: i32) -> CiStmtId:
+    var ids: Vec[i32] = Vec.new()
+    ids.push((stmts.goto_state(state)) as i32)
+    ids.push((stmts.continue_()) as i32)
+    ci_stmt_from_flat_ids(stmts, &ids)
+
+fn ci_rewrite_breaks_to_state_ir(stmts: &mut CiStmtPool, stmt_id: CiStmtId, state: i32) -> CiStmtId:
+    if state < 0 or (stmt_id as i32) == 0:
+        return stmt_id
+    let kind = stmts.kind(stmt_id)
+    if kind == CiStmtKind.CIS_BREAK:
+        return ci_goto_state_transfer_ir(stmts, state)
+    if kind == CiStmtKind.CIS_BLOCK:
+        let start = stmts.get_d0(stmt_id)
+        let count = stmts.get_d1(stmt_id)
+        var ids: Vec[i32] = Vec.new()
+        var i = 0
+        while i < count:
+            let child = (stmts.get_extra(start + i)) as CiStmtId
+            let rewritten = ci_rewrite_breaks_to_state_ir(stmts, child, state)
+            if (rewritten as i32) != 0:
+                ids.push(rewritten as i32)
+            i = i + 1
+        return ci_stmt_from_flat_ids(stmts, &ids)
+    if kind == CiStmtKind.CIS_IF:
+        let cond = (stmts.get_d0(stmt_id)) as CiExprId
+        let then_id = ci_rewrite_breaks_to_state_ir(stmts, (stmts.get_d1(stmt_id)) as CiStmtId, state)
+        let else_id = ci_rewrite_breaks_to_state_ir(stmts, (stmts.get_d2(stmt_id)) as CiStmtId, state)
+        return stmts.if_stmt(cond, then_id, else_id)
+    stmt_id
+
 fn ci_goto_clear_pending_ir(stmts: &mut CiStmtPool, exprs: &mut CiExprPool) -> CiStmtId:
     let pending_idx = exprs.add_string("__goto_pending")
     let pending_id = exprs.ident(pending_idx, 0 as CiTypeId)
@@ -4092,19 +4133,22 @@ fn ci_print_compact_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypeP
         let cond = (stmts.get_d0(id)) as CiExprId
         let then_b = (stmts.get_d1(id)) as CiStmtId
         let else_b = (stmts.get_d2(id)) as CiStmtId
-        var out = indent ++ "if " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ ":\n"
+        let brace = migrate_prefer_brace()
+        var out = indent ++ "if " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ (if brace: " {\n" else: ":\n")
         let then_text = ci_print_compact_stmt(stmts, exprs, types, then_b, depth + 4)
         if then_text.len() > 0:
             out = out ++ then_text
         else:
             out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         if (else_b as i32) != 0:
-            out = out ++ indent ++ "else:\n"
+            out = out ++ indent ++ (if brace: "} else {\n" else: "else:\n")
             let else_text = ci_print_compact_stmt(stmts, exprs, types, else_b, depth + 4)
             if else_text.len() > 0:
                 out = out ++ else_text
             else:
                 out = out ++ ci_make_indent(depth + 4) ++ "0\n"
+        if brace:
+            out = out ++ indent ++ "}\n"
         return out
 
     if kind == CiStmtKind.CIS_VAR_DECL:
@@ -4276,6 +4320,8 @@ fn ci_render_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, ex
     let seq_name = ci_expr_temp_name(session, cursor, "seq")
     let tail_stmt = stmts.expr_stmt(lowered.value_expr)
     let body_stmt = ci_stmt_merge_ir(stmts, lowered.setup_stmt, tail_stmt)
+    if migrate_prefer_brace():
+        return "with 0 as " ++ seq_name ++ " {\n" ++ ci_print_compact_stmt(stmts, exprs, types, body_stmt, 4) ++ "}"
     "with 0 as " ++ seq_name ++ ":\n" ++ ci_print_compact_stmt(stmts, exprs, types, body_stmt, 4)
 
 fn ci_cursor_is_simple_storage_ref(session: i64, cursor: i32) -> bool:
@@ -7046,18 +7092,13 @@ fn ci_lower_switch_prong_forward_ir(session: i64, body_cursor: i32, start_idx: i
                 if (inner_id as i32) == 0:
                     return 0 as CiStmtId
                 part_ids.push(inner_id as i32)
-            if bk == CXK_RETURN_STMT or bk == CXK_GOTO_STMT or bk == CXK_CONTINUE_STMT:
+            if ci_stmt_ends_with_terminator(session, inner):
                 return ci_stmt_from_flat_ids(stmts, &part_ids)
     var j = start_idx + 1
     while j < total:
         let next_child = with_ci_child(session, body_cursor, j)
         let next_kind = with_ci_cursor_kind(session, next_child)
         if next_kind == CXK_BREAK_STMT:
-            return ci_stmt_from_flat_ids(stmts, &part_ids)
-        if next_kind == CXK_RETURN_STMT or next_kind == CXK_GOTO_STMT or next_kind == CXK_CONTINUE_STMT:
-            let next_id = ci_lower_stmt_ir(session, next_child, stmts, exprs, types, 0, scope)
-            if (next_id as i32) != 0:
-                part_ids.push(next_id as i32)
             return ci_stmt_from_flat_ids(stmts, &part_ids)
         if next_kind == CXK_CASE_STMT or next_kind == CXK_DEFAULT_STMT:
             let dup_id = ci_lower_switch_prong_forward_ir(session, body_cursor, j, total, stmts, exprs, types, scope)
@@ -7068,6 +7109,8 @@ fn ci_lower_switch_prong_forward_ir(session: i64, body_cursor: i32, start_idx: i
             let next_id = ci_lower_stmt_ir(session, next_child, stmts, exprs, types, 0, scope)
             if (next_id as i32) != 0:
                 part_ids.push(next_id as i32)
+            if ci_stmt_ends_with_terminator(session, next_child):
+                return ci_stmt_from_flat_ids(stmts, &part_ids)
         j = j + 1
     ci_stmt_from_flat_ids(stmts, &part_ids)
 
@@ -7155,6 +7198,10 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
                     if (sib_id as i32) == 0:
                         return 0 as CiStmtId
                     body_ids.push(sib_id as i32)
+                    if ci_stmt_ends_with_terminator(session, sib):
+                        hit_break = true
+                        j = j + 1
+                        break
                 j = j + 1
             if not hit_break and j < body_nc:
                 let probe_kind = with_ci_cursor_kind(session, with_ci_child(session, body_cursor, j))
@@ -7205,6 +7252,10 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
                     if (sib_id as i32) == 0:
                         return 0 as CiStmtId
                     body_ids.push(sib_id as i32)
+                    if ci_stmt_ends_with_terminator(session, sib):
+                        hit_break = true
+                        j = j + 1
+                        break
                 j = j + 1
             if not hit_break and j < body_nc:
                 let probe_kind = with_ci_cursor_kind(session, with_ci_child(session, body_cursor, j))
@@ -7597,6 +7648,61 @@ fn ci_drill_innermost_case_substmt(session: i64, case_cursor: i32) -> i32:
         cur = body_child
     -1
 
+// True when a statement tail leaves the local statement by return/goto.
+// This deliberately excludes break/continue because those may be local to
+// wrapper constructs such as `do { ... } while (0)`.
+fn ci_stmt_ends_with_nonlocal_terminator(session: i64, cursor: i32) -> bool:
+    let kind = with_ci_cursor_kind(session, cursor)
+    if kind == CXK_RETURN_STMT or kind == CXK_GOTO_STMT:
+        return true
+    if kind == CXK_LABEL_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_stmt_ends_with_nonlocal_terminator(session, with_ci_child(session, cursor, nc - 1))
+    if kind == CXK_IF_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 3:
+            return ci_stmt_ends_with_nonlocal_terminator(session, with_ci_child(session, cursor, 1)) and ci_stmt_ends_with_nonlocal_terminator(session, with_ci_child(session, cursor, 2))
+        return false
+    if kind == CXK_UNEXPOSED_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_stmt_ends_with_nonlocal_terminator(session, with_ci_child(session, cursor, nc - 1))
+    if kind == CXK_COMPOUND_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_stmt_ends_with_nonlocal_terminator(session, with_ci_child(session, cursor, nc - 1))
+    if kind == CXK_CASE_STMT or kind == CXK_DEFAULT_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_stmt_ends_with_nonlocal_terminator(session, with_ci_child(session, cursor, nc - 1))
+    if kind == CXK_DO_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_stmt_ends_with_nonlocal_terminator(session, with_ci_child(session, cursor, 0))
+    false
+
+fn ci_subtree_has_break_for_current_loop(session: i64, cursor: i32) -> bool:
+    let kind = with_ci_cursor_kind(session, cursor)
+    if kind == CXK_BREAK_STMT:
+        return true
+    if kind == CXK_SWITCH_STMT or kind == CXK_FOR_STMT or kind == CXK_WHILE_STMT or kind == CXK_DO_STMT:
+        return false
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        if ci_subtree_has_break_for_current_loop(session, with_ci_child(session, cursor, i)):
+            return true
+        i = i + 1
+    false
+
+fn ci_label_state_transfer_if_known(session: i64, stmts: &mut CiStmtPool, label_map: str, label_cursor: i32) -> CiStmtId:
+    let label_name = with_ci_cursor_spelling(session, label_cursor)
+    let target_state = ci_label_state(label_map, label_name)
+    if target_state >= 0:
+        return ci_goto_state_transfer_ir(stmts, target_state)
+    0 as CiStmtId
+
 // Broader "is this case non-fallthrough" check: accepts any
 // unconditional terminator (break, return, continue, goto) at
 // the end of the case body. Used by the structural switch
@@ -7607,6 +7713,19 @@ fn ci_stmt_ends_with_terminator(session: i64, cursor: i32) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)
     if kind == CXK_BREAK_STMT or kind == CXK_RETURN_STMT or kind == CXK_CONTINUE_STMT or kind == CXK_GOTO_STMT:
         return true
+    if kind == CXK_LABEL_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_stmt_ends_with_terminator(session, with_ci_child(session, cursor, nc - 1))
+    if kind == CXK_IF_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 3:
+            return ci_stmt_ends_with_terminator(session, with_ci_child(session, cursor, 1)) and ci_stmt_ends_with_terminator(session, with_ci_child(session, cursor, 2))
+        return false
+    if kind == CXK_UNEXPOSED_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_stmt_ends_with_terminator(session, with_ci_child(session, cursor, nc - 1))
     if kind == CXK_COMPOUND_STMT:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
@@ -7615,6 +7734,12 @@ fn ci_stmt_ends_with_terminator(session: i64, cursor: i32) -> bool:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
             return ci_stmt_ends_with_terminator(session, with_ci_child(session, cursor, nc - 1))
+    if kind == CXK_DO_STMT:
+        return ci_stmt_ends_with_nonlocal_terminator(session, cursor)
+    if kind == CXK_FOR_STMT:
+        let parts = ci_extract_for_parts(session, cursor)
+        if parts.cond_cursor < 0 and parts.body_cursor >= 0 and not ci_subtree_has_break_for_current_loop(session, parts.body_cursor):
+            return true
     false
 
 fn ci_switch_case_is_terminated(session: i64, body_cursor: i32, case_index: i32) -> bool:
@@ -7640,8 +7765,20 @@ fn ci_lower_stmt_strip_break_goto_ir(session: i64, cursor: i32, stmts: &mut CiSt
         return stmt_id
     ci_strip_trailing_break_ir(stmts, stmt_id)
 
-fn ci_lower_switch_prong_forward_goto_ir(session: i64, body_cursor: i32, start_idx: i32, total: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str, label_map: str, loop_depth: i32) -> CiStmtId:
+fn ci_lower_switch_prong_forward_goto_ir(session: i64, body_cursor: i32, start_idx: i32, total: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str, label_map: str, loop_depth: i32, cache: &mut Vec[i32], cache_scope: str) -> CiStmtId:
+    let can_cache = scope == cache_scope
+    if can_cache and start_idx >= 0 and start_idx < cache.len() as i32:
+        let cached = cache.get(start_idx as i64)
+        if cached >= 0:
+            return cached as CiStmtId
+    let result = ci_lower_switch_prong_forward_goto_ir_uncached(session, body_cursor, start_idx, total, stmts, exprs, types, scope, label_map, loop_depth, cache, cache_scope)
+    if can_cache and start_idx >= 0 and start_idx < cache.len() as i32:
+        cache.set_i32(start_idx as i64, result as i32)
+    result
+
+fn ci_lower_switch_prong_forward_goto_ir_uncached(session: i64, body_cursor: i32, start_idx: i32, total: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str, label_map: str, loop_depth: i32, cache: &mut Vec[i32], cache_scope: str) -> CiStmtId:
     var part_ids: Vec[i32] = Vec.new()
+    var part_scope = scope
 
     let start_child = with_ci_child(session, body_cursor, start_idx)
     let start_kind = with_ci_cursor_kind(session, start_child)
@@ -7651,10 +7788,21 @@ fn ci_lower_switch_prong_forward_goto_ir(session: i64, body_cursor: i32, start_i
             let bk = with_ci_cursor_kind(session, inner)
             if bk == CXK_BREAK_STMT:
                 return 0 as CiStmtId
-            let inner_id = ci_lower_stmt_goto_ir(session, inner, stmts, exprs, types, scope, label_map, loop_depth)
+            var inner_id: CiStmtId = 0 as CiStmtId
+            if bk == CXK_LABEL_STMT:
+                inner_id = ci_label_state_transfer_if_known(session, stmts, label_map, inner)
+                if (inner_id as i32) != 0:
+                    part_ids.push(inner_id as i32)
+                    return ci_stmt_from_flat_ids(stmts, &part_ids)
+            else if bk == CXK_DECL_STMT:
+                let decl_ir = ci_lower_decl_stmt_structural(session, inner, part_scope, true, stmts, exprs, types)
+                part_scope = decl_ir.updated_scope
+                inner_id = decl_ir.stmt_id
+            else:
+                inner_id = ci_lower_stmt_goto_ir(session, inner, stmts, exprs, types, part_scope, label_map, loop_depth)
             if (inner_id as i32) != 0:
                 part_ids.push(inner_id as i32)
-            if bk == CXK_RETURN_STMT or bk == CXK_GOTO_STMT:
+            if ci_stmt_ends_with_terminator(session, inner):
                 return ci_stmt_from_flat_ids(stmts, &part_ids)
 
     var j = start_idx + 1
@@ -7663,24 +7811,37 @@ fn ci_lower_switch_prong_forward_goto_ir(session: i64, body_cursor: i32, start_i
         let next_kind = with_ci_cursor_kind(session, next_child)
         if next_kind == CXK_BREAK_STMT:
             return ci_stmt_from_flat_ids(stmts, &part_ids)
-        if next_kind == CXK_RETURN_STMT or next_kind == CXK_GOTO_STMT:
-            let next_id = ci_lower_stmt_goto_ir(session, next_child, stmts, exprs, types, scope, label_map, loop_depth)
-            if (next_id as i32) != 0:
-                part_ids.push(next_id as i32)
-            return ci_stmt_from_flat_ids(stmts, &part_ids)
         if next_kind == CXK_CASE_STMT or next_kind == CXK_DEFAULT_STMT:
-            let dup_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, j, total, stmts, exprs, types, scope, label_map, loop_depth)
+            let dup_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, j, total, stmts, exprs, types, part_scope, label_map, loop_depth, cache, cache_scope)
             if (dup_id as i32) != 0:
                 part_ids.push(dup_id as i32)
             return ci_stmt_from_flat_ids(stmts, &part_ids)
-        let next_id = ci_lower_stmt_goto_ir(session, next_child, stmts, exprs, types, scope, label_map, loop_depth)
+        var next_id: CiStmtId = 0 as CiStmtId
+        if next_kind == CXK_LABEL_STMT:
+            next_id = ci_label_state_transfer_if_known(session, stmts, label_map, next_child)
+            if (next_id as i32) != 0:
+                part_ids.push(next_id as i32)
+                return ci_stmt_from_flat_ids(stmts, &part_ids)
+        else if next_kind == CXK_DECL_STMT:
+            let decl_ir = ci_lower_decl_stmt_structural(session, next_child, part_scope, true, stmts, exprs, types)
+            part_scope = decl_ir.updated_scope
+            next_id = decl_ir.stmt_id
+        else:
+            next_id = ci_lower_stmt_goto_ir(session, next_child, stmts, exprs, types, part_scope, label_map, loop_depth)
         if (next_id as i32) != 0:
             part_ids.push(next_id as i32)
+        if ci_stmt_ends_with_terminator(session, next_child):
+            return ci_stmt_from_flat_ids(stmts, &part_ids)
         j = j + 1
     ci_stmt_from_flat_ids(stmts, &part_ids)
 
 fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiExprId, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str, label_map: str, loop_depth: i32) -> CiStmtId:
     let nc = with_ci_num_children(session, body_cursor)
+    var prong_cache: Vec[i32] = Vec.new()
+    var pci = 0
+    while pci < nc:
+        prong_cache.push(-1)
+        pci = pci + 1
 
     var has_fallthrough = false
     var case_count = 0
@@ -7708,8 +7869,16 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
                 if case_nc < 2:
                     return 0 as CiStmtId
                 let case_val_id = ci_lower_expr_ir(session, with_ci_child(session, child, 0), exprs, types, scope)
-                let case_body_id = ci_lower_stmt_strip_break_goto_ir(session, with_ci_child(session, child, 1), stmts, exprs, types, scope, label_map, loop_depth)
-                if (case_val_id as i32) == 0 or (case_body_id as i32) == 0:
+                let case_body = with_ci_child(session, child, 1)
+                var case_body_id: CiStmtId = 0 as CiStmtId
+                if with_ci_cursor_kind(session, case_body) == CXK_COMPOUND_STMT:
+                    case_body_id = ci_lower_stmt_strip_break_goto_ir(session, case_body, stmts, exprs, types, scope, label_map, loop_depth)
+                else:
+                    let raw_case_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, loop_depth, &mut prong_cache, scope)
+                    case_body_id = ci_strip_trailing_break_ir(stmts, raw_case_body_id)
+                if (case_val_id as i32) == 0:
+                    return 0 as CiStmtId
+                if (case_body_id as i32) == 0 and not ci_stmt_ends_with_terminator(session, case_body):
                     return 0 as CiStmtId
                 arm_records.push(1)
                 arm_records.push(case_val_id as i32)
@@ -7719,8 +7888,13 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
                 let case_nc = with_ci_num_children(session, child)
                 if case_nc < 1:
                     return 0 as CiStmtId
-                default_body_id = ci_lower_stmt_strip_break_goto_ir(session, with_ci_child(session, child, 0), stmts, exprs, types, scope, label_map, loop_depth)
-                if (default_body_id as i32) == 0:
+                let default_body = with_ci_child(session, child, 0)
+                if with_ci_cursor_kind(session, default_body) == CXK_COMPOUND_STMT:
+                    default_body_id = ci_lower_stmt_strip_break_goto_ir(session, default_body, stmts, exprs, types, scope, label_map, loop_depth)
+                else:
+                    let raw_default_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, loop_depth, &mut prong_cache, scope)
+                    default_body_id = ci_strip_trailing_break_ir(stmts, raw_default_body_id)
+                if (default_body_id as i32) == 0 and not ci_stmt_ends_with_terminator(session, default_body):
                     return 0 as CiStmtId
             i = i + 1
         if (default_body_id as i32) != 0:
@@ -7735,7 +7909,7 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
             let child = with_ci_child(session, body_cursor, i)
             let ck = with_ci_cursor_kind(session, child)
             if ck == CXK_CASE_STMT:
-                let prong_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, loop_depth)
+                let prong_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, loop_depth, &mut prong_cache, scope)
                 var chain_cur = child
                 var chain_done = false
                 while not chain_done:
@@ -7776,7 +7950,7 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
                         chain_done = true
             else if ck == CXK_DEFAULT_STMT:
                 has_default = true
-                default_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, loop_depth)
+                default_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, loop_depth, &mut prong_cache, scope)
                 let dnc = with_ci_num_children(session, child)
                 if dnc >= 1:
                     var nested = with_ci_child(session, child, 0)
@@ -7864,7 +8038,8 @@ fn ci_lower_stmt_goto_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, expr
                     return 0 as CiStmtId
             if (child_id as i32) != 0:
                 child_ids.push(child_id as i32)
-                child_ids.push((ci_goto_pending_guard_ir(stmts, exprs, loop_depth)) as i32)
+                if with_ci_cursor_kind(session, child) != CXK_BREAK_STMT:
+                    child_ids.push((ci_goto_pending_guard_ir(stmts, exprs, loop_depth)) as i32)
             i = i + 1
         return ci_stmt_from_flat_ids(stmts, &child_ids)
 
@@ -8083,6 +8258,43 @@ fn ci_goto_decl_suffix(session: i64, var_cursor: i32) -> str:
 
 fn ci_goto_hoisted_var_name(session: i64, var_cursor: i32) -> str:
     ci_escape_reserved(with_ci_cursor_spelling(session, var_cursor)) ++ ci_goto_decl_suffix(session, var_cursor)
+
+fn ci_goto_scope_add_decl_mappings(session: i64, cursor: i32, scope: str) -> str:
+    if with_ci_cursor_kind(session, cursor) != CXK_DECL_STMT:
+        return scope
+    let nc = with_ci_num_children(session, cursor)
+    var new_scope = scope
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, cursor, i)
+        if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
+            let raw_name = with_ci_cursor_spelling(session, child)
+            let escaped = ci_escape_reserved(raw_name)
+            let storage_name = ci_goto_hoisted_var_name(session, child)
+            new_scope = ci_scope_add_mangled(new_scope, escaped, storage_name)
+        i = i + 1
+    new_scope
+
+fn ci_goto_switch_scope_after_case(session: i64, cursor: i32, scope: str) -> str:
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+    if kind == CXK_CASE_STMT:
+        if nc >= 2:
+            let case_body = with_ci_child(session, cursor, 1)
+            let cbk = with_ci_cursor_kind(session, case_body)
+            if cbk == CXK_CASE_STMT or cbk == CXK_DEFAULT_STMT:
+                return ci_goto_switch_scope_after_case(session, case_body, scope)
+            if cbk == CXK_DECL_STMT:
+                return ci_goto_scope_add_decl_mappings(session, case_body, scope)
+    else if kind == CXK_DEFAULT_STMT:
+        if nc >= 1:
+            let default_body = with_ci_child(session, cursor, 0)
+            let dbk = with_ci_cursor_kind(session, default_body)
+            if dbk == CXK_CASE_STMT or dbk == CXK_DEFAULT_STMT:
+                return ci_goto_switch_scope_after_case(session, default_body, scope)
+            if dbk == CXK_DECL_STMT:
+                return ci_goto_scope_add_decl_mappings(session, default_body, scope)
+    scope
 
 // Structural counterpart of ci_lower_decl_stmt. Builds a
 // CIS_VAR_DECL for each VAR_DECL child, combining multiple
@@ -9872,24 +10084,31 @@ fn ci_goto_flush_arm(stmts: &mut CiStmtPool, entry_init_id: CiStmtId, target_sta
 // Walk a subtree that contains labels, recursively descending into
 // structures (for-loops, switches, compound blocks) to find and lift
 // nested labels into top-level state arms.
-fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, label_map: str, next_synthetic: &mut i32, entry_init_id: CiStmtId, cur_state: &mut i32, cur_label_str_idx: &mut i32, cur_children: &mut Vec[i32], cur_has_content: &mut bool, arm_states: &mut Vec[i32], arm_labels: &mut Vec[i32], arm_child_starts: &mut Vec[i32], arm_child_counts: &mut Vec[i32], arm_children_flat: &mut Vec[i32], loop_top_state: i32):
+fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, label_map: str, next_synthetic: &mut i32, entry_init_id: CiStmtId, cur_state: &mut i32, cur_label_str_idx: &mut i32, cur_children: &mut Vec[i32], cur_has_content: &mut bool, arm_states: &mut Vec[i32], arm_labels: &mut Vec[i32], arm_child_starts: &mut Vec[i32], arm_child_counts: &mut Vec[i32], arm_children_flat: &mut Vec[i32], loop_top_state: i32, break_target_state: i32, connect_label_entry: bool, skip_until_label: bool):
     let kind = with_ci_cursor_kind(session, cursor)
 
     if kind == CXK_LABEL_STMT:
         let label_name = with_ci_cursor_spelling(session, cursor)
         let target_state = ci_label_state(label_map, label_name)
         if target_state >= 0:
-            ci_goto_flush_arm(stmts, entry_init_id, target_state, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, stmts.add_string(label_name))
+            if connect_label_entry or *cur_has_content:
+                ci_goto_flush_arm(stmts, entry_init_id, target_state, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, stmts.add_string(label_name))
+            else:
+                *cur_state = target_state
+                *cur_label_str_idx = stmts.add_string(label_name)
+                *cur_children = Vec.new()
+                *cur_has_content = false
         let lnc = with_ci_num_children(session, cursor)
         if lnc > 0:
             let label_body = with_ci_child(session, cursor, 0)
             let lbk = with_ci_cursor_kind(session, label_body)
             if lbk == CXK_LABEL_STMT:
-                ci_goto_body_walk_subtree(session, label_body, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state)
+                ci_goto_body_walk_subtree(session, label_body, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, break_target_state, connect_label_entry, false)
             else if ci_subtree_has_labels(session, label_body):
-                ci_goto_body_walk_subtree(session, label_body, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state)
+                ci_goto_body_walk_subtree(session, label_body, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, break_target_state, connect_label_entry, false)
             else:
-                let stmt_id = ci_lower_stmt_goto_ir(session, label_body, stmts, exprs, types, scope, label_map, 0)
+                let lowered_id = ci_lower_stmt_goto_ir(session, label_body, stmts, exprs, types, scope, label_map, 0)
+                let stmt_id = ci_rewrite_breaks_to_state_ir(stmts, lowered_id, break_target_state)
                 if (stmt_id as i32) != 0:
                     cur_children.push(stmt_id as i32)
                     cur_children.push((ci_goto_pending_guard_ir(stmts, exprs, 0)) as i32)
@@ -9898,12 +10117,22 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
 
     if kind == CXK_COMPOUND_STMT:
         let block_nc = with_ci_num_children(session, cursor)
+        var block_scope = scope
+        var active = not skip_until_label
         var bi = 0
         while bi < block_nc:
             let block_child = with_ci_child(session, cursor, bi)
             let bck = with_ci_cursor_kind(session, block_child)
+            if not active:
+                if bck == CXK_DECL_STMT:
+                    block_scope = ci_goto_scope_add_decl_mappings(session, block_child, block_scope)
+                if bck == CXK_LABEL_STMT or ci_subtree_has_labels(session, block_child):
+                    active = true
+                else:
+                    bi = bi + 1
+                    continue
             if bck == CXK_LABEL_STMT or ci_subtree_has_labels(session, block_child):
-                ci_goto_body_walk_subtree(session, block_child, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state)
+                ci_goto_body_walk_subtree(session, block_child, block_scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, break_target_state, connect_label_entry, false)
             else if bck == CXK_GOTO_STMT:
                 var target_label = ""
                 let gnc = with_ci_num_children(session, block_child)
@@ -9916,13 +10145,18 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
                     cur_children.push((stmts.goto_state(target_state)) as i32)
                     cur_children.push((stmts.continue_()) as i32)
                     *cur_has_content = true
+            else if bck == CXK_BREAK_STMT and break_target_state >= 0:
+                cur_children.push((ci_goto_state_transfer_ir(stmts, break_target_state)) as i32)
+                *cur_has_content = true
             else if bck == CXK_DECL_STMT:
-                let decl_ir = ci_lower_decl_stmt_structural(session, block_child, scope, true, stmts, exprs, types)
+                let decl_ir = ci_lower_decl_stmt_structural(session, block_child, block_scope, true, stmts, exprs, types)
+                block_scope = decl_ir.updated_scope
                 if (decl_ir.stmt_id as i32) != 0:
                     cur_children.push(decl_ir.stmt_id as i32)
                     *cur_has_content = true
             else:
-                let stmt_id = ci_lower_stmt_goto_ir(session, block_child, stmts, exprs, types, scope, label_map, 0)
+                let lowered_id = ci_lower_stmt_goto_ir(session, block_child, stmts, exprs, types, block_scope, label_map, 0)
+                let stmt_id = ci_rewrite_breaks_to_state_ir(stmts, lowered_id, break_target_state)
                 if (stmt_id as i32) != 0:
                     cur_children.push(stmt_id as i32)
                     cur_children.push((ci_goto_pending_guard_ir(stmts, exprs, 0)) as i32)
@@ -9934,15 +10168,17 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
         let parts = ci_extract_for_parts(session, cursor)
         if parts.body_cursor < 0:
             return
+        var loop_scope = scope
         if parts.init_cursor >= 0:
             let ik = with_ci_cursor_kind(session, parts.init_cursor)
             if ik == CXK_DECL_STMT:
-                let decl_ir = ci_lower_decl_stmt_structural(session, parts.init_cursor, scope, true, stmts, exprs, types)
+                let decl_ir = ci_lower_decl_stmt_structural(session, parts.init_cursor, loop_scope, true, stmts, exprs, types)
+                loop_scope = decl_ir.updated_scope
                 if (decl_ir.stmt_id as i32) != 0:
                     cur_children.push(decl_ir.stmt_id as i32)
                     *cur_has_content = true
             else:
-                let init_id = ci_lower_stmt_goto_ir(session, parts.init_cursor, stmts, exprs, types, scope, label_map, 0)
+                let init_id = ci_lower_stmt_goto_ir(session, parts.init_cursor, stmts, exprs, types, loop_scope, label_map, 0)
                 if (init_id as i32) != 0:
                     cur_children.push(init_id as i32)
                     *cur_has_content = true
@@ -9950,7 +10186,7 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
         *next_synthetic = *next_synthetic + 1
         ci_goto_flush_arm(stmts, entry_init_id, loop_state, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, stmts.add_string("__loop_top"))
         if parts.cond_cursor >= 0:
-            let prepared_cond = ci_prepare_stmt_condition_ir(session, parts.cond_cursor, stmts, exprs, types, scope)
+            let prepared_cond = ci_prepare_stmt_condition_ir(session, parts.cond_cursor, stmts, exprs, types, loop_scope)
             if ci_value_ir_valid(prepared_cond):
                 if (prepared_cond.setup_stmt as i32) != 0:
                     cur_children.push(prepared_cond.setup_stmt as i32)
@@ -9962,9 +10198,9 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
                 cur_children.push(goto_after as i32)
                 cur_children.push((ci_goto_pending_guard_ir(stmts, exprs, 0)) as i32)
                 *cur_has_content = true
-                ci_goto_body_walk_subtree(session, parts.body_cursor, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_state)
+                ci_goto_body_walk_subtree(session, parts.body_cursor, loop_scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_state, break_target_state, connect_label_entry, false)
                 if parts.inc_cursor >= 0:
-                    let inc_id = ci_lower_stmt_expr_ir(session, parts.inc_cursor, stmts, exprs, types, scope)
+                    let inc_id = ci_lower_stmt_expr_ir(session, parts.inc_cursor, stmts, exprs, types, loop_scope)
                     if (inc_id as i32) != 0:
                         cur_children.push(inc_id as i32)
                 cur_children.push((stmts.goto_state(loop_state)) as i32)
@@ -9972,7 +10208,7 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
                 *cur_has_content = true
                 ci_goto_flush_arm(stmts, entry_init_id, after_loop_state, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, stmts.add_string("__after_loop"))
             return
-        ci_goto_body_walk_subtree(session, parts.body_cursor, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_state)
+        ci_goto_body_walk_subtree(session, parts.body_cursor, loop_scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_state, break_target_state, connect_label_entry, false)
         cur_children.push((stmts.goto_state(loop_state)) as i32)
         cur_children.push((stmts.continue_()) as i32)
         *cur_has_content = true
@@ -9997,7 +10233,7 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
             cur_children.push(goto_after as i32)
             cur_children.push((ci_goto_pending_guard_ir(stmts, exprs, 0)) as i32)
             *cur_has_content = true
-            ci_goto_body_walk_subtree(session, with_ci_child(session, cursor, 1), scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_state)
+            ci_goto_body_walk_subtree(session, with_ci_child(session, cursor, 1), scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_state, break_target_state, connect_label_entry, false)
             cur_children.push((stmts.goto_state(loop_state)) as i32)
             cur_children.push((stmts.continue_()) as i32)
             *cur_has_content = true
@@ -10011,7 +10247,7 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
         let loop_state = *next_synthetic
         *next_synthetic = *next_synthetic + 1
         ci_goto_flush_arm(stmts, entry_init_id, loop_state, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, stmts.add_string("__do_top"))
-        ci_goto_body_walk_subtree(session, with_ci_child(session, cursor, 0), scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_state)
+        ci_goto_body_walk_subtree(session, with_ci_child(session, cursor, 0), scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_state, break_target_state, connect_label_entry, false)
         let prepared_cond = ci_prepare_stmt_condition_ir(session, with_ci_child(session, cursor, 1), stmts, exprs, types, scope)
         if ci_value_ir_valid(prepared_cond):
             let break_if_false = ci_build_if_not_break_ir(stmts, exprs, prepared_cond.value_expr)
@@ -10056,7 +10292,7 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
                     *cur_has_content = true
                     if inc > 2:
                         if else_has:
-                            ci_goto_body_walk_subtree(session, with_ci_child(session, cursor, 2), scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state)
+                            ci_goto_body_walk_subtree(session, with_ci_child(session, cursor, 2), scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, break_target_state, connect_label_entry, false)
                         else:
                             let else_id = ci_lower_stmt_goto_ir(session, with_ci_child(session, cursor, 2), stmts, exprs, types, scope, label_map, 0)
                             if (else_id as i32) != 0:
@@ -10066,7 +10302,7 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
                     cur_children.push((stmts.goto_state(after_if_state)) as i32)
                     cur_children.push((stmts.continue_()) as i32)
                     ci_goto_flush_arm(stmts, entry_init_id, then_state, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, stmts.add_string("__if_then"))
-                    ci_goto_body_walk_subtree(session, then_child, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state)
+                    ci_goto_body_walk_subtree(session, then_child, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, break_target_state, connect_label_entry, false)
                     cur_children.push((stmts.goto_state(after_if_state)) as i32)
                     cur_children.push((stmts.continue_()) as i32)
                     ci_goto_flush_arm(stmts, entry_init_id, after_if_state, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, stmts.add_string("__after_if"))
@@ -10088,7 +10324,7 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
                     cur_children.push((stmts.goto_state(after_if_state)) as i32)
                     cur_children.push((stmts.continue_()) as i32)
                     ci_goto_flush_arm(stmts, entry_init_id, else_state, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, stmts.add_string("__if_else"))
-                    ci_goto_body_walk_subtree(session, with_ci_child(session, cursor, 2), scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state)
+                    ci_goto_body_walk_subtree(session, with_ci_child(session, cursor, 2), scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, break_target_state, connect_label_entry, false)
                     cur_children.push((stmts.goto_state(after_if_state)) as i32)
                     cur_children.push((stmts.continue_()) as i32)
                     ci_goto_flush_arm(stmts, entry_init_id, after_if_state, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, stmts.add_string("__after_if"))
@@ -10107,17 +10343,30 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
                 cur_children.push(match_id as i32)
                 cur_children.push((ci_goto_pending_guard_ir(stmts, exprs, 0)) as i32)
                 *cur_has_content = true
+            let after_switch_state = *next_synthetic
+            *next_synthetic = *next_synthetic + 1
+            ci_goto_flush_arm(stmts, entry_init_id, after_switch_state, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, stmts.add_string("__after_switch"))
             let switch_body = with_ci_child(session, cursor, 1)
             let sbnc = with_ci_num_children(session, switch_body)
+            var switch_scope = scope
+            var scan_state: i32 = after_switch_state
+            var scan_label_str_idx: i32 = 0
+            var scan_children: Vec[i32] = Vec.new()
+            var scan_has_content = false
             var si = 0
             while si < sbnc:
                 let sc = with_ci_child(session, switch_body, si)
                 let sck = with_ci_cursor_kind(session, sc)
                 if sck == CXK_CASE_STMT or sck == CXK_DEFAULT_STMT:
-                    ci_goto_switch_scan_labels(session, sc, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state)
+                    ci_goto_switch_scan_labels(session, sc, switch_scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, &mut scan_state, &mut scan_label_str_idx, &mut scan_children, &mut scan_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, after_switch_state)
+                    switch_scope = ci_goto_switch_scope_after_case(session, sc, switch_scope)
+                else if sck == CXK_DECL_STMT:
+                    switch_scope = ci_goto_scope_add_decl_mappings(session, sc, switch_scope)
                 else if sck == CXK_LABEL_STMT or ci_subtree_has_labels(session, sc):
-                    ci_goto_body_walk_subtree(session, sc, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state)
+                    ci_goto_body_walk_subtree(session, sc, switch_scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, &mut scan_state, &mut scan_label_str_idx, &mut scan_children, &mut scan_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, after_switch_state, false, true)
                 si = si + 1
+            if scan_has_content:
+                ci_goto_flush_arm(stmts, entry_init_id, after_switch_state, &mut scan_state, &mut scan_label_str_idx, &mut scan_children, &mut scan_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, stmts.add_string("__after_switch"))
             if loop_top_state >= 0:
                 cur_children.push((stmts.goto_state(loop_top_state)) as i32)
                 cur_children.push((stmts.continue_()) as i32)
@@ -10131,7 +10380,7 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
         *cur_has_content = true
 
 // Scan a case/default statement for nested labels and walk them.
-fn ci_goto_switch_scan_labels(session: i64, cursor: i32, scope: str, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, label_map: str, next_synthetic: &mut i32, entry_init_id: CiStmtId, cur_state: &mut i32, cur_label_str_idx: &mut i32, cur_children: &mut Vec[i32], cur_has_content: &mut bool, arm_states: &mut Vec[i32], arm_labels: &mut Vec[i32], arm_child_starts: &mut Vec[i32], arm_child_counts: &mut Vec[i32], arm_children_flat: &mut Vec[i32], loop_top_state: i32):
+fn ci_goto_switch_scan_labels(session: i64, cursor: i32, scope: str, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, label_map: str, next_synthetic: &mut i32, entry_init_id: CiStmtId, cur_state: &mut i32, cur_label_str_idx: &mut i32, cur_children: &mut Vec[i32], cur_has_content: &mut bool, arm_states: &mut Vec[i32], arm_labels: &mut Vec[i32], arm_child_starts: &mut Vec[i32], arm_child_counts: &mut Vec[i32], arm_children_flat: &mut Vec[i32], loop_top_state: i32, break_target_state: i32):
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
     if kind == CXK_CASE_STMT:
@@ -10139,17 +10388,17 @@ fn ci_goto_switch_scan_labels(session: i64, cursor: i32, scope: str, stmts: &mut
             let case_body = with_ci_child(session, cursor, 1)
             let cbk = with_ci_cursor_kind(session, case_body)
             if cbk == CXK_CASE_STMT or cbk == CXK_DEFAULT_STMT:
-                ci_goto_switch_scan_labels(session, case_body, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state)
+                ci_goto_switch_scan_labels(session, case_body, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, break_target_state)
             else if cbk == CXK_LABEL_STMT or ci_subtree_has_labels(session, case_body):
-                ci_goto_body_walk_subtree(session, case_body, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state)
+                ci_goto_body_walk_subtree(session, case_body, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, break_target_state, false, true)
     else if kind == CXK_DEFAULT_STMT:
         if nc >= 1:
             let default_body = with_ci_child(session, cursor, 0)
             let dbk = with_ci_cursor_kind(session, default_body)
             if dbk == CXK_CASE_STMT or dbk == CXK_DEFAULT_STMT:
-                ci_goto_switch_scan_labels(session, default_body, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state)
+                ci_goto_switch_scan_labels(session, default_body, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, break_target_state)
             else if dbk == CXK_LABEL_STMT or ci_subtree_has_labels(session, default_body):
-                ci_goto_body_walk_subtree(session, default_body, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state)
+                ci_goto_body_walk_subtree(session, default_body, scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, cur_state, cur_label_str_idx, cur_children, cur_has_content, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, break_target_state, false, true)
 
 // Translate a goto-containing function body as a structural
 // state-machine (CIS_GOTO_BODY). Each arm stores structural
@@ -10180,9 +10429,6 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
         hoisted_stmt_ids.push(decl_id as i32)
         hvi = hvi + 1
 
-    // Walk body children and group into arms. Each arm stores a
-    // flat list of structural stmt ids with layout
-    // `[state, label_str_idx, child_count, child_stmt_0, ..., child_stmt_(K-1)]`.
     let nc = with_ci_num_children(session, body_cursor)
 
     var arm_states: Vec[i32] = Vec.new()
@@ -10190,7 +10436,6 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
     var arm_child_starts: Vec[i32] = Vec.new()
     var arm_child_counts: Vec[i32] = Vec.new()
     var arm_children_flat: Vec[i32] = Vec.new()
-
     var body_scope = scope
     var cur_state: i32 = 0
     var cur_label_str_idx: i32 = 0
@@ -10230,7 +10475,7 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
                 let label_body = with_ci_child(session, child, 0)
                 let lbk = with_ci_cursor_kind(session, label_body)
                 if lbk == CXK_LABEL_STMT or ci_subtree_has_labels(session, label_body):
-                    ci_goto_body_walk_subtree(session, label_body, body_scope, stmts, exprs, types, label_map, &mut next_synthetic, entry_init_id, &mut cur_state, &mut cur_label_str_idx, &mut cur_children, &mut cur_has_content, &mut arm_states, &mut arm_labels, &mut arm_child_starts, &mut arm_child_counts, &mut arm_children_flat, -1)
+                    ci_goto_body_walk_subtree(session, label_body, body_scope, stmts, exprs, types, label_map, &mut next_synthetic, entry_init_id, &mut cur_state, &mut cur_label_str_idx, &mut cur_children, &mut cur_has_content, &mut arm_states, &mut arm_labels, &mut arm_child_starts, &mut arm_child_counts, &mut arm_children_flat, -1, -1, true, false)
                 else:
                     var stmt_id: CiStmtId = 0 as CiStmtId
                     if lbk == CXK_DECL_STMT:
@@ -10266,7 +10511,7 @@ fn ci_lower_goto_body_structural(session: i64, body_cursor: i32, scope: str, stm
 
         else:
             if ci_subtree_has_labels(session, child):
-                ci_goto_body_walk_subtree(session, child, body_scope, stmts, exprs, types, label_map, &mut next_synthetic, entry_init_id, &mut cur_state, &mut cur_label_str_idx, &mut cur_children, &mut cur_has_content, &mut arm_states, &mut arm_labels, &mut arm_child_starts, &mut arm_child_counts, &mut arm_children_flat, -1)
+                ci_goto_body_walk_subtree(session, child, body_scope, stmts, exprs, types, label_map, &mut next_synthetic, entry_init_id, &mut cur_state, &mut cur_label_str_idx, &mut cur_children, &mut cur_has_content, &mut arm_states, &mut arm_labels, &mut arm_child_starts, &mut arm_child_counts, &mut arm_children_flat, -1, -1, true, false)
             else:
                 let stmt_id = ci_lower_stmt_goto_ir(session, child, stmts, exprs, types, body_scope, label_map, 0)
                 if (stmt_id as i32) != 0:

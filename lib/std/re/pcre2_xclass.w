@@ -60,8 +60,8 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
 
             var ok: c_int
 
-            match (unsafe: *data):
-                0 =>
+            match (unsafe: *data) {
+                0 => {
                     (chartype = prop.chartype)
 
                     var __ci_expr_logic_5: c_int
@@ -85,19 +85,23 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
                     }
 
 
-                1 =>
+                },
+                1 => {
                     if ((if (if (unsafe: data[1]) == _pcre2_ucp_gentype_8[prop.chartype]: 1 else: 0) == isprop: 1 else: 0) != 0) {
                         return not_negated
                     }
-                2 =>
+                },
+                2 => {
                     if ((if (if (unsafe: data[1]) == prop.chartype: 1 else: 0) == isprop: 1 else: 0) != 0) {
                         return not_negated
                     }
-                3 =>
+                },
+                3 => {
                     if ((if (if (unsafe: data[1]) == prop.script: 1 else: 0) == isprop: 1 else: 0) != 0) {
                         return not_negated
                     }
-                4 =>
+                },
+                4 => {
                     var __ci_expr_logic_6: c_int
 
                     if ((if (unsafe: data[1]) == prop.script: 1 else: 0) != 0) {
@@ -113,7 +117,8 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
                         return not_negated
                     }
 
-                5 =>
+                },
+                5 => {
                     (chartype = prop.chartype)
 
                     var __ci_expr_logic_7: c_int
@@ -129,17 +134,22 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
                     }
 
 
-                6 | 7 =>
-                    match c:
-                        9 | 32 | 160 | 5760 | 6158 | 8192 | 8193 | 8194 | 8195 | 8196 | 8197 | 8198 | 8199 | 8200 | 8201 | 8202 | 8239 | 8287 | 12288 | 10 | 11 | 12 | 13 | 133 | 8232 | 8233 =>
+                },
+                6 | 7 => {
+                    match c {
+                        9 | 32 | 160 | 5760 | 6158 | 8192 | 8193 | 8194 | 8195 | 8196 | 8197 | 8198 | 8199 | 8200 | 8201 | 8202 | 8239 | 8287 | 12288 | 10 | 11 | 12 | 13 | 133 | 8232 | 8233 => {
                             if (isprop != 0) {
                                 return not_negated
                             }
-                        _ =>
+                        },
+                        _ => {
                             if ((if (if _pcre2_ucp_gentype_8[prop.chartype] == 6: 1 else: 0) == isprop: 1 else: 0) != 0) {
                                 return not_negated
                             }
-                8 =>
+                        },
+                    }
+                },
+                8 => {
                     (chartype = prop.chartype)
 
                     var __ci_expr_logic_10: c_int
@@ -171,7 +181,8 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
                     }
 
 
-                10 =>
+                },
+                10 => {
                     if ((if c < 160: 1 else: 0) != 0) {
                         var __ci_expr_logic_12: c_int
 
@@ -209,18 +220,21 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
 
 
                     }
-                11 =>
+                },
+                11 => {
                     if ((if (if ((prop.scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe: data[1]): 1 else: 0) == isprop: 1 else: 0) != 0) {
                         return not_negated
                     }
-                12 =>
+                },
+                12 => {
                     (ok = (if ((unsafe: ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + (((prop.bprops & 4095) as isize) as usize))[((unsafe: data[1]) / 32)]) & ((1 as c_uint) << (((unsafe: data[1]) % 32) as c_uint))) != 0: 1 else: 0))
 
                     if ((if ok == isprop: 1 else: 0) != 0) {
                         return not_negated
                     }
 
-                14 =>
+                },
+                14 => {
                     (chartype = prop.chartype)
 
                     var __ci_expr_logic_19: c_int = 0
@@ -271,7 +285,8 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
                     }
 
 
-                15 =>
+                },
+                15 => {
                     (chartype = prop.chartype)
 
                     var __ci_expr_logic_25: c_int = 0
@@ -322,7 +337,8 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
                     }
 
 
-                16 =>
+                },
+                16 => {
                     (chartype = prop.chartype)
 
                     var __ci_expr_logic_27: c_int
@@ -345,7 +361,8 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
                     }
 
 
-                17 =>
+                },
+                17 => {
                     var __ci_expr_logic_38: c_int
 
                     var __ci_expr_logic_36: c_int
@@ -431,7 +448,8 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
                         return not_negated
                     }
 
-                _ =>
+                },
+                _ => {
                     while true {
                         if (not (0 != 0)) {
                             break
@@ -440,6 +458,8 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, char_lists_end: *
 
                     return 0
 
+                },
+            }
 
             (data = data + 2)
 
@@ -892,8 +912,8 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
     }
 
     while ((if ptr < data_end: 1 else: 0) != 0) {
-        match (unsafe: *ptr):
-            1 =>
+        match (unsafe: *ptr) {
+            1 => {
                 (ptr = ptr + 1)
 
                 (stack = ((stack as c_uint) >> (1 as c_uint)) & (stack | (~1)))
@@ -906,7 +926,8 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
 
                 (stack_depth = stack_depth - 1)
 
-            2 =>
+            },
+            2 => {
                 (ptr = ptr + 1)
 
                 (stack = ((stack as c_uint) >> (1 as c_uint)) | (stack & 1))
@@ -919,7 +940,8 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
 
                 (stack_depth = stack_depth - 1)
 
-            3 =>
+            },
+            3 => {
                 (ptr = ptr + 1)
 
                 (stack = ((stack as c_uint) >> (1 as c_uint)) ^ (stack & 1))
@@ -932,7 +954,8 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
 
                 (stack_depth = stack_depth - 1)
 
-            4 =>
+            },
+            4 => {
                 (ptr = ptr + 1)
 
                 (stack = stack ^ 1)
@@ -943,7 +966,8 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
                     }
                 }
 
-            5 =>
+            },
+            5 => {
                 var matched: c_uint = _pcre2_xclass_8(c, ((ptr + ((1 as isize) as usize)) + ((2 as isize) as usize)), char_lists_end, utf)
 
                 (ptr = ptr + (((((unsafe: ptr[1]) as c_int) << (8 as c_uint)) | (unsafe: ptr[(1 + 1)])) as c_uint))
@@ -952,7 +976,8 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
 
                 (stack_depth = stack_depth + 1)
 
-            _ =>
+            },
+            _ => {
                 while true {
                     if (not (0 != 0)) {
                         break
@@ -961,6 +986,8 @@ fn _pcre2_eclass_8(c: c_uint, data_start: *const u8, data_end: *const u8, char_l
 
                 return 0
 
+            },
+        }
 
     }
 

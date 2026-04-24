@@ -153,8 +153,8 @@ fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_o
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true {
-        match __pc:
-            0 =>
+        match __pc {
+            0 => {
                 (__goto_pending = 0)
                 (data__goto_164_30 = ((bytes as *const pcre2_serialized_data)))
                 var __ci_expr_ternary_0: *mut pcre2_memctl = null
@@ -346,7 +346,8 @@ fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_o
                 __pc = 1
                 __goto_pending = 1
                 continue
-            1 =>  // cleanup
+            },
+            1 => {  // cleanup
                 (__goto_pending = 0)
                 if ((if dst_re__goto_169_18 != null: 1 else: 0) != 0) {
                     memctl__goto_165_21.free(dst_re__goto_169_18, memctl__goto_165_21.memory_data)
@@ -380,7 +381,11 @@ fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_o
                 if (__goto_pending != 0) {
                     continue
                 }
-            _ => break
+            },
+            _ => {
+                break
+            },
+        }
     }
 }
 

@@ -5,15 +5,20 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
     var re: *const pcre2_real_code_8 = code
 
     if ((if where_ == null: 1 else: 0) != 0) {
-        match what:
-            0 | 1 | 2 | 3 | 4 | 21 | 26 | 6 | 5 | 23 | 8 | 25 | 9 | 12 | 11 | 13 | 14 | 15 | 16 | 18 | 17 | 20 =>
+        match what {
+            0 | 1 | 2 | 3 | 4 | 21 | 26 | 6 | 5 | 23 | 8 | 25 | 9 | 12 | 11 | 13 | 14 | 15 | 16 | 18 | 17 | 20 => {
                 return 4
-            7 =>
+            },
+            7 => {
                 return 8
-            10 | 22 | 24 =>
+            },
+            10 | 22 | 24 => {
                 return 8
-            19 =>
+            },
+            19 => {
                 return 8
+            },
+        }
 
     }
 
@@ -29,27 +34,34 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
         return -32
     }
 
-    match what:
-        0 =>
+    match what {
+        0 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.overall_options)
-        1 =>
+        },
+        1 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.compile_options)
-        2 =>
+        },
+        2 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.top_backref)
-        3 =>
+        },
+        3 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.bsr_convention)
-        4 =>
+        },
+        4 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.top_bracket)
-        21 =>
+        },
+        21 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.limit_depth)
 
             if ((if re.limit_depth == 4294967295: 1 else: 0) != 0) {
                 return -55
             }
 
-        26 =>
+        },
+        26 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.extra_options)
-        6 =>
+        },
+        6 => {
             var __ci_expr_ternary_1: c_int = 0
 
             if ((if (re.flags & 16) != 0: 1 else: 0) != 0) {
@@ -69,7 +81,8 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
 
             ((unsafe: *(where_ as *mut c_uint)) = __ci_expr_ternary_1)
 
-        5 =>
+        },
+        5 => {
             var __ci_expr_ternary_2: c_uint = 0
 
             if ((if (re.flags & 16) != 0: 1 else: 0) != 0) {
@@ -80,7 +93,8 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
 
             ((unsafe: *(where_ as *mut c_uint)) = __ci_expr_ternary_2)
 
-        7 =>
+        },
+        7 => {
             var __ci_expr_ternary_3: *const u8 = null
 
             if ((if (re.flags & 64) != 0: 1 else: 0) != 0) {
@@ -91,24 +105,31 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
 
             ((unsafe: *(where_ as *mut *const u8)) = __ci_expr_ternary_3)
 
-        24 =>
+        },
+        24 => {
             ((unsafe: *(where_ as *mut c_ulong)) = (120 +% ((re.top_bracket * 2) *% sizeof[c_ulong]())))
-        23 =>
+        },
+        23 => {
             ((unsafe: *(where_ as *mut c_uint)) = (if (re.flags & 4194304) != 0: 1 else: 0))
-        8 =>
+        },
+        8 => {
             ((unsafe: *(where_ as *mut c_uint)) = (if (re.flags & 2048) != 0: 1 else: 0))
-        25 =>
+        },
+        25 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.limit_heap)
 
             if ((if re.limit_heap == 4294967295: 1 else: 0) != 0) {
                 return -55
             }
 
-        9 =>
+        },
+        9 => {
             ((unsafe: *(where_ as *mut c_uint)) = (if (re.flags & 1024) != 0: 1 else: 0))
-        10 =>
+        },
+        10 => {
             ((unsafe: *(where_ as *mut c_ulong)) = 0)
-        12 =>
+        },
+        12 => {
             var __ci_expr_ternary_4: c_int = 0
 
             if ((if (re.flags & 128) != 0: 1 else: 0) != 0) {
@@ -119,7 +140,8 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
 
             ((unsafe: *(where_ as *mut c_uint)) = __ci_expr_ternary_4)
 
-        11 =>
+        },
+        11 => {
             var __ci_expr_ternary_5: c_uint = 0
 
             if ((if (re.flags & 128) != 0: 1 else: 0) != 0) {
@@ -130,31 +152,43 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
 
             ((unsafe: *(where_ as *mut c_uint)) = __ci_expr_ternary_5)
 
-        13 =>
+        },
+        13 => {
             ((unsafe: *(where_ as *mut c_uint)) = (if (re.flags & 8192) != 0: 1 else: 0))
-        14 =>
+        },
+        14 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.limit_match)
 
             if ((if re.limit_match == 4294967295: 1 else: 0) != 0) {
                 return -55
             }
 
-        15 =>
+        },
+        15 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.max_lookbehind)
-        16 =>
+        },
+        16 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.minlength)
-        18 =>
+        },
+        18 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.name_entry_size)
-        17 =>
+        },
+        17 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.name_count)
-        19 =>
+        },
+        19 => {
             ((unsafe: *(where_ as *mut *const u8)) = ((((re as *const c_char) + sizeof[pcre2_real_code_8]()) as *const u8)))
-        20 =>
+        },
+        20 => {
             ((unsafe: *(where_ as *mut c_uint)) = re.newline_convention)
-        22 =>
+        },
+        22 => {
             ((unsafe: *(where_ as *mut c_ulong)) = re.blocksize)
-        _ =>
+        },
+        _ => {
             return -34
+        },
+    }
 
     return 0
 
@@ -190,10 +224,11 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
     while (1 != 0) {
         var rc: c_int
 
-        match (unsafe: *cc):
-            OP_END =>
+        match (unsafe: *cc) {
+            OP_END => {
                 return 0
-            OP_CHAR | OP_CHARI | OP_NOT | OP_NOTI | OP_STAR | OP_MINSTAR | OP_PLUS | OP_MINPLUS | OP_QUERY | OP_MINQUERY | OP_UPTO | OP_MINUPTO | OP_EXACT | OP_POSSTAR | OP_POSPLUS | OP_POSQUERY | OP_POSUPTO | OP_STARI | OP_MINSTARI | OP_PLUSI | OP_MINPLUSI | OP_QUERYI | OP_MINQUERYI | OP_UPTOI | OP_MINUPTOI | OP_EXACTI | OP_POSSTARI | OP_POSPLUSI | OP_POSQUERYI | OP_POSUPTOI | OP_NOTSTAR | OP_NOTMINSTAR | OP_NOTPLUS | OP_NOTMINPLUS | OP_NOTQUERY | OP_NOTMINQUERY | OP_NOTUPTO | OP_NOTMINUPTO | OP_NOTEXACT | OP_NOTPOSSTAR | OP_NOTPOSPLUS | OP_NOTPOSQUERY | OP_NOTPOSUPTO | OP_NOTSTARI | OP_NOTMINSTARI | OP_NOTPLUSI | OP_NOTMINPLUSI | OP_NOTQUERYI | OP_NOTMINQUERYI | OP_NOTUPTOI | OP_NOTMINUPTOI | OP_NOTEXACTI | OP_NOTPOSSTARI | OP_NOTPOSPLUSI | OP_NOTPOSQUERYI | OP_NOTPOSUPTOI =>
+            },
+            OP_CHAR | OP_CHARI | OP_NOT | OP_NOTI | OP_STAR | OP_MINSTAR | OP_PLUS | OP_MINPLUS | OP_QUERY | OP_MINQUERY | OP_UPTO | OP_MINUPTO | OP_EXACT | OP_POSSTAR | OP_POSPLUS | OP_POSQUERY | OP_POSUPTO | OP_STARI | OP_MINSTARI | OP_PLUSI | OP_MINPLUSI | OP_QUERYI | OP_MINQUERYI | OP_UPTOI | OP_MINUPTOI | OP_EXACTI | OP_POSSTARI | OP_POSPLUSI | OP_POSQUERYI | OP_POSUPTOI | OP_NOTSTAR | OP_NOTMINSTAR | OP_NOTPLUS | OP_NOTMINPLUS | OP_NOTQUERY | OP_NOTMINQUERY | OP_NOTUPTO | OP_NOTMINUPTO | OP_NOTEXACT | OP_NOTPOSSTAR | OP_NOTPOSPLUS | OP_NOTPOSQUERY | OP_NOTPOSUPTO | OP_NOTSTARI | OP_NOTMINSTARI | OP_NOTPLUSI | OP_NOTMINPLUSI | OP_NOTQUERYI | OP_NOTMINQUERYI | OP_NOTUPTOI | OP_NOTMINUPTOI | OP_NOTEXACTI | OP_NOTPOSSTARI | OP_NOTPOSPLUSI | OP_NOTPOSQUERYI | OP_NOTPOSUPTOI => {
                 (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
 
                 var __ci_expr_logic_0: c_int = 0
@@ -207,7 +242,8 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
                 }
 
 
-            OP_TYPESTAR | OP_TYPEMINSTAR | OP_TYPEPLUS | OP_TYPEMINPLUS | OP_TYPEQUERY | OP_TYPEMINQUERY | OP_TYPEUPTO | OP_TYPEMINUPTO | OP_TYPEEXACT | OP_TYPEPOSSTAR | OP_TYPEPOSPLUS | OP_TYPEPOSQUERY | OP_TYPEPOSUPTO =>
+            },
+            OP_TYPESTAR | OP_TYPEMINSTAR | OP_TYPEPLUS | OP_TYPEMINPLUS | OP_TYPEQUERY | OP_TYPEMINQUERY | OP_TYPEUPTO | OP_TYPEMINUPTO | OP_TYPEEXACT | OP_TYPEPOSSTAR | OP_TYPEPOSPLUS | OP_TYPEPOSQUERY | OP_TYPEPOSUPTO => {
                 (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
 
                 var __ci_expr_logic_1: c_int
@@ -223,11 +259,14 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
                 }
 
 
-            OP_XCLASS | OP_ECLASS =>
+            },
+            OP_XCLASS | OP_ECLASS => {
                 (cc = cc + (((((unsafe: cc[1]) as c_int) << (8 as c_uint)) | (unsafe: cc[(1 + 1)])) as c_uint))
-            OP_MARK | OP_COMMIT_ARG | OP_PRUNE_ARG | OP_SKIP_ARG | OP_THEN_ARG =>
+            },
+            OP_MARK | OP_COMMIT_ARG | OP_PRUNE_ARG | OP_SKIP_ARG | OP_THEN_ARG => {
                 (cc = cc + (_pcre2_OP_lengths_8[(unsafe: *cc)] + (unsafe: cc[1])))
-            OP_CALLOUT =>
+            },
+            OP_CALLOUT => {
                 (cb.pattern_position = ((((((unsafe: cc[1]) as c_int) << (8 as c_uint)) | (unsafe: cc[(1 + 1)])) as c_uint)))
 
                 (cb.next_item_length = ((((((unsafe: cc[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + 2) + 1)])) as c_uint)))
@@ -248,7 +287,8 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
 
                 (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
 
-            OP_CALLOUT_STR =>
+            },
+            OP_CALLOUT_STR => {
                 (cb.pattern_position = ((((((unsafe: cc[1]) as c_int) << (8 as c_uint)) | (unsafe: cc[(1 + 1)])) as c_uint)))
 
                 (cb.next_item_length = ((((((unsafe: cc[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + 2) + 1)])) as c_uint)))
@@ -269,8 +309,11 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
 
                 (cc = cc + (((((unsafe: cc[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + (2 * 2)) + 1)])) as c_uint))
 
-            _ =>
+            },
+            _ => {
                 (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+            },
+        }
 
     }
 

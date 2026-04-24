@@ -22,8 +22,8 @@ fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int {
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true {
-        match __pc:
-            0 =>
+        match __pc {
+            0 => {
                 (__goto_pending = 0)
                 (count__goto_1917_5 = 0)
                 (utf__goto_1919_6 = (if (re.overall_options & 524288) != 0: 1 else: 0))
@@ -33,108 +33,116 @@ fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int {
                     continue
                 }
                 if ((if (re.flags & (16 | 512)) == 0: 1 else: 0) != 0) {
-                    (depth__goto_1932_7 = 0)
+                    __pc = 3
+                    __goto_pending = 1
+                    continue
+                }
+                if (__goto_pending != 0) {
+                    continue
+                }
+                __pc = 2
+                __goto_pending = 1
+                continue
+                __pc = 3
+                __goto_pending = 1
+                continue
+            },
+            3 => {  // __if_then
+                (__goto_pending = 0)
+                (depth__goto_1932_7 = 0)
+                (rc__goto_1933_7 = set_start_bits(re, code__goto_1918_14, utf__goto_1919_6, ucp__goto_1920_6, (&mut depth__goto_1932_7 as *mut c_int)))
+                if ((if rc__goto_1933_7 == SSB_UNKNOWN: 1 else: 0) != 0) {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    (rc__goto_1933_7 = set_start_bits(re, code__goto_1918_14, utf__goto_1919_6, ucp__goto_1920_6, (&mut depth__goto_1932_7 as *mut c_int)))
+                    return 1
                     if (__goto_pending != 0) {
                         continue
                     }
-                    if ((if rc__goto_1933_7 == SSB_UNKNOWN: 1 else: 0) != 0) {
+                }
+                if (__goto_pending != 0) {
+                    continue
+                }
+                if ((if rc__goto_1933_7 == SSB_DONE: 1 else: 0) != 0) {
+                    __pc = 5
+                    __goto_pending = 1
+                    continue
+                }
+                if (__goto_pending != 0) {
+                    continue
+                }
+                __pc = 4
+                __goto_pending = 1
+                continue
+                __pc = 5
+                __goto_pending = 1
+                continue
+            },
+            5 => {  // __if_then
+                (__goto_pending = 0)
+                (a__goto_1953_9 = -1)
+                (b__goto_1954_9 = -1)
+                (p__goto_1955_14 = ((&re.start_bitmap[0] as *mut u8)))
+                (flags__goto_1956_14 = 64)
+                (i__goto_1952_9 = 0)
+                while ((if i__goto_1952_9 < 256: 1 else: 0) != 0) {
+                    (x__goto_1960_15 = (unsafe: *p__goto_1955_14))
+                    if (__goto_pending != 0) {
+                        break
+                    }
+                    if ((if x__goto_1960_15 != 0: 1 else: 0) != 0) {
                         0
                     }
                     if (__goto_pending != 0) {
+                        break
+                    }
+                    if (__goto_pending != 0) {
+                        break
+                    }
+                    (p__goto_1955_14 = p__goto_1955_14 + 1)
+                    (i__goto_1952_9 = i__goto_1952_9 + 8)
+                }
+                if (__goto_pending != 0) {
+                    continue
+                }
+                if ((if a__goto_1953_9 >= 0: 1 else: 0) != 0) {
+                    var __ci_expr_logic_2: c_int = 0
+                    if ((re.flags & 128) != 0) {
+                        var __ci_expr_logic_1: c_int
+                        if ((if re.last_codeunit == ((a__goto_1953_9 as c_uint)): 1 else: 0) != 0) {
+                            (__ci_expr_logic_1 = (if true: 1 else: 0))
+                        } else {
+                            var __ci_expr_logic_0: c_int = 0
+                            if ((if b__goto_1954_9 >= 0: 1 else: 0) != 0) {
+                                (__ci_expr_logic_0 = (if (if re.last_codeunit == ((b__goto_1954_9 as c_uint)): 1 else: 0) != 0: 1 else: 0))
+                            }
+                            (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
+                        }
+                        (__ci_expr_logic_2 = (if __ci_expr_logic_1 != 0: 1 else: 0))
+                    }
+                    if (__ci_expr_logic_2 != 0) {
+                        (re.flags = re.flags & (~(128 | 256)))
+                        if (__goto_pending != 0) {
+                            continue
+                        }
+                        (re.last_codeunit = 0)
+                        if (__goto_pending != 0) {
+                            continue
+                        }
+                    }
+                    if (__goto_pending != 0) {
                         continue
                     }
-                    if ((if rc__goto_1933_7 == SSB_DONE: 1 else: 0) != 0) {
-                        (a__goto_1953_9 = -1)
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        (b__goto_1954_9 = -1)
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        (p__goto_1955_14 = ((&re.start_bitmap[0] as *mut u8)))
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        (flags__goto_1956_14 = 64)
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        (i__goto_1952_9 = 0)
-                        while ((if i__goto_1952_9 < 256: 1 else: 0) != 0) {
-                            (x__goto_1960_15 = (unsafe: *p__goto_1955_14))
-                            if (__goto_pending != 0) {
-                                break
-                            }
-                            if ((if x__goto_1960_15 != 0: 1 else: 0) != 0) {
-                                0
-                            }
-                            if (__goto_pending != 0) {
-                                break
-                            }
-                            if (__goto_pending != 0) {
-                                break
-                            }
-                            (p__goto_1955_14 = p__goto_1955_14 + 1)
-                            (i__goto_1952_9 = i__goto_1952_9 + 8)
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        if ((if a__goto_1953_9 >= 0: 1 else: 0) != 0) {
-                            var __ci_expr_logic_2: c_int = 0
-                            if ((re.flags & 128) != 0) {
-                                var __ci_expr_logic_1: c_int
-                                if ((if re.last_codeunit == ((a__goto_1953_9 as c_uint)): 1 else: 0) != 0) {
-                                    (__ci_expr_logic_1 = (if true: 1 else: 0))
-                                } else {
-                                    var __ci_expr_logic_0: c_int = 0
-                                    if ((if b__goto_1954_9 >= 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_0 = (if (if re.last_codeunit == ((b__goto_1954_9 as c_uint)): 1 else: 0) != 0: 1 else: 0))
-                                    }
-                                    (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
-                                }
-                                (__ci_expr_logic_2 = (if __ci_expr_logic_1 != 0: 1 else: 0))
-                            }
-                            if (__ci_expr_logic_2 != 0) {
-                                (re.flags = re.flags & (~(128 | 256)))
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-                                (re.last_codeunit = 0)
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-                            }
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (re.first_codeunit = a__goto_1953_9)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (flags__goto_1956_14 = 16)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            if ((if b__goto_1954_9 >= 0: 1 else: 0) != 0) {
-                                (flags__goto_1956_14 = flags__goto_1956_14 | 32)
-                            }
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        (re.flags = re.flags | flags__goto_1956_14)
-                        if (__goto_pending != 0) {
-                            continue
-                        }
+                    (re.first_codeunit = a__goto_1953_9)
+                    if (__goto_pending != 0) {
+                        continue
+                    }
+                    (flags__goto_1956_14 = 16)
+                    if (__goto_pending != 0) {
+                        continue
+                    }
+                    if ((if b__goto_1954_9 >= 0: 1 else: 0) != 0) {
+                        (flags__goto_1956_14 = flags__goto_1956_14 | 32)
                     }
                     if (__goto_pending != 0) {
                         continue
@@ -143,6 +151,34 @@ fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
+                __pc = 1
+                __goto_pending = 1
+                continue
+            },
+            1 => {  // DONE
+                (__goto_pending = 0)
+                (re.flags = re.flags | flags__goto_1956_14)
+                if (__goto_pending != 0) {
+                    continue
+                }
+                __pc = 4
+                __goto_pending = 1
+                continue
+                __pc = 4
+                __goto_pending = 1
+                continue
+            },
+            4 => {  // __after_if
+                (__goto_pending = 0)
+                __pc = 2
+                __goto_pending = 1
+                continue
+                __pc = 2
+                __goto_pending = 1
+                continue
+            },
+            2 => {  // __after_if
+                (__goto_pending = 0)
                 var __ci_expr_logic_3: c_int = 0
                 if ((if (re.flags & (8192 | 8388608)) == 0: 1 else: 0) != 0) {
                     (__ci_expr_logic_3 = (if (if re.top_backref <= 128: 1 else: 0) != 0: 1 else: 0))
@@ -157,7 +193,11 @@ fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-            _ => break
+            },
+            _ => {
+                break
+            },
+        }
     }
 }
 
@@ -191,8 +231,8 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true {
-        match __pc:
-            0 =>
+        match __pc {
+            0 => {
                 (__goto_pending = 0)
                 (length__goto_106_5 = -1)
                 (branchlength__goto_107_5 = 0)
@@ -235,2388 +275,2033 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                 if (__goto_pending != 0) {
                     continue
                 }
-                while true {
-                    if ((if branchlength__goto_107_5 >= 65535: 1 else: 0) != 0) {
-                        (branchlength__goto_107_5 = 65535)
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        (cc__goto_116_12 = nextbranch__goto_115_12)
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                    }
+                __pc = 3
+                __goto_pending = 1
+                continue
+            },
+            3 => {  // __loop_top
+                (__goto_pending = 0)
+                if ((if branchlength__goto_107_5 >= 65535: 1 else: 0) != 0) {
+                    (branchlength__goto_107_5 = 65535)
                     if (__goto_pending != 0) {
-                        break
+                        continue
                     }
-                    (op__goto_138_15 = (unsafe: *cc__goto_116_12))
+                    (cc__goto_116_12 = nextbranch__goto_115_12)
                     if (__goto_pending != 0) {
-                        break
+                        continue
                     }
-                    match op__goto_138_15:
-                        OP_COND =>
-                            (cs__goto_139_14 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                }
+                if (__goto_pending != 0) {
+                    continue
+                }
+                (op__goto_138_15 = (unsafe: *cc__goto_116_12))
+                if (__goto_pending != 0) {
+                    continue
+                }
+                match op__goto_138_15 {
+                    OP_COND => {
+                        (cs__goto_139_14 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
-                            if ((if (unsafe: *cs__goto_139_14) != OP_ALT: 1 else: 0) != 0) {
-                                (cc__goto_116_12 = (cs__goto_139_14 + ((1 as isize) as usize)) + ((2 as isize) as usize))
+                        if ((if (unsafe: *cs__goto_139_14) != OP_ALT: 1 else: 0) != 0) {
+                            (cc__goto_116_12 = (cs__goto_139_14 + ((1 as isize) as usize)) + ((2 as isize) as usize))
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+                            if (__goto_pending != 0) {
+                                continue
+                            }
 
+                            break
+
+                        }
+
+                        __pc = 1
+                        __goto_pending = 1
+
+                    },
+                    OP_SCOND => {
+                        (cs__goto_139_14 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        if ((if (unsafe: *cs__goto_139_14) != OP_ALT: 1 else: 0) != 0) {
+                            (cc__goto_116_12 = (cs__goto_139_14 + ((1 as isize) as usize)) + ((2 as isize) as usize))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            break
+
+                        }
+
+                        __pc = 1
+                        __goto_pending = 1
+
+                    },
+                    OP_BRA => {
+                        var __ci_expr_logic_3: c_int = 0
+
+                        if ((if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_RECURSE: 1 else: 0) != 0) {
+                            (__ci_expr_logic_3 = (if (if (unsafe: cc__goto_116_12[(2 * (1 + 2))]) == OP_KET: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_3 != 0) {
+                            (once_fudge__goto_112_10 = 3)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            break
+
+                        }
+
+
+                        (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
+
+                        if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
+                            return d__goto_137_7
+                        }
+
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
+
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
                                 break
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
                             }
 
-                            __pc = 1
-                            __goto_pending = 1
-
-                        OP_SCOND =>
-                            (cs__goto_139_14 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            if ((if (unsafe: *cs__goto_139_14) != OP_ALT: 1 else: 0) != 0) {
-                                (cc__goto_116_12 = (cs__goto_139_14 + ((1 as isize) as usize)) + ((2 as isize) as usize))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
                                 break
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
                             }
 
-                            __pc = 1
-                            __goto_pending = 1
+                        }
 
-                        OP_BRA =>
-                            var __ci_expr_logic_3: c_int = 0
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
-                            if ((if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_RECURSE: 1 else: 0) != 0) {
-                                (__ci_expr_logic_3 = (if (if (unsafe: cc__goto_116_12[(2 * (1 + 2))]) == OP_KET: 1 else: 0) != 0: 1 else: 0))
-                            }
 
-                            if (__ci_expr_logic_3 != 0) {
-                                (once_fudge__goto_112_10 = 3)
+                    },
+                    OP_ONCE => {
+                        (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+                        if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
+                            return d__goto_137_7
+                        }
 
-                                (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
+                            if (__goto_pending != 0) {
                                 break
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
                             }
 
-
-                            (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
-
-                            if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
-                                return d__goto_137_7
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
                             }
 
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
+                        }
 
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+                    },
+                    OP_SCRIPT_RUN => {
+                        (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
 
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
+                        if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
+                            return d__goto_137_7
+                        }
 
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
+
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
                             }
 
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-
-                        OP_ONCE =>
-                            (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
-
-                            if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
-                                return d__goto_137_7
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
                             }
 
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
+                        }
 
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+                    },
+                    OP_SBRA => {
+                        (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
 
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
+                        if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
+                            return d__goto_137_7
+                        }
 
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
+
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
                             }
 
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                        OP_SCRIPT_RUN =>
-                            (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
-
-                            if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
-                                return d__goto_137_7
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
                             }
 
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
+                        }
 
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+                    },
+                    OP_BRAPOS => {
+                        (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
 
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
+                        if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
+                            return d__goto_137_7
+                        }
 
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
+
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
                             }
 
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                        OP_SBRA =>
-                            (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
-
-                            if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
-                                return d__goto_137_7
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
                             }
 
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
+                        }
 
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+                    },
+                    OP_SBRAPOS => {
+                        (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
 
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
+                        if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
+                            return d__goto_137_7
+                        }
 
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
+
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
                             }
 
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                        OP_BRAPOS =>
-                            (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
-
-                            if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
-                                return d__goto_137_7
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
                             }
 
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
+                        }
 
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+                    },
+                    OP_CBRA => {
+                        (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
 
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
+                        var __ci_expr_logic_4: c_int
 
+                        if (dupcapused__goto_114_6 != 0) {
+                            (__ci_expr_logic_4 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_4 = (if (if recno__goto_137_15 != prev_cap_recno__goto_108_5: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_4 != 0) {
+                            (prev_cap_recno__goto_108_5 = recno__goto_137_15)
+
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+                            (prev_cap_d__goto_109_5 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
 
-                        OP_SBRAPOS =>
-                            (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
-
-                            if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
-                                return d__goto_137_7
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + d__goto_137_7)
-
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
+                            if ((if prev_cap_d__goto_109_5 < 0: 1 else: 0) != 0) {
+                                return prev_cap_d__goto_109_5
                             }
 
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                        OP_CBRA =>
-                            (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
-
-                            var __ci_expr_logic_4: c_int
-
-                            if (dupcapused__goto_114_6 != 0) {
-                                (__ci_expr_logic_4 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_4 = (if (if recno__goto_137_15 != prev_cap_recno__goto_108_5: 1 else: 0) != 0: 1 else: 0))
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            if (__ci_expr_logic_4 != 0) {
-                                (prev_cap_recno__goto_108_5 = recno__goto_137_15)
+                        }
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
 
-                                (prev_cap_d__goto_109_5 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_cap_d__goto_109_5)
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
-                                if ((if prev_cap_d__goto_109_5 < 0: 1 else: 0) != 0) {
-                                    return prev_cap_d__goto_109_5
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
+                            if (__goto_pending != 0) {
+                                break
                             }
 
-
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_cap_d__goto_109_5)
-
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
                             }
 
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+                        }
 
-                        OP_SCBRA =>
-                            (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
-                            var __ci_expr_logic_4: c_int
+                    },
+                    OP_SCBRA => {
+                        (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
 
-                            if (dupcapused__goto_114_6 != 0) {
-                                (__ci_expr_logic_4 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_4 = (if (if recno__goto_137_15 != prev_cap_recno__goto_108_5: 1 else: 0) != 0: 1 else: 0))
+                        var __ci_expr_logic_4: c_int
+
+                        if (dupcapused__goto_114_6 != 0) {
+                            (__ci_expr_logic_4 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_4 = (if (if recno__goto_137_15 != prev_cap_recno__goto_108_5: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_4 != 0) {
+                            (prev_cap_recno__goto_108_5 = recno__goto_137_15)
+
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            if (__ci_expr_logic_4 != 0) {
-                                (prev_cap_recno__goto_108_5 = recno__goto_137_15)
+                            (prev_cap_d__goto_109_5 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (prev_cap_d__goto_109_5 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if ((if prev_cap_d__goto_109_5 < 0: 1 else: 0) != 0) {
-                                    return prev_cap_d__goto_109_5
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_cap_d__goto_109_5)
-
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
+                            if ((if prev_cap_d__goto_109_5 < 0: 1 else: 0) != 0) {
+                                return prev_cap_d__goto_109_5
                             }
 
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                        OP_CBRAPOS =>
-                            (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
-
-                            var __ci_expr_logic_4: c_int
-
-                            if (dupcapused__goto_114_6 != 0) {
-                                (__ci_expr_logic_4 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_4 = (if (if recno__goto_137_15 != prev_cap_recno__goto_108_5: 1 else: 0) != 0: 1 else: 0))
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            if (__ci_expr_logic_4 != 0) {
-                                (prev_cap_recno__goto_108_5 = recno__goto_137_15)
+                        }
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
 
-                                (prev_cap_d__goto_109_5 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_cap_d__goto_109_5)
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
 
-                                if ((if prev_cap_d__goto_109_5 < 0: 1 else: 0) != 0) {
-                                    return prev_cap_d__goto_109_5
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
+                            if (__goto_pending != 0) {
+                                break
                             }
 
-
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_cap_d__goto_109_5)
-
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
                             }
 
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+                        }
 
-                        OP_SCBRAPOS =>
-                            (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
 
-                            var __ci_expr_logic_4: c_int
+                    },
+                    OP_CBRAPOS => {
+                        (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
 
-                            if (dupcapused__goto_114_6 != 0) {
-                                (__ci_expr_logic_4 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_4 = (if (if recno__goto_137_15 != prev_cap_recno__goto_108_5: 1 else: 0) != 0: 1 else: 0))
+                        var __ci_expr_logic_4: c_int
+
+                        if (dupcapused__goto_114_6 != 0) {
+                            (__ci_expr_logic_4 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_4 = (if (if recno__goto_137_15 != prev_cap_recno__goto_108_5: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_4 != 0) {
+                            (prev_cap_recno__goto_108_5 = recno__goto_137_15)
+
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            if (__ci_expr_logic_4 != 0) {
-                                (prev_cap_recno__goto_108_5 = recno__goto_137_15)
+                            (prev_cap_d__goto_109_5 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (prev_cap_d__goto_109_5 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if ((if prev_cap_d__goto_109_5 < 0: 1 else: 0) != 0) {
-                                    return prev_cap_d__goto_109_5
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_cap_d__goto_109_5)
-
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
+                            if ((if prev_cap_d__goto_109_5 < 0: 1 else: 0) != 0) {
+                                return prev_cap_d__goto_109_5
                             }
 
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+                            if (__goto_pending != 0) {
+                                continue
+                            }
 
-                        OP_ACCEPT =>
+                        }
+
+
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_cap_d__goto_109_5)
+
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                    },
+                    OP_SCBRAPOS => {
+                        (recno__goto_137_15 = (((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint) as c_int)))
+
+                        var __ci_expr_logic_4: c_int
+
+                        if (dupcapused__goto_114_6 != 0) {
+                            (__ci_expr_logic_4 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_4 = (if (if recno__goto_137_15 != prev_cap_recno__goto_108_5: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_4 != 0) {
+                            (prev_cap_recno__goto_108_5 = recno__goto_137_15)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (prev_cap_d__goto_109_5 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            if ((if prev_cap_d__goto_109_5 < 0: 1 else: 0) != 0) {
+                                return prev_cap_d__goto_109_5
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_cap_d__goto_109_5)
+
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                    },
+                    OP_ACCEPT => {
+                        return -1
+                    },
+                    OP_ASSERT_ACCEPT => {
+                        return -1
+                    },
+                    OP_ALT => {
+                        var __ci_expr_logic_6: c_int
+
+                        if ((if length__goto_106_5 < 0: 1 else: 0) != 0) {
+                            (__ci_expr_logic_6 = (if true: 1 else: 0))
+                        } else {
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if not (had_recurse__goto_113_6 != 0): 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if branchlength__goto_107_5 < length__goto_106_5: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
+
+                        }
+
+                        if (__ci_expr_logic_6 != 0) {
+                            (length__goto_106_5 = branchlength__goto_107_5)
+                        }
+
+
+                        var __ci_expr_logic_7: c_int
+
+                        if ((if op__goto_138_15 != OP_ALT: 1 else: 0) != 0) {
+                            (__ci_expr_logic_7 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_7 = (if (if length__goto_106_5 == 0: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_7 != 0) {
+                            return length__goto_106_5
+                        }
+
+
+                        (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                        (branchlength__goto_107_5 = 0)
+
+                        (had_recurse__goto_113_6 = 0)
+
+                    },
+                    OP_KET => {
+                        var __ci_expr_logic_6: c_int
+
+                        if ((if length__goto_106_5 < 0: 1 else: 0) != 0) {
+                            (__ci_expr_logic_6 = (if true: 1 else: 0))
+                        } else {
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if not (had_recurse__goto_113_6 != 0): 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if branchlength__goto_107_5 < length__goto_106_5: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
+
+                        }
+
+                        if (__ci_expr_logic_6 != 0) {
+                            (length__goto_106_5 = branchlength__goto_107_5)
+                        }
+
+
+                        var __ci_expr_logic_7: c_int
+
+                        if ((if op__goto_138_15 != OP_ALT: 1 else: 0) != 0) {
+                            (__ci_expr_logic_7 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_7 = (if (if length__goto_106_5 == 0: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_7 != 0) {
+                            return length__goto_106_5
+                        }
+
+
+                        (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                        (branchlength__goto_107_5 = 0)
+
+                        (had_recurse__goto_113_6 = 0)
+
+                    },
+                    OP_KETRMAX => {
+                        var __ci_expr_logic_6: c_int
+
+                        if ((if length__goto_106_5 < 0: 1 else: 0) != 0) {
+                            (__ci_expr_logic_6 = (if true: 1 else: 0))
+                        } else {
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if not (had_recurse__goto_113_6 != 0): 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if branchlength__goto_107_5 < length__goto_106_5: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
+
+                        }
+
+                        if (__ci_expr_logic_6 != 0) {
+                            (length__goto_106_5 = branchlength__goto_107_5)
+                        }
+
+
+                        var __ci_expr_logic_7: c_int
+
+                        if ((if op__goto_138_15 != OP_ALT: 1 else: 0) != 0) {
+                            (__ci_expr_logic_7 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_7 = (if (if length__goto_106_5 == 0: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_7 != 0) {
+                            return length__goto_106_5
+                        }
+
+
+                        (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                        (branchlength__goto_107_5 = 0)
+
+                        (had_recurse__goto_113_6 = 0)
+
+                    },
+                    OP_KETRMIN => {
+                        var __ci_expr_logic_6: c_int
+
+                        if ((if length__goto_106_5 < 0: 1 else: 0) != 0) {
+                            (__ci_expr_logic_6 = (if true: 1 else: 0))
+                        } else {
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if not (had_recurse__goto_113_6 != 0): 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if branchlength__goto_107_5 < length__goto_106_5: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
+
+                        }
+
+                        if (__ci_expr_logic_6 != 0) {
+                            (length__goto_106_5 = branchlength__goto_107_5)
+                        }
+
+
+                        var __ci_expr_logic_7: c_int
+
+                        if ((if op__goto_138_15 != OP_ALT: 1 else: 0) != 0) {
+                            (__ci_expr_logic_7 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_7 = (if (if length__goto_106_5 == 0: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_7 != 0) {
+                            return length__goto_106_5
+                        }
+
+
+                        (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                        (branchlength__goto_107_5 = 0)
+
+                        (had_recurse__goto_113_6 = 0)
+
+                    },
+                    OP_KETRPOS => {
+                        var __ci_expr_logic_6: c_int
+
+                        if ((if length__goto_106_5 < 0: 1 else: 0) != 0) {
+                            (__ci_expr_logic_6 = (if true: 1 else: 0))
+                        } else {
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if not (had_recurse__goto_113_6 != 0): 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if branchlength__goto_107_5 < length__goto_106_5: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
+
+                        }
+
+                        if (__ci_expr_logic_6 != 0) {
+                            (length__goto_106_5 = branchlength__goto_107_5)
+                        }
+
+
+                        var __ci_expr_logic_7: c_int
+
+                        if ((if op__goto_138_15 != OP_ALT: 1 else: 0) != 0) {
+                            (__ci_expr_logic_7 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_7 = (if (if length__goto_106_5 == 0: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_7 != 0) {
+                            return length__goto_106_5
+                        }
+
+
+                        (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                        (branchlength__goto_107_5 = 0)
+
+                        (had_recurse__goto_113_6 = 0)
+
+                    },
+                    OP_END => {
+                        var __ci_expr_logic_6: c_int
+
+                        if ((if length__goto_106_5 < 0: 1 else: 0) != 0) {
+                            (__ci_expr_logic_6 = (if true: 1 else: 0))
+                        } else {
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if not (had_recurse__goto_113_6 != 0): 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if branchlength__goto_107_5 < length__goto_106_5: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
+
+                        }
+
+                        if (__ci_expr_logic_6 != 0) {
+                            (length__goto_106_5 = branchlength__goto_107_5)
+                        }
+
+
+                        var __ci_expr_logic_7: c_int
+
+                        if ((if op__goto_138_15 != OP_ALT: 1 else: 0) != 0) {
+                            (__ci_expr_logic_7 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_7 = (if (if length__goto_106_5 == 0: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_7 != 0) {
+                            return length__goto_106_5
+                        }
+
+
+                        (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                        (branchlength__goto_107_5 = 0)
+
+                        (had_recurse__goto_113_6 = 0)
+
+                    },
+                    OP_ASSERT => {
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                    },
+                    OP_ASSERT_NOT => {
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                    },
+                    OP_ASSERTBACK => {
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                    },
+                    OP_ASSERTBACK_NOT => {
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                    },
+                    OP_ASSERT_NA => {
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                    },
+                    OP_ASSERT_SCS => {
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                    },
+                    OP_ASSERTBACK_NA => {
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                    },
+                    OP_REVERSE => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_VREVERSE => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_CREF => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_DNCREF => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_RREF => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_DNRREF => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_FALSE => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_TRUE => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_CALLOUT => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_SOD => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_SOM => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_EOD => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_EODN => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_CIRC => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_CIRCM => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_DOLL => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_DOLLM => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_NOT_WORD_BOUNDARY => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_WORD_BOUNDARY => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_NOT_UCP_WORD_BOUNDARY => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_UCP_WORD_BOUNDARY => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+                    },
+                    OP_CALLOUT_STR => {
+                        (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + (2 * 2)) + 1)])) as c_uint))
+                    },
+                    OP_BRAZERO => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                    },
+                    OP_BRAMINZERO => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                    },
+                    OP_BRAPOSZERO => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                    },
+                    OP_SKIPZERO => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                        while true {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
+
+                    },
+                    OP_CHAR => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_CHARI => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOT => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOTI => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_PLUS => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_PLUSI => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_MINPLUS => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_MINPLUSI => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_POSPLUS => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_POSPLUSI => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOTPLUS => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOTPLUSI => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOTMINPLUS => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOTMINPLUSI => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOTPOSPLUS => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOTPOSPLUSI => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        var __ci_expr_logic_8: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_8 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_TYPEPLUS => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        var __ci_expr_ternary_10: c_int = 0
+
+                        var __ci_expr_logic_9: c_int
+
+                        if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_9 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_9 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_9 != 0) {
+                            (__ci_expr_ternary_10 = 4)
+                        } else {
+                            (__ci_expr_ternary_10 = 2)
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + __ci_expr_ternary_10)
+
+
+                    },
+                    OP_TYPEMINPLUS => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        var __ci_expr_ternary_10: c_int = 0
+
+                        var __ci_expr_logic_9: c_int
+
+                        if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_9 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_9 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_9 != 0) {
+                            (__ci_expr_ternary_10 = 4)
+                        } else {
+                            (__ci_expr_ternary_10 = 2)
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + __ci_expr_ternary_10)
+
+
+                    },
+                    OP_TYPEPOSPLUS => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        var __ci_expr_ternary_10: c_int = 0
+
+                        var __ci_expr_logic_9: c_int
+
+                        if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_9 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_9 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_9 != 0) {
+                            (__ci_expr_ternary_10 = 4)
+                        } else {
+                            (__ci_expr_ternary_10 = 2)
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + __ci_expr_ternary_10)
+
+
+                    },
+                    OP_EXACT => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (2 + 2))
+
+                        var __ci_expr_logic_11: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_11 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_11 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_EXACTI => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (2 + 2))
+
+                        var __ci_expr_logic_11: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_11 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_11 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOTEXACT => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (2 + 2))
+
+                        var __ci_expr_logic_11: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_11 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_11 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOTEXACTI => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (2 + 2))
+
+                        var __ci_expr_logic_11: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_11 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_11 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_TYPEEXACT => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        var __ci_expr_ternary_13: c_int = 0
+
+                        var __ci_expr_logic_12: c_int
+
+                        if ((if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_12 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_12 = (if (if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_12 != 0) {
+                            (__ci_expr_ternary_13 = 2)
+                        } else {
+                            (__ci_expr_ternary_13 = 0)
+                        }
+
+                        (cc__goto_116_12 = cc__goto_116_12 + ((2 + 2) + __ci_expr_ternary_13))
+
+
+                    },
+                    OP_PROP => {
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+
+                    },
+                    OP_NOTPROP => {
+                        (cc__goto_116_12 = cc__goto_116_12 + 2)
+
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+
+                    },
+                    OP_NOT_DIGIT => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_DIGIT => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_NOT_WHITESPACE => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_WHITESPACE => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_NOT_WORDCHAR => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_WORDCHAR => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_ANY => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_ALLANY => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_EXTUNI => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_HSPACE => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_NOT_HSPACE => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_VSPACE => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_NOT_VSPACE => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_ANYNL => {
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_ANYBYTE => {
+                        if (utf != 0) {
                             return -1
-                        OP_ASSERT_ACCEPT =>
-                            return -1
-                        OP_ALT =>
-                            var __ci_expr_logic_6: c_int
+                        }
 
-                            if ((if length__goto_106_5 < 0: 1 else: 0) != 0) {
-                                (__ci_expr_logic_6 = (if true: 1 else: 0))
-                            } else {
-                                var __ci_expr_logic_5: c_int = 0
+                        (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
 
-                                if ((if not (had_recurse__goto_113_6 != 0): 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if (if branchlength__goto_107_5 < length__goto_106_5: 1 else: 0) != 0: 1 else: 0))
-                                }
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
 
-                                (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
+                    },
+                    OP_TYPESTAR => {
+                        var __ci_expr_logic_14: c_int
 
+                        if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_14 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_14 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_14 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + 2)
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                    },
+                    OP_TYPEMINSTAR => {
+                        var __ci_expr_logic_14: c_int
+
+                        if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_14 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_14 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_14 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + 2)
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                    },
+                    OP_TYPEQUERY => {
+                        var __ci_expr_logic_14: c_int
+
+                        if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_14 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_14 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_14 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + 2)
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                    },
+                    OP_TYPEMINQUERY => {
+                        var __ci_expr_logic_14: c_int
+
+                        if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_14 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_14 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_14 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + 2)
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                    },
+                    OP_TYPEPOSSTAR => {
+                        var __ci_expr_logic_14: c_int
+
+                        if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_14 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_14 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_14 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + 2)
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                    },
+                    OP_TYPEPOSQUERY => {
+                        var __ci_expr_logic_14: c_int
+
+                        if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_14 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_14 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_14 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + 2)
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                    },
+                    OP_TYPEUPTO => {
+                        var __ci_expr_logic_15: c_int
+
+                        if ((if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_15 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_15 = (if (if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_15 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + 2)
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                    },
+                    OP_TYPEMINUPTO => {
+                        var __ci_expr_logic_15: c_int
+
+                        if ((if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_15 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_15 = (if (if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_15 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + 2)
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                    },
+                    OP_TYPEPOSUPTO => {
+                        var __ci_expr_logic_15: c_int
+
+                        if ((if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
+                            (__ci_expr_logic_15 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_15 = (if (if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_15 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + 2)
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                    },
+                    OP_CLASS => {
+                        var __ci_expr_logic_16: c_int
+
+                        if ((if op__goto_138_15 == OP_XCLASS: 1 else: 0) != 0) {
+                            (__ci_expr_logic_16 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_16 = (if (if op__goto_138_15 == OP_ECLASS: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_16 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                        } else {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
+                        }
+
+
+                        match (unsafe: *cc__goto_116_12) {
+                            OP_CRPLUS => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRMINPLUS => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRPOSPLUS => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRSTAR => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRMINSTAR => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRQUERY => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRMINQUERY => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRPOSSTAR => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRPOSQUERY => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRRANGE => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            OP_CRMINRANGE => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            OP_CRPOSRANGE => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            _ => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+                            },
+                        }
+
+                    },
+                    OP_NCLASS => {
+                        var __ci_expr_logic_16: c_int
+
+                        if ((if op__goto_138_15 == OP_XCLASS: 1 else: 0) != 0) {
+                            (__ci_expr_logic_16 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_16 = (if (if op__goto_138_15 == OP_ECLASS: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_16 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                        } else {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
+                        }
+
+
+                        match (unsafe: *cc__goto_116_12) {
+                            OP_CRPLUS => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRMINPLUS => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRPOSPLUS => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRSTAR => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRMINSTAR => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRQUERY => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRMINQUERY => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRPOSSTAR => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRPOSQUERY => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRRANGE => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            OP_CRMINRANGE => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            OP_CRPOSRANGE => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            _ => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+                            },
+                        }
+
+                    },
+                    OP_XCLASS => {
+                        var __ci_expr_logic_16: c_int
+
+                        if ((if op__goto_138_15 == OP_XCLASS: 1 else: 0) != 0) {
+                            (__ci_expr_logic_16 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_16 = (if (if op__goto_138_15 == OP_ECLASS: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_16 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                        } else {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
+                        }
+
+
+                        match (unsafe: *cc__goto_116_12) {
+                            OP_CRPLUS => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRMINPLUS => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRPOSPLUS => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRSTAR => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRMINSTAR => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRQUERY => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRMINQUERY => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRPOSSTAR => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRPOSQUERY => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRRANGE => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            OP_CRMINRANGE => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            OP_CRPOSRANGE => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            _ => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+                            },
+                        }
+
+                    },
+                    OP_ECLASS => {
+                        var __ci_expr_logic_16: c_int
+
+                        if ((if op__goto_138_15 == OP_XCLASS: 1 else: 0) != 0) {
+                            (__ci_expr_logic_16 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_16 = (if (if op__goto_138_15 == OP_ECLASS: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_16 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                        } else {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
+                        }
+
+
+                        match (unsafe: *cc__goto_116_12) {
+                            OP_CRPLUS => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRMINPLUS => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRPOSPLUS => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRSTAR => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRMINSTAR => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRQUERY => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRMINQUERY => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRPOSSTAR => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRPOSQUERY => {
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+                            },
+                            OP_CRRANGE => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            OP_CRMINRANGE => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            OP_CRPOSRANGE => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            _ => {
+                                (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
+                            },
+                        }
+
+                    },
+                    OP_DNREF => {
+                        var __ci_expr_logic_17: c_int = 0
+
+                        if ((if not (dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
+                            (__ci_expr_logic_17 = (if (if (re.overall_options & 512) == 0: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_17 != 0) {
+                            (count__goto_481_11 = ((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            if (__ci_expr_logic_6 != 0) {
-                                (length__goto_106_5 = branchlength__goto_107_5)
+                            (slot__goto_482_18 = ((re as *const u8) + sizeof[pcre2_real_code_8]()) + ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint) *% re.name_entry_size))
+
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
+                            (d__goto_137_7 = 2147483647)
 
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if op__goto_138_15 != OP_ALT: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if length__goto_106_5 == 0: 1 else: 0) != 0: 1 else: 0))
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            if (__ci_expr_logic_7 != 0) {
-                                return length__goto_106_5
-                            }
-
-
-                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                            (branchlength__goto_107_5 = 0)
-
-                            (had_recurse__goto_113_6 = 0)
-
-                        OP_KET =>
-                            var __ci_expr_logic_6: c_int
-
-                            if ((if length__goto_106_5 < 0: 1 else: 0) != 0) {
-                                (__ci_expr_logic_6 = (if true: 1 else: 0))
-                            } else {
-                                var __ci_expr_logic_5: c_int = 0
-
-                                if ((if not (had_recurse__goto_113_6 != 0): 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if (if branchlength__goto_107_5 < length__goto_106_5: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
-
-                            }
-
-                            if (__ci_expr_logic_6 != 0) {
-                                (length__goto_106_5 = branchlength__goto_107_5)
-                            }
-
-
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if op__goto_138_15 != OP_ALT: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if length__goto_106_5 == 0: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                return length__goto_106_5
-                            }
-
-
-                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                            (branchlength__goto_107_5 = 0)
-
-                            (had_recurse__goto_113_6 = 0)
-
-                        OP_KETRMAX =>
-                            var __ci_expr_logic_6: c_int
-
-                            if ((if length__goto_106_5 < 0: 1 else: 0) != 0) {
-                                (__ci_expr_logic_6 = (if true: 1 else: 0))
-                            } else {
-                                var __ci_expr_logic_5: c_int = 0
-
-                                if ((if not (had_recurse__goto_113_6 != 0): 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if (if branchlength__goto_107_5 < length__goto_106_5: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
-
-                            }
-
-                            if (__ci_expr_logic_6 != 0) {
-                                (length__goto_106_5 = branchlength__goto_107_5)
-                            }
-
-
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if op__goto_138_15 != OP_ALT: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if length__goto_106_5 == 0: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                return length__goto_106_5
-                            }
-
-
-                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                            (branchlength__goto_107_5 = 0)
-
-                            (had_recurse__goto_113_6 = 0)
-
-                        OP_KETRMIN =>
-                            var __ci_expr_logic_6: c_int
-
-                            if ((if length__goto_106_5 < 0: 1 else: 0) != 0) {
-                                (__ci_expr_logic_6 = (if true: 1 else: 0))
-                            } else {
-                                var __ci_expr_logic_5: c_int = 0
-
-                                if ((if not (had_recurse__goto_113_6 != 0): 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if (if branchlength__goto_107_5 < length__goto_106_5: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
-
-                            }
-
-                            if (__ci_expr_logic_6 != 0) {
-                                (length__goto_106_5 = branchlength__goto_107_5)
-                            }
-
-
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if op__goto_138_15 != OP_ALT: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if length__goto_106_5 == 0: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                return length__goto_106_5
-                            }
-
-
-                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                            (branchlength__goto_107_5 = 0)
-
-                            (had_recurse__goto_113_6 = 0)
-
-                        OP_KETRPOS =>
-                            var __ci_expr_logic_6: c_int
-
-                            if ((if length__goto_106_5 < 0: 1 else: 0) != 0) {
-                                (__ci_expr_logic_6 = (if true: 1 else: 0))
-                            } else {
-                                var __ci_expr_logic_5: c_int = 0
-
-                                if ((if not (had_recurse__goto_113_6 != 0): 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if (if branchlength__goto_107_5 < length__goto_106_5: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
-
-                            }
-
-                            if (__ci_expr_logic_6 != 0) {
-                                (length__goto_106_5 = branchlength__goto_107_5)
-                            }
-
-
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if op__goto_138_15 != OP_ALT: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if length__goto_106_5 == 0: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                return length__goto_106_5
-                            }
-
-
-                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                            (branchlength__goto_107_5 = 0)
-
-                            (had_recurse__goto_113_6 = 0)
-
-                        OP_END =>
-                            var __ci_expr_logic_6: c_int
-
-                            if ((if length__goto_106_5 < 0: 1 else: 0) != 0) {
-                                (__ci_expr_logic_6 = (if true: 1 else: 0))
-                            } else {
-                                var __ci_expr_logic_5: c_int = 0
-
-                                if ((if not (had_recurse__goto_113_6 != 0): 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if (if branchlength__goto_107_5 < length__goto_106_5: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                (__ci_expr_logic_6 = (if __ci_expr_logic_5 != 0: 1 else: 0))
-
-                            }
-
-                            if (__ci_expr_logic_6 != 0) {
-                                (length__goto_106_5 = branchlength__goto_107_5)
-                            }
-
-
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if op__goto_138_15 != OP_ALT: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if length__goto_106_5 == 0: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                return length__goto_106_5
-                            }
-
-
-                            (nextbranch__goto_115_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                            (branchlength__goto_107_5 = 0)
-
-                            (had_recurse__goto_113_6 = 0)
-
-                        OP_ASSERT =>
                             while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+                                var __ci_expr_old_18: c_int = count__goto_481_11
+
+                                (count__goto_481_11 = count__goto_481_11 - 1)
+
+                                if (not ((if __ci_expr_old_18 > 0: 1 else: 0) != 0)) {
+                                    break
+                                }
+
+                                (recno__goto_137_15 = ((((((unsafe: slot__goto_482_18[0]) as c_int) << (8 as c_uint)) | (unsafe: slot__goto_482_18[(0 + 1)])) as c_uint)))
 
                                 if (__goto_pending != 0) {
                                     break
                                 }
 
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
+                                var __ci_expr_logic_19: c_int = 0
+
+                                if ((if recno__goto_137_15 <= (unsafe: backref_cache[0]): 1 else: 0) != 0) {
+                                    (__ci_expr_logic_19 = (if (if (unsafe: backref_cache[recno__goto_137_15]) >= 0: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                        OP_ASSERT_NOT =>
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                        OP_ASSERTBACK =>
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                        OP_ASSERTBACK_NOT =>
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                        OP_ASSERT_NA =>
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                        OP_ASSERT_SCS =>
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                        OP_ASSERTBACK_NA =>
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                        OP_REVERSE =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_VREVERSE =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_CREF =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_DNCREF =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_RREF =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_DNRREF =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_FALSE =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_TRUE =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_CALLOUT =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_SOD =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_SOM =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_EOD =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_EODN =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_CIRC =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_CIRCM =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_DOLL =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_DOLLM =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_NOT_WORD_BOUNDARY =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_WORD_BOUNDARY =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_NOT_UCP_WORD_BOUNDARY =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_UCP_WORD_BOUNDARY =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-                        OP_CALLOUT_STR =>
-                            (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + (2 * 2)) + 1)])) as c_uint))
-                        OP_BRAZERO =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                        OP_BRAMINZERO =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                        OP_BRAPOSZERO =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                        OP_SKIPZERO =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                            while true {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not ((if (unsafe: *cc__goto_116_12) == OP_ALT: 1 else: 0) != 0)) {
-                                    break
-                                }
-
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (1 + 2))
-
-                        OP_CHAR =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_CHARI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_NOT =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_NOTI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_PLUS =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_PLUSI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_MINPLUS =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_MINPLUSI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_POSPLUS =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_POSPLUSI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_NOTPLUS =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_NOTPLUSI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_NOTMINPLUS =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_NOTMINPLUSI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_NOTPOSPLUS =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_NOTPOSPLUSI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            var __ci_expr_logic_8: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_8 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_8 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_TYPEPLUS =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            var __ci_expr_ternary_10: c_int = 0
-
-                            var __ci_expr_logic_9: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_9 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_9 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_9 != 0) {
-                                (__ci_expr_ternary_10 = 4)
-                            } else {
-                                (__ci_expr_ternary_10 = 2)
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + __ci_expr_ternary_10)
-
-
-                        OP_TYPEMINPLUS =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            var __ci_expr_ternary_10: c_int = 0
-
-                            var __ci_expr_logic_9: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_9 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_9 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_9 != 0) {
-                                (__ci_expr_ternary_10 = 4)
-                            } else {
-                                (__ci_expr_ternary_10 = 2)
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + __ci_expr_ternary_10)
-
-
-                        OP_TYPEPOSPLUS =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            var __ci_expr_ternary_10: c_int = 0
-
-                            var __ci_expr_logic_9: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_9 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_9 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_9 != 0) {
-                                (__ci_expr_ternary_10 = 4)
-                            } else {
-                                (__ci_expr_ternary_10 = 2)
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + __ci_expr_ternary_10)
-
-
-                        OP_EXACT =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (2 + 2))
-
-                            var __ci_expr_logic_11: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_11 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_11 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_EXACTI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (2 + 2))
-
-                            var __ci_expr_logic_11: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_11 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_11 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_NOTEXACT =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (2 + 2))
-
-                            var __ci_expr_logic_11: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_11 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_11 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_NOTEXACTI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            (cc__goto_116_12 = cc__goto_116_12 + (2 + 2))
-
-                            var __ci_expr_logic_11: c_int = 0
-
-                            if (utf != 0) {
-                                (__ci_expr_logic_11 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_11 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
-
-
-                        OP_TYPEEXACT =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            var __ci_expr_ternary_13: c_int = 0
-
-                            var __ci_expr_logic_12: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_12 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_12 = (if (if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_12 != 0) {
-                                (__ci_expr_ternary_13 = 2)
-                            } else {
-                                (__ci_expr_ternary_13 = 0)
-                            }
-
-                            (cc__goto_116_12 = cc__goto_116_12 + ((2 + 2) + __ci_expr_ternary_13))
-
-
-                        OP_PROP =>
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-
-                        OP_NOTPROP =>
-                            (cc__goto_116_12 = cc__goto_116_12 + 2)
-
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-
-                        OP_NOT_DIGIT =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_DIGIT =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_NOT_WHITESPACE =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_WHITESPACE =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_NOT_WORDCHAR =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_WORDCHAR =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_ANY =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_ALLANY =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_EXTUNI =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_HSPACE =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_NOT_HSPACE =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_VSPACE =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_NOT_VSPACE =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_ANYNL =>
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_ANYBYTE =>
-                            if (utf != 0) {
-                                return -1
-                            }
-
-                            (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                            (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                        OP_TYPESTAR =>
-                            var __ci_expr_logic_14: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_14 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_14 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_14 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + 2)
-                            }
-
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-
-                        OP_TYPEMINSTAR =>
-                            var __ci_expr_logic_14: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_14 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_14 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_14 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + 2)
-                            }
-
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-
-                        OP_TYPEQUERY =>
-                            var __ci_expr_logic_14: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_14 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_14 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_14 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + 2)
-                            }
-
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-
-                        OP_TYPEMINQUERY =>
-                            var __ci_expr_logic_14: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_14 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_14 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_14 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + 2)
-                            }
-
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-
-                        OP_TYPEPOSSTAR =>
-                            var __ci_expr_logic_14: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_14 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_14 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_14 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + 2)
-                            }
-
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-
-                        OP_TYPEPOSQUERY =>
-                            var __ci_expr_logic_14: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_14 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_14 = (if (if (unsafe: cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_14 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + 2)
-                            }
-
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-
-                        OP_TYPEUPTO =>
-                            var __ci_expr_logic_15: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_15 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_15 = (if (if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_15 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + 2)
-                            }
-
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-
-                        OP_TYPEMINUPTO =>
-                            var __ci_expr_logic_15: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_15 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_15 = (if (if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_15 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + 2)
-                            }
-
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-
-                        OP_TYPEPOSUPTO =>
-                            var __ci_expr_logic_15: c_int
-
-                            if ((if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_15 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_15 = (if (if (unsafe: cc__goto_116_12[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_15 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + 2)
-                            }
-
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-
-                        OP_CLASS =>
-                            var __ci_expr_logic_16: c_int
-
-                            if ((if op__goto_138_15 == OP_XCLASS: 1 else: 0) != 0) {
-                                (__ci_expr_logic_16 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_16 = (if (if op__goto_138_15 == OP_ECLASS: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_16 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-                            } else {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
-                            }
-
-
-                            match (unsafe: *cc__goto_116_12):
-                                OP_CRPLUS =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                                OP_CRMINPLUS =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                                OP_CRPOSPLUS =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                                OP_CRSTAR =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRMINSTAR =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRQUERY =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRMINQUERY =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRPOSSTAR =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRPOSQUERY =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
-
-                                OP_CRMINRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
-
-                                OP_CRPOSRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
-
-                                _ =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                        OP_NCLASS =>
-                            var __ci_expr_logic_16: c_int
-
-                            if ((if op__goto_138_15 == OP_XCLASS: 1 else: 0) != 0) {
-                                (__ci_expr_logic_16 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_16 = (if (if op__goto_138_15 == OP_ECLASS: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_16 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-                            } else {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
-                            }
-
-
-                            match (unsafe: *cc__goto_116_12):
-                                OP_CRPLUS =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                                OP_CRMINPLUS =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                                OP_CRPOSPLUS =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                                OP_CRSTAR =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRMINSTAR =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRQUERY =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRMINQUERY =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRPOSSTAR =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRPOSQUERY =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
-
-                                OP_CRMINRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
-
-                                OP_CRPOSRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
-
-                                _ =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                        OP_XCLASS =>
-                            var __ci_expr_logic_16: c_int
-
-                            if ((if op__goto_138_15 == OP_XCLASS: 1 else: 0) != 0) {
-                                (__ci_expr_logic_16 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_16 = (if (if op__goto_138_15 == OP_ECLASS: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_16 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-                            } else {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
-                            }
-
-
-                            match (unsafe: *cc__goto_116_12):
-                                OP_CRPLUS =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                                OP_CRMINPLUS =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                                OP_CRPOSPLUS =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                                OP_CRSTAR =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRMINSTAR =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRQUERY =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRMINQUERY =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRPOSSTAR =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRPOSQUERY =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
-
-                                OP_CRMINRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
-
-                                OP_CRPOSRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
-
-                                _ =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                        OP_ECLASS =>
-                            var __ci_expr_logic_16: c_int
-
-                            if ((if op__goto_138_15 == OP_XCLASS: 1 else: 0) != 0) {
-                                (__ci_expr_logic_16 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_16 = (if (if op__goto_138_15 == OP_ECLASS: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_16 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-                            } else {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[OP_CLASS])
-                            }
-
-
-                            match (unsafe: *cc__goto_116_12):
-                                OP_CRPLUS =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                                OP_CRMINPLUS =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                                OP_CRPOSPLUS =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-
-                                OP_CRSTAR =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRMINSTAR =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRQUERY =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRMINQUERY =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRPOSSTAR =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRPOSQUERY =>
-                                    (cc__goto_116_12 = cc__goto_116_12 + 1)
-                                OP_CRRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
-
-                                OP_CRMINRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
-
-                                OP_CRPOSRANGE =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                                    (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
-
-                                _ =>
-                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + 1)
-
-                        OP_DNREF =>
-                            var __ci_expr_logic_17: c_int = 0
-
-                            if ((if not (dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
-                                (__ci_expr_logic_17 = (if (if (re.overall_options & 512) == 0: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_17 != 0) {
-                                (count__goto_481_11 = ((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint)))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (slot__goto_482_18 = ((re as *const u8) + sizeof[pcre2_real_code_8]()) + ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint) *% re.name_entry_size))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (d__goto_137_7 = 2147483647)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                while true {
-                                    var __ci_expr_old_18: c_int = count__goto_481_11
-
-                                    (count__goto_481_11 = count__goto_481_11 - 1)
-
-                                    if (not ((if __ci_expr_old_18 > 0: 1 else: 0) != 0)) {
-                                        break
-                                    }
-
-                                    (recno__goto_137_15 = ((((((unsafe: slot__goto_482_18[0]) as c_int) << (8 as c_uint)) | (unsafe: slot__goto_482_18[(0 + 1)])) as c_uint)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    var __ci_expr_logic_19: c_int = 0
-
-                                    if ((if recno__goto_137_15 <= (unsafe: backref_cache[0]): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_19 = (if (if (unsafe: backref_cache[recno__goto_137_15]) >= 0: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_19 != 0) {
-                                        (dd__goto_492_13 = (unsafe: backref_cache[recno__goto_137_15]))
-                                    } else {
-                                        (cs__goto_139_14 = _pcre2_find_bracket_8(startcode, utf, recno__goto_137_15))
-
-                                        (ce__goto_139_18 = cs__goto_139_14)
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        if ((if cs__goto_139_14 == null: 1 else: 0) != 0) {
-                                            return -2
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        while true {
-                                            (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *ce__goto_139_18) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (dd__goto_492_13 = 0)
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        var __ci_expr_logic_20: c_int
-
-                                        if ((if not (dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
-                                            (__ci_expr_logic_20 = (if true: 1 else: 0))
-                                        } else {
-                                            (__ci_expr_logic_20 = (if (if _pcre2_find_bracket_8(ce__goto_139_18, utf, recno__goto_137_15) == null: 1 else: 0) != 0: 1 else: 0))
-                                        }
-
-                                        if (__ci_expr_logic_20 != 0) {
-                                            var __ci_expr_logic_21: c_int = 0
-
-                                            if ((if cc__goto_116_12 > cs__goto_139_14: 1 else: 0) != 0) {
-                                                (__ci_expr_logic_21 = (if (if cc__goto_116_12 < ce__goto_139_18: 1 else: 0) != 0: 1 else: 0))
-                                            }
-
-                                            if (__ci_expr_logic_21 != 0) {
-                                                (had_recurse__goto_113_6 = 1)
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                            } else {
-                                                (r__goto_512_30 = recurses)
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (r__goto_512_30 = recurses)
-
-                                                while ((if r__goto_512_30 != null: 1 else: 0) != 0) {
-                                                    if ((if r__goto_512_30.group == cs__goto_139_14: 1 else: 0) != 0) {
-                                                        break
-                                                    }
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                    (r__goto_512_30 = r__goto_512_30.prev)
-
-                                                }
-
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                if ((if r__goto_512_30 != null: 1 else: 0) != 0) {
-                                                    (had_recurse__goto_113_6 = 1)
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                } else {
-                                                    (this_recurse__goto_117_15.prev = recurses)
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                    (this_recurse__goto_117_15.group = cs__goto_139_14)
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                    (dd__goto_492_13 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                    if ((if dd__goto_492_13 < 0: 1 else: 0) != 0) {
-                                                        return dd__goto_492_13
-                                                    }
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                }
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                            }
-
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                        }
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        ((unsafe: backref_cache[recno__goto_137_15]) = dd__goto_492_13)
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (i__goto_492_17 = (unsafe: backref_cache[0]) + 1)
-
-                                        while ((if i__goto_492_17 < recno__goto_137_15: 1 else: 0) != 0) {
-                                            ((unsafe: backref_cache[i__goto_492_17]) = -1)
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            (i__goto_492_17 = i__goto_492_17 + 1)
-
-                                        }
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        ((unsafe: backref_cache[0]) = recno__goto_137_15)
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    if ((if dd__goto_492_13 < d__goto_137_7: 1 else: 0) != 0) {
-                                        (d__goto_137_7 = dd__goto_492_13)
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    if ((if d__goto_137_7 <= 0: 1 else: 0) != 0) {
-                                        break
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (slot__goto_482_18 = slot__goto_482_18 + re.name_entry_size)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            } else {
-                                (d__goto_137_7 = 0)
-                            }
-
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                            __pc = 2
-                            __goto_pending = 1
-
-                        OP_DNREFI =>
-                            var __ci_expr_logic_17: c_int = 0
-
-                            if ((if not (dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
-                                (__ci_expr_logic_17 = (if (if (re.overall_options & 512) == 0: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_17 != 0) {
-                                (count__goto_481_11 = ((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint)))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (slot__goto_482_18 = ((re as *const u8) + sizeof[pcre2_real_code_8]()) + ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint) *% re.name_entry_size))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (d__goto_137_7 = 2147483647)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                while true {
-                                    var __ci_expr_old_18: c_int = count__goto_481_11
-
-                                    (count__goto_481_11 = count__goto_481_11 - 1)
-
-                                    if (not ((if __ci_expr_old_18 > 0: 1 else: 0) != 0)) {
-                                        break
-                                    }
-
-                                    (recno__goto_137_15 = ((((((unsafe: slot__goto_482_18[0]) as c_int) << (8 as c_uint)) | (unsafe: slot__goto_482_18[(0 + 1)])) as c_uint)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    var __ci_expr_logic_19: c_int = 0
-
-                                    if ((if recno__goto_137_15 <= (unsafe: backref_cache[0]): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_19 = (if (if (unsafe: backref_cache[recno__goto_137_15]) >= 0: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_19 != 0) {
-                                        (dd__goto_492_13 = (unsafe: backref_cache[recno__goto_137_15]))
-                                    } else {
-                                        (cs__goto_139_14 = _pcre2_find_bracket_8(startcode, utf, recno__goto_137_15))
-
-                                        (ce__goto_139_18 = cs__goto_139_14)
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        if ((if cs__goto_139_14 == null: 1 else: 0) != 0) {
-                                            return -2
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        while true {
-                                            (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *ce__goto_139_18) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (dd__goto_492_13 = 0)
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        var __ci_expr_logic_20: c_int
-
-                                        if ((if not (dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
-                                            (__ci_expr_logic_20 = (if true: 1 else: 0))
-                                        } else {
-                                            (__ci_expr_logic_20 = (if (if _pcre2_find_bracket_8(ce__goto_139_18, utf, recno__goto_137_15) == null: 1 else: 0) != 0: 1 else: 0))
-                                        }
-
-                                        if (__ci_expr_logic_20 != 0) {
-                                            var __ci_expr_logic_21: c_int = 0
-
-                                            if ((if cc__goto_116_12 > cs__goto_139_14: 1 else: 0) != 0) {
-                                                (__ci_expr_logic_21 = (if (if cc__goto_116_12 < ce__goto_139_18: 1 else: 0) != 0: 1 else: 0))
-                                            }
-
-                                            if (__ci_expr_logic_21 != 0) {
-                                                (had_recurse__goto_113_6 = 1)
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                            } else {
-                                                (r__goto_512_30 = recurses)
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (r__goto_512_30 = recurses)
-
-                                                while ((if r__goto_512_30 != null: 1 else: 0) != 0) {
-                                                    if ((if r__goto_512_30.group == cs__goto_139_14: 1 else: 0) != 0) {
-                                                        break
-                                                    }
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                    (r__goto_512_30 = r__goto_512_30.prev)
-
-                                                }
-
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                if ((if r__goto_512_30 != null: 1 else: 0) != 0) {
-                                                    (had_recurse__goto_113_6 = 1)
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                } else {
-                                                    (this_recurse__goto_117_15.prev = recurses)
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                    (this_recurse__goto_117_15.group = cs__goto_139_14)
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                    (dd__goto_492_13 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                    if ((if dd__goto_492_13 < 0: 1 else: 0) != 0) {
-                                                        return dd__goto_492_13
-                                                    }
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                }
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                            }
-
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                        }
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        ((unsafe: backref_cache[recno__goto_137_15]) = dd__goto_492_13)
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (i__goto_492_17 = (unsafe: backref_cache[0]) + 1)
-
-                                        while ((if i__goto_492_17 < recno__goto_137_15: 1 else: 0) != 0) {
-                                            ((unsafe: backref_cache[i__goto_492_17]) = -1)
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            (i__goto_492_17 = i__goto_492_17 + 1)
-
-                                        }
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        ((unsafe: backref_cache[0]) = recno__goto_137_15)
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    if ((if dd__goto_492_13 < d__goto_137_7: 1 else: 0) != 0) {
-                                        (d__goto_137_7 = dd__goto_492_13)
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    if ((if d__goto_137_7 <= 0: 1 else: 0) != 0) {
-                                        break
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (slot__goto_482_18 = slot__goto_482_18 + re.name_entry_size)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            } else {
-                                (d__goto_137_7 = 0)
-                            }
-
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                            __pc = 2
-                            __goto_pending = 1
-
-                        OP_REF =>
-                            (recno__goto_137_15 = ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint)))
-
-                            var __ci_expr_logic_22: c_int = 0
-
-                            if ((if recno__goto_137_15 <= (unsafe: backref_cache[0]): 1 else: 0) != 0) {
-                                (__ci_expr_logic_22 = (if (if (unsafe: backref_cache[recno__goto_137_15]) >= 0: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_22 != 0) {
-                                (d__goto_137_7 = (unsafe: backref_cache[recno__goto_137_15]))
-                            } else {
-                                (d__goto_137_7 = 0)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if ((if (re.overall_options & 512) == 0: 1 else: 0) != 0) {
+                                if (__ci_expr_logic_19 != 0) {
+                                    (dd__goto_492_13 = (unsafe: backref_cache[recno__goto_137_15]))
+                                } else {
                                     (cs__goto_139_14 = _pcre2_find_bracket_8(startcode, utf, recno__goto_137_15))
 
                                     (ce__goto_139_18 = cs__goto_139_14)
@@ -2651,22 +2336,28 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                         break
                                     }
 
-                                    var __ci_expr_logic_23: c_int
+                                    (dd__goto_492_13 = 0)
 
-                                    if ((if not (dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_23 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_23 = (if (if _pcre2_find_bracket_8(ce__goto_139_18, utf, recno__goto_137_15) == null: 1 else: 0) != 0: 1 else: 0))
+                                    if (__goto_pending != 0) {
+                                        break
                                     }
 
-                                    if (__ci_expr_logic_23 != 0) {
-                                        var __ci_expr_logic_24: c_int = 0
+                                    var __ci_expr_logic_20: c_int
+
+                                    if ((if not (dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
+                                        (__ci_expr_logic_20 = (if true: 1 else: 0))
+                                    } else {
+                                        (__ci_expr_logic_20 = (if (if _pcre2_find_bracket_8(ce__goto_139_18, utf, recno__goto_137_15) == null: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_20 != 0) {
+                                        var __ci_expr_logic_21: c_int = 0
 
                                         if ((if cc__goto_116_12 > cs__goto_139_14: 1 else: 0) != 0) {
-                                            (__ci_expr_logic_24 = (if (if cc__goto_116_12 < ce__goto_139_18: 1 else: 0) != 0: 1 else: 0))
+                                            (__ci_expr_logic_21 = (if (if cc__goto_116_12 < ce__goto_139_18: 1 else: 0) != 0: 1 else: 0))
                                         }
 
-                                        if (__ci_expr_logic_24 != 0) {
+                                        if (__ci_expr_logic_21 != 0) {
                                             (had_recurse__goto_113_6 = 1)
 
                                             if (__goto_pending != 0) {
@@ -2674,16 +2365,16 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                             }
 
                                         } else {
-                                            (r__goto_571_28 = recurses)
+                                            (r__goto_512_30 = recurses)
 
                                             if (__goto_pending != 0) {
                                                 break
                                             }
 
-                                            (r__goto_571_28 = recurses)
+                                            (r__goto_512_30 = recurses)
 
-                                            while ((if r__goto_571_28 != null: 1 else: 0) != 0) {
-                                                if ((if r__goto_571_28.group == cs__goto_139_14: 1 else: 0) != 0) {
+                                            while ((if r__goto_512_30 != null: 1 else: 0) != 0) {
+                                                if ((if r__goto_512_30.group == cs__goto_139_14: 1 else: 0) != 0) {
                                                     break
                                                 }
 
@@ -2691,7 +2382,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                                     break
                                                 }
 
-                                                (r__goto_571_28 = r__goto_571_28.prev)
+                                                (r__goto_512_30 = r__goto_512_30.prev)
 
                                             }
 
@@ -2700,7 +2391,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                                 break
                                             }
 
-                                            if ((if r__goto_571_28 != null: 1 else: 0) != 0) {
+                                            if ((if r__goto_512_30 != null: 1 else: 0) != 0) {
                                                 (had_recurse__goto_113_6 = 1)
 
                                                 if (__goto_pending != 0) {
@@ -2720,14 +2411,14 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                                     break
                                                 }
 
-                                                (d__goto_137_7 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
+                                                (dd__goto_492_13 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
 
                                                 if (__goto_pending != 0) {
                                                     break
                                                 }
 
-                                                if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
-                                                    return d__goto_137_7
+                                                if ((if dd__goto_492_13 < 0: 1 else: 0) != 0) {
+                                                    return dd__goto_492_13
                                                 }
 
                                                 if (__goto_pending != 0) {
@@ -2754,37 +2445,63 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                         break
                                     }
 
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                ((unsafe: backref_cache[recno__goto_137_15]) = d__goto_137_7)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (i__goto_554_11 = (unsafe: backref_cache[0]) + 1)
-
-                                while ((if i__goto_554_11 < recno__goto_137_15: 1 else: 0) != 0) {
-                                    ((unsafe: backref_cache[i__goto_554_11]) = -1)
+                                    ((unsafe: backref_cache[recno__goto_137_15]) = dd__goto_492_13)
 
                                     if (__goto_pending != 0) {
                                         break
                                     }
 
-                                    (i__goto_554_11 = i__goto_554_11 + 1)
+                                    (i__goto_492_17 = (unsafe: backref_cache[0]) + 1)
+
+                                    while ((if i__goto_492_17 < recno__goto_137_15: 1 else: 0) != 0) {
+                                        ((unsafe: backref_cache[i__goto_492_17]) = -1)
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        (i__goto_492_17 = i__goto_492_17 + 1)
+
+                                    }
+
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    ((unsafe: backref_cache[0]) = recno__goto_137_15)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
 
                                 }
-
 
                                 if (__goto_pending != 0) {
                                     break
                                 }
 
-                                ((unsafe: backref_cache[0]) = recno__goto_137_15)
+                                if ((if dd__goto_492_13 < d__goto_137_7: 1 else: 0) != 0) {
+                                    (d__goto_137_7 = dd__goto_492_13)
+                                }
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                if ((if d__goto_137_7 <= 0: 1 else: 0) != 0) {
+                                    break
+                                }
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                (slot__goto_482_18 = slot__goto_482_18 + re.name_entry_size)
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
 
                                 if (__goto_pending != 0) {
                                     break
@@ -2792,49 +2509,71 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
                             }
 
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                            var __ci_expr_logic_26: c_int
-
-                            var __ci_expr_logic_25: c_int = 0
-
-                            if ((if d__goto_137_7 > 0: 1 else: 0) != 0) {
-                                (__ci_expr_logic_25 = (if (if (2147483647 / d__goto_137_7) < min__goto_137_10: 1 else: 0) != 0: 1 else: 0))
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            if (__ci_expr_logic_25 != 0) {
-                                (__ci_expr_logic_26 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_26 = (if (if (65535 - branchlength__goto_107_5) < (min__goto_137_10 * d__goto_137_7): 1 else: 0) != 0: 1 else: 0))
+                        } else {
+                            (d__goto_137_7 = 0)
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                        __pc = 2
+                        __goto_pending = 1
+
+                    },
+                    OP_DNREFI => {
+                        var __ci_expr_logic_17: c_int = 0
+
+                        if ((if not (dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
+                            (__ci_expr_logic_17 = (if (if (re.overall_options & 512) == 0: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_17 != 0) {
+                            (count__goto_481_11 = ((((((unsafe: cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[((1 + 2) + 1)])) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            if (__ci_expr_logic_26 != 0) {
-                                (branchlength__goto_107_5 = 65535)
-                            } else {
-                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (min__goto_137_10 * d__goto_137_7))
+                            (slot__goto_482_18 = ((re as *const u8) + sizeof[pcre2_real_code_8]()) + ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint) *% re.name_entry_size))
+
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
+                            (d__goto_137_7 = 2147483647)
 
-                        OP_REFI =>
-                            (recno__goto_137_15 = ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint)))
-
-                            var __ci_expr_logic_22: c_int = 0
-
-                            if ((if recno__goto_137_15 <= (unsafe: backref_cache[0]): 1 else: 0) != 0) {
-                                (__ci_expr_logic_22 = (if (if (unsafe: backref_cache[recno__goto_137_15]) >= 0: 1 else: 0) != 0: 1 else: 0))
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            if (__ci_expr_logic_22 != 0) {
-                                (d__goto_137_7 = (unsafe: backref_cache[recno__goto_137_15]))
-                            } else {
-                                (d__goto_137_7 = 0)
+                            while true {
+                                var __ci_expr_old_18: c_int = count__goto_481_11
+
+                                (count__goto_481_11 = count__goto_481_11 - 1)
+
+                                if (not ((if __ci_expr_old_18 > 0: 1 else: 0) != 0)) {
+                                    break
+                                }
+
+                                (recno__goto_137_15 = ((((((unsafe: slot__goto_482_18[0]) as c_int) << (8 as c_uint)) | (unsafe: slot__goto_482_18[(0 + 1)])) as c_uint)))
 
                                 if (__goto_pending != 0) {
                                     break
                                 }
 
-                                if ((if (re.overall_options & 512) == 0: 1 else: 0) != 0) {
+                                var __ci_expr_logic_19: c_int = 0
+
+                                if ((if recno__goto_137_15 <= (unsafe: backref_cache[0]): 1 else: 0) != 0) {
+                                    (__ci_expr_logic_19 = (if (if (unsafe: backref_cache[recno__goto_137_15]) >= 0: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_19 != 0) {
+                                    (dd__goto_492_13 = (unsafe: backref_cache[recno__goto_137_15]))
+                                } else {
                                     (cs__goto_139_14 = _pcre2_find_bracket_8(startcode, utf, recno__goto_137_15))
 
                                     (ce__goto_139_18 = cs__goto_139_14)
@@ -2869,22 +2608,28 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                         break
                                     }
 
-                                    var __ci_expr_logic_23: c_int
+                                    (dd__goto_492_13 = 0)
 
-                                    if ((if not (dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_23 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_23 = (if (if _pcre2_find_bracket_8(ce__goto_139_18, utf, recno__goto_137_15) == null: 1 else: 0) != 0: 1 else: 0))
+                                    if (__goto_pending != 0) {
+                                        break
                                     }
 
-                                    if (__ci_expr_logic_23 != 0) {
-                                        var __ci_expr_logic_24: c_int = 0
+                                    var __ci_expr_logic_20: c_int
+
+                                    if ((if not (dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
+                                        (__ci_expr_logic_20 = (if true: 1 else: 0))
+                                    } else {
+                                        (__ci_expr_logic_20 = (if (if _pcre2_find_bracket_8(ce__goto_139_18, utf, recno__goto_137_15) == null: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_20 != 0) {
+                                        var __ci_expr_logic_21: c_int = 0
 
                                         if ((if cc__goto_116_12 > cs__goto_139_14: 1 else: 0) != 0) {
-                                            (__ci_expr_logic_24 = (if (if cc__goto_116_12 < ce__goto_139_18: 1 else: 0) != 0: 1 else: 0))
+                                            (__ci_expr_logic_21 = (if (if cc__goto_116_12 < ce__goto_139_18: 1 else: 0) != 0: 1 else: 0))
                                         }
 
-                                        if (__ci_expr_logic_24 != 0) {
+                                        if (__ci_expr_logic_21 != 0) {
                                             (had_recurse__goto_113_6 = 1)
 
                                             if (__goto_pending != 0) {
@@ -2892,16 +2637,16 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                             }
 
                                         } else {
-                                            (r__goto_571_28 = recurses)
+                                            (r__goto_512_30 = recurses)
 
                                             if (__goto_pending != 0) {
                                                 break
                                             }
 
-                                            (r__goto_571_28 = recurses)
+                                            (r__goto_512_30 = recurses)
 
-                                            while ((if r__goto_571_28 != null: 1 else: 0) != 0) {
-                                                if ((if r__goto_571_28.group == cs__goto_139_14: 1 else: 0) != 0) {
+                                            while ((if r__goto_512_30 != null: 1 else: 0) != 0) {
+                                                if ((if r__goto_512_30.group == cs__goto_139_14: 1 else: 0) != 0) {
                                                     break
                                                 }
 
@@ -2909,7 +2654,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                                     break
                                                 }
 
-                                                (r__goto_571_28 = r__goto_571_28.prev)
+                                                (r__goto_512_30 = r__goto_512_30.prev)
 
                                             }
 
@@ -2918,7 +2663,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                                 break
                                             }
 
-                                            if ((if r__goto_571_28 != null: 1 else: 0) != 0) {
+                                            if ((if r__goto_512_30 != null: 1 else: 0) != 0) {
                                                 (had_recurse__goto_113_6 = 1)
 
                                                 if (__goto_pending != 0) {
@@ -2938,14 +2683,14 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                                     break
                                                 }
 
-                                                (d__goto_137_7 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
+                                                (dd__goto_492_13 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
 
                                                 if (__goto_pending != 0) {
                                                     break
                                                 }
 
-                                                if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
-                                                    return d__goto_137_7
+                                                if ((if dd__goto_492_13 < 0: 1 else: 0) != 0) {
+                                                    return dd__goto_492_13
                                                 }
 
                                                 if (__goto_pending != 0) {
@@ -2972,37 +2717,63 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                         break
                                     }
 
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                ((unsafe: backref_cache[recno__goto_137_15]) = d__goto_137_7)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (i__goto_554_11 = (unsafe: backref_cache[0]) + 1)
-
-                                while ((if i__goto_554_11 < recno__goto_137_15: 1 else: 0) != 0) {
-                                    ((unsafe: backref_cache[i__goto_554_11]) = -1)
+                                    ((unsafe: backref_cache[recno__goto_137_15]) = dd__goto_492_13)
 
                                     if (__goto_pending != 0) {
                                         break
                                     }
 
-                                    (i__goto_554_11 = i__goto_554_11 + 1)
+                                    (i__goto_492_17 = (unsafe: backref_cache[0]) + 1)
+
+                                    while ((if i__goto_492_17 < recno__goto_137_15: 1 else: 0) != 0) {
+                                        ((unsafe: backref_cache[i__goto_492_17]) = -1)
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        (i__goto_492_17 = i__goto_492_17 + 1)
+
+                                    }
+
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    ((unsafe: backref_cache[0]) = recno__goto_137_15)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
 
                                 }
-
 
                                 if (__goto_pending != 0) {
                                     break
                                 }
 
-                                ((unsafe: backref_cache[0]) = recno__goto_137_15)
+                                if ((if dd__goto_492_13 < d__goto_137_7: 1 else: 0) != 0) {
+                                    (d__goto_137_7 = dd__goto_492_13)
+                                }
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                if ((if d__goto_137_7 <= 0: 1 else: 0) != 0) {
+                                    break
+                                }
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                (slot__goto_482_18 = slot__goto_482_18 + re.name_entry_size)
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
 
                                 if (__goto_pending != 0) {
                                     break
@@ -3010,46 +2781,57 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
 
                             }
 
-
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
-
-                            var __ci_expr_logic_26: c_int
-
-                            var __ci_expr_logic_25: c_int = 0
-
-                            if ((if d__goto_137_7 > 0: 1 else: 0) != 0) {
-                                (__ci_expr_logic_25 = (if (if (2147483647 / d__goto_137_7) < min__goto_137_10: 1 else: 0) != 0: 1 else: 0))
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            if (__ci_expr_logic_25 != 0) {
-                                (__ci_expr_logic_26 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_26 = (if (if (65535 - branchlength__goto_107_5) < (min__goto_137_10 * d__goto_137_7): 1 else: 0) != 0: 1 else: 0))
+                        } else {
+                            (d__goto_137_7 = 0)
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                        __pc = 2
+                        __goto_pending = 1
+
+                    },
+                    OP_REF => {
+                        (recno__goto_137_15 = ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint)))
+
+                        var __ci_expr_logic_22: c_int = 0
+
+                        if ((if recno__goto_137_15 <= (unsafe: backref_cache[0]): 1 else: 0) != 0) {
+                            (__ci_expr_logic_22 = (if (if (unsafe: backref_cache[recno__goto_137_15]) >= 0: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_22 != 0) {
+                            (d__goto_137_7 = (unsafe: backref_cache[recno__goto_137_15]))
+                        } else {
+                            (d__goto_137_7 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
-                            if (__ci_expr_logic_26 != 0) {
-                                (branchlength__goto_107_5 = 65535)
-                            } else {
-                                (branchlength__goto_107_5 = branchlength__goto_107_5 + (min__goto_137_10 * d__goto_137_7))
-                            }
+                            if ((if (re.overall_options & 512) == 0: 1 else: 0) != 0) {
+                                (cs__goto_139_14 = _pcre2_find_bracket_8(startcode, utf, recno__goto_137_15))
 
+                                (ce__goto_139_18 = cs__goto_139_14)
 
-                        OP_RECURSE =>
-                            (ce__goto_139_18 = startcode + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
-
-                            (cs__goto_139_14 = ce__goto_139_18)
-
-
-                            (recno__goto_137_15 = ((((((unsafe: cs__goto_139_14[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cs__goto_139_14[((1 + 2) + 1)])) as c_uint)))
-
-                            if ((if recno__goto_137_15 == prev_recurse_recno__goto_110_5: 1 else: 0) != 0) {
-                                (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_recurse_d__goto_111_5)
 
                                 if (__goto_pending != 0) {
-                                    break
+                                    continue
                                 }
 
-                            } else {
+                                if ((if cs__goto_139_14 == null: 1 else: 0) != 0) {
+                                    return -2
+                                }
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
                                 while true {
                                     (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
 
@@ -3064,641 +2846,1210 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                 }
 
                                 if (__goto_pending != 0) {
-                                    break
+                                    continue
                                 }
 
-                                var __ci_expr_logic_27: c_int = 0
+                                var __ci_expr_logic_23: c_int
 
-                                if ((if cc__goto_116_12 > cs__goto_139_14: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_27 = (if (if cc__goto_116_12 < ce__goto_139_18: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_27 != 0) {
-                                    (had_recurse__goto_113_6 = 1)
+                                if ((if not (dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
+                                    (__ci_expr_logic_23 = (if true: 1 else: 0))
                                 } else {
-                                    (r__goto_657_24 = recurses)
+                                    (__ci_expr_logic_23 = (if (if _pcre2_find_bracket_8(ce__goto_139_18, utf, recno__goto_137_15) == null: 1 else: 0) != 0: 1 else: 0))
+                                }
 
-                                    if (__goto_pending != 0) {
-                                        break
+                                if (__ci_expr_logic_23 != 0) {
+                                    var __ci_expr_logic_24: c_int = 0
+
+                                    if ((if cc__goto_116_12 > cs__goto_139_14: 1 else: 0) != 0) {
+                                        (__ci_expr_logic_24 = (if (if cc__goto_116_12 < ce__goto_139_18: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (r__goto_657_24 = recurses)
-
-                                    while ((if r__goto_657_24 != null: 1 else: 0) != 0) {
-                                        if ((if r__goto_657_24.group == cs__goto_139_14: 1 else: 0) != 0) {
-                                            break
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (r__goto_657_24 = r__goto_657_24.prev)
-
-                                    }
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    if ((if r__goto_657_24 != null: 1 else: 0) != 0) {
+                                    if (__ci_expr_logic_24 != 0) {
                                         (had_recurse__goto_113_6 = 1)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
                                     } else {
-                                        (this_recurse__goto_117_15.prev = recurses)
+                                        (r__goto_571_28 = recurses)
 
                                         if (__goto_pending != 0) {
-                                            break
+                                            continue
                                         }
 
-                                        (this_recurse__goto_117_15.group = cs__goto_139_14)
+                                        (r__goto_571_28 = recurses)
+
+                                        while ((if r__goto_571_28 != null: 1 else: 0) != 0) {
+                                            if ((if r__goto_571_28.group == cs__goto_139_14: 1 else: 0) != 0) {
+                                                break
+                                            }
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            (r__goto_571_28 = r__goto_571_28.prev)
+
+                                        }
+
 
                                         if (__goto_pending != 0) {
-                                            break
+                                            continue
                                         }
 
-                                        (prev_recurse_d__goto_111_5 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
+                                        if ((if r__goto_571_28 != null: 1 else: 0) != 0) {
+                                            (had_recurse__goto_113_6 = 1)
+
+                                            if (__goto_pending != 0) {
+                                                continue
+                                            }
+
+                                        } else {
+                                            (this_recurse__goto_117_15.prev = recurses)
+
+                                            if (__goto_pending != 0) {
+                                                continue
+                                            }
+
+                                            (this_recurse__goto_117_15.group = cs__goto_139_14)
+
+                                            if (__goto_pending != 0) {
+                                                continue
+                                            }
+
+                                            (d__goto_137_7 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
+
+                                            if (__goto_pending != 0) {
+                                                continue
+                                            }
+
+                                            if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
+                                                return d__goto_137_7
+                                            }
+
+                                            if (__goto_pending != 0) {
+                                                continue
+                                            }
+
+                                        }
 
                                         if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        if ((if prev_recurse_d__goto_111_5 < 0: 1 else: 0) != 0) {
-                                            return prev_recurse_d__goto_111_5
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (prev_recurse_recno__goto_110_5 = recno__goto_137_15)
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_recurse_d__goto_111_5)
-
-                                        if (__goto_pending != 0) {
-                                            break
+                                            continue
                                         }
 
                                     }
 
+
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
                                 }
 
 
                                 if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            ((unsafe: backref_cache[recno__goto_137_15]) = d__goto_137_7)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (i__goto_554_11 = (unsafe: backref_cache[0]) + 1)
+
+                            while ((if i__goto_554_11 < recno__goto_137_15: 1 else: 0) != 0) {
+                                ((unsafe: backref_cache[i__goto_554_11]) = -1)
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                (i__goto_554_11 = i__goto_554_11 + 1)
+
+                            }
+
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            ((unsafe: backref_cache[0]) = recno__goto_137_15)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                        match (unsafe: *cc__goto_116_12) {
+                            OP_CRSTAR => {
+                                (min__goto_137_10 = 0)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRPLUS => {
+                                (min__goto_137_10 = 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRRANGE => {
+                                (min__goto_137_10 = ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint)))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            _ => {
+                                (min__goto_137_10 = 1)
+                            },
+                        }
+
+                        var __ci_expr_logic_26: c_int
+
+                        var __ci_expr_logic_25: c_int = 0
+
+                        if ((if d__goto_137_7 > 0: 1 else: 0) != 0) {
+                            (__ci_expr_logic_25 = (if (if (2147483647 / d__goto_137_7) < min__goto_137_10: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_25 != 0) {
+                            (__ci_expr_logic_26 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_26 = (if (if (65535 - branchlength__goto_107_5) < (min__goto_137_10 * d__goto_137_7): 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_26 != 0) {
+                            (branchlength__goto_107_5 = 65535)
+                        } else {
+                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (min__goto_137_10 * d__goto_137_7))
+                        }
+
+
+                    },
+                    OP_REFI => {
+                        (recno__goto_137_15 = ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint)))
+
+                        var __ci_expr_logic_22: c_int = 0
+
+                        if ((if recno__goto_137_15 <= (unsafe: backref_cache[0]): 1 else: 0) != 0) {
+                            (__ci_expr_logic_22 = (if (if (unsafe: backref_cache[recno__goto_137_15]) >= 0: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_22 != 0) {
+                            (d__goto_137_7 = (unsafe: backref_cache[recno__goto_137_15]))
+                        } else {
+                            (d__goto_137_7 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            if ((if (re.overall_options & 512) == 0: 1 else: 0) != 0) {
+                                (cs__goto_139_14 = _pcre2_find_bracket_8(startcode, utf, recno__goto_137_15))
+
+                                (ce__goto_139_18 = cs__goto_139_14)
+
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                if ((if cs__goto_139_14 == null: 1 else: 0) != 0) {
+                                    return -2
+                                }
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                while true {
+                                    (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    if (not ((if (unsafe: *ce__goto_139_18) == OP_ALT: 1 else: 0) != 0)) {
+                                        break
+                                    }
+
+                                }
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                var __ci_expr_logic_23: c_int
+
+                                if ((if not (dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
+                                    (__ci_expr_logic_23 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_23 = (if (if _pcre2_find_bracket_8(ce__goto_139_18, utf, recno__goto_137_15) == null: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_23 != 0) {
+                                    var __ci_expr_logic_24: c_int = 0
+
+                                    if ((if cc__goto_116_12 > cs__goto_139_14: 1 else: 0) != 0) {
+                                        (__ci_expr_logic_24 = (if (if cc__goto_116_12 < ce__goto_139_18: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_24 != 0) {
+                                        (had_recurse__goto_113_6 = 1)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                    } else {
+                                        (r__goto_571_28 = recurses)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                        (r__goto_571_28 = recurses)
+
+                                        while ((if r__goto_571_28 != null: 1 else: 0) != 0) {
+                                            if ((if r__goto_571_28.group == cs__goto_139_14: 1 else: 0) != 0) {
+                                                break
+                                            }
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            (r__goto_571_28 = r__goto_571_28.prev)
+
+                                        }
+
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                        if ((if r__goto_571_28 != null: 1 else: 0) != 0) {
+                                            (had_recurse__goto_113_6 = 1)
+
+                                            if (__goto_pending != 0) {
+                                                continue
+                                            }
+
+                                        } else {
+                                            (this_recurse__goto_117_15.prev = recurses)
+
+                                            if (__goto_pending != 0) {
+                                                continue
+                                            }
+
+                                            (this_recurse__goto_117_15.group = cs__goto_139_14)
+
+                                            if (__goto_pending != 0) {
+                                                continue
+                                            }
+
+                                            (d__goto_137_7 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
+
+                                            if (__goto_pending != 0) {
+                                                continue
+                                            }
+
+                                            if ((if d__goto_137_7 < 0: 1 else: 0) != 0) {
+                                                return d__goto_137_7
+                                            }
+
+                                            if (__goto_pending != 0) {
+                                                continue
+                                            }
+
+                                        }
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                    }
+
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            ((unsafe: backref_cache[recno__goto_137_15]) = d__goto_137_7)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (i__goto_554_11 = (unsafe: backref_cache[0]) + 1)
+
+                            while ((if i__goto_554_11 < recno__goto_137_15: 1 else: 0) != 0) {
+                                ((unsafe: backref_cache[i__goto_554_11]) = -1)
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                (i__goto_554_11 = i__goto_554_11 + 1)
+
+                            }
+
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            ((unsafe: backref_cache[0]) = recno__goto_137_15)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[(unsafe: *cc__goto_116_12)])
+
+                        match (unsafe: *cc__goto_116_12) {
+                            OP_CRSTAR => {
+                                (min__goto_137_10 = 0)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRPLUS => {
+                                (min__goto_137_10 = 1)
+
+                                (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                            },
+                            OP_CRRANGE => {
+                                (min__goto_137_10 = ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint)))
+
+                                (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                            },
+                            _ => {
+                                (min__goto_137_10 = 1)
+                            },
+                        }
+
+                        var __ci_expr_logic_26: c_int
+
+                        var __ci_expr_logic_25: c_int = 0
+
+                        if ((if d__goto_137_7 > 0: 1 else: 0) != 0) {
+                            (__ci_expr_logic_25 = (if (if (2147483647 / d__goto_137_7) < min__goto_137_10: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_25 != 0) {
+                            (__ci_expr_logic_26 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_26 = (if (if (65535 - branchlength__goto_107_5) < (min__goto_137_10 * d__goto_137_7): 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_26 != 0) {
+                            (branchlength__goto_107_5 = 65535)
+                        } else {
+                            (branchlength__goto_107_5 = branchlength__goto_107_5 + (min__goto_137_10 * d__goto_137_7))
+                        }
+
+
+                    },
+                    OP_RECURSE => {
+                        (ce__goto_139_18 = startcode + (((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint))
+
+                        (cs__goto_139_14 = ce__goto_139_18)
+
+
+                        (recno__goto_137_15 = ((((((unsafe: cs__goto_139_14[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cs__goto_139_14[((1 + 2) + 1)])) as c_uint)))
+
+                        if ((if recno__goto_137_15 == prev_recurse_recno__goto_110_5: 1 else: 0) != 0) {
+                            (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_recurse_d__goto_111_5)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            while true {
+                                (ce__goto_139_18 = ce__goto_139_18 + (((((unsafe: ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | (unsafe: ce__goto_139_18[(1 + 1)])) as c_uint))
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                if (not ((if (unsafe: *ce__goto_139_18) == OP_ALT: 1 else: 0) != 0)) {
                                     break
                                 }
 
                             }
 
-                            (cc__goto_116_12 = cc__goto_116_12 + (3 +% once_fudge__goto_112_10))
+                            if (__goto_pending != 0) {
+                                continue
+                            }
 
-                            (once_fudge__goto_112_10 = 0)
+                            var __ci_expr_logic_27: c_int = 0
 
-                        OP_UPTO =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                            if ((if cc__goto_116_12 > cs__goto_139_14: 1 else: 0) != 0) {
+                                (__ci_expr_logic_27 = (if (if cc__goto_116_12 < ce__goto_139_18: 1 else: 0) != 0: 1 else: 0))
+                            }
 
-                            var __ci_expr_logic_28: c_int = 0
+                            if (__ci_expr_logic_27 != 0) {
+                                (had_recurse__goto_113_6 = 1)
+                            } else {
+                                (r__goto_657_24 = recurses)
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                                (r__goto_657_24 = recurses)
 
+                                while ((if r__goto_657_24 != null: 1 else: 0) != 0) {
+                                    if ((if r__goto_657_24.group == cs__goto_139_14: 1 else: 0) != 0) {
+                                        break
+                                    }
 
-                        OP_UPTOI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
 
-                            var __ci_expr_logic_28: c_int = 0
+                                    (r__goto_657_24 = r__goto_657_24.prev)
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                                }
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
 
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
 
-                        OP_NOTUPTO =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                                if ((if r__goto_657_24 != null: 1 else: 0) != 0) {
+                                    (had_recurse__goto_113_6 = 1)
+                                } else {
+                                    (this_recurse__goto_117_15.prev = recurses)
 
-                            var __ci_expr_logic_28: c_int = 0
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                                    (this_recurse__goto_117_15.group = cs__goto_139_14)
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
 
+                                    (prev_recurse_d__goto_111_5 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
 
-                        OP_NOTUPTOI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
 
-                            var __ci_expr_logic_28: c_int = 0
+                                    if ((if prev_recurse_d__goto_111_5 < 0: 1 else: 0) != 0) {
+                                        return prev_recurse_d__goto_111_5
+                                    }
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                                    (prev_recurse_recno__goto_110_5 = recno__goto_137_15)
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
 
+                                    (branchlength__goto_107_5 = branchlength__goto_107_5 + prev_recurse_d__goto_111_5)
 
-                        OP_MINUPTO =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
 
-                            var __ci_expr_logic_28: c_int = 0
+                                }
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
                             }
+
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                            if (__goto_pending != 0) {
+                                continue
                             }
 
+                        }
 
-                        OP_MINUPTOI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        (cc__goto_116_12 = cc__goto_116_12 + (3 +% once_fudge__goto_112_10))
 
-                            var __ci_expr_logic_28: c_int = 0
+                        (once_fudge__goto_112_10 = 0)
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_UPTO => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTMINUPTO =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_UPTOI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTMINUPTOI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTUPTO => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_POSUPTO =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTUPTOI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_POSUPTOI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_MINUPTO => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTPOSUPTO =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_MINUPTOI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTPOSUPTOI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTMINUPTO => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_STAR =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTMINUPTOI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_STARI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_POSUPTO => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTSTAR =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_POSUPTOI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTSTARI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTPOSUPTO => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_MINSTAR =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTPOSUPTOI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_MINSTARI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_STAR => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTMINSTAR =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_STARI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTMINSTARI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTSTAR => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_POSSTAR =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTSTARI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_POSSTARI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_MINSTAR => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTPOSSTAR =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_MINSTARI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTPOSSTARI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTMINSTAR => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_QUERY =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTMINSTARI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_QUERYI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_POSSTAR => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTQUERY =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_POSSTARI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTQUERYI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTPOSSTAR => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_MINQUERY =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTPOSSTARI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_MINQUERYI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_QUERY => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTMINQUERY =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_QUERYI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTMINQUERYI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTQUERY => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_POSQUERY =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTQUERYI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_POSQUERYI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_MINQUERY => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTPOSQUERY =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_MINQUERYI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
 
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                        OP_NOTPOSQUERYI =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
 
-                            var __ci_expr_logic_28: c_int = 0
 
-                            if (utf != 0) {
-                                (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
-                            }
+                    },
+                    OP_NOTMINQUERY => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
 
-                            if (__ci_expr_logic_28 != 0) {
-                                (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
-                            }
+                        var __ci_expr_logic_28: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOTMINQUERYI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                        var __ci_expr_logic_28: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_POSQUERY => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                        var __ci_expr_logic_28: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_POSQUERYI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                        var __ci_expr_logic_28: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOTPOSQUERY => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                        var __ci_expr_logic_28: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_NOTPOSQUERYI => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+
+                        var __ci_expr_logic_28: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_28 = (if (if (unsafe: cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_28 != 0) {
+                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_utf8_table4[((unsafe: cc__goto_116_12[-1]) & 63)])
+                        }
+
+
+                    },
+                    OP_MARK => {
+                        (cc__goto_116_12 = cc__goto_116_12 + (_pcre2_OP_lengths_8[op__goto_138_15] + (unsafe: cc__goto_116_12[1])))
+                    },
+                    OP_COMMIT_ARG => {
+                        (cc__goto_116_12 = cc__goto_116_12 + (_pcre2_OP_lengths_8[op__goto_138_15] + (unsafe: cc__goto_116_12[1])))
+                    },
+                    OP_PRUNE_ARG => {
+                        (cc__goto_116_12 = cc__goto_116_12 + (_pcre2_OP_lengths_8[op__goto_138_15] + (unsafe: cc__goto_116_12[1])))
+                    },
+                    OP_SKIP_ARG => {
+                        (cc__goto_116_12 = cc__goto_116_12 + (_pcre2_OP_lengths_8[op__goto_138_15] + (unsafe: cc__goto_116_12[1])))
+                    },
+                    OP_THEN_ARG => {
+                        (cc__goto_116_12 = cc__goto_116_12 + (_pcre2_OP_lengths_8[op__goto_138_15] + (unsafe: cc__goto_116_12[1])))
+                    },
+                    OP_CLOSE => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                    },
+                    OP_COMMIT => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                    },
+                    OP_FAIL => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                    },
+                    OP_PRUNE => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                    },
+                    OP_SET_SOM => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                    },
+                    OP_SKIP => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                    },
+                    OP_THEN => {
+                        (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
+                    },
+                    _ => {
 
+                        return -3
 
-                        OP_MARK =>
-                            (cc__goto_116_12 = cc__goto_116_12 + (_pcre2_OP_lengths_8[op__goto_138_15] + (unsafe: cc__goto_116_12[1])))
-                        OP_COMMIT_ARG =>
-                            (cc__goto_116_12 = cc__goto_116_12 + (_pcre2_OP_lengths_8[op__goto_138_15] + (unsafe: cc__goto_116_12[1])))
-                        OP_PRUNE_ARG =>
-                            (cc__goto_116_12 = cc__goto_116_12 + (_pcre2_OP_lengths_8[op__goto_138_15] + (unsafe: cc__goto_116_12[1])))
-                        OP_SKIP_ARG =>
-                            (cc__goto_116_12 = cc__goto_116_12 + (_pcre2_OP_lengths_8[op__goto_138_15] + (unsafe: cc__goto_116_12[1])))
-                        OP_THEN_ARG =>
-                            (cc__goto_116_12 = cc__goto_116_12 + (_pcre2_OP_lengths_8[op__goto_138_15] + (unsafe: cc__goto_116_12[1])))
-                        OP_CLOSE =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-                        OP_COMMIT =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-                        OP_FAIL =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-                        OP_PRUNE =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-                        OP_SET_SOM =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-                        OP_SKIP =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-                        OP_THEN =>
-                            (cc__goto_116_12 = cc__goto_116_12 + _pcre2_OP_lengths_8[op__goto_138_15])
-                        _ =>
-                            return -3
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
+                    },
                 }
+                if (__goto_pending != 0) {
+                    continue
+                }
+                __pc = 4
+                __goto_pending = 1
+                continue
+            },
+            1 => {  // PROCESS_NON_CAPTURE
+                (__goto_pending = 0)
+                (d__goto_137_7 = find_minlength(re, cc__goto_116_12, startcode, utf, recurses, countptr, backref_cache))
+                if (__goto_pending != 0) {
+                    continue
+                }
+                __pc = 2
+                __goto_pending = 1
+                continue
+            },
+            2 => {  // REPEAT_BACK_REFERENCE
+                (__goto_pending = 0)
+                match (unsafe: *cc__goto_116_12) {
+                    OP_CRSTAR => {
+                        (min__goto_137_10 = 0)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_CRPLUS => {
+                        (min__goto_137_10 = 1)
+
+                        (cc__goto_116_12 = cc__goto_116_12 + 1)
+
+                    },
+                    OP_CRRANGE => {
+                        (min__goto_137_10 = ((((((unsafe: cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | (unsafe: cc__goto_116_12[(1 + 1)])) as c_uint)))
+
+                        (cc__goto_116_12 = cc__goto_116_12 + (1 + (2 * 2)))
+
+                    },
+                    _ => {
+                        (min__goto_137_10 = 1)
+                    },
+                }
+                if (__goto_pending != 0) {
+                    continue
+                }
+                __pc = 4
+                __goto_pending = 1
+                continue
+            },
+            4 => {  // __after_switch
+                (__goto_pending = 0)
+                __pc = 3
+                __goto_pending = 1
+                continue
+                __pc = 3
+                __goto_pending = 1
+                continue
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -3706,7 +4057,11 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                 if (__goto_pending != 0) {
                     continue
                 }
-            _ => break
+            },
+            _ => {
+                break
+            },
+        }
     }
 }
 
@@ -4046,8 +4401,8 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
     var __pc: i32 = 0
     var __goto_pending: i32 = 0
     while true {
-        match __pc:
-            0 =>
+        match __pc {
+            0 => {
                 (__goto_pending = 0)
                 (yield___goto_1097_5 = SSB_DONE)
                 var __ci_expr_ternary_0: c_int = 0
@@ -4067,1007 +4422,780 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                 if (__goto_pending != 0) {
                     continue
                 }
-                while true {
-                    (try_next__goto_1110_8 = 1)
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    (tcode__goto_1111_14 = (code + ((1 as isize) as usize)) + ((2 as isize) as usize))
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    var __ci_expr_logic_3: c_int
-                    var __ci_expr_logic_2: c_int
-                    var __ci_expr_logic_1: c_int
-                    if ((if (unsafe: *code) == OP_CBRA: 1 else: 0) != 0) {
-                        (__ci_expr_logic_1 = (if true: 1 else: 0))
-                    } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: *code) == OP_SCBRA: 1 else: 0) != 0: 1 else: 0))
-                    }
-                    if (__ci_expr_logic_1 != 0) {
-                        (__ci_expr_logic_2 = (if true: 1 else: 0))
-                    } else {
-                        (__ci_expr_logic_2 = (if (if (unsafe: *code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0))
-                    }
-                    if (__ci_expr_logic_2 != 0) {
-                        (__ci_expr_logic_3 = (if true: 1 else: 0))
-                    } else {
-                        (__ci_expr_logic_3 = (if (if (unsafe: *code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0))
-                    }
-                    if (__ci_expr_logic_3 != 0) {
-                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    while (try_next__goto_1110_8 != 0) {
-                        (classmap__goto_1120_20 = ((null as *const u8)))
-                        if (__goto_pending != 0) {
-                            break
+                __pc = 2
+                __goto_pending = 1
+                continue
+            },
+            2 => {  // __do_top
+                (__goto_pending = 0)
+                (try_next__goto_1110_8 = 1)
+                (tcode__goto_1111_14 = (code + ((1 as isize) as usize)) + ((2 as isize) as usize))
+                var __ci_expr_logic_3: c_int
+                var __ci_expr_logic_2: c_int
+                var __ci_expr_logic_1: c_int
+                if ((if (unsafe: *code) == OP_CBRA: 1 else: 0) != 0) {
+                    (__ci_expr_logic_1 = (if true: 1 else: 0))
+                } else {
+                    (__ci_expr_logic_1 = (if (if (unsafe: *code) == OP_SCBRA: 1 else: 0) != 0: 1 else: 0))
+                }
+                if (__ci_expr_logic_1 != 0) {
+                    (__ci_expr_logic_2 = (if true: 1 else: 0))
+                } else {
+                    (__ci_expr_logic_2 = (if (if (unsafe: *code) == OP_CBRAPOS: 1 else: 0) != 0: 1 else: 0))
+                }
+                if (__ci_expr_logic_2 != 0) {
+                    (__ci_expr_logic_3 = (if true: 1 else: 0))
+                } else {
+                    (__ci_expr_logic_3 = (if (if (unsafe: *code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0))
+                }
+                if (__ci_expr_logic_3 != 0) {
+                    (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
+                }
+                if (__goto_pending != 0) {
+                    continue
+                }
+                __pc = 3
+                __goto_pending = 1
+                continue
+            },
+            3 => {  // __while_top
+                (__goto_pending = 0)
+                if (not (try_next__goto_1110_8 != 0)) {
+                    break
+                }
+                __pc = 4
+                __goto_pending = 1
+                if (__goto_pending != 0) {
+                    continue
+                }
+                (classmap__goto_1120_20 = ((null as *const u8)))
+                match (unsafe: *tcode__goto_1111_14) {
+                    OP_ACCEPT => {
+                        return SSB_FAIL
+                    },
+                    OP_ASSERT_ACCEPT => {
+                        return SSB_FAIL
+                    },
+                    OP_ALLANY => {
+                        return SSB_FAIL
+                    },
+                    OP_ANY => {
+                        return SSB_FAIL
+                    },
+                    OP_ANYBYTE => {
+                        return SSB_FAIL
+                    },
+                    OP_CIRCM => {
+                        return SSB_FAIL
+                    },
+                    OP_CLOSE => {
+                        return SSB_FAIL
+                    },
+                    OP_COMMIT => {
+                        return SSB_FAIL
+                    },
+                    OP_COMMIT_ARG => {
+                        return SSB_FAIL
+                    },
+                    OP_COND => {
+                        return SSB_FAIL
+                    },
+                    OP_CREF => {
+                        return SSB_FAIL
+                    },
+                    OP_FALSE => {
+                        return SSB_FAIL
+                    },
+                    OP_TRUE => {
+                        return SSB_FAIL
+                    },
+                    OP_DNCREF => {
+                        return SSB_FAIL
+                    },
+                    OP_DNREF => {
+                        return SSB_FAIL
+                    },
+                    OP_DNREFI => {
+                        return SSB_FAIL
+                    },
+                    OP_DNRREF => {
+                        return SSB_FAIL
+                    },
+                    OP_DOLL => {
+                        return SSB_FAIL
+                    },
+                    OP_DOLLM => {
+                        return SSB_FAIL
+                    },
+                    OP_END => {
+                        return SSB_FAIL
+                    },
+                    OP_EOD => {
+                        return SSB_FAIL
+                    },
+                    OP_EODN => {
+                        return SSB_FAIL
+                    },
+                    OP_EXTUNI => {
+                        return SSB_FAIL
+                    },
+                    OP_FAIL => {
+                        return SSB_FAIL
+                    },
+                    OP_MARK => {
+                        return SSB_FAIL
+                    },
+                    OP_NOT => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTEXACT => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTEXACTI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTMINPLUS => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTMINPLUSI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTMINQUERY => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTMINQUERYI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTMINSTAR => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTMINSTARI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTMINUPTO => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTMINUPTOI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTPLUS => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTPLUSI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTPOSPLUS => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTPOSPLUSI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTPOSQUERY => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTPOSQUERYI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTPOSSTAR => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTPOSSTARI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTPOSUPTO => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTPOSUPTOI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTPROP => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTQUERY => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTQUERYI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTSTAR => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTSTARI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTUPTO => {
+                        return SSB_FAIL
+                    },
+                    OP_NOTUPTOI => {
+                        return SSB_FAIL
+                    },
+                    OP_NOT_HSPACE => {
+                        return SSB_FAIL
+                    },
+                    OP_NOT_VSPACE => {
+                        return SSB_FAIL
+                    },
+                    OP_PRUNE => {
+                        return SSB_FAIL
+                    },
+                    OP_PRUNE_ARG => {
+                        return SSB_FAIL
+                    },
+                    OP_RECURSE => {
+                        return SSB_FAIL
+                    },
+                    OP_REF => {
+                        return SSB_FAIL
+                    },
+                    OP_REFI => {
+                        return SSB_FAIL
+                    },
+                    OP_REVERSE => {
+                        return SSB_FAIL
+                    },
+                    OP_VREVERSE => {
+                        return SSB_FAIL
+                    },
+                    OP_RREF => {
+                        return SSB_FAIL
+                    },
+                    OP_SCOND => {
+                        return SSB_FAIL
+                    },
+                    OP_SET_SOM => {
+                        return SSB_FAIL
+                    },
+                    OP_SKIP => {
+                        return SSB_FAIL
+                    },
+                    OP_SKIP_ARG => {
+                        return SSB_FAIL
+                    },
+                    OP_SOD => {
+                        return SSB_FAIL
+                    },
+                    OP_SOM => {
+                        return SSB_FAIL
+                    },
+                    OP_THEN => {
+                        return SSB_FAIL
+                    },
+                    OP_THEN_ARG => {
+                        return SSB_FAIL
+                    },
+                    OP_CIRC => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + _pcre2_OP_lengths_8[OP_CIRC])
+                    },
+                    OP_PROP => {
+                        if ((if (unsafe: tcode__goto_1111_14[1]) != 9: 1 else: 0) != 0) {
+                            return SSB_FAIL
                         }
-                        match (unsafe: *tcode__goto_1111_14):
-                            OP_ACCEPT =>
-                                return SSB_FAIL
-                            OP_ASSERT_ACCEPT =>
-                                return SSB_FAIL
-                            OP_ALLANY =>
-                                return SSB_FAIL
-                            OP_ANY =>
-                                return SSB_FAIL
-                            OP_ANYBYTE =>
-                                return SSB_FAIL
-                            OP_CIRCM =>
-                                return SSB_FAIL
-                            OP_CLOSE =>
-                                return SSB_FAIL
-                            OP_COMMIT =>
-                                return SSB_FAIL
-                            OP_COMMIT_ARG =>
-                                return SSB_FAIL
-                            OP_COND =>
-                                return SSB_FAIL
-                            OP_CREF =>
-                                return SSB_FAIL
-                            OP_FALSE =>
-                                return SSB_FAIL
-                            OP_TRUE =>
-                                return SSB_FAIL
-                            OP_DNCREF =>
-                                return SSB_FAIL
-                            OP_DNREF =>
-                                return SSB_FAIL
-                            OP_DNREFI =>
-                                return SSB_FAIL
-                            OP_DNRREF =>
-                                return SSB_FAIL
-                            OP_DOLL =>
-                                return SSB_FAIL
-                            OP_DOLLM =>
-                                return SSB_FAIL
-                            OP_END =>
-                                return SSB_FAIL
-                            OP_EOD =>
-                                return SSB_FAIL
-                            OP_EODN =>
-                                return SSB_FAIL
-                            OP_EXTUNI =>
-                                return SSB_FAIL
-                            OP_FAIL =>
-                                return SSB_FAIL
-                            OP_MARK =>
-                                return SSB_FAIL
-                            OP_NOT =>
-                                return SSB_FAIL
-                            OP_NOTEXACT =>
-                                return SSB_FAIL
-                            OP_NOTEXACTI =>
-                                return SSB_FAIL
-                            OP_NOTI =>
-                                return SSB_FAIL
-                            OP_NOTMINPLUS =>
-                                return SSB_FAIL
-                            OP_NOTMINPLUSI =>
-                                return SSB_FAIL
-                            OP_NOTMINQUERY =>
-                                return SSB_FAIL
-                            OP_NOTMINQUERYI =>
-                                return SSB_FAIL
-                            OP_NOTMINSTAR =>
-                                return SSB_FAIL
-                            OP_NOTMINSTARI =>
-                                return SSB_FAIL
-                            OP_NOTMINUPTO =>
-                                return SSB_FAIL
-                            OP_NOTMINUPTOI =>
-                                return SSB_FAIL
-                            OP_NOTPLUS =>
-                                return SSB_FAIL
-                            OP_NOTPLUSI =>
-                                return SSB_FAIL
-                            OP_NOTPOSPLUS =>
-                                return SSB_FAIL
-                            OP_NOTPOSPLUSI =>
-                                return SSB_FAIL
-                            OP_NOTPOSQUERY =>
-                                return SSB_FAIL
-                            OP_NOTPOSQUERYI =>
-                                return SSB_FAIL
-                            OP_NOTPOSSTAR =>
-                                return SSB_FAIL
-                            OP_NOTPOSSTARI =>
-                                return SSB_FAIL
-                            OP_NOTPOSUPTO =>
-                                return SSB_FAIL
-                            OP_NOTPOSUPTOI =>
-                                return SSB_FAIL
-                            OP_NOTPROP =>
-                                return SSB_FAIL
-                            OP_NOTQUERY =>
-                                return SSB_FAIL
-                            OP_NOTQUERYI =>
-                                return SSB_FAIL
-                            OP_NOTSTAR =>
-                                return SSB_FAIL
-                            OP_NOTSTARI =>
-                                return SSB_FAIL
-                            OP_NOTUPTO =>
-                                return SSB_FAIL
-                            OP_NOTUPTOI =>
-                                return SSB_FAIL
-                            OP_NOT_HSPACE =>
-                                return SSB_FAIL
-                            OP_NOT_VSPACE =>
-                                return SSB_FAIL
-                            OP_PRUNE =>
-                                return SSB_FAIL
-                            OP_PRUNE_ARG =>
-                                return SSB_FAIL
-                            OP_RECURSE =>
-                                return SSB_FAIL
-                            OP_REF =>
-                                return SSB_FAIL
-                            OP_REFI =>
-                                return SSB_FAIL
-                            OP_REVERSE =>
-                                return SSB_FAIL
-                            OP_VREVERSE =>
-                                return SSB_FAIL
-                            OP_RREF =>
-                                return SSB_FAIL
-                            OP_SCOND =>
-                                return SSB_FAIL
-                            OP_SET_SOM =>
-                                return SSB_FAIL
-                            OP_SKIP =>
-                                return SSB_FAIL
-                            OP_SKIP_ARG =>
-                                return SSB_FAIL
-                            OP_SOD =>
-                                return SSB_FAIL
-                            OP_SOM =>
-                                return SSB_FAIL
-                            OP_THEN =>
-                                return SSB_FAIL
-                            OP_THEN_ARG =>
-                                return SSB_FAIL
-                            OP_CIRC =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + _pcre2_OP_lengths_8[OP_CIRC])
-                            OP_PROP =>
-                                if ((if (unsafe: tcode__goto_1111_14[1]) != 9: 1 else: 0) != 0) {
-                                    return SSB_FAIL
-                                }
 
-                                (p__goto_1225_25 = (&_pcre2_ucd_caseless_sets_8[0] as *const c_uint) + (((unsafe: tcode__goto_1111_14[2]) as isize) as usize))
+                        (p__goto_1225_25 = (&_pcre2_ucd_caseless_sets_8[0] as *const c_uint) + (((unsafe: tcode__goto_1111_14[2]) as isize) as usize))
+
+                        if (__goto_pending != 0) {
+                            continue
+                        }
+
+                        while true {
+                            var __ci_expr_old_4: *const c_uint = p__goto_1225_25
+
+                            (p__goto_1225_25 = p__goto_1225_25 + 1)
+
+                            (c__goto_1096_10 = (unsafe: *__ci_expr_old_4))
+
+                            if (not ((if c__goto_1096_10 < 4294967295: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                            if (utf != 0) {
+                                _pcre2_ord2utf_8(c__goto_1096_10, (&buff__goto_1231_25[0] as *mut u8))
 
                                 if (__goto_pending != 0) {
                                     break
                                 }
 
+                                (c__goto_1096_10 = buff__goto_1231_25[0])
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            }
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if ((if c__goto_1096_10 > 255: 1 else: 0) != 0) {
+                                (re.start_bitmap[(255 / 8)] = re.start_bitmap[(255 / 8)] | ((1 as c_uint) << ((255 & 7) as c_uint)))
+                            } else {
+                                (re.start_bitmap[(c__goto_1096_10 / 8)] = re.start_bitmap[(c__goto_1096_10 / 8)] | ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint)))
+                            }
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                        }
+
+                        if (__goto_pending != 0) {
+                            continue
+                        }
+
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_WORD_BOUNDARY => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+                    },
+                    OP_NOT_WORD_BOUNDARY => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+                    },
+                    OP_UCP_WORD_BOUNDARY => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+                    },
+                    OP_NOT_UCP_WORD_BOUNDARY => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+                    },
+                    OP_ASSERT => {
+                        (ncode__goto_1119_16 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                        while ((if (unsafe: *ncode__goto_1119_16) == OP_ALT: 1 else: 0) != 0) {
+                            (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | (unsafe: ncode__goto_1119_16[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                        }
+
+                        (ncode__goto_1119_16 = ncode__goto_1119_16 + (1 + 2))
+
+                        (done__goto_1264_17 = 0)
+
+                        while ((if not (done__goto_1264_17 != 0): 1 else: 0) != 0) {
+                            match (unsafe: *ncode__goto_1119_16) {
+                                OP_ASSERT => {
+                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | (unsafe: ncode__goto_1119_16[(1 + 1)])) as c_uint))
+
+                                    while ((if (unsafe: *ncode__goto_1119_16) == OP_ALT: 1 else: 0) != 0) {
+                                        (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | (unsafe: ncode__goto_1119_16[(1 + 1)])) as c_uint))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + (1 + 2))
+
+                                },
+                                OP_WORD_BOUNDARY => {
+                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + 1)
+                                },
+                                OP_CALLOUT => {
+                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + _pcre2_OP_lengths_8[OP_CALLOUT])
+                                },
+                                OP_CALLOUT_STR => {
+                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: ncode__goto_1119_16[((1 + (2 * 2)) + 1)])) as c_uint))
+                                },
+                                _ => {
+                                    (done__goto_1264_17 = 1)
+                                },
+                            }
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                        }
+
+
+                        match (unsafe: *ncode__goto_1119_16) {
+                            OP_PROP => {
+                                if ((if (unsafe: ncode__goto_1119_16[1]) != 9: 1 else: 0) != 0) {
+                                    break
+                                }
+
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+
+                            },
+                            OP_ANYNL => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_CHAR => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_CHARI => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_EXACT => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_EXACTI => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_HSPACE => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_MINPLUS => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_MINPLUSI => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_PLUS => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_PLUSI => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_POSPLUS => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_POSPLUSI => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_VSPACE => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_DIGIT => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_NOT_DIGIT => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_WORDCHAR => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_NOT_WORDCHAR => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_WHITESPACE => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            OP_NOT_WHITESPACE => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
+
+                                continue
+
+                            },
+                            _ => {
+                                0
+                            },
+                        }
+
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
+
+                        if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
+                            (try_next__goto_1110_8 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                 while true {
-                                    var __ci_expr_old_4: *const c_uint = p__goto_1225_25
-
-                                    (p__goto_1225_25 = p__goto_1225_25 + 1)
-
-                                    (c__goto_1096_10 = (unsafe: *__ci_expr_old_4))
-
-                                    if (not ((if c__goto_1096_10 < 4294967295: 1 else: 0) != 0)) {
-                                        break
-                                    }
-
-                                    if (utf != 0) {
-                                        _pcre2_ord2utf_8(c__goto_1096_10, (&buff__goto_1231_25[0] as *mut u8))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (c__goto_1096_10 = buff__goto_1231_25[0])
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    }
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
                                     if (__goto_pending != 0) {
                                         break
                                     }
 
-                                    if ((if c__goto_1096_10 > 255: 1 else: 0) != 0) {
-                                        (re.start_bitmap[(255 / 8)] = re.start_bitmap[(255 / 8)] | ((1 as c_uint) << ((255 & 7) as c_uint)))
-                                    } else {
-                                        (re.start_bitmap[(c__goto_1096_10 / 8)] = re.start_bitmap[(c__goto_1096_10 / 8)] | ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint)))
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    if (__goto_pending != 0) {
+                                    if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
                                         break
                                     }
 
                                 }
 
                                 if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            } else {
+                                return rc__goto_1118_9
+                            }
+                        }
+
+
+                    },
+                    OP_ASSERT_NA => {
+                        (ncode__goto_1119_16 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                        while ((if (unsafe: *ncode__goto_1119_16) == OP_ALT: 1 else: 0) != 0) {
+                            (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | (unsafe: ncode__goto_1119_16[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                        }
+
+                        (ncode__goto_1119_16 = ncode__goto_1119_16 + (1 + 2))
+
+                        (done__goto_1264_17 = 0)
+
+                        while ((if not (done__goto_1264_17 != 0): 1 else: 0) != 0) {
+                            match (unsafe: *ncode__goto_1119_16) {
+                                OP_ASSERT => {
+                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | (unsafe: ncode__goto_1119_16[(1 + 1)])) as c_uint))
+
+                                    while ((if (unsafe: *ncode__goto_1119_16) == OP_ALT: 1 else: 0) != 0) {
+                                        (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | (unsafe: ncode__goto_1119_16[(1 + 1)])) as c_uint))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + (1 + 2))
+
+                                },
+                                OP_WORD_BOUNDARY => {
+                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + 1)
+                                },
+                                OP_CALLOUT => {
+                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + _pcre2_OP_lengths_8[OP_CALLOUT])
+                                },
+                                OP_CALLOUT_STR => {
+                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: ncode__goto_1119_16[((1 + (2 * 2)) + 1)])) as c_uint))
+                                },
+                                _ => {
+                                    (done__goto_1264_17 = 1)
+                                },
+                            }
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                        }
+
+
+                        match (unsafe: *ncode__goto_1119_16) {
+                            OP_PROP => {
+                                if ((if (unsafe: ncode__goto_1119_16[1]) != 9: 1 else: 0) != 0) {
                                     break
                                 }
 
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                (try_next__goto_1110_8 = 0)
+                                continue
 
-                            OP_WORD_BOUNDARY =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-                            OP_NOT_WORD_BOUNDARY =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-                            OP_UCP_WORD_BOUNDARY =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-                            OP_NOT_UCP_WORD_BOUNDARY =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-                            OP_ASSERT =>
-                                (ncode__goto_1119_16 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
-                                while ((if (unsafe: *ncode__goto_1119_16) == OP_ALT: 1 else: 0) != 0) {
-                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | (unsafe: ncode__goto_1119_16[(1 + 1)])) as c_uint))
+                            },
+                            OP_ANYNL => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
+                                continue
 
-                                }
+                            },
+                            OP_CHAR => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                (ncode__goto_1119_16 = ncode__goto_1119_16 + (1 + 2))
+                                continue
 
-                                match (unsafe: *ncode__goto_1119_16):
-                                    OP_PROP =>
-                                        if ((if (unsafe: ncode__goto_1119_16[1]) != 9: 1 else: 0) != 0) {
-                                            break
-                                        }
+                            },
+                            OP_CHARI => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                                continue
 
-                                        continue
+                            },
+                            OP_EXACT => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
+                                continue
 
-                                    OP_ANYNL =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_EXACTI => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_CHAR =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_HSPACE => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_CHARI =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_MINPLUS => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_EXACT =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_MINPLUSI => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_EXACTI =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_PLUS => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_HSPACE =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_PLUSI => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_MINPLUS =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_POSPLUS => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_MINPLUSI =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_POSPLUSI => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_PLUS =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_VSPACE => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_PLUSI =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_DIGIT => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_POSPLUS =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_NOT_DIGIT => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_POSPLUSI =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_WORDCHAR => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_VSPACE =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_NOT_WORDCHAR => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_DIGIT =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_WHITESPACE => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_NOT_DIGIT =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            OP_NOT_WHITESPACE => {
+                                (tcode__goto_1111_14 = ncode__goto_1119_16)
 
-                                        continue
+                                continue
 
-                                    OP_WORDCHAR =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                            },
+                            _ => {
+                                0
+                            },
+                        }
 
-                                        continue
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
 
-                                    OP_NOT_WORDCHAR =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
+                        if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
+                            (try_next__goto_1110_8 = 0)
 
-                                        continue
+                            if (__goto_pending != 0) {
+                                continue
+                            }
 
-                                    OP_WHITESPACE =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_NOT_WHITESPACE =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    _ =>
-                                        0
-
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-                                if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
-                                    (try_next__goto_1110_8 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
-                                        while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        return rc__goto_1118_9
-                                    }
-                                }
-
-
-                            OP_ASSERT_NA =>
-                                (ncode__goto_1119_16 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                while ((if (unsafe: *ncode__goto_1119_16) == OP_ALT: 1 else: 0) != 0) {
-                                    (ncode__goto_1119_16 = ncode__goto_1119_16 + (((((unsafe: ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | (unsafe: ncode__goto_1119_16[(1 + 1)])) as c_uint))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                (ncode__goto_1119_16 = ncode__goto_1119_16 + (1 + 2))
-
-                                match (unsafe: *ncode__goto_1119_16):
-                                    OP_PROP =>
-                                        if ((if (unsafe: ncode__goto_1119_16[1]) != 9: 1 else: 0) != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-
-                                    OP_ANYNL =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_CHAR =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_CHARI =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_EXACT =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_EXACTI =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_HSPACE =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_MINPLUS =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_MINPLUSI =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_PLUS =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_PLUSI =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_POSPLUS =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_POSPLUSI =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_VSPACE =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_DIGIT =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_NOT_DIGIT =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_WORDCHAR =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_NOT_WORDCHAR =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_WHITESPACE =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    OP_NOT_WHITESPACE =>
-                                        (tcode__goto_1111_14 = ncode__goto_1119_16)
-
-                                        continue
-
-                                    _ =>
-                                        0
-
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-                                if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
-                                    (try_next__goto_1110_8 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
-                                        while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        return rc__goto_1118_9
-                                    }
-                                }
-
-
-                            OP_BRA =>
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-                                if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
-                                    (try_next__goto_1110_8 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
-                                        while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        return rc__goto_1118_9
-                                    }
-                                }
-
-                            OP_SBRA =>
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-                                if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
-                                    (try_next__goto_1110_8 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
-                                        while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        return rc__goto_1118_9
-                                    }
-                                }
-
-                            OP_CBRA =>
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-                                if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
-                                    (try_next__goto_1110_8 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
-                                        while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        return rc__goto_1118_9
-                                    }
-                                }
-
-                            OP_SCBRA =>
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-                                if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
-                                    (try_next__goto_1110_8 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
-                                        while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        return rc__goto_1118_9
-                                    }
-                                }
-
-                            OP_BRAPOS =>
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-                                if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
-                                    (try_next__goto_1110_8 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
-                                        while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        return rc__goto_1118_9
-                                    }
-                                }
-
-                            OP_SBRAPOS =>
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-                                if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
-                                    (try_next__goto_1110_8 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
-                                        while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        return rc__goto_1118_9
-                                    }
-                                }
-
-                            OP_CBRAPOS =>
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-                                if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
-                                    (try_next__goto_1110_8 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
-                                        while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        return rc__goto_1118_9
-                                    }
-                                }
-
-                            OP_SCBRAPOS =>
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-                                if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
-                                    (try_next__goto_1110_8 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
-                                        while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        return rc__goto_1118_9
-                                    }
-                                }
-
-                            OP_ONCE =>
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-                                if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
-                                    (try_next__goto_1110_8 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
-                                        while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        return rc__goto_1118_9
-                                    }
-                                }
-
-                            OP_SCRIPT_RUN =>
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-                                if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
-                                    (try_next__goto_1110_8 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
-                                        while true {
-                                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
-                                                break
-                                            }
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        return rc__goto_1118_9
-                                    }
-                                }
-
-                            OP_ALT =>
-                                (yield___goto_1097_5 = SSB_CONTINUE)
-
-                                (try_next__goto_1110_8 = 0)
-
-                            OP_KET =>
-                                return SSB_CONTINUE
-                            OP_KETRMAX =>
-                                return SSB_CONTINUE
-                            OP_KETRMIN =>
-                                return SSB_CONTINUE
-                            OP_KETRPOS =>
-                                return SSB_CONTINUE
-                            OP_CALLOUT =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + _pcre2_OP_lengths_8[OP_CALLOUT])
-                            OP_CALLOUT_STR =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[((1 + (2 * 2)) + 1)])) as c_uint))
-                            OP_ASSERT_NOT =>
+                        } else {
+                            if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                 while true {
                                     (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
@@ -5081,9 +5209,35 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                                 }
 
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
 
-                            OP_ASSERTBACK =>
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            } else {
+                                return rc__goto_1118_9
+                            }
+                        }
+
+
+                    },
+                    OP_BRA => {
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
+
+                        if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
+                            (try_next__goto_1110_8 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                 while true {
                                     (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
@@ -5097,9 +5251,34 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                                 }
 
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
 
-                            OP_ASSERTBACK_NOT =>
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            } else {
+                                return rc__goto_1118_9
+                            }
+                        }
+
+                    },
+                    OP_SBRA => {
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
+
+                        if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
+                            (try_next__goto_1110_8 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                 while true {
                                     (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
@@ -5113,9 +5292,34 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                                 }
 
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
 
-                            OP_ASSERTBACK_NA =>
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            } else {
+                                return rc__goto_1118_9
+                            }
+                        }
+
+                    },
+                    OP_CBRA => {
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
+
+                        if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
+                            (try_next__goto_1110_8 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                 while true {
                                     (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
@@ -5129,9 +5333,34 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                                 }
 
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
 
-                            OP_ASSERT_SCS =>
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            } else {
+                                return rc__goto_1118_9
+                            }
+                        }
+
+                    },
+                    OP_SCBRA => {
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
+
+                        if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
+                            (try_next__goto_1110_8 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                 while true {
                                     (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
@@ -5145,35 +5374,34 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                                 }
 
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
 
-                            OP_BRAZERO =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-
-                                var __ci_expr_logic_6: c_int
-
-                                var __ci_expr_logic_5: c_int
-
-                                if ((if rc__goto_1118_9 == SSB_FAIL: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_5 = (if (if rc__goto_1118_9 == SSB_UNKNOWN: 1 else: 0) != 0: 1 else: 0))
+                                if (__goto_pending != 0) {
+                                    continue
                                 }
 
-                                if (__ci_expr_logic_5 != 0) {
-                                    (__ci_expr_logic_6 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_6 = (if (if rc__goto_1118_9 == SSB_TOODEEP: 1 else: 0) != 0: 1 else: 0))
-                                }
+                            } else {
+                                return rc__goto_1118_9
+                            }
+                        }
 
-                                if (__ci_expr_logic_6 != 0) {
-                                    return rc__goto_1118_9
-                                }
+                    },
+                    OP_BRAPOS => {
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
 
+                        if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
+                            (try_next__goto_1110_8 = 0)
 
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                 while true {
                                     (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
@@ -5187,35 +5415,34 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                                 }
 
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
 
-                            OP_BRAMINZERO =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-
-                                var __ci_expr_logic_6: c_int
-
-                                var __ci_expr_logic_5: c_int
-
-                                if ((if rc__goto_1118_9 == SSB_FAIL: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_5 = (if (if rc__goto_1118_9 == SSB_UNKNOWN: 1 else: 0) != 0: 1 else: 0))
+                                if (__goto_pending != 0) {
+                                    continue
                                 }
 
-                                if (__ci_expr_logic_5 != 0) {
-                                    (__ci_expr_logic_6 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_6 = (if (if rc__goto_1118_9 == SSB_TOODEEP: 1 else: 0) != 0: 1 else: 0))
-                                }
+                            } else {
+                                return rc__goto_1118_9
+                            }
+                        }
 
-                                if (__ci_expr_logic_6 != 0) {
-                                    return rc__goto_1118_9
-                                }
+                    },
+                    OP_SBRAPOS => {
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
 
+                        if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
+                            (try_next__goto_1110_8 = 0)
 
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                 while true {
                                     (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
@@ -5229,35 +5456,34 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                                 }
 
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
 
-                            OP_BRAPOSZERO =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-
-                                (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
-
-
-                                var __ci_expr_logic_6: c_int
-
-                                var __ci_expr_logic_5: c_int
-
-                                if ((if rc__goto_1118_9 == SSB_FAIL: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_5 = (if (if rc__goto_1118_9 == SSB_UNKNOWN: 1 else: 0) != 0: 1 else: 0))
+                                if (__goto_pending != 0) {
+                                    continue
                                 }
 
-                                if (__ci_expr_logic_5 != 0) {
-                                    (__ci_expr_logic_6 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_6 = (if (if rc__goto_1118_9 == SSB_TOODEEP: 1 else: 0) != 0: 1 else: 0))
-                                }
+                            } else {
+                                return rc__goto_1118_9
+                            }
+                        }
 
-                                if (__ci_expr_logic_6 != 0) {
-                                    return rc__goto_1118_9
-                                }
+                    },
+                    OP_CBRAPOS => {
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
 
+                        if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
+                            (try_next__goto_1110_8 = 0)
 
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                 while true {
                                     (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
@@ -5271,11 +5497,34 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                                 }
 
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
 
-                            OP_SKIPZERO =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
 
+                            } else {
+                                return rc__goto_1118_9
+                            }
+                        }
+
+                    },
+                    OP_SCBRAPOS => {
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
+
+                        if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
+                            (try_next__goto_1110_8 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
                                 while true {
                                     (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
@@ -5289,101 +5538,644 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
 
                                 }
 
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
                                 (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
 
-                            OP_STAR =>
-                                (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp))
-                            OP_MINSTAR =>
-                                (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp))
-                            OP_POSSTAR =>
-                                (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp))
-                            OP_QUERY =>
-                                (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp))
-                            OP_MINQUERY =>
-                                (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp))
-                            OP_POSQUERY =>
-                                (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp))
-                            OP_STARI =>
-                                (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp))
-                            OP_MINSTARI =>
-                                (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp))
-                            OP_POSSTARI =>
-                                (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp))
-                            OP_QUERYI =>
-                                (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp))
-                            OP_MINQUERYI =>
-                                (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp))
-                            OP_POSQUERYI =>
-                                (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp))
-                            OP_UPTO =>
-                                (tcode__goto_1111_14 = set_table_bit(re, ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 0, utf, ucp))
-                            OP_MINUPTO =>
-                                (tcode__goto_1111_14 = set_table_bit(re, ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 0, utf, ucp))
-                            OP_POSUPTO =>
-                                (tcode__goto_1111_14 = set_table_bit(re, ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 0, utf, ucp))
-                            OP_UPTOI =>
-                                (tcode__goto_1111_14 = set_table_bit(re, ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 1, utf, ucp))
-                            OP_MINUPTOI =>
-                                (tcode__goto_1111_14 = set_table_bit(re, ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 1, utf, ucp))
-                            OP_POSUPTOI =>
-                                (tcode__goto_1111_14 = set_table_bit(re, ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 1, utf, ucp))
-                            OP_EXACT =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
 
-                                set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp)
+                            } else {
+                                return rc__goto_1118_9
+                            }
+                        }
 
-                                (try_next__goto_1110_8 = 0)
+                    },
+                    OP_ONCE => {
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
+
+                        if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
+                            (try_next__goto_1110_8 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
+                                while true {
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
+                                        break
+                                    }
+
+                                }
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            } else {
+                                return rc__goto_1118_9
+                            }
+                        }
+
+                    },
+                    OP_SCRIPT_RUN => {
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
+
+                        if ((if rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
+                            (try_next__goto_1110_8 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            if ((if rc__goto_1118_9 == SSB_CONTINUE: 1 else: 0) != 0) {
+                                while true {
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
+                                        break
+                                    }
+
+                                }
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            } else {
+                                return rc__goto_1118_9
+                            }
+                        }
+
+                    },
+                    OP_ALT => {
+                        (yield___goto_1097_5 = SSB_CONTINUE)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_KET => {
+                        return SSB_CONTINUE
+                    },
+                    OP_KETRMAX => {
+                        return SSB_CONTINUE
+                    },
+                    OP_KETRMIN => {
+                        return SSB_CONTINUE
+                    },
+                    OP_KETRPOS => {
+                        return SSB_CONTINUE
+                    },
+                    OP_CALLOUT => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + _pcre2_OP_lengths_8[OP_CALLOUT])
+                    },
+                    OP_CALLOUT_STR => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[((1 + (2 * 2)) + 1)])) as c_uint))
+                    },
+                    OP_ASSERT_NOT => {
+                        while true {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
+
+                    },
+                    OP_ASSERTBACK => {
+                        while true {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
+
+                    },
+                    OP_ASSERTBACK_NOT => {
+                        while true {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
+
+                    },
+                    OP_ASSERTBACK_NA => {
+                        while true {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
+
+                    },
+                    OP_ASSERT_SCS => {
+                        while true {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
+
+                    },
+                    OP_BRAZERO => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
 
 
-                            OP_CHAR =>
-                                set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp)
+                        var __ci_expr_logic_6: c_int
 
-                                (try_next__goto_1110_8 = 0)
+                        var __ci_expr_logic_5: c_int
 
-                            OP_PLUS =>
-                                set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp)
+                        if ((if rc__goto_1118_9 == SSB_FAIL: 1 else: 0) != 0) {
+                            (__ci_expr_logic_5 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_5 = (if (if rc__goto_1118_9 == SSB_UNKNOWN: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                                (try_next__goto_1110_8 = 0)
+                        if (__ci_expr_logic_5 != 0) {
+                            (__ci_expr_logic_6 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_6 = (if (if rc__goto_1118_9 == SSB_TOODEEP: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                            OP_MINPLUS =>
-                                set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp)
-
-                                (try_next__goto_1110_8 = 0)
-
-                            OP_POSPLUS =>
-                                set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp)
-
-                                (try_next__goto_1110_8 = 0)
-
-                            OP_EXACTI =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-
-                                set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp)
-
-                                (try_next__goto_1110_8 = 0)
+                        if (__ci_expr_logic_6 != 0) {
+                            return rc__goto_1118_9
+                        }
 
 
-                            OP_CHARI =>
-                                set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp)
+                        while true {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
 
-                                (try_next__goto_1110_8 = 0)
+                            if (__goto_pending != 0) {
+                                break
+                            }
 
-                            OP_PLUSI =>
-                                set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp)
+                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
 
-                                (try_next__goto_1110_8 = 0)
+                        }
 
-                            OP_MINPLUSI =>
-                                set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp)
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
 
-                                (try_next__goto_1110_8 = 0)
+                    },
+                    OP_BRAMINZERO => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
 
-                            OP_POSPLUSI =>
-                                set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp)
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
 
-                                (try_next__goto_1110_8 = 0)
 
-                            OP_HSPACE =>
+                        var __ci_expr_logic_6: c_int
+
+                        var __ci_expr_logic_5: c_int
+
+                        if ((if rc__goto_1118_9 == SSB_FAIL: 1 else: 0) != 0) {
+                            (__ci_expr_logic_5 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_5 = (if (if rc__goto_1118_9 == SSB_UNKNOWN: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_5 != 0) {
+                            (__ci_expr_logic_6 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_6 = (if (if rc__goto_1118_9 == SSB_TOODEEP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_6 != 0) {
+                            return rc__goto_1118_9
+                        }
+
+
+                        while true {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
+
+                    },
+                    OP_BRAPOSZERO => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+
+                        (rc__goto_1118_9 = set_start_bits(re, tcode__goto_1111_14, utf, ucp, depthptr))
+
+
+                        var __ci_expr_logic_6: c_int
+
+                        var __ci_expr_logic_5: c_int
+
+                        if ((if rc__goto_1118_9 == SSB_FAIL: 1 else: 0) != 0) {
+                            (__ci_expr_logic_5 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_5 = (if (if rc__goto_1118_9 == SSB_UNKNOWN: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_5 != 0) {
+                            (__ci_expr_logic_6 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_6 = (if (if rc__goto_1118_9 == SSB_TOODEEP: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_6 != 0) {
+                            return rc__goto_1118_9
+                        }
+
+
+                        while true {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
+
+                    },
+                    OP_SKIPZERO => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+
+                        while true {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if (not ((if (unsafe: *tcode__goto_1111_14) == OP_ALT: 1 else: 0) != 0)) {
+                                break
+                            }
+
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
+
+                    },
+                    OP_STAR => {
+                        (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp))
+                    },
+                    OP_MINSTAR => {
+                        (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp))
+                    },
+                    OP_POSSTAR => {
+                        (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp))
+                    },
+                    OP_QUERY => {
+                        (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp))
+                    },
+                    OP_MINQUERY => {
+                        (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp))
+                    },
+                    OP_POSQUERY => {
+                        (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp))
+                    },
+                    OP_STARI => {
+                        (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp))
+                    },
+                    OP_MINSTARI => {
+                        (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp))
+                    },
+                    OP_POSSTARI => {
+                        (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp))
+                    },
+                    OP_QUERYI => {
+                        (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp))
+                    },
+                    OP_MINQUERYI => {
+                        (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp))
+                    },
+                    OP_POSQUERYI => {
+                        (tcode__goto_1111_14 = set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp))
+                    },
+                    OP_UPTO => {
+                        (tcode__goto_1111_14 = set_table_bit(re, ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 0, utf, ucp))
+                    },
+                    OP_MINUPTO => {
+                        (tcode__goto_1111_14 = set_table_bit(re, ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 0, utf, ucp))
+                    },
+                    OP_POSUPTO => {
+                        (tcode__goto_1111_14 = set_table_bit(re, ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 0, utf, ucp))
+                    },
+                    OP_UPTOI => {
+                        (tcode__goto_1111_14 = set_table_bit(re, ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 1, utf, ucp))
+                    },
+                    OP_MINUPTOI => {
+                        (tcode__goto_1111_14 = set_table_bit(re, ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 1, utf, ucp))
+                    },
+                    OP_POSUPTOI => {
+                        (tcode__goto_1111_14 = set_table_bit(re, ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 1, utf, ucp))
+                    },
+                    OP_EXACT => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
+
+                        set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp)
+
+                        (try_next__goto_1110_8 = 0)
+
+
+                    },
+                    OP_CHAR => {
+                        set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_PLUS => {
+                        set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_MINPLUS => {
+                        set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_POSPLUS => {
+                        set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 0, utf, ucp)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_EXACTI => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
+
+                        set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp)
+
+                        (try_next__goto_1110_8 = 0)
+
+
+                    },
+                    OP_CHARI => {
+                        set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_PLUSI => {
+                        set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_MINPLUSI => {
+                        set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_POSPLUSI => {
+                        set_table_bit(re, (tcode__goto_1111_14 + ((1 as isize) as usize)), 1, utf, ucp)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_HSPACE => {
+                        (re.start_bitmap[(9 / 8)] = re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
+
+                        (re.start_bitmap[(32 / 8)] = re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
+
+                        if (utf != 0) {
+                            (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (re.start_bitmap[(225 / 8)] = re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (re.start_bitmap[(227 / 8)] = re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            (re.start_bitmap[(160 / 8)] = re.start_bitmap[(160 / 8)] | ((1 as c_uint) << ((160 & 7) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_ANYNL => {
+                        (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
+
+                        (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
+
+                        (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
+
+                        (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
+
+                        if (utf != 0) {
+                            (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_VSPACE => {
+                        (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
+
+                        (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
+
+                        (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
+
+                        (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
+
+                        if (utf != 0) {
+                            (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        } else {
+                            (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_NOT_DIGIT => {
+                        set_nottype_bits(re, 64, table_limit__goto_1100_5)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_DIGIT => {
+                        set_type_bits(re, 64, table_limit__goto_1100_5)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_NOT_WHITESPACE => {
+                        set_nottype_bits(re, 0, table_limit__goto_1100_5)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_WHITESPACE => {
+                        set_type_bits(re, 0, table_limit__goto_1100_5)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_NOT_WORDCHAR => {
+                        set_nottype_bits(re, 160, table_limit__goto_1100_5)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_WORDCHAR => {
+                        set_type_bits(re, 160, table_limit__goto_1100_5)
+
+                        (try_next__goto_1110_8 = 0)
+
+                    },
+                    OP_TYPEPLUS => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+                    },
+                    OP_TYPEMINPLUS => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+                    },
+                    OP_TYPEPOSPLUS => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+                    },
+                    OP_TYPEEXACT => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
+                    },
+                    OP_TYPEUPTO => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
+
+                        match (unsafe: tcode__goto_1111_14[1]) {
+                            OP_HSPACE => {
                                 (re.start_bitmap[(9 / 8)] = re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
 
                                 (re.start_bitmap[(32 / 8)] = re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
@@ -5392,39 +6184,38 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                     (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
                                     (re.start_bitmap[(225 / 8)] = re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
                                     (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
                                     (re.start_bitmap[(227 / 8)] = re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
                                 } else {
                                     (re.start_bitmap[(160 / 8)] = re.start_bitmap[(160 / 8)] | ((1 as c_uint) << ((160 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
                                 }
 
-                                (try_next__goto_1110_8 = 0)
-
-                            OP_ANYNL =>
+                            },
+                            OP_ANYNL => {
                                 (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
 
                                 (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
@@ -5437,510 +6228,1114 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                     (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
                                     (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
                                 } else {
                                     (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
                                 }
 
-                                (try_next__goto_1110_8 = 0)
-
-                            OP_VSPACE =>
-                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
-
-                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
-
-                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
-
-                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
-
-                                if (utf != 0) {
-                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                (try_next__goto_1110_8 = 0)
-
-                            OP_NOT_DIGIT =>
+                            },
+                            OP_NOT_DIGIT => {
                                 set_nottype_bits(re, 64, table_limit__goto_1100_5)
-
-                                (try_next__goto_1110_8 = 0)
-
-                            OP_DIGIT =>
+                            },
+                            OP_DIGIT => {
                                 set_type_bits(re, 64, table_limit__goto_1100_5)
-
-                                (try_next__goto_1110_8 = 0)
-
-                            OP_NOT_WHITESPACE =>
+                            },
+                            OP_NOT_WHITESPACE => {
                                 set_nottype_bits(re, 0, table_limit__goto_1100_5)
-
-                                (try_next__goto_1110_8 = 0)
-
-                            OP_WHITESPACE =>
+                            },
+                            OP_WHITESPACE => {
                                 set_type_bits(re, 0, table_limit__goto_1100_5)
-
-                                (try_next__goto_1110_8 = 0)
-
-                            OP_NOT_WORDCHAR =>
+                            },
+                            OP_NOT_WORDCHAR => {
                                 set_nottype_bits(re, 160, table_limit__goto_1100_5)
-
-                                (try_next__goto_1110_8 = 0)
-
-                            OP_WORDCHAR =>
+                            },
+                            OP_WORDCHAR => {
                                 set_type_bits(re, 160, table_limit__goto_1100_5)
-
-                                (try_next__goto_1110_8 = 0)
-
-                            OP_TYPEPLUS =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-                            OP_TYPEMINPLUS =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-                            OP_TYPEPOSPLUS =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-                            OP_TYPEEXACT =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + 2))
-                            OP_TYPEUPTO =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-
-                            OP_TYPEMINUPTO =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-
-                            OP_TYPEPOSUPTO =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-
-                            OP_TYPESTAR =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-                            OP_TYPEMINSTAR =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-                            OP_TYPEPOSSTAR =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-                            OP_TYPEQUERY =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-                            OP_TYPEMINQUERY =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-                            OP_TYPEPOSQUERY =>
-                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
-                            OP_ECLASS =>
+                            },
+                            _ => {
                                 return SSB_FAIL
-                            OP_XCLASS =>
-                                (xclassflags__goto_1122_17 = (unsafe: tcode__goto_1111_14[(1 + 2)]))
+                            },
+                        }
 
-                                var __ci_expr_logic_7: c_int
-
-                                if ((if (xclassflags__goto_1122_17 & 4) != 0: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_7 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_7 = (if (if (xclassflags__goto_1122_17 & (2 | 1)) == 1: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_7 != 0) {
-                                    return SSB_FAIL
-                                }
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
 
 
-                                var __ci_expr_ternary_8: *const u8 = null
+                    },
+                    OP_TYPEMINUPTO => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
 
-                                if ((if (xclassflags__goto_1122_17 & 2) == 0: 1 else: 0) != 0) {
-                                    (__ci_expr_ternary_8 = ((null as *const u8)))
-                                } else {
-                                    (__ci_expr_ternary_8 = ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
-                                }
+                        match (unsafe: tcode__goto_1111_14[1]) {
+                            OP_HSPACE => {
+                                (re.start_bitmap[(9 / 8)] = re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
 
-                                (classmap__goto_1120_20 = __ci_expr_ternary_8)
-
-
-                                var __ci_expr_logic_9: c_int = 0
+                                (re.start_bitmap[(32 / 8)] = re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
 
                                 if (utf != 0) {
-                                    (__ci_expr_logic_9 = (if (if (xclassflags__goto_1122_17 & 1) == 0: 1 else: 0) != 0: 1 else: 0))
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(225 / 8)] = re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(227 / 8)] = re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(160 / 8)] = re.start_bitmap[(160 / 8)] | ((1 as c_uint) << ((160 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
                                 }
 
-                                if (__ci_expr_logic_9 != 0) {
-                                    0
-                                }
+                            },
+                            OP_ANYNL => {
+                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
 
+                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
+
+                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
+
+                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
 
                                 if (utf != 0) {
-                                    (re.start_bitmap[24] = re.start_bitmap[24] | 240)
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
-                                    with_memset((((&re.start_bitmap[0] as *mut u8) + ((25 as isize) as usize)) as *i8), 255, (7 as i64))
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
-                                }
-
-                                if ((if (unsafe: *tcode__goto_1111_14) == OP_XCLASS: 1 else: 0) != 0) {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
                                 } else {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-
-                                    (classmap__goto_1120_20 = tcode__goto_1111_14)
-
+                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (32 / sizeof[u8]()))
-
-                                    if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
                                 }
 
-                                if ((if classmap__goto_1120_20 != null: 1 else: 0) != 0) {
-                                    if (utf != 0) {
-                                        (c__goto_1096_10 = 0)
+                            },
+                            OP_NOT_DIGIT => {
+                                set_nottype_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_DIGIT => {
+                                set_type_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WHITESPACE => {
+                                set_nottype_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_WHITESPACE => {
+                                set_type_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WORDCHAR => {
+                                set_nottype_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            OP_WORDCHAR => {
+                                set_type_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            _ => {
+                                return SSB_FAIL
+                            },
+                        }
 
-                                        while ((if c__goto_1096_10 < 16: 1 else: 0) != 0) {
-                                            (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            (c__goto_1096_10 = c__goto_1096_10 + 1)
-
-                                        }
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (c__goto_1096_10 = 128)
-
-                                        while ((if c__goto_1096_10 < 256: 1 else: 0) != 0) {
-                                            if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint))) != 0: 1 else: 0) != 0) {
-                                                (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> (6 as c_uint)) | 192)
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << ((d__goto_1845_19 & 7) as c_uint)))
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (c__goto_1096_10 = (((c__goto_1096_10 & 192) +% 64) -% 1))
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                            }
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            (c__goto_1096_10 = c__goto_1096_10 + 1)
-
-                                        }
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
 
 
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
+                    },
+                    OP_TYPEPOSUPTO => {
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
 
-                                    } else {
-                                        (c__goto_1096_10 = 0)
+                        match (unsafe: tcode__goto_1111_14[1]) {
+                            OP_HSPACE => {
+                                (re.start_bitmap[(9 / 8)] = re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
 
-                                        while ((if c__goto_1096_10 < 32: 1 else: 0) != 0) {
-                                            (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
+                                (re.start_bitmap[(32 / 8)] = re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
 
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            (c__goto_1096_10 = c__goto_1096_10 + 1)
-
-                                        }
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-
-
-                            OP_NCLASS =>
                                 if (utf != 0) {
-                                    (re.start_bitmap[24] = re.start_bitmap[24] | 240)
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
-                                    with_memset((((&re.start_bitmap[0] as *mut u8) + ((25 as isize) as usize)) as *i8), 255, (7 as i64))
+                                    (re.start_bitmap[(225 / 8)] = re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
-                                }
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
 
-                                if ((if (unsafe: *tcode__goto_1111_14) == OP_XCLASS: 1 else: 0) != 0) {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(227 / 8)] = re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
                                 } else {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-
-                                    (classmap__goto_1120_20 = tcode__goto_1111_14)
-
+                                    (re.start_bitmap[(160 / 8)] = re.start_bitmap[(160 / 8)] | ((1 as c_uint) << ((160 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (32 / sizeof[u8]()))
-
-                                    if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
                                 }
 
-                                if ((if classmap__goto_1120_20 != null: 1 else: 0) != 0) {
-                                    if (utf != 0) {
-                                        (c__goto_1096_10 = 0)
+                            },
+                            OP_ANYNL => {
+                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
 
-                                        while ((if c__goto_1096_10 < 16: 1 else: 0) != 0) {
-                                            (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
+                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
 
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
+                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
 
-                                            (c__goto_1096_10 = c__goto_1096_10 + 1)
+                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
 
-                                        }
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (c__goto_1096_10 = 128)
-
-                                        while ((if c__goto_1096_10 < 256: 1 else: 0) != 0) {
-                                            if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint))) != 0: 1 else: 0) != 0) {
-                                                (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> (6 as c_uint)) | 192)
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << ((d__goto_1845_19 & 7) as c_uint)))
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (c__goto_1096_10 = (((c__goto_1096_10 & 192) +% 64) -% 1))
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                            }
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            (c__goto_1096_10 = c__goto_1096_10 + 1)
-
-                                        }
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        (c__goto_1096_10 = 0)
-
-                                        while ((if c__goto_1096_10 < 32: 1 else: 0) != 0) {
-                                            (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            (c__goto_1096_10 = c__goto_1096_10 + 1)
-
-                                        }
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    }
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
-                                }
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
 
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
 
-                            OP_CLASS =>
-                                if ((if (unsafe: *tcode__goto_1111_14) == OP_XCLASS: 1 else: 0) != 0) {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
                                 } else {
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
-
-                                    (classmap__goto_1120_20 = tcode__goto_1111_14)
-
+                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
 
                                     if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (32 / sizeof[u8]()))
-
-                                    if (__goto_pending != 0) {
-                                        break
+                                        continue
                                     }
 
                                 }
 
-                                if ((if classmap__goto_1120_20 != null: 1 else: 0) != 0) {
-                                    if (utf != 0) {
-                                        (c__goto_1096_10 = 0)
+                            },
+                            OP_NOT_DIGIT => {
+                                set_nottype_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_DIGIT => {
+                                set_type_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WHITESPACE => {
+                                set_nottype_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_WHITESPACE => {
+                                set_type_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WORDCHAR => {
+                                set_nottype_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            OP_WORDCHAR => {
+                                set_type_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            _ => {
+                                return SSB_FAIL
+                            },
+                        }
 
-                                        while ((if c__goto_1096_10 < 16: 1 else: 0) != 0) {
-                                            (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
+
+
+                    },
+                    OP_TYPESTAR => {
+                        match (unsafe: tcode__goto_1111_14[1]) {
+                            OP_HSPACE => {
+                                (re.start_bitmap[(9 / 8)] = re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
+
+                                (re.start_bitmap[(32 / 8)] = re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
+
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(225 / 8)] = re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(227 / 8)] = re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(160 / 8)] = re.start_bitmap[(160 / 8)] | ((1 as c_uint) << ((160 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+                            },
+                            OP_ANYNL => {
+                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
+
+                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
+
+                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
+
+                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
+
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+                            },
+                            OP_NOT_DIGIT => {
+                                set_nottype_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_DIGIT => {
+                                set_type_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WHITESPACE => {
+                                set_nottype_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_WHITESPACE => {
+                                set_type_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WORDCHAR => {
+                                set_nottype_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            OP_WORDCHAR => {
+                                set_type_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            _ => {
+                                return SSB_FAIL
+                            },
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
+
+                    },
+                    OP_TYPEMINSTAR => {
+                        match (unsafe: tcode__goto_1111_14[1]) {
+                            OP_HSPACE => {
+                                (re.start_bitmap[(9 / 8)] = re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
+
+                                (re.start_bitmap[(32 / 8)] = re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
+
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(225 / 8)] = re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(227 / 8)] = re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(160 / 8)] = re.start_bitmap[(160 / 8)] | ((1 as c_uint) << ((160 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+                            },
+                            OP_ANYNL => {
+                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
+
+                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
+
+                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
+
+                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
+
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+                            },
+                            OP_NOT_DIGIT => {
+                                set_nottype_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_DIGIT => {
+                                set_type_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WHITESPACE => {
+                                set_nottype_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_WHITESPACE => {
+                                set_type_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WORDCHAR => {
+                                set_nottype_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            OP_WORDCHAR => {
+                                set_type_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            _ => {
+                                return SSB_FAIL
+                            },
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
+
+                    },
+                    OP_TYPEPOSSTAR => {
+                        match (unsafe: tcode__goto_1111_14[1]) {
+                            OP_HSPACE => {
+                                (re.start_bitmap[(9 / 8)] = re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
+
+                                (re.start_bitmap[(32 / 8)] = re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
+
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(225 / 8)] = re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(227 / 8)] = re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(160 / 8)] = re.start_bitmap[(160 / 8)] | ((1 as c_uint) << ((160 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+                            },
+                            OP_ANYNL => {
+                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
+
+                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
+
+                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
+
+                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
+
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+                            },
+                            OP_NOT_DIGIT => {
+                                set_nottype_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_DIGIT => {
+                                set_type_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WHITESPACE => {
+                                set_nottype_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_WHITESPACE => {
+                                set_type_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WORDCHAR => {
+                                set_nottype_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            OP_WORDCHAR => {
+                                set_type_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            _ => {
+                                return SSB_FAIL
+                            },
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
+
+                    },
+                    OP_TYPEQUERY => {
+                        match (unsafe: tcode__goto_1111_14[1]) {
+                            OP_HSPACE => {
+                                (re.start_bitmap[(9 / 8)] = re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
+
+                                (re.start_bitmap[(32 / 8)] = re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
+
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(225 / 8)] = re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(227 / 8)] = re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(160 / 8)] = re.start_bitmap[(160 / 8)] | ((1 as c_uint) << ((160 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+                            },
+                            OP_ANYNL => {
+                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
+
+                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
+
+                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
+
+                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
+
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+                            },
+                            OP_NOT_DIGIT => {
+                                set_nottype_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_DIGIT => {
+                                set_type_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WHITESPACE => {
+                                set_nottype_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_WHITESPACE => {
+                                set_type_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WORDCHAR => {
+                                set_nottype_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            OP_WORDCHAR => {
+                                set_type_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            _ => {
+                                return SSB_FAIL
+                            },
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
+
+                    },
+                    OP_TYPEMINQUERY => {
+                        match (unsafe: tcode__goto_1111_14[1]) {
+                            OP_HSPACE => {
+                                (re.start_bitmap[(9 / 8)] = re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
+
+                                (re.start_bitmap[(32 / 8)] = re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
+
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(225 / 8)] = re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(227 / 8)] = re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(160 / 8)] = re.start_bitmap[(160 / 8)] | ((1 as c_uint) << ((160 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+                            },
+                            OP_ANYNL => {
+                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
+
+                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
+
+                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
+
+                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
+
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+                            },
+                            OP_NOT_DIGIT => {
+                                set_nottype_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_DIGIT => {
+                                set_type_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WHITESPACE => {
+                                set_nottype_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_WHITESPACE => {
+                                set_type_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WORDCHAR => {
+                                set_nottype_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            OP_WORDCHAR => {
+                                set_type_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            _ => {
+                                return SSB_FAIL
+                            },
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
+
+                    },
+                    OP_TYPEPOSQUERY => {
+                        match (unsafe: tcode__goto_1111_14[1]) {
+                            OP_HSPACE => {
+                                (re.start_bitmap[(9 / 8)] = re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
+
+                                (re.start_bitmap[(32 / 8)] = re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
+
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(225 / 8)] = re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(227 / 8)] = re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(160 / 8)] = re.start_bitmap[(160 / 8)] | ((1 as c_uint) << ((160 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+                            },
+                            OP_ANYNL => {
+                                (re.start_bitmap[(10 / 8)] = re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
+
+                                (re.start_bitmap[(11 / 8)] = re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
+
+                                (re.start_bitmap[(12 / 8)] = re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
+
+                                (re.start_bitmap[(13 / 8)] = re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
+
+                                if (utf != 0) {
+                                    (re.start_bitmap[(194 / 8)] = re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                    (re.start_bitmap[(226 / 8)] = re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                } else {
+                                    (re.start_bitmap[(133 / 8)] = re.start_bitmap[(133 / 8)] | ((1 as c_uint) << ((133 & 7) as c_uint)))
+
+                                    if (__goto_pending != 0) {
+                                        continue
+                                    }
+
+                                }
+
+                            },
+                            OP_NOT_DIGIT => {
+                                set_nottype_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_DIGIT => {
+                                set_type_bits(re, 64, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WHITESPACE => {
+                                set_nottype_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_WHITESPACE => {
+                                set_type_bits(re, 0, table_limit__goto_1100_5)
+                            },
+                            OP_NOT_WORDCHAR => {
+                                set_nottype_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            OP_WORDCHAR => {
+                                set_type_bits(re, 160, table_limit__goto_1100_5)
+                            },
+                            _ => {
+                                return SSB_FAIL
+                            },
+                        }
+
+                        (tcode__goto_1111_14 = tcode__goto_1111_14 + 2)
+
+                    },
+                    OP_ECLASS => {
+                        return SSB_FAIL
+                    },
+                    OP_XCLASS => {
+                        (xclassflags__goto_1122_17 = (unsafe: tcode__goto_1111_14[(1 + 2)]))
+
+                        var __ci_expr_logic_7: c_int
+
+                        if ((if (xclassflags__goto_1122_17 & 4) != 0: 1 else: 0) != 0) {
+                            (__ci_expr_logic_7 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_7 = (if (if (xclassflags__goto_1122_17 & (2 | 1)) == 1: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_7 != 0) {
+                            return SSB_FAIL
+                        }
+
+
+                        var __ci_expr_ternary_8: *const u8 = null
+
+                        if ((if (xclassflags__goto_1122_17 & 2) == 0: 1 else: 0) != 0) {
+                            (__ci_expr_ternary_8 = ((null as *const u8)))
+                        } else {
+                            (__ci_expr_ternary_8 = ((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
+                        }
+
+                        (classmap__goto_1120_20 = __ci_expr_ternary_8)
+
+
+                        var __ci_expr_logic_9: c_int = 0
+
+                        if (utf != 0) {
+                            (__ci_expr_logic_9 = (if (if (xclassflags__goto_1122_17 & 1) == 0: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_9 != 0) {
+                            var __ci_expr_ternary_10: c_int = 0
+
+                            if ((if classmap__goto_1120_20 == null: 1 else: 0) != 0) {
+                                (__ci_expr_ternary_10 = 0)
+                            } else {
+                                (__ci_expr_ternary_10 = 32)
+                            }
+
+                            (p__goto_1750_20 = (((tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize)) + ((__ci_expr_ternary_10 as isize) as usize))
+
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            var __ci_expr_ternary_11: c_int = 0
+
+                            if (1 != 0) {
+                                (__ci_expr_ternary_11 = 16)
+                            } else {
+                                (__ci_expr_ternary_11 = 4096)
+                            }
+
+                            if ((if (unsafe: *p__goto_1750_20) >= __ci_expr_ternary_11: 1 else: 0) != 0) {
+                                study_char_list(p__goto_1750_20, (&re.start_bitmap[0] as *mut u8), ((re as *const u8) + re.code_start))
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                __pc = 1
+                                __goto_pending = 1
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            }
+
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            while true {
+                                var __ci_expr_old_12: *const u8 = p__goto_1750_20
+
+                                (p__goto_1750_20 = p__goto_1750_20 + 1)
+
+                                var __ci_expr_switch_13: c_int = (unsafe: *__ci_expr_old_12)
+
+                                match __ci_expr_switch_13 {
+                                    1 => {
+                                        var __ci_expr_old_14: *const u8 = p__goto_1750_20
+
+                                        (p__goto_1750_20 = p__goto_1750_20 + 1)
+
+                                        (b__goto_1749_21 = (unsafe: *__ci_expr_old_14))
+
+
+                                        while ((if ((unsafe: *p__goto_1750_20) & 192) == 128: 1 else: 0) != 0) {
+                                            (p__goto_1750_20 = p__goto_1750_20 + 1)
 
                                             if (__goto_pending != 0) {
                                                 break
                                             }
 
-                                            (c__goto_1096_10 = c__goto_1096_10 + 1)
+                                        }
+
+                                        (re.start_bitmap[(b__goto_1749_21 / 8)] = re.start_bitmap[(b__goto_1749_21 / 8)] | ((1 as c_uint) << ((b__goto_1749_21 & 7) as c_uint)))
+
+                                    },
+                                    2 => {
+                                        var __ci_expr_old_15: *const u8 = p__goto_1750_20
+
+                                        (p__goto_1750_20 = p__goto_1750_20 + 1)
+
+                                        (b__goto_1749_21 = (unsafe: *__ci_expr_old_15))
+
+
+                                        while ((if ((unsafe: *p__goto_1750_20) & 192) == 128: 1 else: 0) != 0) {
+                                            (p__goto_1750_20 = p__goto_1750_20 + 1)
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
 
                                         }
 
+                                        var __ci_expr_old_16: *const u8 = p__goto_1750_20
+
+                                        (p__goto_1750_20 = p__goto_1750_20 + 1)
+
+                                        (e__goto_1749_24 = (unsafe: *__ci_expr_old_16))
+
+
+                                        while ((if ((unsafe: *p__goto_1750_20) & 192) == 128: 1 else: 0) != 0) {
+                                            (p__goto_1750_20 = p__goto_1750_20 + 1)
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                        }
+
+                                        while ((if b__goto_1749_21 <= e__goto_1749_24: 1 else: 0) != 0) {
+                                            (re.start_bitmap[(b__goto_1749_21 / 8)] = re.start_bitmap[(b__goto_1749_21 / 8)] | ((1 as c_uint) << ((b__goto_1749_21 & 7) as c_uint)))
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            (b__goto_1749_21 = b__goto_1749_21 + 1)
+
+                                        }
+
+                                    },
+                                    0 => {
+                                        __pc = 1
+                                        __goto_pending = 1
+                                    },
+                                    _ => {
+
+                                        return SSB_UNKNOWN
+
+                                    },
+                                }
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+
+                        if (utf != 0) {
+                            (re.start_bitmap[24] = re.start_bitmap[24] | 240)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            with_memset((((&re.start_bitmap[0] as *mut u8) + ((25 as isize) as usize)) as *i8), 255, (7 as i64))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+                        if ((if (unsafe: *tcode__goto_1111_14) == OP_XCLASS: 1 else: 0) != 0) {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                        } else {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+
+                            (classmap__goto_1120_20 = tcode__goto_1111_14)
+
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (32 / sizeof[u8]()))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+                        if ((if classmap__goto_1120_20 != null: 1 else: 0) != 0) {
+                            if (utf != 0) {
+                                (c__goto_1096_10 = 0)
+
+                                while ((if c__goto_1096_10 < 16: 1 else: 0) != 0) {
+                                    (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (c__goto_1096_10 = c__goto_1096_10 + 1)
+
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                (c__goto_1096_10 = 128)
+
+                                while ((if c__goto_1096_10 < 256: 1 else: 0) != 0) {
+                                    if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint))) != 0: 1 else: 0) != 0) {
+                                        (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> (6 as c_uint)) | 192)
 
                                         if (__goto_pending != 0) {
                                             break
                                         }
 
-                                        (c__goto_1096_10 = 128)
-
-                                        while ((if c__goto_1096_10 < 256: 1 else: 0) != 0) {
-                                            if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint))) != 0: 1 else: 0) != 0) {
-                                                (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> (6 as c_uint)) | 192)
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << ((d__goto_1845_19 & 7) as c_uint)))
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (c__goto_1096_10 = (((c__goto_1096_10 & 192) +% 64) -% 1))
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                            }
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            (c__goto_1096_10 = c__goto_1096_10 + 1)
-
-                                        }
-
+                                        (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << ((d__goto_1845_19 & 7) as c_uint)))
 
                                         if (__goto_pending != 0) {
                                             break
                                         }
 
-                                    } else {
-                                        (c__goto_1096_10 = 0)
-
-                                        while ((if c__goto_1096_10 < 32: 1 else: 0) != 0) {
-                                            (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            (c__goto_1096_10 = c__goto_1096_10 + 1)
-
-                                        }
-
+                                        (c__goto_1096_10 = (((c__goto_1096_10 & 192) +% 64) -% 1))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -5952,38 +7347,453 @@ fn set_start_bits(re: *mut pcre2_real_code_8, __param_code: *const u8, utf: c_in
                                         break
                                     }
 
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (c__goto_1096_10 = c__goto_1096_10 + 1)
+
                                 }
 
-                            _ =>
-                                return SSB_UNKNOWN
-                        if (__goto_pending != 0) {
-                            break
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            } else {
+                                (c__goto_1096_10 = 0)
+
+                                while ((if c__goto_1096_10 < 32: 1 else: 0) != 0) {
+                                    (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (c__goto_1096_10 = c__goto_1096_10 + 1)
+
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+                        match (unsafe: *tcode__goto_1111_14) {
+                            OP_CRSTAR => {
+                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+                            },
+                            OP_CRRANGE => {
+                                if ((if ((((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint)) == 0: 1 else: 0) != 0) {
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + (2 * 2)))
+                                } else {
+                                    (try_next__goto_1110_8 = 0)
+                                }
+                            },
+                            _ => {
+                                (try_next__goto_1110_8 = 0)
+                            },
+                        }
+
+
+
+                    },
+                    OP_NCLASS => {
+                        if (utf != 0) {
+                            (re.start_bitmap[24] = re.start_bitmap[24] | 240)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            with_memset((((&re.start_bitmap[0] as *mut u8) + ((25 as isize) as usize)) as *i8), 255, (7 as i64))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+                        if ((if (unsafe: *tcode__goto_1111_14) == OP_XCLASS: 1 else: 0) != 0) {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                        } else {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+
+                            (classmap__goto_1120_20 = tcode__goto_1111_14)
+
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (32 / sizeof[u8]()))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+                        if ((if classmap__goto_1120_20 != null: 1 else: 0) != 0) {
+                            if (utf != 0) {
+                                (c__goto_1096_10 = 0)
+
+                                while ((if c__goto_1096_10 < 16: 1 else: 0) != 0) {
+                                    (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (c__goto_1096_10 = c__goto_1096_10 + 1)
+
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                (c__goto_1096_10 = 128)
+
+                                while ((if c__goto_1096_10 < 256: 1 else: 0) != 0) {
+                                    if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint))) != 0: 1 else: 0) != 0) {
+                                        (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> (6 as c_uint)) | 192)
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << ((d__goto_1845_19 & 7) as c_uint)))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        (c__goto_1096_10 = (((c__goto_1096_10 & 192) +% 64) -% 1))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (c__goto_1096_10 = c__goto_1096_10 + 1)
+
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            } else {
+                                (c__goto_1096_10 = 0)
+
+                                while ((if c__goto_1096_10 < 32: 1 else: 0) != 0) {
+                                    (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (c__goto_1096_10 = c__goto_1096_10 + 1)
+
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+                        match (unsafe: *tcode__goto_1111_14) {
+                            OP_CRSTAR => {
+                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+                            },
+                            OP_CRRANGE => {
+                                if ((if ((((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint)) == 0: 1 else: 0) != 0) {
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + (2 * 2)))
+                                } else {
+                                    (try_next__goto_1110_8 = 0)
+                                }
+                            },
+                            _ => {
+                                (try_next__goto_1110_8 = 0)
+                            },
+                        }
+
+
+                    },
+                    OP_CLASS => {
+                        if ((if (unsafe: *tcode__goto_1111_14) == OP_XCLASS: 1 else: 0) != 0) {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint))
+                        } else {
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+
+                            (classmap__goto_1120_20 = tcode__goto_1111_14)
+
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            (tcode__goto_1111_14 = tcode__goto_1111_14 + (32 / sizeof[u8]()))
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+                        if ((if classmap__goto_1120_20 != null: 1 else: 0) != 0) {
+                            if (utf != 0) {
+                                (c__goto_1096_10 = 0)
+
+                                while ((if c__goto_1096_10 < 16: 1 else: 0) != 0) {
+                                    (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (c__goto_1096_10 = c__goto_1096_10 + 1)
+
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                (c__goto_1096_10 = 128)
+
+                                while ((if c__goto_1096_10 < 256: 1 else: 0) != 0) {
+                                    if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint))) != 0: 1 else: 0) != 0) {
+                                        (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> (6 as c_uint)) | 192)
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << ((d__goto_1845_19 & 7) as c_uint)))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        (c__goto_1096_10 = (((c__goto_1096_10 & 192) +% 64) -% 1))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (c__goto_1096_10 = c__goto_1096_10 + 1)
+
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            } else {
+                                (c__goto_1096_10 = 0)
+
+                                while ((if c__goto_1096_10 < 32: 1 else: 0) != 0) {
+                                    (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (c__goto_1096_10 = c__goto_1096_10 + 1)
+
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                        }
+
+                        match (unsafe: *tcode__goto_1111_14) {
+                            OP_CRSTAR => {
+                                (tcode__goto_1111_14 = tcode__goto_1111_14 + 1)
+                            },
+                            OP_CRRANGE => {
+                                if ((if ((((((unsafe: tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | (unsafe: tcode__goto_1111_14[(1 + 1)])) as c_uint)) == 0: 1 else: 0) != 0) {
+                                    (tcode__goto_1111_14 = tcode__goto_1111_14 + (1 + (2 * 2)))
+                                } else {
+                                    (try_next__goto_1110_8 = 0)
+                                }
+                            },
+                            _ => {
+                                (try_next__goto_1110_8 = 0)
+                            },
+                        }
+
+                    },
+                    _ => {
+                        return SSB_UNKNOWN
+                    },
+                }
+                if (__goto_pending != 0) {
+                    continue
+                }
+                __pc = 5
+                __goto_pending = 1
+                continue
+            },
+            1 => {  // HANDLE_CLASSMAP
+                (__goto_pending = 0)
+                if ((if classmap__goto_1120_20 != null: 1 else: 0) != 0) {
+                    if (utf != 0) {
+                        (c__goto_1096_10 = 0)
+                        while ((if c__goto_1096_10 < 16: 1 else: 0) != 0) {
+                            (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
+                            if (__goto_pending != 0) {
+                                break
+                            }
+                            (c__goto_1096_10 = c__goto_1096_10 + 1)
                         }
                         if (__goto_pending != 0) {
-                            break
+                            continue
+                        }
+                        (c__goto_1096_10 = 128)
+                        while ((if c__goto_1096_10 < 256: 1 else: 0) != 0) {
+                            if ((if ((unsafe: classmap__goto_1120_20[(c__goto_1096_10 / 8)]) & ((1 as c_uint) << ((c__goto_1096_10 & 7) as c_uint))) != 0: 1 else: 0) != 0) {
+                                (d__goto_1845_19 = ((c__goto_1096_10 as c_uint) >> (6 as c_uint)) | 192)
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+                                (re.start_bitmap[(d__goto_1845_19 / 8)] = re.start_bitmap[(d__goto_1845_19 / 8)] | ((1 as c_uint) << ((d__goto_1845_19 & 7) as c_uint)))
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+                                (c__goto_1096_10 = (((c__goto_1096_10 & 192) +% 64) -% 1))
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+                            }
+                            if (__goto_pending != 0) {
+                                break
+                            }
+                            if (__goto_pending != 0) {
+                                break
+                            }
+                            (c__goto_1096_10 = c__goto_1096_10 + 1)
+                        }
+                        if (__goto_pending != 0) {
+                            continue
+                        }
+                    } else {
+                        (c__goto_1096_10 = 0)
+                        while ((if c__goto_1096_10 < 32: 1 else: 0) != 0) {
+                            (re.start_bitmap[c__goto_1096_10] = re.start_bitmap[c__goto_1096_10] | (unsafe: classmap__goto_1120_20[c__goto_1096_10]))
+                            if (__goto_pending != 0) {
+                                break
+                            }
+                            (c__goto_1096_10 = c__goto_1096_10 + 1)
+                        }
+                        if (__goto_pending != 0) {
+                            continue
                         }
                     }
                     if (__goto_pending != 0) {
-                        break
-                    }
-                    (code = code + (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    if (not ((if (unsafe: *code) == OP_ALT: 1 else: 0) != 0)) {
-                        break
+                        continue
                     }
                 }
                 if (__goto_pending != 0) {
                     continue
                 }
+                __pc = 5
+                __goto_pending = 1
+                continue
+            },
+            5 => {  // __after_switch
+                (__goto_pending = 0)
+                __pc = 3
+                __goto_pending = 1
+                continue
+                __pc = 3
+                __goto_pending = 1
+                continue
+                __pc = 4
+                __goto_pending = 1
+                continue
+            },
+            4 => {  // __after_while
+                (__goto_pending = 0)
+                (code = code + (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
+                if (__goto_pending != 0) {
+                    continue
+                }
+                if (not ((if (unsafe: *code) == OP_ALT: 1 else: 0) != 0)) {
+                    break
+                }
+                __pc = 6
+                __goto_pending = 1
+                if (__goto_pending != 0) {
+                    continue
+                }
+                __pc = 2
+                __goto_pending = 1
+                continue
+                __pc = 6
+                __goto_pending = 1
+                continue
+            },
+            6 => {  // __after_do
+                (__goto_pending = 0)
                 return yield___goto_1097_5
                 if (__goto_pending != 0) {
                     continue
                 }
-            _ => break
+            },
+            _ => {
+                break
+            },
+        }
     }
 }
