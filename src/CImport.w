@@ -5669,6 +5669,13 @@ fn ci_lower_literal_or_ref(session: i64, cursor: i32, kind: i32, exprs: &mut CiE
         let name = with_ci_cursor_spelling(session, cursor)
         let escaped = ci_escape_reserved(name)
         let mangled = ci_scope_lookup(scope, escaped)
+        if mangled.len() == 0 and ci_map_libc_call(name, "").len() == 0:
+            if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN):
+                if not ci_note_filtered_system_symbol_ref(session, name, CI_LIBC_KIND_FN):
+                    return 0 as CiExprId
+            else:
+                if not ci_note_filtered_system_symbol_ref(session, name, CI_LIBC_KIND_VAR):
+                    return 0 as CiExprId
         var text = ""
         if mangled.len() > 0:
             text = mangled
@@ -6673,6 +6680,9 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
             }
         if callee_text.len() > 0 and ci_map_libc_call(callee_text, "").len() > 0:
             return ci_value_ir_invalid()
+        if callee_text.len() > 0:
+            if not ci_note_filtered_system_symbol_ref(session, callee_text, CI_LIBC_KIND_FN):
+                return ci_value_ir_invalid()
         let args_start = exprs.extra.len() as i32
         var j: i64 = 0
         while j < arg_ids.len():
@@ -10819,6 +10829,52 @@ fn ci_is_system_path(loc: str) -> bool:
     if ci_str_contains(loc, "/usr/include/"): return true
     if ci_str_contains(loc, "/SDKs/"): return true
     if ci_str_contains(loc, "/clang/"): return true
+    false
+
+let CI_LIBC_KIND_FN: i32 = 1
+let CI_LIBC_KIND_VAR: i32 = 2
+let CI_LIBC_KIND_TYPE: i32 = 4
+let CI_LIBC_PLATFORM_DARWIN: i32 = 1
+
+fn ci_libc_symbol_platforms(name: str) -> i32:
+    if name == "__stdinp" or name == "__stdoutp" or name == "__stderrp": return CI_LIBC_PLATFORM_DARWIN
+    if name == "__error": return CI_LIBC_PLATFORM_DARWIN
+    CI_LIBC_PLATFORM_DARWIN
+
+fn ci_libc_symbol_kind_mask(name: str) -> i32:
+    if name == "rlimit": return CI_LIBC_KIND_TYPE
+    if name == "__stdinp" or name == "__stdoutp" or name == "__stderrp": return CI_LIBC_KIND_VAR
+    if name == "fprintf" or name == "printf" or name == "snprintf" or name == "sprintf": return CI_LIBC_KIND_FN
+    if name == "fopen" or name == "fclose" or name == "fflush" or name == "fileno": return CI_LIBC_KIND_FN
+    if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs": return CI_LIBC_KIND_FN
+    if name == "putc" or name == "feof" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN
+    if name == "strcpy" or name == "strncpy" or name == "strstr" or name == "strerror": return CI_LIBC_KIND_FN
+    if name == "strtol" or name == "strtoul" or name == "setlocale": return CI_LIBC_KIND_FN
+    if name == "exit" or name == "clock" or name == "time" or name == "isatty": return CI_LIBC_KIND_FN
+    if name == "getrlimit" or name == "setrlimit" or name == "__error": return CI_LIBC_KIND_FN
+    0
+
+fn ci_libc_symbol_allowed_as(name: str, kind: i32) -> bool:
+    (ci_libc_symbol_kind_mask(name) & kind) != 0
+
+fn ci_libc_kind_name(kind: i32) -> str:
+    if kind == CI_LIBC_KIND_FN: return "function"
+    if kind == CI_LIBC_KIND_VAR: return "variable"
+    if kind == CI_LIBC_KIND_TYPE: return "type"
+    "symbol"
+
+fn ci_note_filtered_system_symbol_ref(session: i64, name: str, kind: i32) -> bool:
+    if name.len() == 0:
+        return true
+    let loc = ci_get_decl_location(session, name)
+    let filtered = ci_is_system_decl(name) or (loc.len() > 0 and ci_is_system_path(loc))
+    if not filtered:
+        return true
+    if ci_libc_symbol_allowed_as(name, kind):
+        ci_migrate_note_libc_symbol(name)
+        return true
+    let loc_suffix = if loc.len() > 0: " from " ++ loc else: ""
+    ci_migrate_set_error("migrate: unsupported filtered system " ++ ci_libc_kind_name(kind) ++ " '" ++ name ++ "'" ++ loc_suffix ++ "; add an explicit binding or extend std.libc")
     false
 
 // Check if a declaration name is from a system header (not the user's code).
