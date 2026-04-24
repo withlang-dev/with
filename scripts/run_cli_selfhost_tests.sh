@@ -1630,6 +1630,72 @@ EOF
   echo "PASS(cli-selfhost-migrate) typed_cast_macros"
 }
 
+expect_migrate_pcre2test_cfprintf_helper() {
+  local case_dir="$tmpdir/migrate_pcre2test_cfprintf_case"
+  local src="$case_dir/pcre2test.c"
+  local out_w="$case_dir/pcre2test.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+#include <stdarg.h>
+#include <stdio.h>
+
+static void colour_begin(int clr, FILE *f) {
+  (void)clr;
+  (void)f;
+}
+
+static void colour_end(FILE *f) {
+  (void)f;
+}
+
+static int cfprintf(int clr, FILE *file, const char *fmt, ...) {
+  va_list args;
+  int ret;
+  va_start(args, fmt);
+  colour_begin(clr, file);
+  ret = vfprintf(file, fmt, args);
+  va_end(args);
+  colour_end(file);
+  return ret;
+}
+
+int write_message(FILE *out) {
+  cfprintf(7, out, "value=%d\n", 42);
+  return 0;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) pcre2test_cfprintf"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if grep -Fq 'fn cfprintf' "$out_w" \
+    || ! grep -Fq 'Variadic C helper cfprintf is inlined at statement call sites.' "$out_w" \
+    || ! grep -Fq 'colour_begin(7, out)' "$out_w" \
+    || ! grep -Fq 'fprintf(out, "value=%d\n", 42)' "$out_w" \
+    || ! grep -Fq 'colour_end(out)' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) pcre2test_cfprintf"
+    cat "$tmpdir/err" || true
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) pcre2test_cfprintf"
+    cat "$tmpdir/err" || true
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) pcre2test_cfprintf"
+}
+
 expect_migrate_for_continue_switch_break_semantics() {
   local case_dir="$tmpdir/migrate_for_continue_switch_break_case"
   local src="$case_dir/for_continue_switch_break.c"
@@ -2728,6 +2794,7 @@ expect_migrate_small_int_shift_promotion
 expect_shift_count_check_prevents_llvm_poison
 expect_migrate_prefer_brace_no_trailing_ws
 expect_migrate_typed_cast_macros
+expect_migrate_pcre2test_cfprintf_helper
 expect_migrate_for_continue_switch_break_semantics
 expect_migrate_goto_shadowed_local
 expect_migrate_goto_label_preserves_block_scope

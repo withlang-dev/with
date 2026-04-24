@@ -4226,6 +4226,53 @@ fn ci_effect_expr_needs_terminal_stmt(session: i64, cursor: i32) -> bool:
 
     true
 
+fn ci_lower_cfprintf_effect_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+    if with_ci_cursor_kind(session, cursor) != CXK_CALL_EXPR:
+        return 0 as CiStmtId
+    let callee_name = ci_call_name_from_source_text(with_ci_cursor_source_text(session, cursor))
+    if callee_name != "cfprintf":
+        return 0 as CiStmtId
+
+    let nc = with_ci_num_children(session, cursor)
+    let first_arg = 1
+    let arg_count = nc - first_arg
+    if arg_count < 3:
+        return 0 as CiStmtId
+    if not ci_note_filtered_system_symbol_ref(session, "fprintf", CI_LIBC_KIND_FN):
+        return 0 as CiStmtId
+
+    var setup = 0 as CiStmtId
+    let arg_ids: Vec[i32] = Vec.new()
+    var ai = first_arg
+    while ai < nc:
+        let lowered = ci_lower_value_expr_ir(session, with_ci_child(session, cursor, ai), stmts, exprs, types, scope)
+        if not ci_value_ir_valid(lowered):
+            return 0 as CiStmtId
+        setup = ci_stmt_merge_ir(stmts, setup, lowered.setup_stmt)
+        arg_ids.push(lowered.value_expr as i32)
+        ai = ai + 1
+
+    let begin_args: Vec[i32] = Vec.new()
+    begin_args.push(arg_ids.get(0))
+    begin_args.push(arg_ids.get(1))
+    let begin_call = ci_build_named_call_expr(exprs, "colour_begin", &begin_args)
+
+    let fprintf_args: Vec[i32] = Vec.new()
+    var fi: i64 = 1
+    while fi < arg_ids.len():
+        fprintf_args.push(arg_ids.get(fi))
+        fi = fi + 1
+    let fprintf_call = ci_build_named_call_expr(exprs, "fprintf", &fprintf_args)
+
+    let end_args: Vec[i32] = Vec.new()
+    end_args.push(arg_ids.get(1))
+    let end_call = ci_build_named_call_expr(exprs, "colour_end", &end_args)
+
+    let begin_stmt = stmts.expr_stmt(begin_call)
+    let fprintf_stmt = stmts.expr_stmt(fprintf_call)
+    let end_stmt = stmts.expr_stmt(end_call)
+    ci_stmt_merge_ir(stmts, setup, ci_stmt_merge3_ir(stmts, begin_stmt, fprintf_stmt, end_stmt))
+
 fn ci_lower_effect_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
@@ -4248,6 +4295,11 @@ fn ci_lower_effect_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, ex
         if inner >= 0:
             return ci_lower_effect_expr_ir(session, inner, stmts, exprs, types, scope)
         return 0 as CiStmtId
+
+    if kind == CXK_CALL_EXPR:
+        let cfp = ci_lower_cfprintf_effect_ir(session, cursor, stmts, exprs, types, scope)
+        if (cfp as i32) != 0:
+            return cfp
 
     if kind == CXK_BINARY_OP and nc >= 2 and with_ci_binary_op(session, cursor) == BO_COMMA:
         let lhs_stmt = ci_lower_effect_expr_ir(session, with_ci_child(session, cursor, 0), stmts, exprs, types, scope)
@@ -6648,6 +6700,8 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
             callee = ci_value_ir_plain(exprs.ident(callee_idx, 0 as CiTypeId))
             callee_text = ci_escape_reserved(callee_name)
             first_arg = 0
+        if callee_text == "cfprintf":
+            return ci_value_ir_invalid()
         var arg_ids: Vec[i32] = Vec.new()
         var ai = first_arg
         while ai < nc:
