@@ -22,7 +22,7 @@ code can be incrementally cleaned up later.
    translated, not idiomatic. It uses `unsafe` liberally. Cleanup
    is a separate, optional pass.
 
-4. **One command.** `with migrate pcre2/src/ -o lib/std/regex/`
+4. **One command.** `with migrate pcre2/src/ -o lib/std/regex/ --prefer-brace`
    translates an entire directory.
 
 ---
@@ -584,7 +584,7 @@ fn foo_process(ctx: *mut FooContext, data: *const u8, len: i32) -> i32:
 ### Statistics output (`--stats`)
 
 ```
-with migrate pcre2/src/ --stats
+with migrate pcre2/src/ --prefer-brace --stats
 
 pcre2_compile.c   → pcre2_compile.w   2847 lines  0 gotos  123 unsafe
 pcre2_match.c     → pcre2_match.w     3012 lines  47 gotos  456 unsafe
@@ -674,7 +674,7 @@ Walk directory, process each `.c` file independently. Track
 emitted names across files for deduplication. Emit shared
 types in a common file.
 
-**Done when:** `with migrate pcre2/src/ -o lib/std/regex/`
+**Done when:** `with migrate pcre2/src/ -o lib/std/regex/ --prefer-brace`
 processes all files.
 
 ### Step 8: `@[c_export]` for API functions
@@ -698,7 +698,7 @@ Three modes (write/check/diff), `-o` flag, `-I`/`-D` flags,
 The proof of the pudding.
 
 1. Clone PCRE2 to `.reference/pcre2/`
-2. `with migrate .reference/pcre2/src/ -o lib/std/pcre2/`
+2. `with migrate .reference/pcre2/src/ -o lib/std/pcre2/ --prefer-brace`
 3. Build: `with build` (the migrated files must compile)
 4. Link pcre2test against the migrated library
 5. Run PCRE2's test suite

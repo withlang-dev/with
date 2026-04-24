@@ -293,6 +293,9 @@ fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32)
     if wl_get_type_kind(agg_ty) != wl_struct_type_kind():
         return 0 - 1
     let elem_count = wl_count_struct_elem_types(agg_ty)
+    let struct_idx = self.find_struct_index_by_type(agg_ty)
+    let source_field_count = if struct_idx >= 0: self.struct_field_counts.get(struct_idx as i64) else: elem_count
+    let is_union = self.is_union_struct_index(struct_idx)
 
     // Try symbol-based lookup first (for named struct fields from MIR field projections).
     // MIR stores field *symbols* as projection data, not numeric indices.
@@ -301,7 +304,7 @@ fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32)
     let st_sym = self.find_struct_type_by_llvm(agg_ty)
     if st_sym != 0:
         let fi = self.find_field_index(st_sym, field_token)
-        if fi >= 0 and fi < elem_count:
+        if fi >= 0 and ((is_union and fi < source_field_count) or ((not is_union) and fi < elem_count)):
             return fi
 
     // Vec types are created dynamically and not registered in the struct field
@@ -313,7 +316,7 @@ fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32)
         if field_token == self.sym_elem_size: return 3
 
     // Fall back to direct numeric index (for tuple fields, match bindings)
-    if field_token >= 0 and field_token < elem_count:
+    if field_token >= 0 and ((is_union and field_token < source_field_count) or ((not is_union) and field_token < elem_count)):
         return field_token
 
     let field_name = self.intern.resolve(field_token)
@@ -376,7 +379,13 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
             let fi = self.mir_resolve_field_index(cur_ty, pd)
             if fi < 0:
                 return 0
-            if self.is_bitpacked_struct(cur_ty):
+            let union_idx = self.find_struct_index_by_type(cur_ty)
+            if self.is_union_struct_index(union_idx):
+                let union_field_ty = self.struct_source_field_type(union_idx, fi)
+                if union_field_ty == 0:
+                    return 0
+                cur_ty = union_field_ty
+            else if self.is_bitpacked_struct(cur_ty):
                 // Bitpacked: field type is the sub-byte integer
                 let bp_pinfo = self.get_bitpacked_field_info(cur_ty, fi)
                 if bp_pinfo >= 0:
@@ -535,7 +544,13 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
             let fi = self.mir_resolve_field_index(cur_ty, pd)
             if fi < 0:
                 return 0
-            if self.is_bitpacked_struct(cur_ty):
+            let union_idx = self.find_struct_index_by_type(cur_ty)
+            if self.is_union_struct_index(union_idx):
+                let union_field_ty = self.struct_source_field_type(union_idx, fi)
+                if union_field_ty == 0:
+                    return 0
+                cur_ty = union_field_ty
+            else if self.is_bitpacked_struct(cur_ty):
                 // Bitpacked field: don't GEP — record bit offset/width for later shift+mask.
                 // cur_ptr stays pointing to the backing iN, cur_ty stays as iN.
                 let bp_info = self.get_bitpacked_field_info(cur_ty, fi)
@@ -2175,14 +2190,23 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                         let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym)
                         if resolved_fi >= 0:
                             fi = resolved_fi
-                let llvm_fi = self.get_llvm_field_index(struct_ty, fi)
-                if llvm_fi >= struct_field_count:
-                    continue
-                let field_ty = wl_struct_get_type_at(struct_ty, llvm_fi)
-                let val = self.mir_eval_operand(body, op_id, field_ty)
-                let coerced_val = self.coerce_value_to_type(val, field_ty)
-                let gep = wl_build_struct_gep(self.builder, struct_ty, alloca, llvm_fi)
-                wl_build_store(self.builder, coerced_val, gep)
+                let union_idx = self.find_struct_index_by_type(struct_ty)
+                if self.is_union_struct_index(union_idx):
+                    let field_ty = self.struct_source_field_type(union_idx, fi)
+                    if field_ty == 0:
+                        continue
+                    let val = self.mir_eval_operand(body, op_id, field_ty)
+                    let coerced_val = self.coerce_value_to_type(val, field_ty)
+                    wl_build_store(self.builder, coerced_val, alloca)
+                else:
+                    let llvm_fi = self.get_llvm_field_index(struct_ty, fi)
+                    if llvm_fi >= struct_field_count:
+                        continue
+                    let field_ty = wl_struct_get_type_at(struct_ty, llvm_fi)
+                    let val = self.mir_eval_operand(body, op_id, field_ty)
+                    let coerced_val = self.coerce_value_to_type(val, field_ty)
+                    let gep = wl_build_struct_gep(self.builder, struct_ty, alloca, llvm_fi)
+                    wl_build_store(self.builder, coerced_val, gep)
             return wl_build_load(self.builder, struct_ty, alloca)
         return wl_get_undef(fallback_ty)
 

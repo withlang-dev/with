@@ -88,16 +88,19 @@ fn pcre2_compile_context_free_8(ccontext: *mut pcre2_real_compile_context_8) {
 }
 
 fn pcre2_set_bsr_8(ccontext: *mut pcre2_real_compile_context_8, value: c_uint) -> c_int {
-    match value:
-        2 | 1 =>
+    match value {
+        2 | 1 => {
             (ccontext.bsr_convention = value)
 
             return 0
 
             return -29
 
-        _ =>
+        },
+        _ => {
             return -29
+        },
+    }
 
 }
 
@@ -137,16 +140,19 @@ fn pcre2_set_max_varlookbehind_8(ccontext: *mut pcre2_real_compile_context_8, li
 }
 
 fn pcre2_set_newline_8(ccontext: *mut pcre2_real_compile_context_8, newline: c_uint) -> c_int {
-    match newline:
-        1 | 2 | 3 | 4 | 5 | 6 =>
+    match newline {
+        1 | 2 | 3 | 4 | 5 | 6 => {
             (ccontext.newline_convention = newline)
 
             return 0
 
             return -29
 
-        _ =>
+        },
+        _ => {
             return -29
+        },
+    }
 
 }
 
@@ -171,12 +177,14 @@ fn pcre2_set_optimize_8(ccontext: *mut pcre2_real_compile_context_8, directive: 
         return -51
     }
 
-    match directive:
-        0 =>
+    match directive {
+        0 => {
             (ccontext.optimization_flags = 0)
-        1 =>
+        },
+        1 => {
             (ccontext.optimization_flags = 7)
-        _ =>
+        },
+        _ => {
             var __ci_expr_logic_0: c_int = 0
 
             if ((if directive >= 64: 1 else: 0) != 0) {
@@ -197,6 +205,8 @@ fn pcre2_set_optimize_8(ccontext: *mut pcre2_real_compile_context_8, directive: 
 
             return -34
 
+        },
+    }
 
     return 0
 

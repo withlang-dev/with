@@ -237,6 +237,7 @@ match limits to prevent runaway).
 with migrate .reference/pcre2/src/ \
     -o out/pcre2_migrate_raw/ \
     --no-c-export \
+    --prefer-brace \
     -I .reference/pcre2/src \
     -D PCRE2_CODE_UNIT_WIDTH=8 \
     -D HAVE_CONFIG_H=1

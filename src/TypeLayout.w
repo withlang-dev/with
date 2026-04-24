@@ -145,13 +145,18 @@ fn Sema.type_layout_struct_size_of(self: Sema, tid: i32) -> i64:
             let decl = self.type_decl_nodes.get(base_sym).unwrap()
             if type_decl_sub_kind(self.ast.get_data2(decl)) == TypeDeclKind.Union:
                 var max_size: i64 = 0
+                var max_align: i64 = 1
                 for fi in 0..self.type_layout_generic_struct_field_count(resolved as i32):
-                    let field_size = self.type_layout_size_of(self.type_layout_generic_struct_field_type(resolved as i32, fi))
+                    let field_tid = self.type_layout_generic_struct_field_type(resolved as i32, fi)
+                    let field_size = self.type_layout_size_of(field_tid)
+                    let field_align = self.type_layout_align_of(field_tid)
                     if field_size > max_size:
                         max_size = field_size
+                    if field_align > max_align:
+                        max_align = field_align
                 if max_size == 0:
                     return 1
-                return max_size
+                return type_layout_align_up(max_size, max_align)
         let field_count = self.type_layout_generic_struct_field_count(resolved as i32)
         var offset: i64 = 0
         var max_align: i64 = 1
@@ -172,15 +177,19 @@ fn Sema.type_layout_struct_size_of(self: Sema, tid: i32) -> i64:
     let field_count = self.get_type_d2(resolved)
     if sub_kind == TypeDeclKind.Union:
         var max_size: i64 = 0
+        var max_align: i64 = 1
         for fi in 0..field_count:
             let te_start = self.get_type_d1(resolved)
             let field_tid = self.type_extra.get((te_start + fi * 3 + 1) as i64)
             let field_size = self.type_layout_size_of(field_tid)
+            let field_align = self.type_layout_struct_field_align(resolved as i32, fi)
             if field_size > max_size:
                 max_size = field_size
+            if field_align > max_align:
+                max_align = field_align
         if max_size == 0:
             return 1
-        return max_size
+        return type_layout_align_up(max_size, max_align)
     if field_count <= 0:
         return 0
     var offset: i64 = 0

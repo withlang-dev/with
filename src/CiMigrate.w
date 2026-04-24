@@ -201,6 +201,11 @@ fn ci_migrate_render_stub(name: str, safe_name: str, params: str, ret: str, sour
     else:
         comment ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body_line ++ "\n"
 
+fn ci_migrate_render_preamble_fn(signature: str, colon_expr: str, brace_expr: str) -> str:
+    if migrate_prefer_brace():
+        return signature ++ " {\n    " ++ brace_expr ++ "\n}\n"
+    signature ++ ": " ++ colon_expr ++ "\n"
+
 // Write the shared defs module (defs.w) to output_dir.
 // Contains: preamble + hardcoded extras + shared declarations.
 fn ci_migrate_write_shared_defs(output_dir: str):
@@ -234,24 +239,24 @@ fn ci_migrate_write_shared_defs(output_dir: str):
 fn ci_migrate_preamble_text() -> str:
     var p = ""
     // Inline ctype helpers (pure functions, no dependencies).
-    p = p ++ "fn is_alpha(c: i32) -> bool: (c >= 65 and c <= 90) or (c >= 97 and c <= 122)\n"
-    p = p ++ "fn is_digit(c: i32) -> bool: c >= 48 and c <= 57\n"
-    p = p ++ "fn is_space(c: i32) -> bool: c == 32 or c == 9 or c == 10 or c == 13 or c == 12 or c == 11\n"
-    p = p ++ "fn is_alnum(c: i32) -> bool: is_alpha(c) or is_digit(c)\n"
-    p = p ++ "fn is_upper(c: i32) -> bool: c >= 65 and c <= 90\n"
-    p = p ++ "fn is_lower(c: i32) -> bool: c >= 97 and c <= 122\n"
-    p = p ++ "fn is_xdigit(c: i32) -> bool: (c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)\n"
-    p = p ++ "fn is_print(c: i32) -> bool: c >= 32 and c <= 126\n"
-    p = p ++ "fn to_lower(c: i32) -> i32: if c >= 65 and c <= 90: c + 32 else: c\n"
-    p = p ++ "fn to_upper(c: i32) -> i32: if c >= 97 and c <= 122: c - 32 else: c\n"
+    p = p ++ ci_migrate_render_preamble_fn("fn is_alpha(c: i32) -> bool", "(c >= 65 and c <= 90) or (c >= 97 and c <= 122)", "(c >= 65 and c <= 90) or (c >= 97 and c <= 122)")
+    p = p ++ ci_migrate_render_preamble_fn("fn is_digit(c: i32) -> bool", "c >= 48 and c <= 57", "c >= 48 and c <= 57")
+    p = p ++ ci_migrate_render_preamble_fn("fn is_space(c: i32) -> bool", "c == 32 or c == 9 or c == 10 or c == 13 or c == 12 or c == 11", "c == 32 or c == 9 or c == 10 or c == 13 or c == 12 or c == 11")
+    p = p ++ ci_migrate_render_preamble_fn("fn is_alnum(c: i32) -> bool", "is_alpha(c) or is_digit(c)", "is_alpha(c) or is_digit(c)")
+    p = p ++ ci_migrate_render_preamble_fn("fn is_upper(c: i32) -> bool", "c >= 65 and c <= 90", "c >= 65 and c <= 90")
+    p = p ++ ci_migrate_render_preamble_fn("fn is_lower(c: i32) -> bool", "c >= 97 and c <= 122", "c >= 97 and c <= 122")
+    p = p ++ ci_migrate_render_preamble_fn("fn is_xdigit(c: i32) -> bool", "(c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)", "(c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)")
+    p = p ++ ci_migrate_render_preamble_fn("fn is_print(c: i32) -> bool", "c >= 32 and c <= 126", "c >= 32 and c <= 126")
+    p = p ++ ci_migrate_render_preamble_fn("fn to_lower(c: i32) -> i32", "if c >= 65 and c <= 90: c + 32 else: c", "if c >= 65 and c <= 90 { c + 32 } else { c }")
+    p = p ++ ci_migrate_render_preamble_fn("fn to_upper(c: i32) -> i32", "if c >= 97 and c <= 122: c - 32 else: c", "if c >= 97 and c <= 122 { c - 32 } else { c }")
     // String functions from libc
     p = p ++ "extern fn strlen(s: *const i8) -> i64\n"
     p = p ++ "extern fn strcmp(a: *const i8, b: *const i8) -> i32\n"
     p = p ++ "extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32\n"
     p = p ++ "extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void\n"
-    p = p ++ "fn string_len(s: *const i8) -> i64: strlen(s)\n"
-    p = p ++ "fn string_cmp(a: *const i8, b: *const i8) -> i32: strcmp(a, b)\n"
-    p = p ++ "fn string_find_char(s: *const i8, c: i32) -> *const i8: (memchr((s as *const c_void), c, strlen(s)) as *const i8)\n"
+    p = p ++ ci_migrate_render_preamble_fn("fn string_len(s: *const i8) -> i64", "strlen(s)", "strlen(s)")
+    p = p ++ ci_migrate_render_preamble_fn("fn string_cmp(a: *const i8, b: *const i8) -> i32", "strcmp(a, b)", "strcmp(a, b)")
+    p = p ++ ci_migrate_render_preamble_fn("fn string_find_char(s: *const i8, c: i32) -> *const i8", "(memchr((s as *const c_void), c, strlen(s)) as *const i8)", "(memchr((s as *const c_void), c, strlen(s)) as *const i8)")
     p = p ++ "\ntype c_void = opaque\n"
     p = p ++ "type c_char = i8\n"
     p = p ++ "type c_short = i16\n"

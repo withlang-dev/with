@@ -125,23 +125,30 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
             }
 
 
-            match require_state:
-                0 =>
-                    match script:
-                        30 =>
+            match require_state {
+                0 => {
+                    match script {
+                        30 => {
                             (require_state = 2)
-                        27 | 28 =>
+                        },
+                        27 | 28 => {
                             (require_state = 3)
-                        29 =>
+                        },
+                        29 => {
                             (require_state = 4)
-                        22 =>
+                        },
+                        22 => {
                             (require_state = 5)
-                        _ =>
+                        },
+                        _ => {
                             with_memcpy(((&require_map[0] as *mut c_uint) as *i8), ((&map[0] as *mut c_uint) as *i8), ((6 *% sizeof[c_uint]()) as i64))
 
                             (require_state = 1)
 
-                2 =>
+                        },
+                    }
+                },
+                2 => {
                     if ((if script != 30: 1 else: 0) != 0) {
                         var chspecial: c_uint = 0
 
@@ -174,19 +181,23 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
                         }
 
                     }
-                3 =>
+                },
+                3 => {
                     if ((if (((map[(ucp_Han / 32)] & ((1 as c_uint) << ((ucp_Han % 32) as c_uint))) +% (map[(ucp_Hiragana / 32)] & ((1 as c_uint) << ((ucp_Hiragana % 32) as c_uint)))) +% (map[(ucp_Katakana / 32)] & ((1 as c_uint) << ((ucp_Katakana % 32) as c_uint)))) == 0: 1 else: 0) != 0) {
                         return 0
                     }
-                4 =>
+                },
+                4 => {
                     if ((if ((map[(ucp_Han / 32)] & ((1 as c_uint) << ((ucp_Han % 32) as c_uint))) +% (map[(ucp_Bopomofo / 32)] & ((1 as c_uint) << ((ucp_Bopomofo % 32) as c_uint)))) == 0: 1 else: 0) != 0) {
                         return 0
                     }
-                5 =>
+                },
+                5 => {
                     if ((if ((map[(ucp_Han / 32)] & ((1 as c_uint) << ((ucp_Han % 32) as c_uint))) +% (map[(ucp_Hangul / 32)] & ((1 as c_uint) << ((ucp_Hangul % 32) as c_uint)))) == 0: 1 else: 0) != 0) {
                         return 0
                     }
-                1 =>
+                },
+                1 => {
                     (OK = 0)
 
                     var i_1: c_int = 0
@@ -209,16 +220,20 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
                         return 0
                     }
 
-                    match script:
-                        30 =>
+                    match script {
+                        30 => {
                             (require_state = 2)
-                        27 | 28 =>
+                        },
+                        27 | 28 => {
                             (require_state = 3)
-                        29 =>
+                        },
+                        29 => {
                             (require_state = 4)
-                        22 =>
+                        },
+                        22 => {
                             (require_state = 5)
-                        _ =>
+                        },
+                        _ => {
                             var i_2: c_int = 0
 
                             while ((if i_2 < ((ucp_Script_Count / 32) + 1): 1 else: 0) != 0) {
@@ -228,7 +243,11 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
 
                             }
 
+                        },
+                    }
 
+                },
+            }
 
         }
 

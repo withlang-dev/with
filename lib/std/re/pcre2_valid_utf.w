@@ -45,17 +45,23 @@ fn _pcre2_valid_utf_8(string: *const u8, __param_length: c_ulong, erroroffset: *
         if ((if length < ab: 1 else: 0) != 0) {
             ((unsafe: *erroroffset) = (((((p as usize) -% (string as usize)) / sizeof[u8]()) as c_ulong)))
 
-            match (ab -% length):
-                1 =>
+            match (ab -% length) {
+                1 => {
                     return -3
-                2 =>
+                },
+                2 => {
                     return -4
-                3 =>
+                },
+                3 => {
                     return -5
-                4 =>
+                },
+                4 => {
                     return -6
-                5 =>
+                },
+                5 => {
                     return -7
+                },
+            }
 
         }
 
@@ -73,15 +79,16 @@ fn _pcre2_valid_utf_8(string: *const u8, __param_length: c_ulong, erroroffset: *
         }
 
 
-        match ab:
-            1 =>
+        match ab {
+            1 => {
                 if ((if (c & 62) == 0: 1 else: 0) != 0) {
                     ((unsafe: *erroroffset) = (((((p as usize) -% (string as usize)) / sizeof[u8]()) as c_ulong) -% 1))
 
                     return -17
 
                 }
-            2 =>
+            },
+            2 => {
                 (p = p + 1)
 
                 if ((if ((unsafe: *p) & 192) != 128: 1 else: 0) != 0) {
@@ -120,7 +127,8 @@ fn _pcre2_valid_utf_8(string: *const u8, __param_length: c_ulong, erroroffset: *
                 }
 
 
-            3 =>
+            },
+            3 => {
                 (p = p + 1)
 
                 if ((if ((unsafe: *p) & 192) != 128: 1 else: 0) != 0) {
@@ -178,7 +186,8 @@ fn _pcre2_valid_utf_8(string: *const u8, __param_length: c_ulong, erroroffset: *
                 }
 
 
-            4 =>
+            },
+            4 => {
                 (p = p + 1)
 
                 if ((if ((unsafe: *p) & 192) != 128: 1 else: 0) != 0) {
@@ -223,7 +232,8 @@ fn _pcre2_valid_utf_8(string: *const u8, __param_length: c_ulong, erroroffset: *
                 }
 
 
-            5 =>
+            },
+            5 => {
                 (p = p + 1)
 
                 if ((if ((unsafe: *p) & 192) != 128: 1 else: 0) != 0) {
@@ -278,6 +288,8 @@ fn _pcre2_valid_utf_8(string: *const u8, __param_length: c_ulong, erroroffset: *
                 }
 
 
+            },
+        }
 
         if ((if ab > 3: 1 else: 0) != 0) {
             ((unsafe: *erroroffset) = (((((p as usize) -% (string as usize)) / sizeof[u8]()) as c_ulong) -% ab))

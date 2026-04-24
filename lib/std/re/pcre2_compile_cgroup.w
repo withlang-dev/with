@@ -309,8 +309,8 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
     with_memset((captures as *i8), 0, (size as i64))
 
     while (1 != 0) {
-        match ((unsafe: *pptr) & (4294901760 as c_uint)):
-            2148925440 =>
+        match ((unsafe: *pptr) & (4294901760 as c_uint)) {
+            2148925440 => {
                 (pptr = pptr + 1)
 
                 (pptr = pptr + 2)
@@ -375,7 +375,8 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
                 continue
 
 
-            2149056512 =>
+            },
+            2149056512 => {
                 (ng = cb.named_groups + (unsafe: pptr[1]))
 
                 while true {
@@ -459,7 +460,8 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
                 continue
 
 
-            2149122048 =>
+            },
+            2149122048 => {
                 (pptr = pptr + 2)
 
                 (capture_ptr = captures + (((unsafe: pptr[-1]) as c_uint) >> (3 as c_uint)))
@@ -485,8 +487,11 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
 
                 continue
 
-            _ =>
+            },
+            _ => {
                 0
+            },
+        }
 
         break
 
@@ -556,8 +561,8 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
     while (1 != 0) {
         (pptr = pptr + 1)
 
-        match ((unsafe: *pptr) & (4294901760 as c_uint)):
-            2148925440 =>
+        match ((unsafe: *pptr) & (4294901760 as c_uint)) {
+            2148925440 => {
                 (pptr = pptr + 2)
 
                 continue
@@ -603,7 +608,8 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
                 continue
 
 
-            2149056512 =>
+            },
+            2149056512 => {
                 (pptr = pptr + 1)
 
                 (ng = cb.named_groups + (unsafe: *pptr))
@@ -656,7 +662,8 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
                 continue
 
 
-            2149122048 =>
+            },
+            2149122048 => {
                 var __ci_expr_old_2: *mut c_ushort = captures
 
                 (captures = captures + 1)
@@ -668,8 +675,11 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
 
                 continue
 
-            _ =>
+            },
+            _ => {
                 0
+            },
+        }
 
         break
 
@@ -772,8 +782,8 @@ fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset
     while (1 != 0) {
         (pptr = pptr + 1)
 
-        match ((unsafe: *pptr) & (4294901760 as c_uint)):
-            2148925440 =>
+        match ((unsafe: *pptr) & (4294901760 as c_uint)) {
+            2148925440 => {
                 (offset = ((((unsafe: pptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr[2]) as c_ulong))
 
                 (pptr = pptr + 2)
@@ -836,7 +846,8 @@ fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset
                 continue
 
 
-            2149056512 =>
+            },
+            2149056512 => {
                 (offset = offset + ((unsafe: *pptr) & 65535))
 
                 (pptr = pptr + 1)
@@ -916,7 +927,8 @@ fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset
                 continue
 
 
-            2149122048 =>
+            },
+            2149122048 => {
                 (offset = offset + ((unsafe: *pptr) & 65535))
 
                 (pptr = pptr + 1)
@@ -941,8 +953,11 @@ fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset
 
                 continue
 
-            _ =>
+            },
+            _ => {
                 0
+            },
+        }
 
         while true {
             if (not (0 != 0)) {

@@ -533,7 +533,7 @@ mis-translation.
 Not implementation work — validation and bug fixing.
 
 1. Clone PCRE2 to `.reference/pcre2/`
-2. Run `with migrate .reference/pcre2/src/ -o lib/std/pcre2/ --stats`
+2. Run `with migrate .reference/pcre2/src/ -o lib/std/pcre2/ --prefer-brace --stats`
 3. Exclude `pcre2_jit_compile.c` (inline asm, code gen — skip)
 4. Build migrated code with `with build`
 5. Fix translation bugs found by compilation failures
@@ -616,7 +616,7 @@ with build /tmp/test_goto.w
 
 After Step 10:
 ```
-with migrate .reference/pcre2/src/ -o lib/std/pcre2/ --stats
+with migrate .reference/pcre2/src/ -o lib/std/pcre2/ --prefer-brace --stats
 with build lib/std/pcre2/
 cc -o pcre2test pcre2/src/pcre2test.c -L out/lib -lpcre2
 ./pcre2test pcre2/testdata/testinput1

@@ -24,6 +24,7 @@ bash "./scripts/prepare_pcre2_reference.sh" "$PCRE2_SRC"
 echo "=== Step 2: Run with migrate ==="
 rm -rf "$MIGRATE_OUT" && mkdir -p "$MIGRATE_OUT"
 $WITH migrate "$PCRE2_SRC/" -o "$MIGRATE_OUT/" \
+    --prefer-brace \
     --exclude pcre2test.c \
     --exclude pcre2demo.c \
     --exclude pcre2grep.c \
@@ -94,7 +95,7 @@ TOTAL=0; OK=0
 for mod in $(ls "$LIB_RE"/*.w | sed "s|$LIB_RE/||;s|\.w||" | sort); do
     head -48 "$MIGRATE_OUT/pcre2_tables.w" > /tmp/tf.w
     tail -n +3 "$LIB_RE/$mod.w" >> /tmp/tf.w
-    echo -e "\nfn main: print(\"ok\")" >> /tmp/tf.w
+    echo -e "\nfn main { print(\"ok\") }" >> /tmp/tf.w
     errs=$($WITH check /tmp/tf.w 2>&1 | grep -c "error:" || true)
     TOTAL=$((TOTAL + errs))
     if [ "$errs" -eq 0 ]; then OK=$((OK + 1)); fi

@@ -86,23 +86,32 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
             }
 
             if (__ci_expr_logic_5 != 0) {
-                match c:
-                    OP_STAR =>
+                match c {
+                    OP_STAR => {
                         ((unsafe: *code) = (unsafe: *code) + (OP_POSSTAR - OP_STAR))
-                    OP_MINSTAR =>
+                    },
+                    OP_MINSTAR => {
                         ((unsafe: *code) = (unsafe: *code) + (OP_POSSTAR - OP_MINSTAR))
-                    OP_PLUS =>
+                    },
+                    OP_PLUS => {
                         ((unsafe: *code) = (unsafe: *code) + (OP_POSPLUS - OP_PLUS))
-                    OP_MINPLUS =>
+                    },
+                    OP_MINPLUS => {
                         ((unsafe: *code) = (unsafe: *code) + (OP_POSPLUS - OP_MINPLUS))
-                    OP_QUERY =>
+                    },
+                    OP_QUERY => {
                         ((unsafe: *code) = (unsafe: *code) + (OP_POSQUERY - OP_QUERY))
-                    OP_MINQUERY =>
+                    },
+                    OP_MINQUERY => {
                         ((unsafe: *code) = (unsafe: *code) + (OP_POSQUERY - OP_MINQUERY))
-                    OP_UPTO =>
+                    },
+                    OP_UPTO => {
                         ((unsafe: *code) = (unsafe: *code) + (OP_POSUPTO - OP_UPTO))
-                    OP_MINUPTO =>
+                    },
+                    OP_MINUPTO => {
                         ((unsafe: *code) = (unsafe: *code) + (OP_POSUPTO - OP_MINUPTO))
+                    },
+                }
 
             }
 
@@ -170,15 +179,20 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                     }
 
                     if (__ci_expr_logic_11 != 0) {
-                        match c:
-                            OP_CRSTAR | OP_CRMINSTAR =>
+                        match c {
+                            OP_CRSTAR | OP_CRMINSTAR => {
                                 ((unsafe: *repeat_opcode) = 106)
-                            OP_CRPLUS | OP_CRMINPLUS =>
+                            },
+                            OP_CRPLUS | OP_CRMINPLUS => {
                                 ((unsafe: *repeat_opcode) = 107)
-                            OP_CRQUERY | OP_CRMINQUERY =>
+                            },
+                            OP_CRQUERY | OP_CRMINQUERY => {
                                 ((unsafe: *repeat_opcode) = 108)
-                            OP_CRRANGE | OP_CRMINRANGE =>
+                            },
+                            OP_CRRANGE | OP_CRMINRANGE => {
                                 ((unsafe: *repeat_opcode) = 109)
+                            },
+                        }
 
                     }
 
@@ -193,10 +207,11 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
         }
 
 
-        match c:
-            OP_END =>
+        match c {
+            OP_END => {
                 return 0
-            OP_TYPESTAR | OP_TYPEMINSTAR | OP_TYPEPLUS | OP_TYPEMINPLUS | OP_TYPEQUERY | OP_TYPEMINQUERY | OP_TYPEPOSSTAR | OP_TYPEPOSPLUS | OP_TYPEPOSQUERY =>
+            },
+            OP_TYPESTAR | OP_TYPEMINSTAR | OP_TYPEPLUS | OP_TYPEMINPLUS | OP_TYPEQUERY | OP_TYPEMINQUERY | OP_TYPEPOSSTAR | OP_TYPEPOSPLUS | OP_TYPEPOSQUERY => {
                 var __ci_expr_logic_12: c_int
 
                 if ((if (unsafe: code[1]) == OP_PROP: 1 else: 0) != 0) {
@@ -209,7 +224,8 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                     (code = code + 2)
                 }
 
-            OP_TYPEUPTO | OP_TYPEMINUPTO | OP_TYPEEXACT | OP_TYPEPOSUPTO =>
+            },
+            OP_TYPEUPTO | OP_TYPEMINUPTO | OP_TYPEEXACT | OP_TYPEPOSUPTO => {
                 var __ci_expr_logic_13: c_int
 
                 if ((if (unsafe: code[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
@@ -222,21 +238,28 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                     (code = code + 2)
                 }
 
-            OP_CALLOUT_STR =>
+            },
+            OP_CALLOUT_STR => {
                 (code = code + (((((unsafe: code[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: code[((1 + (2 * 2)) + 1)])) as c_uint))
-            OP_XCLASS | OP_ECLASS =>
+            },
+            OP_XCLASS | OP_ECLASS => {
                 (code = code + (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
-            OP_MARK | OP_COMMIT_ARG | OP_PRUNE_ARG | OP_SKIP_ARG | OP_THEN_ARG =>
+            },
+            OP_MARK | OP_COMMIT_ARG | OP_PRUNE_ARG | OP_SKIP_ARG | OP_THEN_ARG => {
                 (code = code + (unsafe: code[1]))
+            },
+        }
 
         (code = code + _pcre2_OP_lengths_8[c])
 
         if (utf != 0) {
-            match c:
-                OP_CHAR | OP_CHARI | OP_NOT | OP_NOTI | OP_STAR | OP_MINSTAR | OP_PLUS | OP_MINPLUS | OP_QUERY | OP_MINQUERY | OP_UPTO | OP_MINUPTO | OP_EXACT | OP_POSSTAR | OP_POSPLUS | OP_POSQUERY | OP_POSUPTO | OP_STARI | OP_MINSTARI | OP_PLUSI | OP_MINPLUSI | OP_QUERYI | OP_MINQUERYI | OP_UPTOI | OP_MINUPTOI | OP_EXACTI | OP_POSSTARI | OP_POSPLUSI | OP_POSQUERYI | OP_POSUPTOI | OP_NOTSTAR | OP_NOTMINSTAR | OP_NOTPLUS | OP_NOTMINPLUS | OP_NOTQUERY | OP_NOTMINQUERY | OP_NOTUPTO | OP_NOTMINUPTO | OP_NOTEXACT | OP_NOTPOSSTAR | OP_NOTPOSPLUS | OP_NOTPOSQUERY | OP_NOTPOSUPTO | OP_NOTSTARI | OP_NOTMINSTARI | OP_NOTPLUSI | OP_NOTMINPLUSI | OP_NOTQUERYI | OP_NOTMINQUERYI | OP_NOTUPTOI | OP_NOTMINUPTOI | OP_NOTEXACTI | OP_NOTPOSSTARI | OP_NOTPOSPLUSI | OP_NOTPOSQUERYI | OP_NOTPOSUPTOI =>
+            match c {
+                OP_CHAR | OP_CHARI | OP_NOT | OP_NOTI | OP_STAR | OP_MINSTAR | OP_PLUS | OP_MINPLUS | OP_QUERY | OP_MINQUERY | OP_UPTO | OP_MINUPTO | OP_EXACT | OP_POSSTAR | OP_POSPLUS | OP_POSQUERY | OP_POSUPTO | OP_STARI | OP_MINSTARI | OP_PLUSI | OP_MINPLUSI | OP_QUERYI | OP_MINQUERYI | OP_UPTOI | OP_MINUPTOI | OP_EXACTI | OP_POSSTARI | OP_POSPLUSI | OP_POSQUERYI | OP_POSUPTOI | OP_NOTSTAR | OP_NOTMINSTAR | OP_NOTPLUS | OP_NOTMINPLUS | OP_NOTQUERY | OP_NOTMINQUERY | OP_NOTUPTO | OP_NOTMINUPTO | OP_NOTEXACT | OP_NOTPOSSTAR | OP_NOTPOSPLUS | OP_NOTPOSQUERY | OP_NOTPOSUPTO | OP_NOTSTARI | OP_NOTMINSTARI | OP_NOTPLUSI | OP_NOTMINPLUSI | OP_NOTQUERYI | OP_NOTMINQUERYI | OP_NOTUPTOI | OP_NOTMINUPTOI | OP_NOTEXACTI | OP_NOTPOSSTARI | OP_NOTPOSPLUSI | OP_NOTPOSQUERYI | OP_NOTPOSUPTOI => {
                     if ((if (unsafe: code[-1]) >= 192: 1 else: 0) != 0) {
                         (code = code + _pcre2_utf8_table4[((unsafe: code[-1]) & 63)])
                     }
+                },
+            }
         }
 
     }
@@ -253,8 +276,8 @@ fn check_char_prop(c: c_uint, ptype: c_uint, pdata: c_uint, negated: c_int) -> c
 
     var prop: *const ucd_record = ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((c as c_int) / 128)] * 128) + ((c as c_int) % 128))] as isize) as usize))
 
-    match ptype:
-        0 =>
+    match ptype {
+        0 => {
             var __ci_expr_logic_1: c_int
 
             var __ci_expr_logic_0: c_int
@@ -273,13 +296,17 @@ fn check_char_prop(c: c_uint, ptype: c_uint, pdata: c_uint, negated: c_int) -> c
 
             return (if __ci_expr_logic_1 == negated: 1 else: 0)
 
-        1 =>
+        },
+        1 => {
             return (if (if pdata == _pcre2_ucp_gentype_8[prop.chartype]: 1 else: 0) == negated: 1 else: 0)
-        2 =>
+        },
+        2 => {
             return (if (if pdata == prop.chartype: 1 else: 0) == negated: 1 else: 0)
-        3 =>
+        },
+        3 => {
             return (if (if pdata == prop.script: 1 else: 0) == negated: 1 else: 0)
-        4 =>
+        },
+        4 => {
             var __ci_expr_logic_2: c_int
 
             if ((if pdata == prop.script: 1 else: 0) != 0) {
@@ -304,7 +331,8 @@ fn check_char_prop(c: c_uint, ptype: c_uint, pdata: c_uint, negated: c_int) -> c
             return (if __ci_expr_logic_3 == negated: 1 else: 0)
 
 
-        5 =>
+        },
+        5 => {
             var __ci_expr_logic_3: c_int
 
             if ((if _pcre2_ucp_gentype_8[prop.chartype] == 1: 1 else: 0) != 0) {
@@ -315,12 +343,16 @@ fn check_char_prop(c: c_uint, ptype: c_uint, pdata: c_uint, negated: c_int) -> c
 
             return (if __ci_expr_logic_3 == negated: 1 else: 0)
 
-        6 | 7 =>
-            match c:
-                9 | 32 | 160 | 5760 | 6158 | 8192 | 8193 | 8194 | 8195 | 8196 | 8197 | 8198 | 8199 | 8200 | 8201 | 8202 | 8239 | 8287 | 12288 | 10 | 11 | 12 | 13 | 133 | 8232 | 8233 =>
+        },
+        6 | 7 => {
+            match c {
+                9 | 32 | 160 | 5760 | 6158 | 8192 | 8193 | 8194 | 8195 | 8196 | 8197 | 8198 | 8199 | 8200 | 8201 | 8202 | 8239 | 8287 | 12288 | 10 | 11 | 12 | 13 | 133 | 8232 | 8233 => {
                     (rc = negated)
-                _ =>
+                },
+                _ => {
                     (rc = (if (if _pcre2_ucp_gentype_8[prop.chartype] == 6: 1 else: 0) == negated: 1 else: 0))
+                },
+            }
 
             return rc
 
@@ -343,7 +375,8 @@ fn check_char_prop(c: c_uint, ptype: c_uint, pdata: c_uint, negated: c_int) -> c
             return (if __ci_expr_logic_5 == negated: 1 else: 0)
 
 
-        8 =>
+        },
+        8 => {
             var __ci_expr_logic_5: c_int
 
             var __ci_expr_logic_4: c_int
@@ -362,7 +395,8 @@ fn check_char_prop(c: c_uint, ptype: c_uint, pdata: c_uint, negated: c_int) -> c
 
             return (if __ci_expr_logic_5 == negated: 1 else: 0)
 
-        9 =>
+        },
+        9 => {
             (p = (&_pcre2_ucd_caseless_sets_8[0] as *const c_uint) + ((prop.caseset as isize) as usize))
 
             while true {
@@ -387,10 +421,14 @@ fn check_char_prop(c: c_uint, ptype: c_uint, pdata: c_uint, negated: c_int) -> c
                 }
             }
 
-        11 =>
+        },
+        11 => {
             return 0
-        12 =>
+        },
+        12 => {
             return 0
+        },
+    }
 
     return 0
 
@@ -529,30 +567,37 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
         ((unsafe: list[1]) = __ci_expr_logic_6)
 
 
-        match base:
-            OP_STAR =>
+        match base {
+            OP_STAR => {
                 ((unsafe: list[0]) = 29)
-            OP_STARI =>
+            },
+            OP_STARI => {
                 ((unsafe: list[0]) = 30)
-            OP_NOTSTAR =>
+            },
+            OP_NOTSTAR => {
                 ((unsafe: list[0]) = 31)
-            OP_NOTSTARI =>
+            },
+            OP_NOTSTARI => {
                 ((unsafe: list[0]) = 32)
-            OP_TYPESTAR =>
+            },
+            OP_TYPESTAR => {
                 ((unsafe: list[0]) = (unsafe: *code))
 
                 (code = code + 1)
 
+            },
+        }
 
         (c = (unsafe: list[0]))
 
     }
 
 
-    match c:
-        OP_NOT_DIGIT | OP_DIGIT | OP_NOT_WHITESPACE | OP_WHITESPACE | OP_NOT_WORDCHAR | OP_WORDCHAR | OP_ANY | OP_ALLANY | OP_ANYNL | OP_NOT_HSPACE | OP_HSPACE | OP_NOT_VSPACE | OP_VSPACE | OP_EXTUNI | OP_EODN | OP_EOD | OP_DOLL | OP_DOLLM =>
+    match c {
+        OP_NOT_DIGIT | OP_DIGIT | OP_NOT_WHITESPACE | OP_WHITESPACE | OP_NOT_WORDCHAR | OP_WORDCHAR | OP_ANY | OP_ALLANY | OP_ANYNL | OP_NOT_HSPACE | OP_HSPACE | OP_NOT_VSPACE | OP_VSPACE | OP_EXTUNI | OP_EODN | OP_EOD | OP_DOLL | OP_DOLLM => {
             return code
-        OP_CHAR | OP_NOT =>
+        },
+        OP_CHAR | OP_NOT => {
             var __ci_expr_old_7: *const u8 = code
 
             (code = code + 1)
@@ -713,7 +758,8 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             return code
 
 
-        OP_CHARI | OP_NOTI =>
+        },
+        OP_CHARI | OP_NOTI => {
             var __ci_expr_ternary_10: c_int = 0
 
             if ((if c == OP_CHARI: 1 else: 0) != 0) {
@@ -876,7 +922,8 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             return code
 
 
-        OP_PROP | OP_NOTPROP =>
+        },
+        OP_PROP | OP_NOTPROP => {
             if ((if (unsafe: code[0]) != 9: 1 else: 0) != 0) {
                 ((unsafe: list[2]) = (unsafe: code[0]))
 
@@ -954,19 +1001,23 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
 
             (class_end = end)
 
-            match (unsafe: *end):
-                OP_CRSTAR | OP_CRMINSTAR | OP_CRQUERY | OP_CRMINQUERY | OP_CRPOSSTAR | OP_CRPOSQUERY =>
+            match (unsafe: *end) {
+                OP_CRSTAR | OP_CRMINSTAR | OP_CRQUERY | OP_CRMINQUERY | OP_CRPOSSTAR | OP_CRPOSQUERY => {
                     ((unsafe: list[1]) = 1)
 
                     (end = end + 1)
 
-                OP_CRPLUS | OP_CRMINPLUS | OP_CRPOSPLUS =>
+                },
+                OP_CRPLUS | OP_CRMINPLUS | OP_CRPOSPLUS => {
                     (end = end + 1)
-                OP_CRRANGE | OP_CRMINRANGE | OP_CRPOSRANGE =>
+                },
+                OP_CRRANGE | OP_CRMINRANGE | OP_CRPOSRANGE => {
                     ((unsafe: list[1]) = (if ((((((unsafe: end[1]) as c_int) << (8 as c_uint)) | (unsafe: end[(1 + 1)])) as c_uint)) == 0: 1 else: 0))
 
                     (end = end + (1 + (2 * 2)))
 
+                },
+            }
 
             ((unsafe: list[2]) = (((((end as usize) -% (code as usize)) / sizeof[u8]()) as c_uint)))
 
@@ -975,7 +1026,8 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
             return end
 
 
-        OP_NCLASS | OP_CLASS | OP_XCLASS | OP_ECLASS =>
+        },
+        OP_NCLASS | OP_CLASS | OP_XCLASS | OP_ECLASS => {
             var __ci_expr_logic_20: c_int
 
             if ((if c == OP_XCLASS: 1 else: 0) != 0) {
@@ -993,19 +1045,23 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
 
             (class_end = end)
 
-            match (unsafe: *end):
-                OP_CRSTAR | OP_CRMINSTAR | OP_CRQUERY | OP_CRMINQUERY | OP_CRPOSSTAR | OP_CRPOSQUERY =>
+            match (unsafe: *end) {
+                OP_CRSTAR | OP_CRMINSTAR | OP_CRQUERY | OP_CRMINQUERY | OP_CRPOSSTAR | OP_CRPOSQUERY => {
                     ((unsafe: list[1]) = 1)
 
                     (end = end + 1)
 
-                OP_CRPLUS | OP_CRMINPLUS | OP_CRPOSPLUS =>
+                },
+                OP_CRPLUS | OP_CRMINPLUS | OP_CRPOSPLUS => {
                     (end = end + 1)
-                OP_CRRANGE | OP_CRMINRANGE | OP_CRPOSRANGE =>
+                },
+                OP_CRRANGE | OP_CRMINRANGE | OP_CRPOSRANGE => {
                     ((unsafe: list[1]) = (if ((((((unsafe: end[1]) as c_int) << (8 as c_uint)) | (unsafe: end[(1 + 1)])) as c_uint)) == 0: 1 else: 0))
 
                     (end = end + (1 + (2 * 2)))
 
+                },
+            }
 
             ((unsafe: list[2]) = (((((end as usize) -% (code as usize)) / sizeof[u8]()) as c_uint)))
 
@@ -1013,6 +1069,8 @@ fn get_chr_property_list(__param_code: *const u8, utf: c_int, ucp: c_int, fcc: *
 
             return end
 
+        },
+    }
 
     return null
 
@@ -1092,22 +1150,24 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
 
         }
 
-        match c:
-            OP_END =>
+        match c {
+            OP_END => {
                 return (if (unsafe: base_list[1]) != 0: 1 else: 0)
-            OP_KET | OP_KETRPOS =>
+            },
+            OP_KET | OP_KETRPOS => {
                 if ((if (unsafe: base_list[1]) == 0: 1 else: 0) != 0) {
                     return 0
                 }
 
                 (bracode = code - (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
 
-                match (unsafe: *bracode):
-                    OP_CBRA | OP_SCBRA | OP_CBRAPOS | OP_SCBRAPOS =>
+                match (unsafe: *bracode) {
+                    OP_CBRA | OP_SCBRA | OP_CBRAPOS | OP_SCBRAPOS => {
                         if (cb.had_recurse != 0) {
                             return 0
                         }
-                    OP_SCRIPT_RUN =>
+                    },
+                    OP_SCRIPT_RUN => {
                         var __ci_expr_logic_0: c_int = 0
 
                         if ((if (unsafe: base_list[0]) != 29: 1 else: 0) != 0) {
@@ -1118,9 +1178,11 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                             return 0
                         }
 
-                    OP_ASSERT | OP_ASSERT_NOT | OP_ONCE =>
+                    },
+                    OP_ASSERT | OP_ASSERT_NOT | OP_ONCE => {
                         return (if not (entered_a_group != 0): 1 else: 0)
-                    OP_ASSERTBACK | OP_ASSERTBACK_NOT =>
+                    },
+                    OP_ASSERTBACK | OP_ASSERTBACK_NOT => {
                         while true {
                             if ((if (unsafe: bracode[(1 + 2)]) == OP_VREVERSE: 1 else: 0) != 0) {
                                 return 0
@@ -1138,8 +1200,11 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
 
                         return 0
 
-                    OP_ASSERT_NA | OP_ASSERTBACK_NA =>
+                    },
+                    OP_ASSERT_NA | OP_ASSERTBACK_NA => {
                         return 0
+                    },
+                }
 
                 (code = code + _pcre2_OP_lengths_8[c])
 
@@ -1165,7 +1230,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                 continue
 
 
-            OP_ONCE | OP_BRA | OP_CBRA =>
+            },
+            OP_ONCE | OP_BRA | OP_CBRA => {
                 (next_code = code + (((((unsafe: code[1]) as c_int) << (8 as c_uint)) | (unsafe: code[(1 + 1)])) as c_uint))
 
                 (code = code + _pcre2_OP_lengths_8[c])
@@ -1224,7 +1290,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                 continue
 
 
-            OP_BRAZERO | OP_BRAMINZERO =>
+            },
+            OP_BRAZERO | OP_BRAMINZERO => {
                 (next_code = code + ((1 as isize) as usize))
 
                 var __ci_expr_logic_2: c_int = 0
@@ -1263,8 +1330,11 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
 
                 continue
 
-            _ =>
+            },
+            _ => {
                 0
+            },
+        }
 
         (code = get_chr_property_list(code, utf, ucp, cb.fcc, (&list[0] as *mut c_uint)))
 
@@ -1347,8 +1417,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
 
                     (invert_bits = 0)
 
-                    match (unsafe: list_ptr[0]):
-                        110 | 111 =>
+                    match (unsafe: list_ptr[0]) {
+                        110 | 111 => {
                             var __ci_expr_ternary_9: *const u8 = null
 
                             if ((if list_ptr == (&list[0] as *const c_uint): 1 else: 0) != 0) {
@@ -1359,7 +1429,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
 
                             (set2 = __ci_expr_ternary_9 - (unsafe: list_ptr[2]))
 
-                        112 =>
+                        },
+                        112 => {
                             var __ci_expr_ternary_10: *const u8 = null
 
                             if ((if list_ptr == (&list[0] as *const c_uint): 1 else: 0) != 0) {
@@ -1386,29 +1457,38 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
 
                             (set2 = xclass_flags + ((1 as isize) as usize))
 
-                        6 =>
+                        },
+                        6 => {
                             (invert_bits = 1)
 
                             (set2 = cb.cbits + ((64 as isize) as usize))
 
-                        7 =>
+                        },
+                        7 => {
                             (set2 = cb.cbits + ((64 as isize) as usize))
-                        8 =>
+                        },
+                        8 => {
                             (invert_bits = 1)
 
                             (set2 = cb.cbits + ((0 as isize) as usize))
 
-                        9 =>
+                        },
+                        9 => {
                             (set2 = cb.cbits + ((0 as isize) as usize))
-                        10 =>
+                        },
+                        10 => {
                             (invert_bits = 1)
 
                             (set2 = cb.cbits + ((160 as isize) as usize))
 
-                        11 =>
+                        },
+                        11 => {
                             (set2 = cb.cbits + ((160 as isize) as usize))
-                        _ =>
+                        },
+                        _ => {
                             return 0
+                        },
+                    }
 
                     (set_end = set1 + ((32 as isize) as usize))
 
@@ -1513,16 +1593,20 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
 
                                 (n = propposstab[(unsafe: base_list[2])][list[2]])
 
-                                match n:
-                                    0 =>
+                                match n {
+                                    0 => {
                                         0
-                                    1 =>
+                                    },
+                                    1 => {
                                         (accepted = bothprop)
-                                    2 =>
+                                    },
+                                    2 => {
                                         (accepted = (if (if (unsafe: base_list[3]) == list[3]: 1 else: 0) != same: 1 else: 0))
-                                    3 =>
+                                    },
+                                    3 => {
                                         (accepted = (if not (same != 0): 1 else: 0))
-                                    4 =>
+                                    },
+                                    4 => {
                                         var __ci_expr_logic_18: c_int = 0
 
                                         if (risprop != 0) {
@@ -1531,7 +1615,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
 
                                         (accepted = __ci_expr_logic_18)
 
-                                    5 =>
+                                    },
+                                    5 => {
                                         var __ci_expr_logic_19: c_int = 0
 
                                         if (lisprop != 0) {
@@ -1540,7 +1625,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
 
                                         (accepted = __ci_expr_logic_19)
 
-                                    6 | 7 | 8 =>
+                                    },
+                                    6 | 7 | 8 => {
                                         (p = (&posspropstab[(n - 6)][0] as *const u8))
 
                                         var __ci_expr_logic_23: c_int = 0
@@ -1574,7 +1660,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                                         (accepted = __ci_expr_logic_23)
 
 
-                                    9 | 10 | 11 =>
+                                    },
+                                    9 | 10 | 11 => {
                                         (p = (&posspropstab[(n - 9)][0] as *const u8))
 
                                         var __ci_expr_logic_27: c_int = 0
@@ -1608,7 +1695,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                                         (accepted = __ci_expr_logic_27)
 
 
-                                    12 | 13 | 14 =>
+                                    },
+                                    12 | 13 | 14 => {
                                         (p = (&posspropstab[(n - 12)][0] as *const u8))
 
                                         var __ci_expr_logic_31: c_int = 0
@@ -1642,7 +1730,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                                         (accepted = __ci_expr_logic_31)
 
 
-                                    15 | 16 | 17 =>
+                                    },
+                                    15 | 16 | 17 => {
                                         (p = (&posspropstab[(n - 15)][0] as *const u8))
 
                                         var __ci_expr_logic_35: c_int = 0
@@ -1676,6 +1765,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                                         (accepted = __ci_expr_logic_35)
 
 
+                                    },
+                                }
 
                             }
 
@@ -1729,8 +1820,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
         while true {
             (chr = (unsafe: *chr_ptr))
 
-            match (unsafe: list_ptr[0]):
-                29 =>
+            match (unsafe: list_ptr[0]) {
+                29 => {
                     (ochr_ptr = list_ptr + ((2 as isize) as usize))
 
                     while true {
@@ -1746,7 +1837,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
 
                     }
 
-                31 =>
+                },
+                31 => {
                     (ochr_ptr = list_ptr + ((2 as isize) as usize))
 
                     while true {
@@ -1766,7 +1858,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         return 0
                     }
 
-                7 =>
+                },
+                7 => {
                     var __ci_expr_logic_40: c_int = 0
 
                     if ((if chr < 256: 1 else: 0) != 0) {
@@ -1777,7 +1870,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         return 0
                     }
 
-                6 =>
+                },
+                6 => {
                     var __ci_expr_logic_41: c_int
 
                     if ((if chr > 255: 1 else: 0) != 0) {
@@ -1790,7 +1884,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         return 0
                     }
 
-                9 =>
+                },
+                9 => {
                     var __ci_expr_logic_42: c_int = 0
 
                     if ((if chr < 256: 1 else: 0) != 0) {
@@ -1801,7 +1896,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         return 0
                     }
 
-                8 =>
+                },
+                8 => {
                     var __ci_expr_logic_43: c_int
 
                     if ((if chr > 255: 1 else: 0) != 0) {
@@ -1814,7 +1910,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         return 0
                     }
 
-                11 =>
+                },
+                11 => {
                     var __ci_expr_logic_44: c_int = 0
 
                     if ((if chr < 255: 1 else: 0) != 0) {
@@ -1825,7 +1922,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         return 0
                     }
 
-                10 =>
+                },
+                10 => {
                     var __ci_expr_logic_45: c_int
 
                     if ((if chr > 255: 1 else: 0) != 0) {
@@ -1838,41 +1936,63 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         return 0
                     }
 
-                19 =>
-                    match chr:
-                        9 | 32 | 160 | 5760 | 6158 | 8192 | 8193 | 8194 | 8195 | 8196 | 8197 | 8198 | 8199 | 8200 | 8201 | 8202 | 8239 | 8287 | 12288 =>
+                },
+                19 => {
+                    match chr {
+                        9 | 32 | 160 | 5760 | 6158 | 8192 | 8193 | 8194 | 8195 | 8196 | 8197 | 8198 | 8199 | 8200 | 8201 | 8202 | 8239 | 8287 | 12288 => {
                             return 0
-                        _ =>
+                        },
+                        _ => {
                             0
-                18 =>
-                    match chr:
-                        9 | 32 | 160 | 5760 | 6158 | 8192 | 8193 | 8194 | 8195 | 8196 | 8197 | 8198 | 8199 | 8200 | 8201 | 8202 | 8239 | 8287 | 12288 =>
+                        },
+                    }
+                },
+                18 => {
+                    match chr {
+                        9 | 32 | 160 | 5760 | 6158 | 8192 | 8193 | 8194 | 8195 | 8196 | 8197 | 8198 | 8199 | 8200 | 8201 | 8202 | 8239 | 8287 | 12288 => {
                             0
-                        _ =>
+                        },
+                        _ => {
                             return 0
-                17 | 21 =>
-                    match chr:
-                        10 | 11 | 12 | 13 | 133 | 8232 | 8233 =>
+                        },
+                    }
+                },
+                17 | 21 => {
+                    match chr {
+                        10 | 11 | 12 | 13 | 133 | 8232 | 8233 => {
                             return 0
-                        _ =>
+                        },
+                        _ => {
                             0
-                20 =>
-                    match chr:
-                        10 | 11 | 12 | 13 | 133 | 8232 | 8233 =>
+                        },
+                    }
+                },
+                20 => {
+                    match chr {
+                        10 | 11 | 12 | 13 | 133 | 8232 | 8233 => {
                             0
-                        _ =>
+                        },
+                        _ => {
                             return 0
-                25 | 23 =>
-                    match chr:
-                        13 | 10 | 11 | 12 | 133 | 8232 | 8233 =>
+                        },
+                    }
+                },
+                25 | 23 => {
+                    match chr {
+                        13 | 10 | 11 | 12 | 133 | 8232 | 8233 => {
                             return 0
-                24 =>
+                        },
+                    }
+                },
+                24 => {
                     0
-                16 | 15 =>
+                },
+                16 | 15 => {
                     if ((if not (check_char_prop(chr, (unsafe: list_ptr[2]), (unsafe: list_ptr[3]), (if (unsafe: list_ptr[0]) == 15: 1 else: 0)) != 0): 1 else: 0) != 0) {
                         return 0
                     }
-                111 =>
+                },
+                111 => {
                     if ((if chr > 255: 1 else: 0) != 0) {
                         return 0
                     }
@@ -1897,7 +2017,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                     }
 
 
-                110 =>
+                },
+                110 => {
                     if ((if chr > 255: 1 else: 0) != 0) {
                         break
                     }
@@ -1917,7 +2038,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         return 0
                     }
 
-                112 =>
+                },
+                112 => {
                     var __ci_expr_ternary_47: *const u8 = null
 
                     if ((if list_ptr == (&list[0] as *const c_uint): 1 else: 0) != 0) {
@@ -1930,7 +2052,8 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         return 0
                     }
 
-                113 =>
+                },
+                113 => {
                     var __ci_expr_ternary_48: *const u8 = null
 
                     if ((if list_ptr == (&list[0] as *const c_uint): 1 else: 0) != 0) {
@@ -1951,8 +2074,11 @@ fn compare_opcodes(__param_code: *const u8, utf: c_int, ucp: c_int, cb: *const c
                         return 0
                     }
 
-                _ =>
+                },
+                _ => {
                     return 0
+                },
+            }
 
             (chr_ptr = chr_ptr + 1)
 

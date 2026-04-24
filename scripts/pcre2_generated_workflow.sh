@@ -11,9 +11,50 @@ CLEANUP_FILES=()
 cleanup() { rm -f "${CLEANUP_FILES[@]+"${CLEANUP_FILES[@]}"}"; }
 trap cleanup EXIT
 
+CHECK_TIMEOUT_SECS="${PCRE2_CHECK_TIMEOUT_SECS:-180}"
+
 die() {
     echo "error: $*" >&2
     exit 1
+}
+
+run_capture_with_timeout() {
+    local timeout_secs="$1"
+    local out_file="$2"
+    shift 2
+
+    if [ "$timeout_secs" -le 0 ]; then
+        "$@" >"$out_file" 2>&1
+        return $?
+    fi
+
+    local marker child watchdog rc
+    marker="$(mktemp "${TMPDIR:-/tmp}/pcre2-check-timeout.XXXXXX")"
+    rm -f "$marker"
+    CLEANUP_FILES+=("$marker")
+
+    "$@" >"$out_file" 2>&1 &
+    child="$!"
+    (
+        sleep "$timeout_secs"
+        if kill -0 "$child" 2>/dev/null; then
+            touch "$marker"
+            kill -TERM "$child" 2>/dev/null || true
+            sleep 2
+            kill -KILL "$child" 2>/dev/null || true
+        fi
+    ) &
+    watchdog="$!"
+
+    wait "$child"
+    rc="$?"
+    kill "$watchdog" 2>/dev/null || true
+    wait "$watchdog" 2>/dev/null || true
+
+    if [ -f "$marker" ]; then
+        return 124
+    fi
+    return "$rc"
 }
 
 ensure_generated_dependencies() {
@@ -87,7 +128,7 @@ count_generated_errors() {
     mv "$tf_base" "$tf"
     CLEANUP_FILES+=("$tf")
 
-    local mod errs size
+    local mod errs size check_out check_rc
     for mod in $(ls "$generated_dir"/*.w | sed "s|$generated_dir/||;s|\.w||" | sort); do
         [ "$mod" = "defs" ] && continue
         # defs.w contains the full preamble. For this synthetic single-file
@@ -101,7 +142,16 @@ count_generated_errors() {
         fi
         awk 'NR <= 2 { next } /^use std\.re\./ { next } { print }' "$generated_dir/$mod.w" >> "$tf"
         printf '\nfn main: print("ok")\n' >> "$tf"
-        errs="$("$with_bin" check "$tf" 2>&1 | grep -c 'error:' || true)"
+        check_out="$(mktemp "${TMPDIR:-/tmp}/pcre2-check-output.XXXXXX")"
+        CLEANUP_FILES+=("$check_out")
+        set +e
+        run_capture_with_timeout "$CHECK_TIMEOUT_SECS" "$check_out" "$with_bin" check "$tf"
+        check_rc="$?"
+        set -e
+        if [ "$check_rc" -eq 124 ]; then
+            die "generated module check timed out after ${CHECK_TIMEOUT_SECS}s: $mod"
+        fi
+        errs="$(grep -c 'error:' "$check_out" || true)"
         if [ "$errs" -eq 0 ]; then
             ok=$((ok + 1))
         else

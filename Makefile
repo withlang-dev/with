@@ -221,7 +221,7 @@ define WITH_REPO_LOCK
 	owner_file="$$lock/owner"; \
 	if mkdir "$$lock" 2>/dev/null; then \
 		trap 'rm -rf "$$lock"' EXIT INT TERM HUP; \
-		printf 'target=%s pid=%s started=%s\n' "$@" "$$" "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$$owner_file"; \
+		printf 'target=%s pid=%s started=%s\n' "$@" "$$$$" "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$$owner_file"; \
 		$(1); \
 	else \
 		if [ -f "$$owner_file" ]; then \

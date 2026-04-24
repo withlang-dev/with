@@ -4787,7 +4787,12 @@ fn Parser.parse_inline_match_arms(self: Parser) -> i32:
             self.suppress_fat_arrow_closure = saved_sfa2
         if self.expect(TokenKind.TK_FAT_ARROW) == 0:
             break
-        let body = self.parse_expr()
+        var body: NodeId = 0 as NodeId
+        if self.peek() == TokenKind.TK_L_BRACE:
+            self.advance()
+            body = self.parse_braced_body()
+        else:
+            body = self.parse_expr()
         let arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, arm_start, self.prev_end(), pattern, body, guard)
         arms.push(arm as i32)
         if self.peek() == TokenKind.TK_COMMA:

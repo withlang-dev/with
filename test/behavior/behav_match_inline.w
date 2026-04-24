@@ -7,6 +7,7 @@ fn main:
     test_or_pattern()
     test_guard()
     test_wildcard()
+    test_braced_multi_statement_arm()
     print("all inline match tests passed")
 
 fn test_basic:
@@ -35,3 +36,17 @@ fn test_guard:
 fn test_wildcard:
     let x = match 999 { 0 => "zero", _ => "nonzero" }
     assert(x == "nonzero")
+
+fn test_braced_multi_statement_arm:
+    var hits = 0
+    let result = match 1 {
+        1 => {
+            hits = hits + 1
+            hits + 10
+        },
+        _ => {
+            0
+        },
+    }
+    assert(result == 11)
+    assert(hits == 1)

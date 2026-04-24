@@ -1832,6 +1832,26 @@ fn Codegen.find_struct_index_by_type(self: Codegen, llvm_ty: i64) -> i32:
             return i
     0 - 1
 
+fn Codegen.is_union_struct_index(self: Codegen, struct_idx: i32) -> bool:
+    if struct_idx < 0 or struct_idx >= self.struct_index_syms.len() as i32:
+        return false
+    let name_sym = self.struct_index_syms.get(struct_idx as i64)
+    if name_sym == 0:
+        return false
+    self.sema.type_layout_struct_sub_kind(name_sym) == TypeDeclKind.Union
+
+fn Codegen.is_union_struct_type(self: Codegen, llvm_ty: i64) -> bool:
+    self.is_union_struct_index(self.find_struct_index_by_type(llvm_ty))
+
+fn Codegen.struct_source_field_type(self: Codegen, struct_idx: i32, source_fi: i32) -> i64:
+    if struct_idx < 0 or struct_idx >= self.struct_field_counts.len() as i32:
+        return 0
+    let f_count = self.struct_field_counts.get(struct_idx as i64)
+    if source_fi < 0 or source_fi >= f_count:
+        return 0
+    let f_start = self.struct_field_starts.get(struct_idx as i64)
+    self.struct_field_types.get((f_start + source_fi) as i64)
+
 fn Codegen.is_bitpacked_struct(self: Codegen, llvm_ty: i64) -> bool:
     self.bitpacked_by_llvm_type.contains(llvm_ty)
 
@@ -1863,6 +1883,8 @@ fn Codegen.get_llvm_field_index(self: Codegen, llvm_ty: i64, source_fi: i32) -> 
     let f_count = self.struct_field_counts.get(struct_idx as i64)
     if source_fi < 0 or source_fi >= f_count:
         return source_fi
+    if self.is_union_struct_index(struct_idx):
+        return 0
     let map_idx = (f_start + source_fi) as i64
     if map_idx >= self.struct_llvm_field_indices.len() as i64:
         return source_fi
@@ -2735,10 +2757,10 @@ fn Codegen.declare_struct_type(self: Codegen, name_sym: i32, type_node: i32):
                 // Nested bitpacked struct: inline its bits
                 let nested_idx = self.find_bitpacked_index_by_type(f_ty)
                 let nested_bits = self.bitpacked_total_bits.get(nested_idx)
-                field_bits = if nested_bits.is_some(): nested_bits.unwrap() as i32 else: (wl_size_of(f_ty) * 8) as i32
+                field_bits = if nested_bits.is_some(): nested_bits.unwrap() as i32 else: (self.abi_size_of(f_ty) * 8) as i32
             else:
                 // Non-integer field: use 8 bits per byte of ABI size
-                field_bits = (wl_size_of(f_ty) * 8) as i32
+                field_bits = (self.abi_size_of(f_ty) * 8) as i32
             self.bitpacked_field_bit_offsets.push(total_bits)
             self.bitpacked_field_bit_widths.push(field_bits)
             total_bits = total_bits + field_bits
@@ -2822,30 +2844,60 @@ fn Codegen.declare_union_type(self: Codegen, name_sym: i32, type_node: i32):
     self.struct_field_starts.set_i32(idx as i64, self.struct_field_names.len() as i32)
     self.struct_field_counts.set_i32(idx as i64, field_count)
 
-    // Find max size among all fields
+    // Find max ABI size/alignment among all fields. LLVMSizeOf returns an
+    // LLVM constant value, not a host integer, so use Sema's layout model here.
     var max_size: i64 = 0
+    var max_align: i64 = 1
+    var max_align_ty: i64 = 0
+    var max_align_size: i64 = 0
+    var invalid_layout = 0
     for fi in 0..field_count:
         let offset = extra_start + 1 + fi * 3
         let f_name = self.pool.get_extra(offset)
         let f_type_node = self.pool.get_extra(offset + 1)
         let f_default = self.pool.get_extra(offset + 2)
         let f_ty = self.resolve_type(f_type_node)
+        if f_ty == 0:
+            with_eprint("error: unresolved type for field '" ++ self.intern.resolve(f_name) ++ "' in union '" ++ name_str ++ "'")
+            invalid_layout = 1
+            self.had_error = 1
         self.struct_field_names.push(f_name)
         self.struct_field_types.push(f_ty)
         self.struct_field_type_nodes.push(f_type_node)
         self.struct_field_defaults.push(f_default)
-        self.struct_llvm_field_indices.push(fi)
-        let f_size = wl_size_of(f_ty)
+        self.struct_llvm_field_indices.push(0)
+        let f_tid = self.sema.resolve_type_expr(f_type_node)
+        let f_size = if f_tid > 0: self.sema.type_layout_size_of(f_tid) else: self.abi_size_of(f_ty)
+        let f_align = if f_tid > 0: self.sema.type_layout_align_of(f_tid) else: 1
         if f_size > max_size:
             max_size = f_size
+        if f_align > max_align:
+            max_align = f_align
+            max_align_ty = f_ty
+            max_align_size = f_size
 
-    // Union body = single array of i8 with max field size
-    if max_size == 0:
+    if invalid_layout != 0:
+        return
+
+    if max_align_ty == 0:
+        max_align_ty = wl_i8_type(self.context)
+        max_align_size = 1
+    if max_align_size <= 0:
+        max_align_size = 1
+    if max_align <= 0:
+        max_align = 1
+    if max_size <= 0:
         max_size = 1
-    let arr_ty = wl_array_type(wl_i8_type(self.context), max_size)
+
+    let rem = max_size % max_align
+    if rem != 0:
+        max_size = max_size + (max_align - rem)
+
     let body: Vec[i64] = Vec.new()
-    body.push(arr_ty)
-    wl_struct_set_body(st_type, vec_data_i64(&body), 1, 0)
+    body.push(max_align_ty)
+    if max_size > max_align_size:
+        body.push(wl_array_type(wl_i8_type(self.context), max_size - max_align_size))
+    wl_struct_set_body(st_type, vec_data_i64(&body), body.len() as i32, 0)
 
 // ── Declare enum type ─────────────────────────────────────────────
 

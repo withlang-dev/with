@@ -657,7 +657,8 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         let subject = (stmts.get_d0(id)) as CiExprId
         let arms_start = stmts.get_d1(id)
         let arm_count = stmts.get_d2(id)
-        var out = indent ++ "match " ++ ci_print_expr(exprs, types, subject, 0, 0) ++ ":\n"
+        let brace = migrate_prefer_brace()
+        var out = indent ++ "match " ++ ci_print_expr(exprs, types, subject, 0, 0) ++ (if brace: " {\n" else: ":\n")
         var cursor: i32 = arms_start
         var ai: i32 = 0
         while ai < arm_count:
@@ -677,16 +678,30 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
                     vi = vi + 1
             let body_id = (stmts.get_extra(cursor)) as CiStmtId
             cursor = cursor + 1
-            out = out ++ ci_make_indent(depth + 4) ++ arm_head ++ " =>\n"
-            if (body_id as i32) == 0:
-                out = out ++ ci_make_indent(depth + 8) ++ "0\n"
-            else:
-                let body_text = ci_print_stmt(stmts, exprs, types, body_id, 0)
-                if body_text.len() > 0:
-                    out = out ++ ci_reindent_spaces(body_text, depth + 8)
-                else:
+            if brace:
+                out = out ++ ci_make_indent(depth + 4) ++ arm_head ++ " => {\n"
+                if (body_id as i32) == 0:
                     out = out ++ ci_make_indent(depth + 8) ++ "0\n"
+                else:
+                    let body_text = ci_print_stmt(stmts, exprs, types, body_id, 0)
+                    if body_text.len() > 0:
+                        out = out ++ ci_reindent_spaces(body_text, depth + 8)
+                    else:
+                        out = out ++ ci_make_indent(depth + 8) ++ "0\n"
+                out = out ++ ci_make_indent(depth + 4) ++ "},\n"
+            else:
+                out = out ++ ci_make_indent(depth + 4) ++ arm_head ++ " =>\n"
+                if (body_id as i32) == 0:
+                    out = out ++ ci_make_indent(depth + 8) ++ "0\n"
+                else:
+                    let body_text = ci_print_stmt(stmts, exprs, types, body_id, 0)
+                    if body_text.len() > 0:
+                        out = out ++ ci_reindent_spaces(body_text, depth + 8)
+                    else:
+                        out = out ++ ci_make_indent(depth + 8) ++ "0\n"
             ai = ai + 1
+        if brace:
+            out = out ++ indent ++ "}\n"
         return out
 
     if kind == CiStmtKind.CIS_BREAK:
@@ -771,10 +786,11 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         let ds = ci_make_indent(depth)
         let ds1 = ci_make_indent(depth + 4)
         let ds2 = ci_make_indent(depth + 8)
+        let brace = migrate_prefer_brace()
         out = out ++ ds ++ "var __pc: i32 = 0\n"
         out = out ++ ds ++ "var __goto_pending: i32 = 0\n"
         out = out ++ ds ++ "while true {\n"
-        out = out ++ ds1 ++ "match __pc:\n"
+        out = out ++ ds1 ++ (if brace: "match __pc {\n" else: "match __pc:\n")
 
         // Each arm: variable-length meta [state, label_str_idx,
         // child_count, child_stmt_0, ..., child_stmt_(K-1)].
@@ -788,6 +804,8 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
             arm_cursor = arm_cursor + 3
 
             out = out ++ ds2 ++ i32_to_string(state_num) ++ " =>"
+            if brace:
+                out = out ++ " {"
             if label_str_idx != 0:
                 out = out ++ "  // " ++ stmts.get_string(label_str_idx)
             out = out ++ "\n"
@@ -797,10 +815,18 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
                 let child_id = (stmts.get_extra(arm_cursor + ci)) as CiStmtId
                 out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, child_id, depth + 12)
                 ci = ci + 1
+            if brace:
+                out = out ++ ds2 ++ "},\n"
             arm_cursor = arm_cursor + child_count
             ai = ai + 1
 
-        out = out ++ ds2 ++ "_ => break\n"
+        if brace:
+            out = out ++ ds2 ++ "_ => {\n"
+            out = out ++ ci_make_indent(depth + 12) ++ "break\n"
+            out = out ++ ds2 ++ "},\n"
+            out = out ++ ds1 ++ "}\n"
+        else:
+            out = out ++ ds2 ++ "_ => break\n"
         out = out ++ ds ++ "}\n"
         return out
 
