@@ -5721,7 +5721,7 @@ fn ci_lower_literal_or_ref(session: i64, cursor: i32, kind: i32, exprs: &mut CiE
         let name = with_ci_cursor_spelling(session, cursor)
         let escaped = ci_escape_reserved(name)
         let mangled = ci_scope_lookup(scope, escaped)
-        if mangled.len() == 0 and ci_map_libc_call(name, "").len() == 0:
+        if mangled.len() == 0 and not ci_has_value_libc_call_mapping(name):
             if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN):
                 if not ci_note_filtered_system_symbol_ref(session, name, CI_LIBC_KIND_FN):
                     return 0 as CiExprId
@@ -6244,7 +6244,26 @@ fn ci_build_libc_call_value_expr(session: i64, cursor: i32, callee_text: str, ar
     if callee_text == "calloc":
         return ci_build_named_call_expr(exprs, "alloc_zeroed", arg_ids)
     if callee_text == "realloc":
-        return ci_build_named_call_expr(exprs, "realloc_mem", arg_ids)
+        if arg_ids.len() != 2:
+            return 0 as CiExprId
+        let i8_ty = ci_named_type_from_text(types, "i8")
+        let i64_ty = ci_named_type_from_text(types, "i64")
+        let c_void_ty = ci_named_type_from_text(types, "c_void")
+        if (i8_ty as i32) == 0 or (i64_ty as i32) == 0 or (c_void_ty as i32) == 0:
+            return 0 as CiExprId
+        let i8_ptr_ty = types.ty_pointer(i8_ty, 0)
+        let arg_ptr = exprs.cast(i8_ptr_ty, (arg_ids.get(0)) as CiExprId)
+        let zero_idx = exprs.add_string("0")
+        let zero_id = exprs.int_lit(zero_idx, 0 as CiTypeId)
+        let old_size = exprs.cast(i64_ty, zero_id)
+        let new_size = exprs.cast(i64_ty, (arg_ids.get(1)) as CiExprId)
+        let realloc_args: Vec[i32] = Vec.new()
+        realloc_args.push(arg_ptr as i32)
+        realloc_args.push(old_size as i32)
+        realloc_args.push(new_size as i32)
+        let call_id = ci_build_named_call_expr(exprs, "with_realloc", &realloc_args)
+        let void_ptr_ty = types.ty_pointer(c_void_ty, 0)
+        return exprs.cast(void_ptr_ty, call_id)
     let i64_ty = ci_named_type_from_text(types, "i64")
     let i8_ptr_ty = ci_named_type_from_text(types, "*i8")
     if callee_text == "memcpy" or callee_text == "memmove":
@@ -6724,7 +6743,8 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                 return ci_value_ir_invalid()
             arg_ids.push(arg_id as i32)
             ai = ai + 1
-        let mapped_id = if callee_text.len() > 0 and ci_map_libc_call(callee_text, "").len() > 0:
+        let has_mapped_call = callee_text.len() > 0 and ci_has_value_libc_call_mapping(callee_text)
+        let mapped_id = if has_mapped_call:
             ci_build_libc_call_value_expr(session, cursor, callee_text, &arg_ids, exprs, types)
         else:
             0 as CiExprId
@@ -6733,7 +6753,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                 setup_stmt: setup,
                 value_expr: mapped_id,
             }
-        if callee_text.len() > 0 and ci_map_libc_call(callee_text, "").len() > 0:
+        if has_mapped_call:
             return ci_value_ir_invalid()
         if callee_text.len() > 0:
             if not ci_note_filtered_system_symbol_ref(session, callee_text, CI_LIBC_KIND_FN):
@@ -11034,6 +11054,19 @@ fn ci_libc_simple_rename(callee: str) -> str:
     if callee == "toupper": return "to_upper"
     ""
 
+fn ci_has_value_libc_call_mapping(callee: str) -> bool:
+    if ci_libc_simple_rename(callee).len() > 0:
+        return true
+    if callee == "malloc" or callee == "free" or callee == "calloc" or callee == "realloc":
+        return true
+    if callee == "memcpy" or callee == "memmove" or callee == "memset" or callee == "memcmp" or callee == "memchr":
+        return true
+    if callee == "isgraph" or callee == "ispunct" or callee == "iscntrl":
+        return true
+    if ci_starts_with(callee, "__builtin"):
+        return true
+    false
+
 // Structural libc-call lowering. For simple-rename callees
 // (strlen, isalpha, etc.) builds CIE_CALL with the renamed
 // callee ident. For malloc, wraps in the required size cast +
@@ -11127,7 +11160,11 @@ fn ci_map_libc_call(callee: str, args: str) -> str:
     if callee == "calloc":
         return "alloc_zeroed(" ++ args ++ ")"
     if callee == "realloc":
-        return "realloc_mem(" ++ args ++ ")"
+        let ptr_arg = ci_extract_first_arg(args)
+        let size_arg = ci_after_first_arg(args)
+        if ptr_arg.len() == 0 or size_arg.len() == 0:
+            return ""
+        return "(with_realloc((" ++ ptr_arg ++ " as *i8), 0, (" ++ size_arg ++ " as i64)) as *mut c_void)"
 
     // Memory operations — cast pointer args to *mut u8 / *const u8
     if callee == "memcpy":

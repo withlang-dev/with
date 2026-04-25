@@ -1847,6 +1847,47 @@ PY
   echo "PASS(cli-selfhost-migrate) split_multi_value_match_arms"
 }
 
+expect_migrate_realloc_runtime_helper() {
+  local case_dir="$tmpdir/migrate_realloc_runtime_helper_case"
+  local src="$case_dir/realloc_runtime_helper.c"
+  local out_w="$case_dir/realloc_runtime_helper.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+#include <stddef.h>
+#include <stdlib.h>
+
+void *grow_buffer(void *p, size_t n) {
+  return realloc(p, n);
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) realloc_runtime_helper"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$out_w" "extern fn with_realloc(ptr: *i8, old_size: i64, new_size: i64) -> *i8" \
+    || ! file_has_literal "$out_w" "with_realloc" \
+    || file_has_literal "$out_w" "realloc_mem"; then
+    echo "FAIL(cli-selfhost-migrate-output) realloc_runtime_helper"
+    cat "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-check) realloc_runtime_helper"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) realloc_runtime_helper"
+}
+
 expect_migrate_sizeof_pointer_type_syntax() {
   local case_dir="$tmpdir/migrate_sizeof_pointer_type_syntax_case"
   local src="$case_dir/sizeof_pointer_type_syntax.c"
@@ -2987,6 +3028,7 @@ expect_migrate_typed_cast_macros
 expect_migrate_pcre2test_cfprintf_helper
 expect_migrate_switch_case_constant_exprs
 expect_migrate_split_multi_value_match_arms
+expect_migrate_realloc_runtime_helper
 expect_migrate_sizeof_pointer_type_syntax
 expect_migrate_for_continue_switch_break_semantics
 expect_migrate_goto_shadowed_local
