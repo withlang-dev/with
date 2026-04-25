@@ -1696,6 +1696,47 @@ EOF
   echo "PASS(cli-selfhost-migrate) pcre2test_cfprintf"
 }
 
+expect_migrate_switch_case_constant_exprs() {
+  local case_dir="$tmpdir/migrate_switch_case_constant_exprs_case"
+  local src="$case_dir/switch_case_constant_exprs.c"
+  local out_w="$case_dir/switch_case_constant_exprs.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int classify(int x) {
+  switch (x) {
+    case 1 | 2:
+      return 7;
+    default:
+      return 0;
+  }
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) switch_case_constant_exprs"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$out_w" "3 => {" || file_has_literal "$out_w" "(1 | 2) =>"; then
+    echo "FAIL(cli-selfhost-migrate-output) switch_case_constant_exprs"
+    cat "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-check) switch_case_constant_exprs"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) switch_case_constant_exprs"
+}
+
 expect_migrate_for_continue_switch_break_semantics() {
   local case_dir="$tmpdir/migrate_for_continue_switch_break_case"
   local src="$case_dir/for_continue_switch_break.c"
@@ -2795,6 +2836,7 @@ expect_shift_count_check_prevents_llvm_poison
 expect_migrate_prefer_brace_no_trailing_ws
 expect_migrate_typed_cast_macros
 expect_migrate_pcre2test_cfprintf_helper
+expect_migrate_switch_case_constant_exprs
 expect_migrate_for_continue_switch_break_semantics
 expect_migrate_goto_shadowed_local
 expect_migrate_goto_label_preserves_block_scope
