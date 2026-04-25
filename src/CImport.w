@@ -4037,6 +4037,15 @@ fn ci_goto_state_transfer_ir(stmts: &mut CiStmtPool, state: i32) -> CiStmtId:
     ids.push((stmts.continue_()) as i32)
     ci_stmt_from_flat_ids(stmts, &ids)
 
+fn ci_goto_state_transfer_for_depth_ir(stmts: &mut CiStmtPool, state: i32, loop_depth: i32) -> CiStmtId:
+    var ids: Vec[i32] = Vec.new()
+    ids.push((stmts.goto_state(state)) as i32)
+    if loop_depth > 0:
+        ids.push((stmts.break_()) as i32)
+    else:
+        ids.push((stmts.continue_()) as i32)
+    ci_stmt_from_flat_ids(stmts, &ids)
+
 fn ci_rewrite_breaks_to_state_ir(stmts: &mut CiStmtPool, stmt_id: CiStmtId, state: i32) -> CiStmtId:
     if state < 0 or (stmt_id as i32) == 0:
         return stmt_id
@@ -7883,11 +7892,11 @@ fn ci_subtree_has_break_for_current_loop(session: i64, cursor: i32) -> bool:
         i = i + 1
     false
 
-fn ci_label_state_transfer_if_known(session: i64, stmts: &mut CiStmtPool, label_map: str, label_cursor: i32) -> CiStmtId:
+fn ci_label_state_transfer_if_known(session: i64, stmts: &mut CiStmtPool, label_map: str, label_cursor: i32, loop_depth: i32) -> CiStmtId:
     let label_name = with_ci_cursor_spelling(session, label_cursor)
     let target_state = ci_label_state(label_map, label_name)
     if target_state >= 0:
-        return ci_goto_state_transfer_ir(stmts, target_state)
+        return ci_goto_state_transfer_for_depth_ir(stmts, target_state, loop_depth)
     0 as CiStmtId
 
 // Broader "is this case non-fallthrough" check: accepts any
@@ -7977,7 +7986,7 @@ fn ci_lower_switch_prong_forward_goto_ir_uncached(session: i64, body_cursor: i32
                 return 0 as CiStmtId
             var inner_id: CiStmtId = 0 as CiStmtId
             if bk == CXK_LABEL_STMT:
-                inner_id = ci_label_state_transfer_if_known(session, stmts, label_map, inner)
+                inner_id = ci_label_state_transfer_if_known(session, stmts, label_map, inner, loop_depth)
                 if (inner_id as i32) != 0:
                     part_ids.push(inner_id as i32)
                     return ci_stmt_from_flat_ids(stmts, &part_ids)
@@ -8005,7 +8014,7 @@ fn ci_lower_switch_prong_forward_goto_ir_uncached(session: i64, body_cursor: i32
             return ci_stmt_from_flat_ids(stmts, &part_ids)
         var next_id: CiStmtId = 0 as CiStmtId
         if next_kind == CXK_LABEL_STMT:
-            next_id = ci_label_state_transfer_if_known(session, stmts, label_map, next_child)
+            next_id = ci_label_state_transfer_if_known(session, stmts, label_map, next_child, loop_depth)
             if (next_id as i32) != 0:
                 part_ids.push(next_id as i32)
                 return ci_stmt_from_flat_ids(stmts, &part_ids)
@@ -8042,6 +8051,9 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
                 has_fallthrough = true
         i = i + 1
 
+    let needs_switch_wrapper = ci_subtree_has_break_for_current_switch(session, body_cursor) or ci_subtree_has_continue_for_current_loop(session, body_cursor)
+    let arm_loop_depth = if needs_switch_wrapper: loop_depth + 1 else: loop_depth
+
     var arm_records: Vec[i32] = Vec.new()
     var arm_count = 0
 
@@ -8059,9 +8071,9 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
                 let case_body = with_ci_child(session, child, 1)
                 var case_body_id: CiStmtId = 0 as CiStmtId
                 if with_ci_cursor_kind(session, case_body) == CXK_COMPOUND_STMT:
-                    case_body_id = ci_lower_stmt_strip_break_goto_ir(session, case_body, stmts, exprs, types, scope, label_map, loop_depth)
+                    case_body_id = ci_lower_stmt_strip_break_goto_ir(session, case_body, stmts, exprs, types, scope, label_map, arm_loop_depth)
                 else:
-                    let raw_case_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, loop_depth, &mut prong_cache, scope)
+                    let raw_case_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, arm_loop_depth, &mut prong_cache, scope)
                     case_body_id = ci_strip_trailing_break_ir(stmts, raw_case_body_id)
                 if (case_val_id as i32) == 0:
                     return 0 as CiStmtId
@@ -8077,9 +8089,9 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
                     return 0 as CiStmtId
                 let default_body = with_ci_child(session, child, 0)
                 if with_ci_cursor_kind(session, default_body) == CXK_COMPOUND_STMT:
-                    default_body_id = ci_lower_stmt_strip_break_goto_ir(session, default_body, stmts, exprs, types, scope, label_map, loop_depth)
+                    default_body_id = ci_lower_stmt_strip_break_goto_ir(session, default_body, stmts, exprs, types, scope, label_map, arm_loop_depth)
                 else:
-                    let raw_default_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, loop_depth, &mut prong_cache, scope)
+                    let raw_default_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, arm_loop_depth, &mut prong_cache, scope)
                     default_body_id = ci_strip_trailing_break_ir(stmts, raw_default_body_id)
                 if (default_body_id as i32) == 0 and not ci_stmt_ends_with_terminator(session, default_body):
                     return 0 as CiStmtId
@@ -8096,7 +8108,7 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
             let child = with_ci_child(session, body_cursor, i)
             let ck = with_ci_cursor_kind(session, child)
             if ck == CXK_CASE_STMT:
-                let prong_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, loop_depth, &mut prong_cache, scope)
+                let prong_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, arm_loop_depth, &mut prong_cache, scope)
                 var chain_cur = child
                 var chain_done = false
                 while not chain_done:
@@ -8137,7 +8149,7 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
                         chain_done = true
             else if ck == CXK_DEFAULT_STMT:
                 has_default = true
-                default_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, loop_depth, &mut prong_cache, scope)
+                default_body_id = ci_lower_switch_prong_forward_goto_ir(session, body_cursor, i, nc, stmts, exprs, types, scope, label_map, arm_loop_depth, &mut prong_cache, scope)
                 let dnc = with_ci_num_children(session, child)
                 if dnc >= 1:
                     var nested = with_ci_child(session, child, 0)
@@ -8175,7 +8187,10 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
     while ri < arm_records.len():
         let _ = stmts.add_extra(arm_records.get(ri))
         ri = ri + 1
-    stmts.add(CiStmtKind.CIS_MATCH, subject_id as i32, arms_start, arm_count, 0)
+    let match_id = stmts.add(CiStmtKind.CIS_MATCH, subject_id as i32, arms_start, arm_count, 0)
+    if needs_switch_wrapper:
+        return ci_wrap_switch_match_breaks_ir(session, body_cursor, stmts, exprs, types, match_id)
+    match_id
 
 fn ci_lower_stmt_goto_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str, label_map: str, loop_depth: i32) -> CiStmtId:
     let kind = with_ci_cursor_kind(session, cursor)
