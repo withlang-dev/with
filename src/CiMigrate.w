@@ -1105,9 +1105,10 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: st
 
     let definition_kind = ci_migrate_var_definition_kind(session, idx)
     let emits_definition = ci_migrate_var_emits_definition(session, idx, primary_path, project_active, project)
+    let is_static = with_cimport_var_storage_class(session, idx) == CX_SC_STATIC
     let already_emitted = with_cimport_is_name_emitted(name) != 0
     if already_emitted:
-        if ci_migrate_shared_defs_active() and not want_definitions and not emits_definition:
+        if ci_migrate_shared_defs_active() and not is_static and not want_definitions and not emits_definition:
             let owner_path = ci_migrate_project_var_owner_path(project_active, project, name)
             if owner_path.len() == 0:
                 let is_const = with_cimport_var_is_const(session, idx)
@@ -1160,12 +1161,13 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: st
             else:
                 rendered = tl_attr ++ "var " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
         let kind = if is_const != 0: "let" else: "var"
-        if ci_migrate_shared_decl_add(kind, safe_name, rendered):
-            return ""
+        if not is_static:
+            if ci_migrate_shared_decl_add(kind, safe_name, rendered):
+                return ""
         return rendered
 
     var shared_ownerless_extern = false
-    if ci_migrate_shared_defs_active():
+    if ci_migrate_shared_defs_active() and not is_static:
         let owner_path = ci_migrate_project_var_owner_path(project_active, project, name)
         if owner_path.len() > 0:
             return ""
@@ -1175,15 +1177,17 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: st
         if shared_ownerless_extern:
             if ci_migrate_shared_ownerless_extern_add("extern_let", safe_name, rendered):
                 return ""
-        if ci_migrate_shared_decl_add("extern_let", safe_name, rendered):
-            return ""
+        if not is_static:
+            if ci_migrate_shared_decl_add("extern_let", safe_name, rendered):
+                return ""
         return rendered
     let rendered = tl_attr ++ "extern var " ++ safe_name ++ ": " ++ resolved_type ++ "\n"
     if shared_ownerless_extern:
         if ci_migrate_shared_ownerless_extern_add("extern_var", safe_name, rendered):
             return ""
-    if ci_migrate_shared_decl_add("extern_var", safe_name, rendered):
-        return ""
+    if not is_static:
+        if ci_migrate_shared_decl_add("extern_var", safe_name, rendered):
+            return ""
     rendered
 
 fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: str, project_active: bool, project: &CiProject) -> str:
