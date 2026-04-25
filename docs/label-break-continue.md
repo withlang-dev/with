@@ -473,15 +473,17 @@ and the identifier.
 The token kind is `Label` with the identifier text (without the
 leading apostrophe) as its value.
 
-**Disambiguation from char literals.** If With ever adopts char
-literal syntax of the form `'a'` (apostrophe, single character or
-escape, apostrophe), the lexer disambiguates by lookahead: an
-apostrophe followed by an identifier is a label; an apostrophe
-followed by a single character or escape and then a closing
-apostrophe is a char literal. The same lookahead handles byte
-literals (`b'X'`) — there the leading `b` distinguishes at the
-prefix level, and the `'X'` body parses as a char-literal-like
-token.
+**Disambiguation from char literals.** Character literal syntax of
+the form `'a'` (apostrophe, single character or escape, apostrophe)
+is valid. The lexer disambiguates apostrophe-related tokens in this
+order:
+
+1. Byte literals such as `b'X'` or `b'\n'`.
+2. Closed character literals such as `'a'`, `'@'`, or `'\n'`.
+3. Labels such as `'outer`, `'L0`, or `'scan`.
+
+A label has no closing apostrophe. A character literal must have a
+closing apostrophe.
 
 This is the same disambiguation Rust performs. It is well-tested
 and produces no real ambiguity in practice.
@@ -627,9 +629,8 @@ returns.
 
 Phase 1: lexer and parser.
 - Add Label token (apostrophe + identifier, no whitespace).
-- Add char-literal lookahead disambiguation if/when char literals
-  are introduced (no work needed now since With does not yet have
-  char literals).
+- Add char-literal lookahead disambiguation with byte literals first,
+  closed character literals second, and labels third.
 - Add label prefix to `while`, `for`, and block statements, in
   both brace-form and colon-form.
 - Enforce first-token-of-statement positioning.
