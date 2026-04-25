@@ -9243,7 +9243,7 @@ MAP_COMP    := '{' EXPR ':' EXPR 'for' PATTERN 'in' EXPR [ 'if' EXPR ] '}'
 PATTERN     := LITERAL_PAT | IDENT_PAT | TUPLE_PAT | STRUCT_PAT
               | ENUM_PAT | SLICE_PAT | RANGE_PAT | OR_PAT
               | BIND_PAT | WILDCARD | IN_PAT | REST_PAT
-LITERAL_PAT := INT_LIT | STR_LIT | 'true' | 'false'
+LITERAL_PAT := INT_LIT | STR_LIT | CHAR_LIT | 'true' | 'false'
 IDENT_PAT   := IDENT
 TUPLE_PAT   := '(' PATTERN { ',' PATTERN } ')'
 STRUCT_PAT  := [ TYPE ] '{' FIELD_PAT { ',' FIELD_PAT } [ ',' '..' ] '}'
