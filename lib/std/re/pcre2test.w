@@ -831,3142 +831,3154 @@ fn pcre2_printint_8(re: *mut pcre2_real_code_8, f: *mut c_void, print_lengths: c
                 if (__goto_pending != 0) {
                     continue
                 }
-                match (unsafe: *code__goto_654_34) {
-                    0 => {
-                        fprintf(f, "    %s\n", OP_names[(unsafe: *code__goto_654_34)])
+                var __ci_expr_switch_continue_12: i32 = 0
+                while true {
+                    match (unsafe: *code__goto_654_34) {
+                        0 => {
+                            fprintf(f, "    %s\n", OP_names[(unsafe: *code__goto_654_34)])
 
-                        fprintf(f, "------------------------------------------------------------------\n")
+                            fprintf(f, "------------------------------------------------------------------\n")
 
-                        return
+                            return
 
-                    },
-                    29 => {
-                        fprintf(f, "    ")
-
-                        while true {
-                            (code__goto_654_34 = code__goto_654_34 + 1)
-
-                            if (__goto_pending != 0) {
-                                break
-                            }
-
-                            (code__goto_654_34 = code__goto_654_34 + (1 +% print_char_8(f, code__goto_654_34, utf__goto_656_6)))
-
-                            if (__goto_pending != 0) {
-                                break
-                            }
-
-                            if (__goto_pending != 0) {
-                                break
-                            }
-
-                            if (not ((if (unsafe: *code__goto_654_34) == OP_CHAR: 1 else: 0) != 0)) {
-                                break
-                            }
-
-                        }
-
-                        fprintf(f, "\n")
-
-                        continue
-
-                    },
-                    30 => {
-                        fprintf(f, " /i ")
-
-                        while true {
-                            (code__goto_654_34 = code__goto_654_34 + 1)
-
-                            if (__goto_pending != 0) {
-                                break
-                            }
-
-                            (code__goto_654_34 = code__goto_654_34 + (1 +% print_char_8(f, code__goto_654_34, utf__goto_656_6)))
-
-                            if (__goto_pending != 0) {
-                                break
-                            }
-
-                            if (__goto_pending != 0) {
-                                break
-                            }
-
-                            if (not ((if (unsafe: *code__goto_654_34) == OP_CHARI: 1 else: 0) != 0)) {
-                                break
-                            }
-
-                        }
-
-                        fprintf(f, "\n")
-
-                        continue
-
-                    },
-                    139 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
+                        },
+                        29 => {
                             fprintf(f, "    ")
-                        }
 
-                        fprintf(f, "%s %d", OP_names[(unsafe: *code__goto_654_34)], (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-
-                    },
-                    140 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s %d", OP_names[(unsafe: *code__goto_654_34)], (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-
-                    },
-                    144 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s %d", OP_names[(unsafe: *code__goto_654_34)], (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-
-                    },
-                    145 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s %d", OP_names[(unsafe: *code__goto_654_34)], (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-
-                    },
-                    137 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    138 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    142 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    143 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    123 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    124 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    125 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    121 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    122 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    128 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    129 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    130 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    131 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    132 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    133 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    134 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    135 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    136 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    141 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    146 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    168 => {
-                        fprintf(f, "    %s %d", OP_names[(unsafe: *code__goto_654_34)], (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                    },
-                    147 => {
-                        fprintf(f, "%3d %s", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint), OP_names[(unsafe: *code__goto_654_34)])
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_VREVERSE: 1 else: 0) != 0) {
-                            fprintf(f, " %d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-                        }
-
-                    },
-                    126 => {
-                        fprintf(f, "%3d %s", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint), OP_names[(unsafe: *code__goto_654_34)])
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_VREVERSE: 1 else: 0) != 0) {
-                            fprintf(f, " %d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-                        }
-
-                    },
-                    127 => {
-                        fprintf(f, "%3d %s", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint), OP_names[(unsafe: *code__goto_654_34)])
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_VREVERSE: 1 else: 0) != 0) {
-                            fprintf(f, " %d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-                        }
-
-                    },
-                    148 => {
-                        (entry__goto_751_18 = (nametable__goto_654_23 + ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint) *% nesize__goto_655_10)) + ((2 as isize) as usize))
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        fprintf(f, " %s %s<", flag__goto_666_15, OP_names[(unsafe: *code__goto_654_34)])
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        print_custring_8(f, entry__goto_751_18)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        fprintf(f, ">%d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                    },
-                    150 => {
-                        (entry__goto_751_18 = (nametable__goto_654_23 + ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint) *% nesize__goto_655_10)) + ((2 as isize) as usize))
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        fprintf(f, " %s %s<", flag__goto_666_15, OP_names[(unsafe: *code__goto_654_34)])
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        print_custring_8(f, entry__goto_751_18)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        fprintf(f, ">%d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                    },
-                    149 => {
-                        (c__goto_664_12 = ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint)))
-
-                        if ((if c__goto_664_12 == 65535: 1 else: 0) != 0) {
-                            fprintf(f, "    %s any", OP_names[(unsafe: *code__goto_654_34)])
-                        } else {
-                            fprintf(f, "    %s %d", OP_names[(unsafe: *code__goto_654_34)], c__goto_664_12)
-                        }
-
-                    },
-                    46 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    47 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    55 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    48 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    49 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    56 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    50 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    51 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    57 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    33 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    34 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    42 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    35 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    36 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    43 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    37 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    38 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    44 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    85 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    86 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    94 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    87 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    88 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    95 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    89 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    90 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    96 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
-                            var __ci_expr_logic_0: c_int
-
-                            if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_0 != 0) {
-                                print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (extra__goto_667_16 = 2)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    54 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "{")
-
-                        var __ci_expr_logic_1: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_1 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_2: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_2 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_2 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_3: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_3 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_3 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-
-                    },
-                    52 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "{")
-
-                        var __ci_expr_logic_1: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_1 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_2: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_2 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_2 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_3: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_3 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_3 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-
-                    },
-                    53 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "{")
-
-                        var __ci_expr_logic_1: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_1 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_2: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_2 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_2 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_3: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_3 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_3 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-
-                    },
-                    58 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "{")
-
-                        var __ci_expr_logic_1: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_1 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_2: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_2 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_2 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_3: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_3 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_3 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-
-                    },
-                    41 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "{")
-
-                        var __ci_expr_logic_1: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_1 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_2: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_2 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_2 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_3: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_3 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_3 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-                    },
-                    39 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "{")
-
-                        var __ci_expr_logic_1: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_1 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_2: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_2 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_2 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_3: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_3 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_3 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-                    },
-                    40 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "{")
-
-                        var __ci_expr_logic_1: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_1 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_2: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_2 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_2 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_3: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_3 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_3 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-                    },
-                    45 => {
-                        fprintf(f, " %s ", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "{")
-
-                        var __ci_expr_logic_1: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_1 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_2: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_2 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_2 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_3: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_3 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_3 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-                    },
-                    93 => {
-                        var __ci_expr_logic_4: c_int
-
-                        if ((if (unsafe: code__goto_654_34[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
-                            (__ci_expr_logic_4 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_4 = (if (if (unsafe: code__goto_654_34[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_4 != 0) {
-                            print_prop_8(f, ((code__goto_654_34 + ((2 as isize) as usize)) + ((1 as isize) as usize)), "    ", " ")
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (extra__goto_667_16 = 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            fprintf(f, "    %s", OP_names[(unsafe: code__goto_654_34[(1 + 2)])])
-                        }
-
-
-                        fprintf(f, "{")
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_TYPEEXACT: 1 else: 0) != 0) {
-                            fprintf(f, "0,")
-                        }
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_TYPEMINUPTO: 1 else: 0) != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            if ((if (unsafe: *code__goto_654_34) == OP_TYPEPOSUPTO: 1 else: 0) != 0) {
-                                fprintf(f, "+")
-                            }
-                        }
-
-                    },
-                    91 => {
-                        var __ci_expr_logic_4: c_int
-
-                        if ((if (unsafe: code__goto_654_34[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
-                            (__ci_expr_logic_4 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_4 = (if (if (unsafe: code__goto_654_34[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_4 != 0) {
-                            print_prop_8(f, ((code__goto_654_34 + ((2 as isize) as usize)) + ((1 as isize) as usize)), "    ", " ")
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (extra__goto_667_16 = 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            fprintf(f, "    %s", OP_names[(unsafe: code__goto_654_34[(1 + 2)])])
-                        }
-
-
-                        fprintf(f, "{")
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_TYPEEXACT: 1 else: 0) != 0) {
-                            fprintf(f, "0,")
-                        }
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_TYPEMINUPTO: 1 else: 0) != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            if ((if (unsafe: *code__goto_654_34) == OP_TYPEPOSUPTO: 1 else: 0) != 0) {
-                                fprintf(f, "+")
-                            }
-                        }
-
-                    },
-                    92 => {
-                        var __ci_expr_logic_4: c_int
-
-                        if ((if (unsafe: code__goto_654_34[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
-                            (__ci_expr_logic_4 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_4 = (if (if (unsafe: code__goto_654_34[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_4 != 0) {
-                            print_prop_8(f, ((code__goto_654_34 + ((2 as isize) as usize)) + ((1 as isize) as usize)), "    ", " ")
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (extra__goto_667_16 = 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            fprintf(f, "    %s", OP_names[(unsafe: code__goto_654_34[(1 + 2)])])
-                        }
-
-
-                        fprintf(f, "{")
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_TYPEEXACT: 1 else: 0) != 0) {
-                            fprintf(f, "0,")
-                        }
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_TYPEMINUPTO: 1 else: 0) != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            if ((if (unsafe: *code__goto_654_34) == OP_TYPEPOSUPTO: 1 else: 0) != 0) {
-                                fprintf(f, "+")
-                            }
-                        }
-
-                    },
-                    97 => {
-                        var __ci_expr_logic_4: c_int
-
-                        if ((if (unsafe: code__goto_654_34[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
-                            (__ci_expr_logic_4 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_4 = (if (if (unsafe: code__goto_654_34[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_4 != 0) {
-                            print_prop_8(f, ((code__goto_654_34 + ((2 as isize) as usize)) + ((1 as isize) as usize)), "    ", " ")
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (extra__goto_667_16 = 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            fprintf(f, "    %s", OP_names[(unsafe: code__goto_654_34[(1 + 2)])])
-                        }
-
-
-                        fprintf(f, "{")
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_TYPEEXACT: 1 else: 0) != 0) {
-                            fprintf(f, "0,")
-                        }
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_TYPEMINUPTO: 1 else: 0) != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            if ((if (unsafe: *code__goto_654_34) == OP_TYPEPOSUPTO: 1 else: 0) != 0) {
-                                fprintf(f, "+")
-                            }
-                        }
-
-                    },
-                    32 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "] (not)")
-
-
-                    },
-                    31 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "] (not)")
-
-                    },
-                    72 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    73 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    81 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    74 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    75 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    82 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    76 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    77 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    83 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-
-                    },
-                    59 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    60 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    68 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    61 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    62 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    69 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    63 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    64 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    70 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    80 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]{")
-
-                        var __ci_expr_logic_5: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_5 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_6: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_6 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_6 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-                        fprintf(f, " (not)")
-
-
-                    },
-                    78 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]{")
-
-                        var __ci_expr_logic_5: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_5 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_6: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_6 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_6 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-                        fprintf(f, " (not)")
-
-
-                    },
-                    79 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]{")
-
-                        var __ci_expr_logic_5: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_5 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_6: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_6 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_6 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-                        fprintf(f, " (not)")
-
-
-                    },
-                    84 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]{")
-
-                        var __ci_expr_logic_5: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_5 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_6: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_6 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_6 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-                        fprintf(f, " (not)")
-
-
-                    },
-                    67 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]{")
-
-                        var __ci_expr_logic_5: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_5 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_6: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_6 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_6 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-                        fprintf(f, " (not)")
-
-                    },
-                    65 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]{")
-
-                        var __ci_expr_logic_5: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_5 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_6: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_6 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_6 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-                        fprintf(f, " (not)")
-
-                    },
-                    66 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]{")
-
-                        var __ci_expr_logic_5: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_5 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_6: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_6 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_6 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-                        fprintf(f, " (not)")
-
-                    },
-                    71 => {
-                        fprintf(f, " %s [^", flag__goto_666_15)
-
-                        (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
-
-                        fprintf(f, "]{")
-
-                        var __ci_expr_logic_5: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_5 != 0) {
-                            fprintf(f, "0,")
-                        }
-
-
-                        fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_logic_6: c_int
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
-                            (__ci_expr_logic_6 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_6 != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            var __ci_expr_logic_7: c_int
-
-                            if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
-                                (__ci_expr_logic_7 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_7 != 0) {
-                                fprintf(f, "+")
-                            }
-
-                        }
-
-
-                        fprintf(f, " (not)")
-
-                    },
-                    118 => {
-                        if (print_lengths != 0) {
-                            fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-                        } else {
-                            fprintf(f, "    ")
-                        }
-
-                        fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
-
-                    },
-                    115 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        fprintf(f, " %s \\g{%d}", flag__goto_666_15, (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_ternary_8: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_REFI: 1 else: 0) != 0) {
-                            (__ci_expr_ternary_8 = (unsafe: code__goto_654_34[(1 + 2)]))
-                        } else {
-                            (__ci_expr_ternary_8 = 0)
-                        }
-
-                        (i__goto_665_7 = __ci_expr_ternary_8)
-
-
-                        if ((if i__goto_665_7 != 0: 1 else: 0) != 0) {
-                            fprintf(f, " 0x%02x", i__goto_665_7)
-                        }
-
-                        (ccode__goto_663_14 = code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize))
-
-                        __pc = 1
-                        __goto_pending = 1
-
-
-                    },
-                    114 => {
-                        fprintf(f, " %s \\g{%d}", flag__goto_666_15, (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
-
-                        var __ci_expr_ternary_8: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_REFI: 1 else: 0) != 0) {
-                            (__ci_expr_ternary_8 = (unsafe: code__goto_654_34[(1 + 2)]))
-                        } else {
-                            (__ci_expr_ternary_8 = 0)
-                        }
-
-                        (i__goto_665_7 = __ci_expr_ternary_8)
-
-
-                        if ((if i__goto_665_7 != 0: 1 else: 0) != 0) {
-                            fprintf(f, " 0x%02x", i__goto_665_7)
-                        }
-
-                        (ccode__goto_663_14 = code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize))
-
-                        __pc = 1
-                        __goto_pending = 1
-
-                    },
-                    117 => {
-                        (flag__goto_666_15 = (("/i" as *const c_char)))
-
-                        (entry__goto_924_18 = (nametable__goto_654_23 + ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint) *% nesize__goto_655_10)) + ((2 as isize) as usize))
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        fprintf(f, " %s \\k<", flag__goto_666_15)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        print_custring_8(f, entry__goto_924_18)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        fprintf(f, ">%d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        var __ci_expr_ternary_9: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_DNREFI: 1 else: 0) != 0) {
-                            (__ci_expr_ternary_9 = (unsafe: code__goto_654_34[(1 + (2 * 2))]))
-                        } else {
-                            (__ci_expr_ternary_9 = 0)
-                        }
-
-                        (i__goto_665_7 = __ci_expr_ternary_9)
-
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        if ((if i__goto_665_7 != 0: 1 else: 0) != 0) {
-                            fprintf(f, " 0x%02x", i__goto_665_7)
-                        }
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-
-                        (ccode__goto_663_14 = code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize))
-
-                        __pc = 1
-                        __goto_pending = 1
-
-
-                    },
-                    116 => {
-                        (entry__goto_924_18 = (nametable__goto_654_23 + ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint) *% nesize__goto_655_10)) + ((2 as isize) as usize))
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        fprintf(f, " %s \\k<", flag__goto_666_15)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        print_custring_8(f, entry__goto_924_18)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        fprintf(f, ">%d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        var __ci_expr_ternary_9: c_int = 0
-
-                        if ((if (unsafe: *code__goto_654_34) == OP_DNREFI: 1 else: 0) != 0) {
-                            (__ci_expr_ternary_9 = (unsafe: code__goto_654_34[(1 + (2 * 2))]))
-                        } else {
-                            (__ci_expr_ternary_9 = 0)
-                        }
-
-                        (i__goto_665_7 = __ci_expr_ternary_9)
-
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        if ((if i__goto_665_7 != 0: 1 else: 0) != 0) {
-                            fprintf(f, " 0x%02x", i__goto_665_7)
-                        }
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-
-                        (ccode__goto_663_14 = code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize))
-
-                        __pc = 1
-                        __goto_pending = 1
-
-                    },
-                    119 => {
-                        fprintf(f, "    %s %d %d %d", OP_names[(unsafe: *code__goto_654_34)], (unsafe: code__goto_654_34[(1 + (2 * 2))]), (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint), (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-                    },
-                    120 => {
-                        (c__goto_664_12 = (unsafe: code__goto_654_34[(1 + (4 * 2))]))
-
-                        fprintf(f, "    %s %c", OP_names[(unsafe: *code__goto_654_34)], c__goto_664_12)
-
-                        (extra__goto_667_16 = ((((((unsafe: code__goto_654_34[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + (2 * 2)) + 1)])) as c_uint)))
-
-                        print_custring_bylen_8(f, ((code__goto_654_34 + ((2 as isize) as usize)) + (((4 * 2) as isize) as usize)), ((extra__goto_667_16 -% 3) -% 8))
-
-                        (i__goto_665_7 = 0)
-
-                        while ((if callout_start_delims[i__goto_665_7] != 0: 1 else: 0) != 0) {
-                            if ((if c__goto_664_12 == callout_start_delims[i__goto_665_7]: 1 else: 0) != 0) {
-                                (c__goto_664_12 = callout_end_delims[i__goto_665_7])
+                            while true {
+                                (code__goto_654_34 = code__goto_654_34 + 1)
 
                                 if (__goto_pending != 0) {
                                     break
                                 }
 
-                                break
+                                (code__goto_654_34 = code__goto_654_34 + (1 +% print_char_8(f, code__goto_654_34, utf__goto_656_6)))
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                if (not ((if (unsafe: *code__goto_654_34) == OP_CHAR: 1 else: 0) != 0)) {
+                                    break
+                                }
 
                             }
 
-                            if (__goto_pending != 0) {
-                                break
+                            fprintf(f, "\n")
+
+                            continue
+
+                        },
+                        30 => {
+                            fprintf(f, " /i ")
+
+                            while true {
+                                (code__goto_654_34 = code__goto_654_34 + 1)
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                (code__goto_654_34 = code__goto_654_34 + (1 +% print_char_8(f, code__goto_654_34, utf__goto_656_6)))
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                if (not ((if (unsafe: *code__goto_654_34) == OP_CHARI: 1 else: 0) != 0)) {
+                                    break
+                                }
+
                             }
 
-                            (i__goto_665_7 = i__goto_665_7 + 1)
+                            fprintf(f, "\n")
 
-                        }
+                            continue
 
-
-                        fprintf(f, "%c %d %d %d", c__goto_664_12, (((((unsafe: code__goto_654_34[(1 + (3 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + (3 * 2)) + 1)])) as c_uint), (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint), (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
-
-                    },
-                    16 => {
-                        print_prop_8(f, code__goto_654_34, "    ", "")
-                    },
-                    15 => {
-                        print_prop_8(f, code__goto_654_34, "    ", "")
-                    },
-                    113 => {
-                        (extra__goto_667_16 = ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint)))
-
-                        fprintf(f, "    eclass[\n")
-
-                        (ccode__goto_663_14 = ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
-
-                        if ((if ((unsafe: ccode__goto_663_14[-1]) & 1) != 0: 1 else: 0) != 0) {
-                            (map__goto_967_22 = ccode__goto_663_14)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (print_negated__goto_970_12 = (if ((unsafe: map__goto_967_22[0]) & 126) == 126: 1 else: 0))
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            var __ci_expr_ternary_10: *mut c_char = null
-
-                            if (print_negated__goto_970_12 != 0) {
-                                (__ci_expr_ternary_10 = (("^" as *mut c_char)))
-                            } else {
-                                (__ci_expr_ternary_10 = (("" as *mut c_char)))
-                            }
-
-                            fprintf(f, "          bitmap: [%s", __ci_expr_ternary_10)
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            print_map_8(f, map__goto_967_22, print_negated__goto_970_12)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            fprintf(f, "]\n")
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (ccode__goto_663_14 = ccode__goto_663_14 + (32 / sizeof[u8]()))
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            fprintf(f, "          no bitmap\n")
-                        }
-
-                        while ((if ccode__goto_663_14 < (code__goto_654_34 + extra__goto_667_16): 1 else: 0) != 0) {
+                        },
+                        139 => {
                             if (print_lengths != 0) {
-                                fprintf(f, "%3d ", ((((ccode__goto_663_14 as usize) -% (codestart__goto_654_12 as usize)) / sizeof[u8]()) as c_int))
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
                             } else {
                                 fprintf(f, "    ")
                             }
 
+                            fprintf(f, "%s %d", OP_names[(unsafe: *code__goto_654_34)], (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
+
+                        },
+                        140 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s %d", OP_names[(unsafe: *code__goto_654_34)], (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
+
+                        },
+                        144 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s %d", OP_names[(unsafe: *code__goto_654_34)], (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
+
+                        },
+                        145 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s %d", OP_names[(unsafe: *code__goto_654_34)], (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
+
+                        },
+                        137 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        138 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        142 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        143 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        123 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        124 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        125 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        121 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        122 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        128 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        129 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        130 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        131 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        132 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        133 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        134 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        135 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        136 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        141 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        146 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        168 => {
+                            fprintf(f, "    %s %d", OP_names[(unsafe: *code__goto_654_34)], (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                        },
+                        147 => {
+                            fprintf(f, "%3d %s", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint), OP_names[(unsafe: *code__goto_654_34)])
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_VREVERSE: 1 else: 0) != 0) {
+                                fprintf(f, " %d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
+                            }
+
+                        },
+                        126 => {
+                            fprintf(f, "%3d %s", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint), OP_names[(unsafe: *code__goto_654_34)])
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_VREVERSE: 1 else: 0) != 0) {
+                                fprintf(f, " %d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
+                            }
+
+                        },
+                        127 => {
+                            fprintf(f, "%3d %s", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint), OP_names[(unsafe: *code__goto_654_34)])
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_VREVERSE: 1 else: 0) != 0) {
+                                fprintf(f, " %d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
+                            }
+
+                        },
+                        148 => {
+                            (entry__goto_751_18 = (nametable__goto_654_23 + ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint) *% nesize__goto_655_10)) + ((2 as isize) as usize))
+
                             if (__goto_pending != 0) {
                                 break
                             }
 
-                            match (unsafe: *ccode__goto_663_14) {
-                                1 => {
-                                    fprintf(f, "      AND\n")
+                            fprintf(f, " %s %s<", flag__goto_666_15, OP_names[(unsafe: *code__goto_654_34)])
 
-                                    (ccode__goto_663_14 = ccode__goto_663_14 + 1)
+                            if (__goto_pending != 0) {
+                                break
+                            }
 
-                                },
-                                2 => {
-                                    fprintf(f, "      OR\n")
+                            print_custring_8(f, entry__goto_751_18)
 
-                                    (ccode__goto_663_14 = ccode__goto_663_14 + 1)
+                            if (__goto_pending != 0) {
+                                break
+                            }
 
-                                },
-                                3 => {
-                                    fprintf(f, "      XOR\n")
+                            fprintf(f, ">%d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
 
-                                    (ccode__goto_663_14 = ccode__goto_663_14 + 1)
+                            if (__goto_pending != 0) {
+                                break
+                            }
 
-                                },
-                                4 => {
-                                    fprintf(f, "      NOT\n")
+                        },
+                        150 => {
+                            (entry__goto_751_18 = (nametable__goto_654_23 + ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint) *% nesize__goto_655_10)) + ((2 as isize) as usize))
 
-                                    (ccode__goto_663_14 = ccode__goto_663_14 + 1)
+                            if (__goto_pending != 0) {
+                                break
+                            }
 
-                                },
-                                5 => {
-                                    print_class_8(f, OP_XCLASS, (ccode__goto_663_14 + ((1 as isize) as usize)), (codestart__goto_654_12 as *mut u8), utf__goto_656_6, "      xclass: ", "\n")
+                            fprintf(f, " %s %s<", flag__goto_666_15, OP_names[(unsafe: *code__goto_654_34)])
 
-                                    (ccode__goto_663_14 = ccode__goto_663_14 + (((((unsafe: ccode__goto_663_14[1]) as c_int) << (8 as c_uint)) | (unsafe: ccode__goto_663_14[(1 + 1)])) as c_uint))
+                            if (__goto_pending != 0) {
+                                break
+                            }
 
-                                },
-                                _ => {
-                                    fprintf(f, "      UNEXPECTED\n")
+                            print_custring_8(f, entry__goto_751_18)
 
-                                    (ccode__goto_663_14 = ccode__goto_663_14 + 1)
+                            if (__goto_pending != 0) {
+                                break
+                            }
 
-                                },
+                            fprintf(f, ">%d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                        },
+                        149 => {
+                            (c__goto_664_12 = ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint)))
+
+                            if ((if c__goto_664_12 == 65535: 1 else: 0) != 0) {
+                                fprintf(f, "    %s any", OP_names[(unsafe: *code__goto_654_34)])
+                            } else {
+                                fprintf(f, "    %s %d", OP_names[(unsafe: *code__goto_654_34)], c__goto_664_12)
+                            }
+
+                        },
+                        46 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        47 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        55 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        48 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        49 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        56 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        50 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        51 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        57 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        33 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        34 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        42 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        35 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        36 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        43 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        37 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        38 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        44 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        85 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        86 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        94 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        87 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        88 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        95 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        89 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        90 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        96 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            if ((if (unsafe: *code__goto_654_34) >= OP_TYPESTAR: 1 else: 0) != 0) {
+                                var __ci_expr_logic_0: c_int
+
+                                if ((if (unsafe: code__goto_654_34[1]) == OP_PROP: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_0 = (if (if (unsafe: code__goto_654_34[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    print_prop_8(f, (code__goto_654_34 + ((1 as isize) as usize)), "", " ")
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    (extra__goto_667_16 = 2)
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                } else {
+                                    fprintf(f, "%s", OP_names[(unsafe: code__goto_654_34[1])])
+                                }
+
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        54 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "{")
+
+                            var __ci_expr_logic_1: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_1 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_2: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_2 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_2 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_3: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_3 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_3 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+
+                        },
+                        52 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "{")
+
+                            var __ci_expr_logic_1: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_1 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_2: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_2 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_2 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_3: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_3 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_3 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+
+                        },
+                        53 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "{")
+
+                            var __ci_expr_logic_1: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_1 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_2: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_2 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_2 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_3: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_3 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_3 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+
+                        },
+                        58 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "{")
+
+                            var __ci_expr_logic_1: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_1 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_2: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_2 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_2 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_3: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_3 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_3 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+
+                        },
+                        41 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "{")
+
+                            var __ci_expr_logic_1: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_1 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_2: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_2 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_2 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_3: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_3 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_3 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+                        },
+                        39 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "{")
+
+                            var __ci_expr_logic_1: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_1 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_2: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_2 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_2 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_3: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_3 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_3 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+                        },
+                        40 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "{")
+
+                            var __ci_expr_logic_1: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_1 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_2: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_2 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_2 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_3: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_3 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_3 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+                        },
+                        45 => {
+                            fprintf(f, " %s ", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "{")
+
+                            var __ci_expr_logic_1: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_EXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_1 = (if (if (unsafe: *code__goto_654_34) != OP_EXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_1 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_2: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_MINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_2 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_2 = (if (if (unsafe: *code__goto_654_34) == OP_MINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_2 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_3: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_POSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_3 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_3 = (if (if (unsafe: *code__goto_654_34) == OP_POSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_3 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+                        },
+                        93 => {
+                            var __ci_expr_logic_4: c_int
+
+                            if ((if (unsafe: code__goto_654_34[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
+                                (__ci_expr_logic_4 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_4 = (if (if (unsafe: code__goto_654_34[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_4 != 0) {
+                                print_prop_8(f, ((code__goto_654_34 + ((2 as isize) as usize)) + ((1 as isize) as usize)), "    ", " ")
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                (extra__goto_667_16 = 2)
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                fprintf(f, "    %s", OP_names[(unsafe: code__goto_654_34[(1 + 2)])])
+                            }
+
+
+                            fprintf(f, "{")
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_TYPEEXACT: 1 else: 0) != 0) {
+                                fprintf(f, "0,")
+                            }
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_TYPEMINUPTO: 1 else: 0) != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                if ((if (unsafe: *code__goto_654_34) == OP_TYPEPOSUPTO: 1 else: 0) != 0) {
+                                    fprintf(f, "+")
+                                }
+                            }
+
+                        },
+                        91 => {
+                            var __ci_expr_logic_4: c_int
+
+                            if ((if (unsafe: code__goto_654_34[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
+                                (__ci_expr_logic_4 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_4 = (if (if (unsafe: code__goto_654_34[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_4 != 0) {
+                                print_prop_8(f, ((code__goto_654_34 + ((2 as isize) as usize)) + ((1 as isize) as usize)), "    ", " ")
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                (extra__goto_667_16 = 2)
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                fprintf(f, "    %s", OP_names[(unsafe: code__goto_654_34[(1 + 2)])])
+                            }
+
+
+                            fprintf(f, "{")
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_TYPEEXACT: 1 else: 0) != 0) {
+                                fprintf(f, "0,")
+                            }
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_TYPEMINUPTO: 1 else: 0) != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                if ((if (unsafe: *code__goto_654_34) == OP_TYPEPOSUPTO: 1 else: 0) != 0) {
+                                    fprintf(f, "+")
+                                }
+                            }
+
+                        },
+                        92 => {
+                            var __ci_expr_logic_4: c_int
+
+                            if ((if (unsafe: code__goto_654_34[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
+                                (__ci_expr_logic_4 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_4 = (if (if (unsafe: code__goto_654_34[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_4 != 0) {
+                                print_prop_8(f, ((code__goto_654_34 + ((2 as isize) as usize)) + ((1 as isize) as usize)), "    ", " ")
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                (extra__goto_667_16 = 2)
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                fprintf(f, "    %s", OP_names[(unsafe: code__goto_654_34[(1 + 2)])])
+                            }
+
+
+                            fprintf(f, "{")
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_TYPEEXACT: 1 else: 0) != 0) {
+                                fprintf(f, "0,")
+                            }
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_TYPEMINUPTO: 1 else: 0) != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                if ((if (unsafe: *code__goto_654_34) == OP_TYPEPOSUPTO: 1 else: 0) != 0) {
+                                    fprintf(f, "+")
+                                }
+                            }
+
+                        },
+                        97 => {
+                            var __ci_expr_logic_4: c_int
+
+                            if ((if (unsafe: code__goto_654_34[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
+                                (__ci_expr_logic_4 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_4 = (if (if (unsafe: code__goto_654_34[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_4 != 0) {
+                                print_prop_8(f, ((code__goto_654_34 + ((2 as isize) as usize)) + ((1 as isize) as usize)), "    ", " ")
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                (extra__goto_667_16 = 2)
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            } else {
+                                fprintf(f, "    %s", OP_names[(unsafe: code__goto_654_34[(1 + 2)])])
+                            }
+
+
+                            fprintf(f, "{")
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_TYPEEXACT: 1 else: 0) != 0) {
+                                fprintf(f, "0,")
+                            }
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_TYPEMINUPTO: 1 else: 0) != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                if ((if (unsafe: *code__goto_654_34) == OP_TYPEPOSUPTO: 1 else: 0) != 0) {
+                                    fprintf(f, "+")
+                                }
+                            }
+
+                        },
+                        32 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "] (not)")
+
+
+                        },
+                        31 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "] (not)")
+
+                        },
+                        72 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        73 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        81 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        74 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        75 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        82 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        76 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        77 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        83 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+
+                        },
+                        59 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        60 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        68 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        61 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        62 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        69 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        63 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        64 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        70 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, (code__goto_654_34 + ((1 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]%s (not)", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        80 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]{")
+
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_5 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_6: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_6 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_6 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_7: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_7 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_7 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+                            fprintf(f, " (not)")
+
+
+                        },
+                        78 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]{")
+
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_5 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_6: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_6 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_6 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_7: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_7 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_7 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+                            fprintf(f, " (not)")
+
+
+                        },
+                        79 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]{")
+
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_5 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_6: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_6 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_6 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_7: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_7 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_7 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+                            fprintf(f, " (not)")
+
+
+                        },
+                        84 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]{")
+
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_5 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_6: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_6 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_6 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_7: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_7 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_7 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+                            fprintf(f, " (not)")
+
+
+                        },
+                        67 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]{")
+
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_5 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_6: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_6 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_6 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_7: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_7 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_7 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+                            fprintf(f, " (not)")
+
+                        },
+                        65 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]{")
+
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_5 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_6: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_6 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_6 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_7: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_7 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_7 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+                            fprintf(f, " (not)")
+
+                        },
+                        66 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]{")
+
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_5 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_6: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_6 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_6 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_7: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_7 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_7 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+                            fprintf(f, " (not)")
+
+                        },
+                        71 => {
+                            fprintf(f, " %s [^", flag__goto_666_15)
+
+                            (extra__goto_667_16 = print_char_8(f, ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)), utf__goto_656_6))
+
+                            fprintf(f, "]{")
+
+                            var __ci_expr_logic_5: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) != OP_NOTEXACT: 1 else: 0) != 0) {
+                                (__ci_expr_logic_5 = (if (if (unsafe: *code__goto_654_34) != OP_NOTEXACTI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_5 != 0) {
+                                fprintf(f, "0,")
+                            }
+
+
+                            fprintf(f, "%d}", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_logic_6: c_int
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_NOTMINUPTO: 1 else: 0) != 0) {
+                                (__ci_expr_logic_6 = (if true: 1 else: 0))
+                            } else {
+                                (__ci_expr_logic_6 = (if (if (unsafe: *code__goto_654_34) == OP_NOTMINUPTOI: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_6 != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                var __ci_expr_logic_7: c_int
+
+                                if ((if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTO: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_7 = (if true: 1 else: 0))
+                                } else {
+                                    (__ci_expr_logic_7 = (if (if (unsafe: *code__goto_654_34) == OP_NOTPOSUPTOI: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_7 != 0) {
+                                    fprintf(f, "+")
+                                }
+
+                            }
+
+
+                            fprintf(f, " (not)")
+
+                        },
+                        118 => {
+                            if (print_lengths != 0) {
+                                fprintf(f, "%3d ", (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+                            } else {
+                                fprintf(f, "    ")
+                            }
+
+                            fprintf(f, "%s", OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        115 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            fprintf(f, " %s \\g{%d}", flag__goto_666_15, (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_ternary_8: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_REFI: 1 else: 0) != 0) {
+                                (__ci_expr_ternary_8 = (unsafe: code__goto_654_34[(1 + 2)]))
+                            } else {
+                                (__ci_expr_ternary_8 = 0)
+                            }
+
+                            (i__goto_665_7 = __ci_expr_ternary_8)
+
+
+                            if ((if i__goto_665_7 != 0: 1 else: 0) != 0) {
+                                fprintf(f, " 0x%02x", i__goto_665_7)
+                            }
+
+                            (ccode__goto_663_14 = code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize))
+
+                            __pc = 1
+                            __goto_pending = 1
+
+
+                        },
+                        114 => {
+                            fprintf(f, " %s \\g{%d}", flag__goto_666_15, (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint))
+
+                            var __ci_expr_ternary_8: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_REFI: 1 else: 0) != 0) {
+                                (__ci_expr_ternary_8 = (unsafe: code__goto_654_34[(1 + 2)]))
+                            } else {
+                                (__ci_expr_ternary_8 = 0)
+                            }
+
+                            (i__goto_665_7 = __ci_expr_ternary_8)
+
+
+                            if ((if i__goto_665_7 != 0: 1 else: 0) != 0) {
+                                fprintf(f, " 0x%02x", i__goto_665_7)
+                            }
+
+                            (ccode__goto_663_14 = code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize))
+
+                            __pc = 1
+                            __goto_pending = 1
+
+                        },
+                        117 => {
+                            (flag__goto_666_15 = (("/i" as *const c_char)))
+
+                            (entry__goto_924_18 = (nametable__goto_654_23 + ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint) *% nesize__goto_655_10)) + ((2 as isize) as usize))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            fprintf(f, " %s \\k<", flag__goto_666_15)
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            print_custring_8(f, entry__goto_924_18)
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            fprintf(f, ">%d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            var __ci_expr_ternary_9: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_DNREFI: 1 else: 0) != 0) {
+                                (__ci_expr_ternary_9 = (unsafe: code__goto_654_34[(1 + (2 * 2))]))
+                            } else {
+                                (__ci_expr_ternary_9 = 0)
+                            }
+
+                            (i__goto_665_7 = __ci_expr_ternary_9)
+
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if ((if i__goto_665_7 != 0: 1 else: 0) != 0) {
+                                fprintf(f, " 0x%02x", i__goto_665_7)
                             }
 
                             if (__goto_pending != 0) {
                                 break
                             }
 
+
+                            (ccode__goto_663_14 = code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize))
+
+                            __pc = 1
+                            __goto_pending = 1
+
+
+                        },
+                        116 => {
+                            (entry__goto_924_18 = (nametable__goto_654_23 + ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint) *% nesize__goto_655_10)) + ((2 as isize) as usize))
+
                             if (__goto_pending != 0) {
                                 break
                             }
 
-                        }
+                            fprintf(f, " %s \\k<", flag__goto_666_15)
 
-                        fprintf(f, "        ]")
+                            if (__goto_pending != 0) {
+                                break
+                            }
 
-                        __pc = 1
-                        __goto_pending = 1
+                            print_custring_8(f, entry__goto_924_18)
 
-                    },
-                    110 => {
-                        if ((if (unsafe: *code__goto_654_34) == OP_XCLASS: 1 else: 0) != 0) {
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            fprintf(f, ">%d", (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            var __ci_expr_ternary_9: c_int = 0
+
+                            if ((if (unsafe: *code__goto_654_34) == OP_DNREFI: 1 else: 0) != 0) {
+                                (__ci_expr_ternary_9 = (unsafe: code__goto_654_34[(1 + (2 * 2))]))
+                            } else {
+                                (__ci_expr_ternary_9 = 0)
+                            }
+
+                            (i__goto_665_7 = __ci_expr_ternary_9)
+
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+                            if ((if i__goto_665_7 != 0: 1 else: 0) != 0) {
+                                fprintf(f, " 0x%02x", i__goto_665_7)
+                            }
+
+                            if (__goto_pending != 0) {
+                                break
+                            }
+
+
+                            (ccode__goto_663_14 = code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize))
+
+                            __pc = 1
+                            __goto_pending = 1
+
+                        },
+                        119 => {
+                            fprintf(f, "    %s %d %d %d", OP_names[(unsafe: *code__goto_654_34)], (unsafe: code__goto_654_34[(1 + (2 * 2))]), (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint), (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
+                        },
+                        120 => {
+                            (c__goto_664_12 = (unsafe: code__goto_654_34[(1 + (4 * 2))]))
+
+                            fprintf(f, "    %s %c", OP_names[(unsafe: *code__goto_654_34)], c__goto_664_12)
+
+                            (extra__goto_667_16 = ((((((unsafe: code__goto_654_34[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + (2 * 2)) + 1)])) as c_uint)))
+
+                            print_custring_bylen_8(f, ((code__goto_654_34 + ((2 as isize) as usize)) + (((4 * 2) as isize) as usize)), ((extra__goto_667_16 -% 3) -% 8))
+
+                            (i__goto_665_7 = 0)
+
+                            while ((if callout_start_delims[i__goto_665_7] != 0: 1 else: 0) != 0) {
+                                if ((if c__goto_664_12 == callout_start_delims[i__goto_665_7]: 1 else: 0) != 0) {
+                                    (c__goto_664_12 = callout_end_delims[i__goto_665_7])
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    break
+
+                                }
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                (i__goto_665_7 = i__goto_665_7 + 1)
+
+                            }
+
+
+                            fprintf(f, "%c %d %d %d", c__goto_664_12, (((((unsafe: code__goto_654_34[(1 + (3 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + (3 * 2)) + 1)])) as c_uint), (((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint), (((((unsafe: code__goto_654_34[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[((1 + 2) + 1)])) as c_uint))
+
+                        },
+                        16 => {
+                            print_prop_8(f, code__goto_654_34, "    ", "")
+                        },
+                        15 => {
+                            print_prop_8(f, code__goto_654_34, "    ", "")
+                        },
+                        113 => {
                             (extra__goto_667_16 = ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint)))
-                        }
 
-                        print_class_8(f, (unsafe: *code__goto_654_34), (code__goto_654_34 + ((1 as isize) as usize)), (codestart__goto_654_12 as *mut u8), utf__goto_656_6, "    ", "")
+                            fprintf(f, "    eclass[\n")
 
-                        (ccode__goto_663_14 = (code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize)) + extra__goto_667_16)
+                            (ccode__goto_663_14 = ((code__goto_654_34 + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
 
-                        __pc = 1
-                        __goto_pending = 1
+                            if ((if ((unsafe: ccode__goto_663_14[-1]) & 1) != 0: 1 else: 0) != 0) {
+                                (map__goto_967_22 = ccode__goto_663_14)
 
-                        continue
+                                if (__goto_pending != 0) {
+                                    break
+                                }
 
+                                (print_negated__goto_970_12 = (if ((unsafe: map__goto_967_22[0]) & 126) == 126: 1 else: 0))
 
-                    },
-                    111 => {
-                        if ((if (unsafe: *code__goto_654_34) == OP_XCLASS: 1 else: 0) != 0) {
-                            (extra__goto_667_16 = ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint)))
-                        }
+                                if (__goto_pending != 0) {
+                                    break
+                                }
 
-                        print_class_8(f, (unsafe: *code__goto_654_34), (code__goto_654_34 + ((1 as isize) as usize)), (codestart__goto_654_12 as *mut u8), utf__goto_656_6, "    ", "")
+                                var __ci_expr_ternary_10: *mut c_char = null
 
-                        (ccode__goto_663_14 = (code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize)) + extra__goto_667_16)
+                                if (print_negated__goto_970_12 != 0) {
+                                    (__ci_expr_ternary_10 = (("^" as *mut c_char)))
+                                } else {
+                                    (__ci_expr_ternary_10 = (("" as *mut c_char)))
+                                }
 
-                        __pc = 1
-                        __goto_pending = 1
-
-                        continue
-
-
-                    },
-                    112 => {
-                        if ((if (unsafe: *code__goto_654_34) == OP_XCLASS: 1 else: 0) != 0) {
-                            (extra__goto_667_16 = ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint)))
-                        }
-
-                        print_class_8(f, (unsafe: *code__goto_654_34), (code__goto_654_34 + ((1 as isize) as usize)), (codestart__goto_654_12 as *mut u8), utf__goto_656_6, "    ", "")
-
-                        (ccode__goto_663_14 = (code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize)) + extra__goto_667_16)
-
-                        __pc = 1
-                        __goto_pending = 1
-
-                        continue
+                                fprintf(f, "          bitmap: [%s", __ci_expr_ternary_10)
 
 
-                    },
-                    156 => {
-                        fprintf(f, "    %s ", OP_names[(unsafe: *code__goto_654_34)])
+                                if (__goto_pending != 0) {
+                                    break
+                                }
 
-                        print_custring_bylen_8(f, (code__goto_654_34 + ((2 as isize) as usize)), (unsafe: code__goto_654_34[1]))
+                                print_map_8(f, map__goto_967_22, print_negated__goto_970_12)
 
-                        (extra__goto_667_16 = extra__goto_667_16 + (unsafe: code__goto_654_34[1]))
+                                if (__goto_pending != 0) {
+                                    break
+                                }
 
-                    },
-                    164 => {
-                        fprintf(f, "    %s ", OP_names[(unsafe: *code__goto_654_34)])
+                                fprintf(f, "]\n")
 
-                        print_custring_bylen_8(f, (code__goto_654_34 + ((2 as isize) as usize)), (unsafe: code__goto_654_34[1]))
+                                if (__goto_pending != 0) {
+                                    break
+                                }
 
-                        (extra__goto_667_16 = extra__goto_667_16 + (unsafe: code__goto_654_34[1]))
+                                (ccode__goto_663_14 = ccode__goto_663_14 + (32 / sizeof[u8]()))
 
-                    },
-                    158 => {
-                        fprintf(f, "    %s ", OP_names[(unsafe: *code__goto_654_34)])
+                                if (__goto_pending != 0) {
+                                    break
+                                }
 
-                        print_custring_bylen_8(f, (code__goto_654_34 + ((2 as isize) as usize)), (unsafe: code__goto_654_34[1]))
+                            } else {
+                                fprintf(f, "          no bitmap\n")
+                            }
 
-                        (extra__goto_667_16 = extra__goto_667_16 + (unsafe: code__goto_654_34[1]))
+                            while ((if ccode__goto_663_14 < (code__goto_654_34 + extra__goto_667_16): 1 else: 0) != 0) {
+                                if (print_lengths != 0) {
+                                    fprintf(f, "%3d ", ((((ccode__goto_663_14 as usize) -% (codestart__goto_654_12 as usize)) / sizeof[u8]()) as c_int))
+                                } else {
+                                    fprintf(f, "    ")
+                                }
 
-                    },
-                    160 => {
-                        fprintf(f, "    %s ", OP_names[(unsafe: *code__goto_654_34)])
+                                if (__goto_pending != 0) {
+                                    break
+                                }
 
-                        print_custring_bylen_8(f, (code__goto_654_34 + ((2 as isize) as usize)), (unsafe: code__goto_654_34[1]))
+                                while true {
+                                    match (unsafe: *ccode__goto_663_14) {
+                                        1 => {
+                                            fprintf(f, "      AND\n")
 
-                        (extra__goto_667_16 = extra__goto_667_16 + (unsafe: code__goto_654_34[1]))
+                                            (ccode__goto_663_14 = ccode__goto_663_14 + 1)
 
-                    },
-                    162 => {
-                        fprintf(f, "    %s ", OP_names[(unsafe: *code__goto_654_34)])
+                                        },
+                                        2 => {
+                                            fprintf(f, "      OR\n")
 
-                        print_custring_bylen_8(f, (code__goto_654_34 + ((2 as isize) as usize)), (unsafe: code__goto_654_34[1]))
+                                            (ccode__goto_663_14 = ccode__goto_663_14 + 1)
 
-                        (extra__goto_667_16 = extra__goto_667_16 + (unsafe: code__goto_654_34[1]))
+                                        },
+                                        3 => {
+                                            fprintf(f, "      XOR\n")
 
-                    },
-                    28 => {
-                        (flag__goto_666_15 = (("/m" as *const c_char)))
+                                            (ccode__goto_663_14 = ccode__goto_663_14 + 1)
 
-                        fprintf(f, " %s %s", flag__goto_666_15, OP_names[(unsafe: *code__goto_654_34)])
+                                        },
+                                        4 => {
+                                            fprintf(f, "      NOT\n")
 
-                    },
-                    26 => {
-                        (flag__goto_666_15 = (("/m" as *const c_char)))
+                                            (ccode__goto_663_14 = ccode__goto_663_14 + 1)
 
-                        fprintf(f, " %s %s", flag__goto_666_15, OP_names[(unsafe: *code__goto_654_34)])
+                                        },
+                                        5 => {
+                                            print_class_8(f, OP_XCLASS, (ccode__goto_663_14 + ((1 as isize) as usize)), (codestart__goto_654_12 as *mut u8), utf__goto_656_6, "      xclass: ", "\n")
 
-                    },
-                    _ => {
-                        fprintf(f, " %s %s", flag__goto_666_15, OP_names[(unsafe: *code__goto_654_34)])
-                    },
+                                            (ccode__goto_663_14 = ccode__goto_663_14 + (((((unsafe: ccode__goto_663_14[1]) as c_int) << (8 as c_uint)) | (unsafe: ccode__goto_663_14[(1 + 1)])) as c_uint))
+
+                                        },
+                                        _ => {
+                                            fprintf(f, "      UNEXPECTED\n")
+
+                                            (ccode__goto_663_14 = ccode__goto_663_14 + 1)
+
+                                        },
+                                    }
+
+                                    break
+
+                                }
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
+                            }
+
+                            fprintf(f, "        ]")
+
+                            __pc = 1
+                            __goto_pending = 1
+
+                        },
+                        110 => {
+                            if ((if (unsafe: *code__goto_654_34) == OP_XCLASS: 1 else: 0) != 0) {
+                                (extra__goto_667_16 = ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint)))
+                            }
+
+                            print_class_8(f, (unsafe: *code__goto_654_34), (code__goto_654_34 + ((1 as isize) as usize)), (codestart__goto_654_12 as *mut u8), utf__goto_656_6, "    ", "")
+
+                            (ccode__goto_663_14 = (code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize)) + extra__goto_667_16)
+
+                            __pc = 1
+                            __goto_pending = 1
+
+                            break
+
+
+                        },
+                        111 => {
+                            if ((if (unsafe: *code__goto_654_34) == OP_XCLASS: 1 else: 0) != 0) {
+                                (extra__goto_667_16 = ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint)))
+                            }
+
+                            print_class_8(f, (unsafe: *code__goto_654_34), (code__goto_654_34 + ((1 as isize) as usize)), (codestart__goto_654_12 as *mut u8), utf__goto_656_6, "    ", "")
+
+                            (ccode__goto_663_14 = (code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize)) + extra__goto_667_16)
+
+                            __pc = 1
+                            __goto_pending = 1
+
+                            break
+
+
+                        },
+                        112 => {
+                            if ((if (unsafe: *code__goto_654_34) == OP_XCLASS: 1 else: 0) != 0) {
+                                (extra__goto_667_16 = ((((((unsafe: code__goto_654_34[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_654_34[(1 + 1)])) as c_uint)))
+                            }
+
+                            print_class_8(f, (unsafe: *code__goto_654_34), (code__goto_654_34 + ((1 as isize) as usize)), (codestart__goto_654_12 as *mut u8), utf__goto_656_6, "    ", "")
+
+                            (ccode__goto_663_14 = (code__goto_654_34 + ((OP_lengths_8[(unsafe: *code__goto_654_34)] as isize) as usize)) + extra__goto_667_16)
+
+                            __pc = 1
+                            __goto_pending = 1
+
+                            break
+
+
+                        },
+                        156 => {
+                            fprintf(f, "    %s ", OP_names[(unsafe: *code__goto_654_34)])
+
+                            print_custring_bylen_8(f, (code__goto_654_34 + ((2 as isize) as usize)), (unsafe: code__goto_654_34[1]))
+
+                            (extra__goto_667_16 = extra__goto_667_16 + (unsafe: code__goto_654_34[1]))
+
+                        },
+                        164 => {
+                            fprintf(f, "    %s ", OP_names[(unsafe: *code__goto_654_34)])
+
+                            print_custring_bylen_8(f, (code__goto_654_34 + ((2 as isize) as usize)), (unsafe: code__goto_654_34[1]))
+
+                            (extra__goto_667_16 = extra__goto_667_16 + (unsafe: code__goto_654_34[1]))
+
+                        },
+                        158 => {
+                            fprintf(f, "    %s ", OP_names[(unsafe: *code__goto_654_34)])
+
+                            print_custring_bylen_8(f, (code__goto_654_34 + ((2 as isize) as usize)), (unsafe: code__goto_654_34[1]))
+
+                            (extra__goto_667_16 = extra__goto_667_16 + (unsafe: code__goto_654_34[1]))
+
+                        },
+                        160 => {
+                            fprintf(f, "    %s ", OP_names[(unsafe: *code__goto_654_34)])
+
+                            print_custring_bylen_8(f, (code__goto_654_34 + ((2 as isize) as usize)), (unsafe: code__goto_654_34[1]))
+
+                            (extra__goto_667_16 = extra__goto_667_16 + (unsafe: code__goto_654_34[1]))
+
+                        },
+                        162 => {
+                            fprintf(f, "    %s ", OP_names[(unsafe: *code__goto_654_34)])
+
+                            print_custring_bylen_8(f, (code__goto_654_34 + ((2 as isize) as usize)), (unsafe: code__goto_654_34[1]))
+
+                            (extra__goto_667_16 = extra__goto_667_16 + (unsafe: code__goto_654_34[1]))
+
+                        },
+                        28 => {
+                            (flag__goto_666_15 = (("/m" as *const c_char)))
+
+                            fprintf(f, " %s %s", flag__goto_666_15, OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        26 => {
+                            (flag__goto_666_15 = (("/m" as *const c_char)))
+
+                            fprintf(f, " %s %s", flag__goto_666_15, OP_names[(unsafe: *code__goto_654_34)])
+
+                        },
+                        _ => {
+                            fprintf(f, " %s %s", flag__goto_666_15, OP_names[(unsafe: *code__goto_654_34)])
+                        },
+                    }
+                    break
+                }
+                if (__ci_expr_switch_continue_12 != 0) {
+                    continue
                 }
                 if (__goto_pending != 0) {
                     continue
@@ -3977,35 +3989,38 @@ fn pcre2_printint_8(re: *mut pcre2_real_code_8, f: *mut c_void, print_lengths: c
             },
             1 => {  // CLASS_REF_REPEAT
                 (__goto_pending = 0)
-                match (unsafe: *ccode__goto_663_14) {
-                    98 => {
-                        fprintf(f, "%s", OP_names[(unsafe: *ccode__goto_663_14)])
+                while true {
+                    match (unsafe: *ccode__goto_663_14) {
+                        98 => {
+                            fprintf(f, "%s", OP_names[(unsafe: *ccode__goto_663_14)])
 
-                        (extra__goto_667_16 = extra__goto_667_16 + OP_lengths_8[(unsafe: *ccode__goto_663_14)])
+                            (extra__goto_667_16 = extra__goto_667_16 + OP_lengths_8[(unsafe: *ccode__goto_663_14)])
 
-                    },
-                    104 => {
-                        (min = ((((((unsafe: ccode__goto_663_14[1]) as c_int) << (8 as c_uint)) | (unsafe: ccode__goto_663_14[(1 + 1)])) as c_uint)))
+                        },
+                        104 => {
+                            (min = ((((((unsafe: ccode__goto_663_14[1]) as c_int) << (8 as c_uint)) | (unsafe: ccode__goto_663_14[(1 + 1)])) as c_uint)))
 
-                        (max = ((((((unsafe: ccode__goto_663_14[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: ccode__goto_663_14[((1 + 2) + 1)])) as c_uint)))
+                            (max = ((((((unsafe: ccode__goto_663_14[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: ccode__goto_663_14[((1 + 2) + 1)])) as c_uint)))
 
-                        if ((if max == 0: 1 else: 0) != 0) {
-                            fprintf(f, "{%u,}", min)
-                        } else {
-                            fprintf(f, "{%u,%u}", min, max)
-                        }
-
-                        if ((if (unsafe: *ccode__goto_663_14) == OP_CRMINRANGE: 1 else: 0) != 0) {
-                            fprintf(f, "?")
-                        } else {
-                            if ((if (unsafe: *ccode__goto_663_14) == OP_CRPOSRANGE: 1 else: 0) != 0) {
-                                fprintf(f, "+")
+                            if ((if max == 0: 1 else: 0) != 0) {
+                                fprintf(f, "{%u,}", min)
+                            } else {
+                                fprintf(f, "{%u,%u}", min, max)
                             }
-                        }
 
-                        (extra__goto_667_16 = extra__goto_667_16 + OP_lengths_8[(unsafe: *ccode__goto_663_14)])
+                            if ((if (unsafe: *ccode__goto_663_14) == OP_CRMINRANGE: 1 else: 0) != 0) {
+                                fprintf(f, "?")
+                            } else {
+                                if ((if (unsafe: *ccode__goto_663_14) == OP_CRPOSRANGE: 1 else: 0) != 0) {
+                                    fprintf(f, "+")
+                                }
+                            }
 
-                    },
+                            (extra__goto_667_16 = extra__goto_667_16 + OP_lengths_8[(unsafe: *ccode__goto_663_14)])
+
+                        },
+                    }
+                    break
                 }
                 if (__goto_pending != 0) {
                     continue
@@ -4013,12 +4028,12 @@ fn pcre2_printint_8(re: *mut pcre2_real_code_8, f: *mut c_void, print_lengths: c
                 __pc = 3
                 __goto_pending = 1
                 continue
+                __pc = 3
+                __goto_pending = 1
+                continue
             },
             3 => {  // __after_switch
                 (__goto_pending = 0)
-                __pc = 2
-                __goto_pending = 1
-                continue
                 (code__goto_654_34 = code__goto_654_34 + (OP_lengths_8[(unsafe: *code__goto_654_34)] +% extra__goto_667_16))
                 if (__goto_pending != 0) {
                     continue
@@ -9867,51 +9882,54 @@ fn process_pattern_8() -> c_int {
                         continue
                     }
                 } else {
-                    match pat_patctl.tables_id {
-                        0 => {
-                            (use_tables = ((null as *const u8)))
-                        },
-                        1 => {
-                            (use_tables = (&tables1[0] as *const u8))
-                        },
-                        2 => {
-                            (use_tables = (&tables2[0] as *const u8))
-                        },
-                        3 => {
-                            if ((if tables3 == null: 1 else: 0) != 0) {
+                    while true {
+                        match pat_patctl.tables_id {
+                            0 => {
+                                (use_tables = ((null as *const u8)))
+                            },
+                            1 => {
+                                (use_tables = (&tables1[0] as *const u8))
+                            },
+                            2 => {
+                                (use_tables = (&tables2[0] as *const u8))
+                            },
+                            3 => {
+                                if ((if tables3 == null: 1 else: 0) != 0) {
+                                    colour_begin(31, outfile)
+
+                                    fprintf(outfile, "** 'Tables = 3' is invalid: binary tables have not been loaded\n")
+
+                                    colour_end(outfile)
+
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                    return PR_SKIP
+
+                                    if (__goto_pending != 0) {
+                                        break
+                                    }
+
+                                }
+
+                                (use_tables = ((tables3 as *const u8)))
+
+                            },
+                            _ => {
                                 colour_begin(31, outfile)
 
-                                fprintf(outfile, "** 'Tables = 3' is invalid: binary tables have not been loaded\n")
+                                fprintf(outfile, "** 'Tables' must specify 0, 1, 2, or 3.\n")
 
                                 colour_end(outfile)
 
 
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
                                 return PR_SKIP
 
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-                            (use_tables = ((tables3 as *const u8)))
-
-                        },
-                        _ => {
-                            colour_begin(31, outfile)
-
-                            fprintf(outfile, "** 'Tables' must specify 0, 1, 2, or 3.\n")
-
-                            colour_end(outfile)
-
-
-                            return PR_SKIP
-
-                        },
+                            },
+                        }
+                        break
                     }
                 }
                 if (__goto_pending != 0) {
@@ -10001,13 +10019,13 @@ fn process_pattern_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_16: c_int
+                    var __ci_expr_logic_17: c_int
                     if ((if (pat_patctl.control & (~((((((1 | 2) | 1024) | 65536) | 8388608) | 16777216) | 536870912))) != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_16 = (if true: 1 else: 0))
+                        (__ci_expr_logic_17 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_16 = (if (if (pat_patctl.control2 & ((~0) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_17 = (if (if (pat_patctl.control2 & ((~0) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_16 != 0) {
+                    if (__ci_expr_logic_17 != 0) {
                         show_controls(31, (pat_patctl.control & (~((((((1 | 2) | 1024) | 65536) | 8388608) | 16777216) | 536870912))), (pat_patctl.control2 & ((~0) as c_uint)), msg__goto_2382_15)
                         if (__goto_pending != 0) {
                             continue
@@ -10132,17 +10150,17 @@ fn process_pattern_8() -> c_int {
                         if (__goto_pending != 0) {
                             continue
                         }
-                        var __ci_expr_ternary_18: c_ulong = 0
-                        var __ci_expr_logic_17: c_int = 0
+                        var __ci_expr_ternary_19: c_ulong = 0
+                        var __ci_expr_logic_18: c_int = 0
                         if ((if pat_patctl.regerror_buffsize >= 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_17 = (if (if ((pat_patctl.regerror_buffsize as c_uint)) <= pbuffer8_size: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_18 = (if (if ((pat_patctl.regerror_buffsize as c_uint)) <= pbuffer8_size: 1 else: 0) != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_17 != 0) {
-                            (__ci_expr_ternary_18 = ((pat_patctl.regerror_buffsize as c_uint)))
+                        if (__ci_expr_logic_18 != 0) {
+                            (__ci_expr_ternary_19 = ((pat_patctl.regerror_buffsize as c_uint)))
                         } else {
-                            (__ci_expr_ternary_18 = pbuffer8_size)
+                            (__ci_expr_ternary_19 = pbuffer8_size)
                         }
-                        (bsize__goto_2468_12 = __ci_expr_ternary_18)
+                        (bsize__goto_2468_12 = __ci_expr_ternary_19)
                         if (__goto_pending != 0) {
                             continue
                         }
@@ -10154,13 +10172,13 @@ fn process_pattern_8() -> c_int {
                         if (__goto_pending != 0) {
                             continue
                         }
-                        var __ci_expr_ternary_19: c_ulong = 0
+                        var __ci_expr_ternary_20: c_ulong = 0
                         if ((if usize__goto_2468_19 > bsize__goto_2468_12: 1 else: 0) != 0) {
-                            (__ci_expr_ternary_19 = bsize__goto_2468_12)
+                            (__ci_expr_ternary_20 = bsize__goto_2468_12)
                         } else {
-                            (__ci_expr_ternary_19 = usize__goto_2468_19)
+                            (__ci_expr_ternary_20 = usize__goto_2468_19)
                         }
-                        (strsize__goto_2468_26 = (__ci_expr_ternary_19 -% 1))
+                        (strsize__goto_2468_26 = (__ci_expr_ternary_20 -% 1))
                         if (__goto_pending != 0) {
                             continue
                         }
@@ -10191,11 +10209,11 @@ fn process_pattern_8() -> c_int {
                         if (__goto_pending != 0) {
                             continue
                         }
-                        var __ci_expr_logic_20: c_int = 0
+                        var __ci_expr_logic_21: c_int = 0
                         if ((if bsize__goto_2468_12 > 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_20 = (if (if string_len(regbuffer__goto_2467_11) != strsize__goto_2468_26: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_21 = (if (if string_len(regbuffer__goto_2467_11) != strsize__goto_2468_26: 1 else: 0) != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_20 != 0) {
+                        if (__ci_expr_logic_21 != 0) {
                             colour_begin(31, outfile)
                             fprintf(outfile, "** regerror() strlen incorrect\n")
                             colour_end(outfile)
@@ -10218,31 +10236,31 @@ fn process_pattern_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
+                    var __ci_expr_logic_25: c_int
                     var __ci_expr_logic_24: c_int
                     var __ci_expr_logic_23: c_int
                     var __ci_expr_logic_22: c_int
-                    var __ci_expr_logic_21: c_int
                     if ((if preg.re_pcre2_code == null: 1 else: 0) != 0) {
-                        (__ci_expr_logic_21 = (if true: 1 else: 0))
-                    } else {
-                        (__ci_expr_logic_21 = (if (if (preg.re_pcre2_code as *mut pcre2_real_code_8).magic_number != 1346589253: 1 else: 0) != 0: 1 else: 0))
-                    }
-                    if (__ci_expr_logic_21 != 0) {
                         (__ci_expr_logic_22 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_22 = (if (if (preg.re_pcre2_code as *mut pcre2_real_code_8).top_bracket != preg.re_nsub: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_22 = (if (if (preg.re_pcre2_code as *mut pcre2_real_code_8).magic_number != 1346589253: 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_22 != 0) {
                         (__ci_expr_logic_23 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_23 = (if (if preg.re_match_data == null: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_23 = (if (if (preg.re_pcre2_code as *mut pcre2_real_code_8).top_bracket != preg.re_nsub: 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_23 != 0) {
                         (__ci_expr_logic_24 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_24 = (if (if preg.re_cflags != cflags__goto_2381_7: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_24 = (if (if preg.re_match_data == null: 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_24 != 0) {
+                        (__ci_expr_logic_25 = (if true: 1 else: 0))
+                    } else {
+                        (__ci_expr_logic_25 = (if (if preg.re_cflags != cflags__goto_2381_7: 1 else: 0) != 0: 1 else: 0))
+                    }
+                    if (__ci_expr_logic_25 != 0) {
                         colour_begin(31, outfile)
                         fprintf(outfile, "** The regcomp() function returned zero (success), but the values set\n** in the preg block are not valid for PCRE2. Check that pcre2test is\n** linked with PCRE2's pcre2posix module (-lpcre2-posix) and not with\n** some other POSIX regex library.\n**\n")
                         colour_end(outfile)
@@ -10285,13 +10303,13 @@ fn process_pattern_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_25: c_int
+                    var __ci_expr_logic_26: c_int
                     if ((if (pat_patctl.control & (~((((((((((32 | 128) | 8192) | 65536) | 131072) | 524288) | 2097152) | 33554432) | 67108864) | 134217728) | 536870912))) != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_25 = (if true: 1 else: 0))
+                        (__ci_expr_logic_26 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_25 = (if (if (pat_patctl.control2 & (~((((2147483648 as c_uint) | 536870912) | 32768) | 1073741824))) != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_26 = (if (if (pat_patctl.control2 & (~((((2147483648 as c_uint) | 536870912) | 32768) | 1073741824))) != 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_25 != 0) {
+                    if (__ci_expr_logic_26 != 0) {
                         show_controls(31, (pat_patctl.control & (~((((((((((32 | 128) | 8192) | 65536) | 131072) | 524288) | 2097152) | 33554432) | 67108864) | 134217728) | 536870912))), (pat_patctl.control2 & (~((((2147483648 as c_uint) | 536870912) | 32768) | 1073741824))), "** Ignored when compiled pattern is stacked with 'push':")
                         if (__goto_pending != 0) {
                             continue
@@ -10304,13 +10322,13 @@ fn process_pattern_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_26: c_int
+                    var __ci_expr_logic_27: c_int
                     if ((if (pat_patctl.control & 524288) != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_26 = (if true: 1 else: 0))
+                        (__ci_expr_logic_27 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_26 = (if (if (pat_patctl.control2 & 0) != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_27 = (if (if (pat_patctl.control2 & 0) != 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_26 != 0) {
+                    if (__ci_expr_logic_27 != 0) {
                         show_controls(31, (pat_patctl.control & 524288), (pat_patctl.control2 & 0), "** Applies only to compile when pattern is stacked with 'push':")
                         if (__goto_pending != 0) {
                             continue
@@ -10356,13 +10374,13 @@ fn process_pattern_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_ternary_27: c_ulong = 0
+                    var __ci_expr_ternary_28: c_ulong = 0
                     if (converted_length__goto_2597_14 != 0) {
-                        (__ci_expr_ternary_27 = (converted_length__goto_2597_14 *% 1))
+                        (__ci_expr_ternary_28 = (converted_length__goto_2597_14 *% 1))
                     } else {
-                        (__ci_expr_ternary_27 = 1)
+                        (__ci_expr_ternary_28 = 1)
                     }
-                    (converted_pattern__goto_2596_16 = ((with_alloc((__ci_expr_ternary_27 as i64)) as *mut c_void)))
+                    (converted_pattern__goto_2596_16 = ((with_alloc((__ci_expr_ternary_28 as i64)) as *mut c_void)))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -10404,13 +10422,13 @@ fn process_pattern_8() -> c_int {
                     continue
                 }
                 if ((if pat_patctl.convert_glob_escape != 0: 1 else: 0) != 0) {
-                    var __ci_expr_ternary_28: c_uint = 0
+                    var __ci_expr_ternary_29: c_uint = 0
                     if ((if pat_patctl.convert_glob_escape == 48: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_28 = 0)
+                        (__ci_expr_ternary_29 = 0)
                     } else {
-                        (__ci_expr_ternary_28 = pat_patctl.convert_glob_escape)
+                        (__ci_expr_ternary_29 = pat_patctl.convert_glob_escape)
                     }
-                    (escape__goto_2620_14 = __ci_expr_ternary_28)
+                    (escape__goto_2620_14 = __ci_expr_ternary_29)
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -10485,13 +10503,13 @@ fn process_pattern_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_ternary_29: *mut u8 = null
+                var __ci_expr_ternary_30: *mut u8 = null
                 if ((if (pat_patctl.control2 & 4096) == 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_29 = pbuffer8)
+                    (__ci_expr_ternary_30 = pbuffer8)
                 } else {
-                    (__ci_expr_ternary_29 = ((null as *mut u8)))
+                    (__ci_expr_ternary_30 = ((null as *mut u8)))
                 }
-                (use_pbuffer__goto_2045_12 = __ci_expr_ternary_29)
+                (use_pbuffer__goto_2045_12 = __ci_expr_ternary_30)
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -10506,13 +10524,13 @@ fn process_pattern_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_ternary_30: c_int = 0
+                    var __ci_expr_ternary_31: c_int = 0
                     if (print_error_message_8(rc__goto_2043_5, "", "\n") != 0) {
-                        (__ci_expr_ternary_30 = PR_SKIP)
+                        (__ci_expr_ternary_31 = PR_SKIP)
                     } else {
-                        (__ci_expr_ternary_30 = PR_ABEND)
+                        (__ci_expr_ternary_31 = PR_ABEND)
                     }
-                    (convert_return__goto_2594_7 = __ci_expr_ternary_30)
+                    (convert_return__goto_2594_7 = __ci_expr_ternary_31)
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -10607,11 +10625,11 @@ fn process_pattern_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_logic_31: c_int = 0
+                var __ci_expr_logic_32: c_int = 0
                 if ((if (pat_patctl.control2 & 1073741824) == 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_31 = (if (if local_newline_default != 0: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_32 = (if (if local_newline_default != 0: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_31 != 0) {
+                if (__ci_expr_logic_32 != 0) {
                     pcre2_set_newline_8(pat_context_8, local_newline_default)
                     if (__goto_pending != 0) {
                         continue
@@ -10620,13 +10638,13 @@ fn process_pattern_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_ternary_32: *mut pcre2_real_compile_context_8 = null
+                var __ci_expr_ternary_33: *mut pcre2_real_compile_context_8 = null
                 if ((if (pat_patctl.control & 4194304) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_32 = ((null as *mut pcre2_real_compile_context_8)))
+                    (__ci_expr_ternary_33 = ((null as *mut pcre2_real_compile_context_8)))
                 } else {
-                    (__ci_expr_ternary_32 = pat_context_8)
+                    (__ci_expr_ternary_33 = pat_context_8)
                 }
-                (use_pat_context__goto_2044_24 = __ci_expr_ternary_32)
+                (use_pat_context__goto_2044_24 = __ci_expr_ternary_33)
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -10636,13 +10654,13 @@ fn process_pattern_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_ternary_33: *mut u8 = null
+                var __ci_expr_ternary_34: *mut u8 = null
                 if ((if (pat_patctl.control2 & 4096) == 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_33 = pbuffer8)
+                    (__ci_expr_ternary_34 = pbuffer8)
                 } else {
-                    (__ci_expr_ternary_33 = ((null as *mut u8)))
+                    (__ci_expr_ternary_34 = ((null as *mut u8)))
                 }
-                (use_pbuffer__goto_2045_12 = __ci_expr_ternary_33)
+                (use_pbuffer__goto_2045_12 = __ci_expr_ternary_34)
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -10731,15 +10749,15 @@ fn process_pattern_8() -> c_int {
                         if (__goto_pending != 0) {
                             break
                         }
-                        var __ci_expr_logic_35: c_int = 0
+                        var __ci_expr_logic_36: c_int = 0
                         if ((if i__goto_2781_12 < target_mallocs__goto_2781_19: 1 else: 0) != 0) {
-                            var __ci_expr_logic_34: c_int = 0
+                            var __ci_expr_logic_35: c_int = 0
                             if ((if compiled_code_8 == null: 1 else: 0) != 0) {
-                                (__ci_expr_logic_34 = (if (if errorcode__goto_2043_9 == 121: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_35 = (if (if errorcode__goto_2043_9 == 121: 1 else: 0) != 0: 1 else: 0))
                             }
-                            (__ci_expr_logic_35 = (if (if not (__ci_expr_logic_34 != 0): 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_36 = (if (if not (__ci_expr_logic_35 != 0): 1 else: 0) != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_35 != 0) {
+                        if (__ci_expr_logic_36 != 0) {
                             colour_begin(31, outfile)
                             fprintf(outfile, "** malloc() compile test did not fail as expected (%d)\n", errorcode__goto_2043_9)
                             colour_end(outfile)
@@ -10766,11 +10784,11 @@ fn process_pattern_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_logic_36: c_int = 0
+                var __ci_expr_logic_37: c_int = 0
                 if ((if compiled_code_8 != null: 1 else: 0) != 0) {
-                    (__ci_expr_logic_36 = (if (if pat_patctl.jit != 0: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_37 = (if (if pat_patctl.jit != 0: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_36 != 0) {
+                if (__ci_expr_logic_37 != 0) {
                     if ((if timeit > 0: 1 else: 0) != 0) {
                         (time_taken__goto_2821_13 = 0)
                         if (__goto_pending != 0) {
@@ -10902,11 +10920,11 @@ fn process_pattern_8() -> c_int {
                             if (__goto_pending != 0) {
                                 break
                             }
-                            var __ci_expr_logic_37: c_int = 0
+                            var __ci_expr_logic_38: c_int = 0
                             if ((if i__goto_2859_14 < target_mallocs__goto_2859_21: 1 else: 0) != 0) {
-                                (__ci_expr_logic_37 = (if (if jitrc != -48: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_38 = (if (if jitrc != -48: 1 else: 0) != 0: 1 else: 0))
                             }
-                            if (__ci_expr_logic_37 != 0) {
+                            if (__ci_expr_logic_38 != 0) {
                                 colour_begin(31, outfile)
                                 fprintf(outfile, "** malloc() JIT compile test did not fail as expected (%d)\n", jitrc)
                                 colour_end(outfile)
@@ -10933,11 +10951,11 @@ fn process_pattern_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_38: c_int = 0
+                    var __ci_expr_logic_39: c_int = 0
                     if ((if jitrc != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_38 = (if (if (pat_patctl.control & 524288) != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_39 = (if (if (pat_patctl.control & 524288) != 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_38 != 0) {
+                    if (__ci_expr_logic_39 != 0) {
                         colour_begin(35, outfile)
                         fprintf(outfile, "JIT compilation was not successful")
                         colour_end(outfile)
@@ -10983,11 +11001,11 @@ fn process_pattern_8() -> c_int {
                         (q__goto_2916_23 = pbuffer8)
                         (q_end__goto_2916_37 = q__goto_2916_23 + erroroffset__goto_2049_12)
                         while true {
-                            var __ci_expr_logic_39: c_int = 0
+                            var __ci_expr_logic_40: c_int = 0
                             if ((if q__goto_2916_23 < q_end__goto_2916_37: 1 else: 0) != 0) {
-                                (__ci_expr_logic_39 = (if (if n__goto_2915_9 > 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_40 = (if (if n__goto_2915_9 > 0: 1 else: 0) != 0: 1 else: 0))
                             }
-                            if (not (__ci_expr_logic_39 != 0)) {
+                            if (not (__ci_expr_logic_40 != 0)) {
                                 break
                             }
                             (n__goto_2915_9 = utf8_to_ord(q__goto_2916_23, q_end__goto_2916_37, (&mut cc__goto_2914_14 as *mut c_uint)))
@@ -11062,20 +11080,20 @@ fn process_pattern_8() -> c_int {
                             if (__goto_pending != 0) {
                                 continue
                             }
-                            var __ci_expr_ternary_41: *mut c_char = null
+                            var __ci_expr_ternary_42: *mut c_char = null
                             if ((if direction__goto_2899_7 == 1: 1 else: 0) != 0) {
-                                (__ci_expr_ternary_41 = (("|<--|" as *mut c_char)))
+                                (__ci_expr_ternary_42 = (("|<--|" as *mut c_char)))
                             } else {
-                                var __ci_expr_ternary_40: *mut c_char = null
+                                var __ci_expr_ternary_41: *mut c_char = null
                                 if ((if direction__goto_2899_7 == 2: 1 else: 0) != 0) {
-                                    (__ci_expr_ternary_40 = (("|-->|" as *mut c_char)))
+                                    (__ci_expr_ternary_41 = (("|-->|" as *mut c_char)))
                                 } else {
-                                    (__ci_expr_ternary_40 = (("|<-->|" as *mut c_char)))
+                                    (__ci_expr_ternary_41 = (("|<-->|" as *mut c_char)))
                                 }
-                                (__ci_expr_ternary_41 = ((__ci_expr_ternary_40 as *mut c_char)))
+                                (__ci_expr_ternary_42 = ((__ci_expr_ternary_41 as *mut c_char)))
                             }
                             colour_begin(35, outfile)
-                            fprintf(outfile, __ci_expr_ternary_41)
+                            fprintf(outfile, __ci_expr_ternary_42)
                             colour_end(outfile)
                             if (__goto_pending != 0) {
                                 continue
@@ -11213,9 +11231,9 @@ fn process_pattern_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_old_42: c_int = patstacknext_8
+                    var __ci_expr_old_43: c_int = patstacknext_8
                     (patstacknext_8 = patstacknext_8 + 1)
-                    (patstack_8[__ci_expr_old_42] = compiled_code_8)
+                    (patstack_8[__ci_expr_old_43] = compiled_code_8)
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -11244,16 +11262,16 @@ fn process_pattern_8() -> c_int {
                         continue
                     }
                     if ((if (pat_patctl.control & 67108864) != 0: 1 else: 0) != 0) {
-                        var __ci_expr_old_43: c_int = patstacknext_8
+                        var __ci_expr_old_44: c_int = patstacknext_8
                         (patstacknext_8 = patstacknext_8 + 1)
-                        (patstack_8[__ci_expr_old_43] = pcre2_code_copy_8(compiled_code_8))
+                        (patstack_8[__ci_expr_old_44] = pcre2_code_copy_8(compiled_code_8))
                         if (__goto_pending != 0) {
                             continue
                         }
                     } else {
-                        var __ci_expr_old_44: c_int = patstacknext_8
+                        var __ci_expr_old_45: c_int = patstacknext_8
                         (patstacknext_8 = patstacknext_8 + 1)
-                        (patstack_8[__ci_expr_old_44] = pcre2_code_copy_with_tables_8(compiled_code_8))
+                        (patstack_8[__ci_expr_old_45] = pcre2_code_copy_with_tables_8(compiled_code_8))
                         if (__goto_pending != 0) {
                             continue
                         }
@@ -11767,22 +11785,25 @@ fn callout_function_8(cb: *mut pcre2_callout_block_8, callout_data_ptr: *mut c_v
                     if (__goto_pending != 0) {
                         continue
                     }
-                    match cb.callout_flags {
-                        2 => {
-                            fprintf(f__goto_3376_7, "Backtrack\n")
-                        },
-                        3 => {
-                            fprintf(f__goto_3376_7, "Backtrack\nNo other matching paths\n")
+                    while true {
+                        match cb.callout_flags {
+                            2 => {
+                                fprintf(f__goto_3376_7, "Backtrack\n")
+                            },
+                            3 => {
+                                fprintf(f__goto_3376_7, "Backtrack\nNo other matching paths\n")
 
-                            fprintf(f__goto_3376_7, "New match attempt\n")
+                                fprintf(f__goto_3376_7, "New match attempt\n")
 
-                        },
-                        1 => {
-                            fprintf(f__goto_3376_7, "New match attempt\n")
-                        },
-                        _ => {
-                            (f__goto_3376_7 = fdefault__goto_3376_11)
-                        },
+                            },
+                            1 => {
+                                fprintf(f__goto_3376_7, "New match attempt\n")
+                            },
+                            _ => {
+                                (f__goto_3376_7 = fdefault__goto_3376_11)
+                            },
+                        }
+                        break
                     }
                     if (__goto_pending != 0) {
                         continue
@@ -11892,13 +11913,13 @@ fn callout_function_8(cb: *mut pcre2_callout_block_8, callout_data_ptr: *mut c_v
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_ternary_3: c_ulong = 0
+                    var __ci_expr_ternary_4: c_ulong = 0
                     if ((if cb.current_position >= cb.start_match: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_3 = cb.current_position)
+                        (__ci_expr_ternary_4 = cb.current_position)
                     } else {
-                        (__ci_expr_ternary_3 = cb.start_match)
+                        (__ci_expr_ternary_4 = cb.start_match)
                     }
-                    (current_position__goto_3378_12 = __ci_expr_ternary_3)
+                    (current_position__goto_3378_12 = __ci_expr_ternary_4)
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -11932,13 +11953,13 @@ fn callout_function_8(cb: *mut pcre2_callout_block_8, callout_data_ptr: *mut c_v
                             continue
                         }
                     } else {
-                        var __ci_expr_logic_4: c_int
+                        var __ci_expr_logic_5: c_int
                         if (callout_capture__goto_3380_6 != 0) {
-                            (__ci_expr_logic_4 = (if true: 1 else: 0))
+                            (__ci_expr_logic_5 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_4 = (if (if cb.callout_string != null: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_5 = (if (if cb.callout_string != null: 1 else: 0) != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_4 != 0) {
+                        if (__ci_expr_logic_5 != 0) {
                             fprintf(outfile, "    ")
                         } else {
                             fprintf(outfile, "%3d ", cb.callout_number)
@@ -12081,21 +12102,21 @@ fn callout_function_8(cb: *mut pcre2_callout_block_8, callout_data_ptr: *mut c_v
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_logic_5: c_int = 0
+                var __ci_expr_logic_6: c_int = 0
                 if ((if cb.callout_number == dat_datctl.cerror[0]: 1 else: 0) != 0) {
-                    (__ci_expr_logic_5 = (if (if callout_count >= dat_datctl.cerror[1]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_6 = (if (if callout_count >= dat_datctl.cerror[1]: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_5 != 0) {
+                if (__ci_expr_logic_6 != 0) {
                     return -37
                 }
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_logic_6: c_int = 0
+                var __ci_expr_logic_7: c_int = 0
                 if ((if cb.callout_number == dat_datctl.cfail[0]: 1 else: 0) != 0) {
-                    (__ci_expr_logic_6 = (if (if callout_count >= dat_datctl.cfail[1]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_7 = (if (if callout_count >= dat_datctl.cfail[1]: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_6 != 0) {
+                if (__ci_expr_logic_7 != 0) {
                     return 1
                 }
                 if (__goto_pending != 0) {
@@ -13225,513 +13246,570 @@ fn process_data_8() -> c_int {
                         (p__goto_3893_10 = p__goto_3893_10 + 1)
                         (c__goto_3891_10 = (unsafe: *__ci_expr_old_16))
                         var __ci_expr_switch_17: c_uint = c__goto_3891_10
-                        match __ci_expr_switch_17 {
-                            92 => {
-                                0
-                            },
-                            97 => {
-                                (c__goto_3891_10 = 7)
-                            },
-                            98 => {
-                                (c__goto_3891_10 = 8)
-                            },
-                            101 => {
-                                (c__goto_3891_10 = 27)
-                            },
-                            102 => {
-                                (c__goto_3891_10 = 12)
-                            },
-                            110 => {
-                                (c__goto_3891_10 = 10)
-                            },
-                            114 => {
-                                (c__goto_3891_10 = 13)
-                            },
-                            116 => {
-                                (c__goto_3891_10 = 9)
-                            },
-                            118 => {
-                                (c__goto_3891_10 = 11)
-                            },
-                            48 => {
-                                (c__goto_3891_10 = c__goto_3891_10 - 48)
-
-                                while true {
-                                    var __ci_expr_logic_20: c_int = 0
-
-                                    var __ci_expr_logic_19: c_int = 0
-
-                                    var __ci_expr_old_18: c_int = i__goto_4008_7
-
-                                    (i__goto_4008_7 = i__goto_4008_7 + 1)
-
-                                    if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_19 != 0) {
-                                        (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (not (__ci_expr_logic_20 != 0)) {
-                                        break
-                                    }
-
-                                    var __ci_expr_old_21: *mut u8 = p__goto_3893_10
-
-                                    (p__goto_3893_10 = p__goto_3893_10 + 1)
-
-                                    (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                (c__goto_3891_10 = c__goto_3891_10)
-
-                                var __ci_expr_ternary_23: c_int = 0
-
-                                var __ci_expr_logic_22: c_int = 0
-
-                                if (utf__goto_3897_6 != 0) {
-                                    (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_22 != 0) {
-                                    (__ci_expr_ternary_23 = FORCE_UTF)
-                                } else {
-                                    (__ci_expr_ternary_23 = FORCE_RAW)
-                                }
-
-                                (encoding__goto_4010_23 = __ci_expr_ternary_23)
-
-
-                            },
-                            49 => {
-                                (c__goto_3891_10 = c__goto_3891_10 - 48)
-
-                                while true {
-                                    var __ci_expr_logic_20: c_int = 0
-
-                                    var __ci_expr_logic_19: c_int = 0
-
-                                    var __ci_expr_old_18: c_int = i__goto_4008_7
-
-                                    (i__goto_4008_7 = i__goto_4008_7 + 1)
-
-                                    if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_19 != 0) {
-                                        (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (not (__ci_expr_logic_20 != 0)) {
-                                        break
-                                    }
-
-                                    var __ci_expr_old_21: *mut u8 = p__goto_3893_10
-
-                                    (p__goto_3893_10 = p__goto_3893_10 + 1)
-
-                                    (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                (c__goto_3891_10 = c__goto_3891_10)
-
-                                var __ci_expr_ternary_23: c_int = 0
-
-                                var __ci_expr_logic_22: c_int = 0
-
-                                if (utf__goto_3897_6 != 0) {
-                                    (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_22 != 0) {
-                                    (__ci_expr_ternary_23 = FORCE_UTF)
-                                } else {
-                                    (__ci_expr_ternary_23 = FORCE_RAW)
-                                }
-
-                                (encoding__goto_4010_23 = __ci_expr_ternary_23)
-
-
-                            },
-                            50 => {
-                                (c__goto_3891_10 = c__goto_3891_10 - 48)
-
-                                while true {
-                                    var __ci_expr_logic_20: c_int = 0
-
-                                    var __ci_expr_logic_19: c_int = 0
-
-                                    var __ci_expr_old_18: c_int = i__goto_4008_7
-
-                                    (i__goto_4008_7 = i__goto_4008_7 + 1)
-
-                                    if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_19 != 0) {
-                                        (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (not (__ci_expr_logic_20 != 0)) {
-                                        break
-                                    }
-
-                                    var __ci_expr_old_21: *mut u8 = p__goto_3893_10
-
-                                    (p__goto_3893_10 = p__goto_3893_10 + 1)
-
-                                    (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                (c__goto_3891_10 = c__goto_3891_10)
-
-                                var __ci_expr_ternary_23: c_int = 0
-
-                                var __ci_expr_logic_22: c_int = 0
-
-                                if (utf__goto_3897_6 != 0) {
-                                    (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_22 != 0) {
-                                    (__ci_expr_ternary_23 = FORCE_UTF)
-                                } else {
-                                    (__ci_expr_ternary_23 = FORCE_RAW)
-                                }
-
-                                (encoding__goto_4010_23 = __ci_expr_ternary_23)
-
-
-                            },
-                            51 => {
-                                (c__goto_3891_10 = c__goto_3891_10 - 48)
-
-                                while true {
-                                    var __ci_expr_logic_20: c_int = 0
-
-                                    var __ci_expr_logic_19: c_int = 0
-
-                                    var __ci_expr_old_18: c_int = i__goto_4008_7
-
-                                    (i__goto_4008_7 = i__goto_4008_7 + 1)
-
-                                    if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_19 != 0) {
-                                        (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (not (__ci_expr_logic_20 != 0)) {
-                                        break
-                                    }
-
-                                    var __ci_expr_old_21: *mut u8 = p__goto_3893_10
-
-                                    (p__goto_3893_10 = p__goto_3893_10 + 1)
-
-                                    (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                (c__goto_3891_10 = c__goto_3891_10)
-
-                                var __ci_expr_ternary_23: c_int = 0
-
-                                var __ci_expr_logic_22: c_int = 0
-
-                                if (utf__goto_3897_6 != 0) {
-                                    (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_22 != 0) {
-                                    (__ci_expr_ternary_23 = FORCE_UTF)
-                                } else {
-                                    (__ci_expr_ternary_23 = FORCE_RAW)
-                                }
-
-                                (encoding__goto_4010_23 = __ci_expr_ternary_23)
-
-
-                            },
-                            52 => {
-                                (c__goto_3891_10 = c__goto_3891_10 - 48)
-
-                                while true {
-                                    var __ci_expr_logic_20: c_int = 0
-
-                                    var __ci_expr_logic_19: c_int = 0
-
-                                    var __ci_expr_old_18: c_int = i__goto_4008_7
-
-                                    (i__goto_4008_7 = i__goto_4008_7 + 1)
-
-                                    if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_19 != 0) {
-                                        (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (not (__ci_expr_logic_20 != 0)) {
-                                        break
-                                    }
-
-                                    var __ci_expr_old_21: *mut u8 = p__goto_3893_10
-
-                                    (p__goto_3893_10 = p__goto_3893_10 + 1)
-
-                                    (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                (c__goto_3891_10 = c__goto_3891_10)
-
-                                var __ci_expr_ternary_23: c_int = 0
-
-                                var __ci_expr_logic_22: c_int = 0
-
-                                if (utf__goto_3897_6 != 0) {
-                                    (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_22 != 0) {
-                                    (__ci_expr_ternary_23 = FORCE_UTF)
-                                } else {
-                                    (__ci_expr_ternary_23 = FORCE_RAW)
-                                }
-
-                                (encoding__goto_4010_23 = __ci_expr_ternary_23)
-
-
-                            },
-                            53 => {
-                                (c__goto_3891_10 = c__goto_3891_10 - 48)
-
-                                while true {
-                                    var __ci_expr_logic_20: c_int = 0
-
-                                    var __ci_expr_logic_19: c_int = 0
-
-                                    var __ci_expr_old_18: c_int = i__goto_4008_7
-
-                                    (i__goto_4008_7 = i__goto_4008_7 + 1)
-
-                                    if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_19 != 0) {
-                                        (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (not (__ci_expr_logic_20 != 0)) {
-                                        break
-                                    }
-
-                                    var __ci_expr_old_21: *mut u8 = p__goto_3893_10
-
-                                    (p__goto_3893_10 = p__goto_3893_10 + 1)
-
-                                    (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                (c__goto_3891_10 = c__goto_3891_10)
-
-                                var __ci_expr_ternary_23: c_int = 0
-
-                                var __ci_expr_logic_22: c_int = 0
-
-                                if (utf__goto_3897_6 != 0) {
-                                    (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_22 != 0) {
-                                    (__ci_expr_ternary_23 = FORCE_UTF)
-                                } else {
-                                    (__ci_expr_ternary_23 = FORCE_RAW)
-                                }
-
-                                (encoding__goto_4010_23 = __ci_expr_ternary_23)
-
-
-                            },
-                            54 => {
-                                (c__goto_3891_10 = c__goto_3891_10 - 48)
-
-                                while true {
-                                    var __ci_expr_logic_20: c_int = 0
-
-                                    var __ci_expr_logic_19: c_int = 0
-
-                                    var __ci_expr_old_18: c_int = i__goto_4008_7
-
-                                    (i__goto_4008_7 = i__goto_4008_7 + 1)
-
-                                    if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_19 != 0) {
-                                        (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (not (__ci_expr_logic_20 != 0)) {
-                                        break
-                                    }
-
-                                    var __ci_expr_old_21: *mut u8 = p__goto_3893_10
-
-                                    (p__goto_3893_10 = p__goto_3893_10 + 1)
-
-                                    (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                (c__goto_3891_10 = c__goto_3891_10)
-
-                                var __ci_expr_ternary_23: c_int = 0
-
-                                var __ci_expr_logic_22: c_int = 0
-
-                                if (utf__goto_3897_6 != 0) {
-                                    (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_22 != 0) {
-                                    (__ci_expr_ternary_23 = FORCE_UTF)
-                                } else {
-                                    (__ci_expr_ternary_23 = FORCE_RAW)
-                                }
-
-                                (encoding__goto_4010_23 = __ci_expr_ternary_23)
-
-
-                            },
-                            55 => {
-                                (c__goto_3891_10 = c__goto_3891_10 - 48)
-
-                                while true {
-                                    var __ci_expr_logic_20: c_int = 0
-
-                                    var __ci_expr_logic_19: c_int = 0
-
-                                    var __ci_expr_old_18: c_int = i__goto_4008_7
-
-                                    (i__goto_4008_7 = i__goto_4008_7 + 1)
-
-                                    if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_19 != 0) {
-                                        (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (not (__ci_expr_logic_20 != 0)) {
-                                        break
-                                    }
-
-                                    var __ci_expr_old_21: *mut u8 = p__goto_3893_10
-
-                                    (p__goto_3893_10 = p__goto_3893_10 + 1)
-
-                                    (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                (c__goto_3891_10 = c__goto_3891_10)
-
-                                var __ci_expr_ternary_23: c_int = 0
-
-                                var __ci_expr_logic_22: c_int = 0
-
-                                if (utf__goto_3897_6 != 0) {
-                                    (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_22 != 0) {
-                                    (__ci_expr_ternary_23 = FORCE_UTF)
-                                } else {
-                                    (__ci_expr_ternary_23 = FORCE_RAW)
-                                }
-
-                                (encoding__goto_4010_23 = __ci_expr_ternary_23)
-
-
-                            },
-                            111 => {
-                                if ((if (unsafe: *p__goto_3893_10) == 123: 1 else: 0) != 0) {
-                                    (pt__goto_4140_16 = p__goto_3893_10)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (c__goto_3891_10 = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (pt__goto_4140_16 = pt__goto_4140_16 + 1)
+                        var __ci_expr_switch_continue_34: i32 = 0
+                        while true {
+                            match __ci_expr_switch_17 {
+                                92 => {
+                                    0
+                                },
+                                97 => {
+                                    (c__goto_3891_10 = 7)
+                                },
+                                98 => {
+                                    (c__goto_3891_10 = 8)
+                                },
+                                101 => {
+                                    (c__goto_3891_10 = 27)
+                                },
+                                102 => {
+                                    (c__goto_3891_10 = 12)
+                                },
+                                110 => {
+                                    (c__goto_3891_10 = 10)
+                                },
+                                114 => {
+                                    (c__goto_3891_10 = 13)
+                                },
+                                116 => {
+                                    (c__goto_3891_10 = 9)
+                                },
+                                118 => {
+                                    (c__goto_3891_10 = 11)
+                                },
+                                48 => {
+                                    (c__goto_3891_10 = c__goto_3891_10 - 48)
 
                                     while true {
-                                        var __ci_expr_logic_24: c_int = 0
+                                        var __ci_expr_logic_20: c_int = 0
 
-                                        if (is_digit((unsafe: *pt__goto_4140_16)) != 0) {
-                                            (__ci_expr_logic_24 = (if (if (unsafe: *pt__goto_4140_16) < 56: 1 else: 0) != 0: 1 else: 0))
+                                        var __ci_expr_logic_19: c_int = 0
+
+                                        var __ci_expr_old_18: c_int = i__goto_4008_7
+
+                                        (i__goto_4008_7 = i__goto_4008_7 + 1)
+
+                                        if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
                                         }
 
-                                        if (not (__ci_expr_logic_24 != 0)) {
+                                        if (__ci_expr_logic_19 != 0) {
+                                            (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (not (__ci_expr_logic_20 != 0)) {
                                             break
                                         }
 
-                                        if ((if c__goto_3891_10 >= 536870912: 1 else: 0) != 0) {
+                                        var __ci_expr_old_21: *mut u8 = p__goto_3893_10
+
+                                        (p__goto_3893_10 = p__goto_3893_10 + 1)
+
+                                        (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                    (c__goto_3891_10 = c__goto_3891_10)
+
+                                    var __ci_expr_ternary_23: c_int = 0
+
+                                    var __ci_expr_logic_22: c_int = 0
+
+                                    if (utf__goto_3897_6 != 0) {
+                                        (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_22 != 0) {
+                                        (__ci_expr_ternary_23 = FORCE_UTF)
+                                    } else {
+                                        (__ci_expr_ternary_23 = FORCE_RAW)
+                                    }
+
+                                    (encoding__goto_4010_23 = __ci_expr_ternary_23)
+
+
+                                },
+                                49 => {
+                                    (c__goto_3891_10 = c__goto_3891_10 - 48)
+
+                                    while true {
+                                        var __ci_expr_logic_20: c_int = 0
+
+                                        var __ci_expr_logic_19: c_int = 0
+
+                                        var __ci_expr_old_18: c_int = i__goto_4008_7
+
+                                        (i__goto_4008_7 = i__goto_4008_7 + 1)
+
+                                        if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_19 != 0) {
+                                            (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (not (__ci_expr_logic_20 != 0)) {
+                                            break
+                                        }
+
+                                        var __ci_expr_old_21: *mut u8 = p__goto_3893_10
+
+                                        (p__goto_3893_10 = p__goto_3893_10 + 1)
+
+                                        (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                    (c__goto_3891_10 = c__goto_3891_10)
+
+                                    var __ci_expr_ternary_23: c_int = 0
+
+                                    var __ci_expr_logic_22: c_int = 0
+
+                                    if (utf__goto_3897_6 != 0) {
+                                        (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_22 != 0) {
+                                        (__ci_expr_ternary_23 = FORCE_UTF)
+                                    } else {
+                                        (__ci_expr_ternary_23 = FORCE_RAW)
+                                    }
+
+                                    (encoding__goto_4010_23 = __ci_expr_ternary_23)
+
+
+                                },
+                                50 => {
+                                    (c__goto_3891_10 = c__goto_3891_10 - 48)
+
+                                    while true {
+                                        var __ci_expr_logic_20: c_int = 0
+
+                                        var __ci_expr_logic_19: c_int = 0
+
+                                        var __ci_expr_old_18: c_int = i__goto_4008_7
+
+                                        (i__goto_4008_7 = i__goto_4008_7 + 1)
+
+                                        if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_19 != 0) {
+                                            (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (not (__ci_expr_logic_20 != 0)) {
+                                            break
+                                        }
+
+                                        var __ci_expr_old_21: *mut u8 = p__goto_3893_10
+
+                                        (p__goto_3893_10 = p__goto_3893_10 + 1)
+
+                                        (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                    (c__goto_3891_10 = c__goto_3891_10)
+
+                                    var __ci_expr_ternary_23: c_int = 0
+
+                                    var __ci_expr_logic_22: c_int = 0
+
+                                    if (utf__goto_3897_6 != 0) {
+                                        (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_22 != 0) {
+                                        (__ci_expr_ternary_23 = FORCE_UTF)
+                                    } else {
+                                        (__ci_expr_ternary_23 = FORCE_RAW)
+                                    }
+
+                                    (encoding__goto_4010_23 = __ci_expr_ternary_23)
+
+
+                                },
+                                51 => {
+                                    (c__goto_3891_10 = c__goto_3891_10 - 48)
+
+                                    while true {
+                                        var __ci_expr_logic_20: c_int = 0
+
+                                        var __ci_expr_logic_19: c_int = 0
+
+                                        var __ci_expr_old_18: c_int = i__goto_4008_7
+
+                                        (i__goto_4008_7 = i__goto_4008_7 + 1)
+
+                                        if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_19 != 0) {
+                                            (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (not (__ci_expr_logic_20 != 0)) {
+                                            break
+                                        }
+
+                                        var __ci_expr_old_21: *mut u8 = p__goto_3893_10
+
+                                        (p__goto_3893_10 = p__goto_3893_10 + 1)
+
+                                        (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                    (c__goto_3891_10 = c__goto_3891_10)
+
+                                    var __ci_expr_ternary_23: c_int = 0
+
+                                    var __ci_expr_logic_22: c_int = 0
+
+                                    if (utf__goto_3897_6 != 0) {
+                                        (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_22 != 0) {
+                                        (__ci_expr_ternary_23 = FORCE_UTF)
+                                    } else {
+                                        (__ci_expr_ternary_23 = FORCE_RAW)
+                                    }
+
+                                    (encoding__goto_4010_23 = __ci_expr_ternary_23)
+
+
+                                },
+                                52 => {
+                                    (c__goto_3891_10 = c__goto_3891_10 - 48)
+
+                                    while true {
+                                        var __ci_expr_logic_20: c_int = 0
+
+                                        var __ci_expr_logic_19: c_int = 0
+
+                                        var __ci_expr_old_18: c_int = i__goto_4008_7
+
+                                        (i__goto_4008_7 = i__goto_4008_7 + 1)
+
+                                        if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_19 != 0) {
+                                            (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (not (__ci_expr_logic_20 != 0)) {
+                                            break
+                                        }
+
+                                        var __ci_expr_old_21: *mut u8 = p__goto_3893_10
+
+                                        (p__goto_3893_10 = p__goto_3893_10 + 1)
+
+                                        (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                    (c__goto_3891_10 = c__goto_3891_10)
+
+                                    var __ci_expr_ternary_23: c_int = 0
+
+                                    var __ci_expr_logic_22: c_int = 0
+
+                                    if (utf__goto_3897_6 != 0) {
+                                        (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_22 != 0) {
+                                        (__ci_expr_ternary_23 = FORCE_UTF)
+                                    } else {
+                                        (__ci_expr_ternary_23 = FORCE_RAW)
+                                    }
+
+                                    (encoding__goto_4010_23 = __ci_expr_ternary_23)
+
+
+                                },
+                                53 => {
+                                    (c__goto_3891_10 = c__goto_3891_10 - 48)
+
+                                    while true {
+                                        var __ci_expr_logic_20: c_int = 0
+
+                                        var __ci_expr_logic_19: c_int = 0
+
+                                        var __ci_expr_old_18: c_int = i__goto_4008_7
+
+                                        (i__goto_4008_7 = i__goto_4008_7 + 1)
+
+                                        if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_19 != 0) {
+                                            (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (not (__ci_expr_logic_20 != 0)) {
+                                            break
+                                        }
+
+                                        var __ci_expr_old_21: *mut u8 = p__goto_3893_10
+
+                                        (p__goto_3893_10 = p__goto_3893_10 + 1)
+
+                                        (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                    (c__goto_3891_10 = c__goto_3891_10)
+
+                                    var __ci_expr_ternary_23: c_int = 0
+
+                                    var __ci_expr_logic_22: c_int = 0
+
+                                    if (utf__goto_3897_6 != 0) {
+                                        (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_22 != 0) {
+                                        (__ci_expr_ternary_23 = FORCE_UTF)
+                                    } else {
+                                        (__ci_expr_ternary_23 = FORCE_RAW)
+                                    }
+
+                                    (encoding__goto_4010_23 = __ci_expr_ternary_23)
+
+
+                                },
+                                54 => {
+                                    (c__goto_3891_10 = c__goto_3891_10 - 48)
+
+                                    while true {
+                                        var __ci_expr_logic_20: c_int = 0
+
+                                        var __ci_expr_logic_19: c_int = 0
+
+                                        var __ci_expr_old_18: c_int = i__goto_4008_7
+
+                                        (i__goto_4008_7 = i__goto_4008_7 + 1)
+
+                                        if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_19 != 0) {
+                                            (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (not (__ci_expr_logic_20 != 0)) {
+                                            break
+                                        }
+
+                                        var __ci_expr_old_21: *mut u8 = p__goto_3893_10
+
+                                        (p__goto_3893_10 = p__goto_3893_10 + 1)
+
+                                        (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                    (c__goto_3891_10 = c__goto_3891_10)
+
+                                    var __ci_expr_ternary_23: c_int = 0
+
+                                    var __ci_expr_logic_22: c_int = 0
+
+                                    if (utf__goto_3897_6 != 0) {
+                                        (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_22 != 0) {
+                                        (__ci_expr_ternary_23 = FORCE_UTF)
+                                    } else {
+                                        (__ci_expr_ternary_23 = FORCE_RAW)
+                                    }
+
+                                    (encoding__goto_4010_23 = __ci_expr_ternary_23)
+
+
+                                },
+                                55 => {
+                                    (c__goto_3891_10 = c__goto_3891_10 - 48)
+
+                                    while true {
+                                        var __ci_expr_logic_20: c_int = 0
+
+                                        var __ci_expr_logic_19: c_int = 0
+
+                                        var __ci_expr_old_18: c_int = i__goto_4008_7
+
+                                        (i__goto_4008_7 = i__goto_4008_7 + 1)
+
+                                        if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_19 = (if (if (unsafe: *p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_19 != 0) {
+                                            (__ci_expr_logic_20 = (if (if (unsafe: *p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (not (__ci_expr_logic_20 != 0)) {
+                                            break
+                                        }
+
+                                        var __ci_expr_old_21: *mut u8 = p__goto_3893_10
+
+                                        (p__goto_3893_10 = p__goto_3893_10 + 1)
+
+                                        (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *__ci_expr_old_21) - 48)))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                    (c__goto_3891_10 = c__goto_3891_10)
+
+                                    var __ci_expr_ternary_23: c_int = 0
+
+                                    var __ci_expr_logic_22: c_int = 0
+
+                                    if (utf__goto_3897_6 != 0) {
+                                        (__ci_expr_logic_22 = (if (if c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_22 != 0) {
+                                        (__ci_expr_ternary_23 = FORCE_UTF)
+                                    } else {
+                                        (__ci_expr_ternary_23 = FORCE_RAW)
+                                    }
+
+                                    (encoding__goto_4010_23 = __ci_expr_ternary_23)
+
+
+                                },
+                                111 => {
+                                    if ((if (unsafe: *p__goto_3893_10) == 123: 1 else: 0) != 0) {
+                                        (pt__goto_4140_16 = p__goto_3893_10)
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        (c__goto_3891_10 = 0)
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        (pt__goto_4140_16 = pt__goto_4140_16 + 1)
+
+                                        while true {
+                                            var __ci_expr_logic_24: c_int = 0
+
+                                            if (is_digit((unsafe: *pt__goto_4140_16)) != 0) {
+                                                (__ci_expr_logic_24 = (if (if (unsafe: *pt__goto_4140_16) < 56: 1 else: 0) != 0: 1 else: 0))
+                                            }
+
+                                            if (not (__ci_expr_logic_24 != 0)) {
+                                                break
+                                            }
+
+                                            if ((if c__goto_3891_10 >= 536870912: 1 else: 0) != 0) {
+                                                colour_begin(31, outfile)
+
+                                                fprintf(outfile, "** \\o{ escape too large\n")
+
+                                                colour_end(outfile)
+
+
+                                                if (__goto_pending != 0) {
+                                                    break
+                                                }
+
+                                                return PR_OK
+
+                                                if (__goto_pending != 0) {
+                                                    break
+                                                }
+
+                                            } else {
+                                                (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *pt__goto_4140_16) - 48)))
+                                            }
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            (i__goto_4008_7 = i__goto_4008_7 + 1)
+
+                                            (pt__goto_4140_16 = pt__goto_4140_16 + 1)
+
+                                        }
+
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        (c__goto_3891_10 = c__goto_3891_10)
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        var __ci_expr_logic_25: c_int
+
+                                        if ((if i__goto_4008_7 == 0: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_25 = (if true: 1 else: 0))
+                                        } else {
+                                            (__ci_expr_logic_25 = (if (if (unsafe: *pt__goto_4140_16) != 125: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_25 != 0) {
                                             colour_begin(31, outfile)
 
-                                            fprintf(outfile, "** \\o{ escape too large\n")
+                                            fprintf(outfile, "** Malformed \\o{ escape\n")
 
                                             colour_end(outfile)
 
@@ -13747,90 +13825,106 @@ fn process_data_8() -> c_int {
                                             }
 
                                         } else {
-                                            (c__goto_3891_10 = ((c__goto_3891_10 *% 8) +% ((unsafe: *pt__goto_4140_16) - 48)))
+                                            (p__goto_3893_10 = pt__goto_4140_16 + ((1 as isize) as usize))
                                         }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (i__goto_4008_7 = i__goto_4008_7 + 1)
-
-                                        (pt__goto_4140_16 = pt__goto_4140_16 + 1)
-
-                                    }
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (c__goto_3891_10 = c__goto_3891_10)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    var __ci_expr_logic_25: c_int
-
-                                    if ((if i__goto_4008_7 == 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_25 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_25 = (if (if (unsafe: *pt__goto_4140_16) != 125: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_25 != 0) {
-                                        colour_begin(31, outfile)
-
-                                        fprintf(outfile, "** Malformed \\o{ escape\n")
-
-                                        colour_end(outfile)
 
 
                                         if (__goto_pending != 0) {
                                             break
                                         }
 
-                                        return PR_OK
+                                    }
+                                },
+                                120 => {
+                                    (c__goto_3891_10 = 0)
+
+                                    if ((if (unsafe: *p__goto_3893_10) == 123: 1 else: 0) != 0) {
+                                        (pt__goto_4165_16 = p__goto_3893_10)
 
                                         if (__goto_pending != 0) {
                                             break
                                         }
 
-                                    } else {
-                                        (p__goto_3893_10 = pt__goto_4140_16 + ((1 as isize) as usize))
-                                    }
+                                        (pt__goto_4165_16 = pt__goto_4165_16 + 1)
+
+                                        while (is_xdigit((unsafe: *pt__goto_4165_16)) != 0) {
+                                            (i__goto_4008_7 = i__goto_4008_7 + 1)
+
+                                            if ((if i__goto_4008_7 == 9: 1 else: 0) != 0) {
+                                                colour_begin(31, outfile)
+
+                                                fprintf(outfile, "** Too many hex digits in \\x{...} item; using only the first eight.\n")
+
+                                                colour_end(outfile)
 
 
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
+                                                if (__goto_pending != 0) {
+                                                    break
+                                                }
 
-                                }
-                            },
-                            120 => {
-                                (c__goto_3891_10 = 0)
+                                                while (is_xdigit((unsafe: *pt__goto_4165_16)) != 0) {
+                                                    (pt__goto_4165_16 = pt__goto_4165_16 + 1)
 
-                                if ((if (unsafe: *p__goto_3893_10) == 123: 1 else: 0) != 0) {
-                                    (pt__goto_4165_16 = p__goto_3893_10)
+                                                    if (__goto_pending != 0) {
+                                                        break
+                                                    }
 
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
+                                                }
 
-                                    (pt__goto_4165_16 = pt__goto_4165_16 + 1)
+                                                if (__goto_pending != 0) {
+                                                    break
+                                                }
 
-                                    while (is_xdigit((unsafe: *pt__goto_4165_16)) != 0) {
-                                        (i__goto_4008_7 = i__goto_4008_7 + 1)
+                                                break
 
-                                        if ((if i__goto_4008_7 == 9: 1 else: 0) != 0) {
+                                            } else {
+                                                var __ci_expr_ternary_26: c_int = 0
+
+                                                if (is_digit((unsafe: *pt__goto_4165_16)) != 0) {
+                                                    (__ci_expr_ternary_26 = 48)
+                                                } else {
+                                                    (__ci_expr_ternary_26 = 97 - 10)
+                                                }
+
+                                                (c__goto_3891_10 = ((c__goto_3891_10 *% 16) +% (to_lower((unsafe: *pt__goto_4165_16)) - __ci_expr_ternary_26)))
+
+                                            }
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            (pt__goto_4165_16 = pt__goto_4165_16 + 1)
+
+                                        }
+
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        (c__goto_3891_10 = c__goto_3891_10)
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        var __ci_expr_logic_27: c_int
+
+                                        if ((if i__goto_4008_7 == 0: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_27 = (if true: 1 else: 0))
+                                        } else {
+                                            (__ci_expr_logic_27 = (if (if (unsafe: *pt__goto_4165_16) != 125: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_27 != 0) {
                                             colour_begin(31, outfile)
 
-                                            fprintf(outfile, "** Too many hex digits in \\x{...} item; using only the first eight.\n")
+                                            fprintf(outfile, "** Malformed \\x{ escape\n")
 
                                             colour_end(outfile)
 
@@ -13839,14 +13933,136 @@ fn process_data_8() -> c_int {
                                                 break
                                             }
 
-                                            while (is_xdigit((unsafe: *pt__goto_4165_16)) != 0) {
-                                                (pt__goto_4165_16 = pt__goto_4165_16 + 1)
+                                            return PR_OK
 
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
+                                            if (__goto_pending != 0) {
+                                                break
                                             }
+
+                                        } else {
+                                            (p__goto_3893_10 = pt__goto_4165_16 + ((1 as isize) as usize))
+                                        }
+
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    } else {
+                                        while true {
+                                            var __ci_expr_logic_29: c_int = 0
+
+                                            var __ci_expr_old_28: c_int = i__goto_4008_7
+
+                                            (i__goto_4008_7 = i__goto_4008_7 + 1)
+
+                                            if ((if __ci_expr_old_28 < 2: 1 else: 0) != 0) {
+                                                (__ci_expr_logic_29 = (if is_xdigit((unsafe: *p__goto_3893_10)) != 0: 1 else: 0))
+                                            }
+
+                                            if (not (__ci_expr_logic_29 != 0)) {
+                                                break
+                                            }
+
+                                            var __ci_expr_ternary_30: c_int = 0
+
+                                            if (is_digit((unsafe: *p__goto_3893_10)) != 0) {
+                                                (__ci_expr_ternary_30 = 48)
+                                            } else {
+                                                (__ci_expr_ternary_30 = 97 - 10)
+                                            }
+
+                                            (c__goto_3891_10 = ((c__goto_3891_10 *% 16) +% (to_lower((unsafe: *p__goto_3893_10)) - __ci_expr_ternary_30)))
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            (p__goto_3893_10 = p__goto_3893_10 + 1)
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                        }
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        (c__goto_3891_10 = c__goto_3891_10)
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        if (utf__goto_3897_6 != 0) {
+                                            (encoding__goto_4010_23 = 1)
+                                        }
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+
+                                },
+                                78 => {
+                                    var __ci_expr_logic_31: c_int = 0
+
+                                    if ((if with_memcmp((p__goto_3893_10 as *i8), ("{U+" as *i8), (3 as i64)) == 0: 1 else: 0) != 0) {
+                                        (__ci_expr_logic_31 = (if is_xdigit((unsafe: p__goto_3893_10[3])) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_31 != 0) {
+                                        (p__goto_3893_10 = p__goto_3893_10 + 3)
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        ((unsafe: *__error()) = 0)
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        (uli__goto_4215_21 = strtoul((p__goto_3893_10 as *const c_char), (&mut endptr__goto_4214_13 as *mut *mut c_char), 16))
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        var __ci_expr_logic_33: c_int = 0
+
+                                        var __ci_expr_logic_32: c_int = 0
+
+                                        if ((if (unsafe: *__error()) == 0: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_32 = (if (if (unsafe: *endptr__goto_4214_13) == 125: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_32 != 0) {
+                                            (__ci_expr_logic_33 = (if (if uli__goto_4215_21 <= 4294967295: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_33 != 0) {
+                                            (c__goto_3891_10 = ((uli__goto_4215_21 as c_uint)))
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            (p__goto_3893_10 = (endptr__goto_4214_13 as *mut u8) + ((1 as isize) as usize))
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            (encoding__goto_4010_23 = 2)
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -13854,54 +14070,41 @@ fn process_data_8() -> c_int {
 
                                             break
 
-                                        } else {
-                                            var __ci_expr_ternary_26: c_int = 0
-
-                                            if (is_digit((unsafe: *pt__goto_4165_16)) != 0) {
-                                                (__ci_expr_ternary_26 = 48)
-                                            } else {
-                                                (__ci_expr_ternary_26 = 97 - 10)
-                                            }
-
-                                            (c__goto_3891_10 = ((c__goto_3891_10 *% 16) +% (to_lower((unsafe: *pt__goto_4165_16)) - __ci_expr_ternary_26)))
-
                                         }
+
 
                                         if (__goto_pending != 0) {
                                             break
                                         }
 
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (pt__goto_4165_16 = pt__goto_4165_16 + 1)
-
                                     }
 
 
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
+                                    colour_begin(31, outfile)
 
-                                    (c__goto_3891_10 = c__goto_3891_10)
+                                    fprintf(outfile, "** Malformed \\N{U+ escape\n")
 
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
+                                    colour_end(outfile)
 
-                                    var __ci_expr_logic_27: c_int
 
-                                    if ((if i__goto_4008_7 == 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_27 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_27 = (if (if (unsafe: *pt__goto_4165_16) != 125: 1 else: 0) != 0: 1 else: 0))
-                                    }
+                                    return PR_OK
 
-                                    if (__ci_expr_logic_27 != 0) {
+                                },
+                                0 => {
+                                    (p__goto_3893_10 = p__goto_3893_10 - 1)
+
+                                    continue
+
+                                },
+                                61 => {
+                                    __pc = 1
+                                    __goto_pending = 1
+                                },
+                                91 => {
+                                    if ((if start_rep__goto_3905_14 != null: 1 else: 0) != 0) {
                                         colour_begin(31, outfile)
 
-                                        fprintf(outfile, "** Malformed \\x{ escape\n")
+                                        fprintf(outfile, "** Nested replication is not supported\n")
 
                                         colour_end(outfile)
 
@@ -13916,232 +14119,57 @@ fn process_data_8() -> c_int {
                                             break
                                         }
 
-                                    } else {
-                                        (p__goto_3893_10 = pt__goto_4165_16 + ((1 as isize) as usize))
                                     }
 
+                                    (start_rep__goto_3905_14 = q__goto_3904_14)
 
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
+                                    continue
 
-                                } else {
-                                    while true {
-                                        var __ci_expr_logic_29: c_int = 0
+                                },
+                                _ => {
+                                    if (is_alnum(c__goto_3891_10) != 0) {
+                                        colour_begin(31, outfile)
 
-                                        var __ci_expr_old_28: c_int = i__goto_4008_7
+                                        fprintf(outfile, "** Unrecognized escape sequence \"\\%c\"\n", c__goto_3891_10)
 
-                                        (i__goto_4008_7 = i__goto_4008_7 + 1)
+                                        colour_end(outfile)
 
-                                        if ((if __ci_expr_old_28 < 2: 1 else: 0) != 0) {
-                                            (__ci_expr_logic_29 = (if is_xdigit((unsafe: *p__goto_3893_10)) != 0: 1 else: 0))
-                                        }
-
-                                        if (not (__ci_expr_logic_29 != 0)) {
-                                            break
-                                        }
-
-                                        var __ci_expr_ternary_30: c_int = 0
-
-                                        if (is_digit((unsafe: *p__goto_3893_10)) != 0) {
-                                            (__ci_expr_ternary_30 = 48)
-                                        } else {
-                                            (__ci_expr_ternary_30 = 97 - 10)
-                                        }
-
-                                        (c__goto_3891_10 = ((c__goto_3891_10 *% 16) +% (to_lower((unsafe: *p__goto_3893_10)) - __ci_expr_ternary_30)))
 
                                         if (__goto_pending != 0) {
                                             break
                                         }
 
-                                        (p__goto_3893_10 = p__goto_3893_10 + 1)
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
+                                        return PR_OK
 
                                         if (__goto_pending != 0) {
                                             break
                                         }
 
                                     }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (c__goto_3891_10 = c__goto_3891_10)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    if (utf__goto_3897_6 != 0) {
-                                        (encoding__goto_4010_23 = 1)
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                            },
-                            78 => {
-                                var __ci_expr_logic_31: c_int = 0
-
-                                if ((if with_memcmp((p__goto_3893_10 as *i8), ("{U+" as *i8), (3 as i64)) == 0: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_31 = (if is_xdigit((unsafe: p__goto_3893_10[3])) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_31 != 0) {
-                                    (p__goto_3893_10 = p__goto_3893_10 + 3)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    ((unsafe: *__error()) = 0)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (uli__goto_4215_21 = strtoul((p__goto_3893_10 as *const c_char), (&mut endptr__goto_4214_13 as *mut *mut c_char), 16))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    var __ci_expr_logic_33: c_int = 0
-
-                                    var __ci_expr_logic_32: c_int = 0
-
-                                    if ((if (unsafe: *__error()) == 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_32 = (if (if (unsafe: *endptr__goto_4214_13) == 125: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_32 != 0) {
-                                        (__ci_expr_logic_33 = (if (if uli__goto_4215_21 <= 4294967295: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_33 != 0) {
-                                        (c__goto_3891_10 = ((uli__goto_4215_21 as c_uint)))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (p__goto_3893_10 = (endptr__goto_4214_13 as *mut u8) + ((1 as isize) as usize))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (encoding__goto_4010_23 = 2)
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        break
-
-                                    }
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-
-                                colour_begin(31, outfile)
-
-                                fprintf(outfile, "** Malformed \\N{U+ escape\n")
-
-                                colour_end(outfile)
-
-
-                                return PR_OK
-
-                            },
-                            0 => {
-                                (p__goto_3893_10 = p__goto_3893_10 - 1)
-
-                                continue
-
-                            },
-                            61 => {
-                                __pc = 1
-                                __goto_pending = 1
-                            },
-                            91 => {
-                                if ((if start_rep__goto_3905_14 != null: 1 else: 0) != 0) {
-                                    colour_begin(31, outfile)
-
-                                    fprintf(outfile, "** Nested replication is not supported\n")
-
-                                    colour_end(outfile)
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    return PR_OK
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                (start_rep__goto_3905_14 = q__goto_3904_14)
-
-                                continue
-
-                            },
-                            _ => {
-                                if (is_alnum(c__goto_3891_10) != 0) {
-                                    colour_begin(31, outfile)
-
-                                    fprintf(outfile, "** Unrecognized escape sequence \"\\%c\"\n", c__goto_3891_10)
-
-                                    colour_end(outfile)
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    return PR_OK
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-                            },
+                                },
+                            }
+                            break
+                        }
+                        if (__ci_expr_switch_continue_34 != 0) {
+                            continue
                         }
                     }
                     if (__goto_pending != 0) {
                         break
                     }
-                    var __ci_expr_logic_35: c_int
+                    var __ci_expr_logic_36: c_int
                     if ((if encoding__goto_4010_23 == 1: 1 else: 0) != 0) {
-                        (__ci_expr_logic_35 = (if true: 1 else: 0))
+                        (__ci_expr_logic_36 = (if true: 1 else: 0))
                     } else {
-                        var __ci_expr_logic_34: c_int
+                        var __ci_expr_logic_35: c_int
                         if (utf__goto_3897_6 != 0) {
-                            (__ci_expr_logic_34 = (if true: 1 else: 0))
+                            (__ci_expr_logic_35 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_34 = (if (if encoding__goto_4010_23 == 2: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_35 = (if (if encoding__goto_4010_23 == 2: 1 else: 0) != 0: 1 else: 0))
                         }
-                        (__ci_expr_logic_35 = (if (if not (__ci_expr_logic_34 != 0): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_36 = (if (if not (__ci_expr_logic_35 != 0): 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_35 != 0) {
+                    if (__ci_expr_logic_36 != 0) {
                         if ((if c__goto_3891_10 > 255: 1 else: 0) != 0) {
                             colour_begin(31, outfile)
                             fprintf(outfile, "** Character \\x{%x} is greater than 255 and UTF-8 mode is not enabled.\n", c__goto_3891_10)
@@ -14159,9 +14187,9 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             break
                         }
-                        var __ci_expr_old_36: *mut u8 = q__goto_3904_14
+                        var __ci_expr_old_37: *mut u8 = q__goto_3904_14
                         (q__goto_3904_14 = q__goto_3904_14 + 1)
-                        ((unsafe: *__ci_expr_old_36) = ((c__goto_3891_10 as u8)))
+                        ((unsafe: *__ci_expr_old_37) = ((c__goto_3891_10 as u8)))
                         if (__goto_pending != 0) {
                             break
                         }
@@ -14178,11 +14206,11 @@ fn process_data_8() -> c_int {
                                 break
                             }
                         } else {
-                            var __ci_expr_logic_37: c_int = 0
+                            var __ci_expr_logic_38: c_int = 0
                             if ((if encoding__goto_4010_23 == 2: 1 else: 0) != 0) {
-                                (__ci_expr_logic_37 = (if (if c__goto_3891_10 > 1114111: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_38 = (if (if c__goto_3891_10 > 1114111: 1 else: 0) != 0: 1 else: 0))
                             }
-                            if (__ci_expr_logic_37 != 0) {
+                            if (__ci_expr_logic_38 != 0) {
                                 colour_begin(31, outfile)
                                 fprintf(outfile, "** Warning: character \\N{U+%x} is greater than 0x%x and should not be encoded as UTF-8\n", c__goto_3891_10, 1114111)
                                 colour_end(outfile)
@@ -14228,23 +14256,23 @@ fn process_data_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_logic_38: c_int = 0
+                var __ci_expr_logic_39: c_int = 0
                 if ((if (unsafe: p__goto_3893_10[-1]) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_38 = (if (if not (decode_modifiers_8(p__goto_3893_10, CTX_DAT, null, (&mut dat_datctl as *mut datctl)) != 0): 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_39 = (if (if not (decode_modifiers_8(p__goto_3893_10, CTX_DAT, null, (&mut dat_datctl as *mut datctl)) != 0): 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_38 != 0) {
+                if (__ci_expr_logic_39 != 0) {
                     return PR_OK
                 }
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_logic_39: c_int
+                var __ci_expr_logic_40: c_int
                 if ((if dat_datctl.substitute_skip != 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_39 = (if true: 1 else: 0))
+                    (__ci_expr_logic_40 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_39 = (if (if dat_datctl.substitute_stop != 0: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_40 = (if (if dat_datctl.substitute_stop != 0: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_39 != 0) {
+                if (__ci_expr_logic_40 != 0) {
                     (dat_datctl.control2 = dat_datctl.control2 | 1)
                 }
                 if (__goto_pending != 0) {
@@ -14256,11 +14284,11 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         break
                     }
-                    var __ci_expr_logic_40: c_int = 0
+                    var __ci_expr_logic_41: c_int = 0
                     if ((if c__goto_3891_10 != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_40 = (if (if c__goto_3891_10 != (c__goto_3891_10 & ((~c__goto_3891_10) +% 1)): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_41 = (if (if c__goto_3891_10 != (c__goto_3891_10 & ((~c__goto_3891_10) +% 1)): 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_40 != 0) {
+                    if (__ci_expr_logic_41 != 0) {
                         show_controls(31, c__goto_3891_10, 0, "** Not allowed together:")
                         if (__goto_pending != 0) {
                             break
@@ -14286,11 +14314,11 @@ fn process_data_8() -> c_int {
                     continue
                 }
                 if ((if dat_datctl.replacement[0] != 255: 1 else: 0) != 0) {
-                    var __ci_expr_logic_41: c_int = 0
+                    var __ci_expr_logic_42: c_int = 0
                     if ((if (dat_datctl.control2 & 1) != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_41 = (if (if (dat_datctl.control & 4194304) != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_42 = (if (if (dat_datctl.control & 4194304) != 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_41 != 0) {
+                    if (__ci_expr_logic_42 != 0) {
                         colour_begin(31, outfile)
                         fprintf(outfile, "** Replacement callouts are not supported with null_context.\n")
                         colour_end(outfile)
@@ -14305,11 +14333,11 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_42: c_int = 0
+                    var __ci_expr_logic_43: c_int = 0
                     if ((if (dat_datctl.control2 & 65536) != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_42 = (if (if (dat_datctl.control & 4194304) != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_43 = (if (if (dat_datctl.control & 4194304) != 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_42 != 0) {
+                    if (__ci_expr_logic_43 != 0) {
                         colour_begin(31, outfile)
                         fprintf(outfile, "** Replacement case callouts are not supported with null_context.\n")
                         colour_end(outfile)
@@ -14332,11 +14360,11 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_43: c_int = 0
+                    var __ci_expr_logic_44: c_int = 0
                     if ((if dat_datctl.substitute_subject[0] != 255: 1 else: 0) != 0) {
-                        (__ci_expr_logic_43 = (if (if (dat_datctl.control2 & 8) == 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_44 = (if (if (dat_datctl.control2 & 8) == 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_43 != 0) {
+                    if (__ci_expr_logic_44 != 0) {
                         colour_begin(31, outfile)
                         fprintf(outfile, "** substitute_subject requires substitute_matched.\n")
                         colour_end(outfile)
@@ -14392,19 +14420,19 @@ fn process_data_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_ternary_45: c_int = 0
-                var __ci_expr_logic_44: c_int
+                var __ci_expr_ternary_46: c_int = 0
+                var __ci_expr_logic_45: c_int
                 if ((if (pat_patctl.control & 8388608) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_44 = (if true: 1 else: 0))
+                    (__ci_expr_logic_45 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_44 = (if (if (dat_datctl.control & (2147483648 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_45 = (if (if (dat_datctl.control & (2147483648 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_44 != 0) {
-                    (__ci_expr_ternary_45 = 1 * (8 / 8))
+                if (__ci_expr_logic_45 != 0) {
+                    (__ci_expr_ternary_46 = 1 * (8 / 8))
                 } else {
-                    (__ci_expr_ternary_45 = 0)
+                    (__ci_expr_ternary_46 = 0)
                 }
-                (c__goto_3891_10 = __ci_expr_ternary_45)
+                (c__goto_3891_10 = __ci_expr_ternary_46)
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -14431,49 +14459,49 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_46: c_int
+                    var __ci_expr_logic_47: c_int
                     if ((if dat_datctl.cerror[0] != 4294967295: 1 else: 0) != 0) {
-                        (__ci_expr_logic_46 = (if true: 1 else: 0))
+                        (__ci_expr_logic_47 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_46 = (if (if dat_datctl.cerror[1] != 4294967295: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_47 = (if (if dat_datctl.cerror[1] != 4294967295: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_46 != 0) {
+                    if (__ci_expr_logic_47 != 0) {
                         prmsg((&mut msg__goto_4449_15 as *mut *const c_char), "callout_error")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_47: c_int
+                    var __ci_expr_logic_48: c_int
                     if ((if dat_datctl.cfail[0] != 4294967295: 1 else: 0) != 0) {
-                        (__ci_expr_logic_47 = (if true: 1 else: 0))
+                        (__ci_expr_logic_48 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_47 = (if (if dat_datctl.cfail[1] != 4294967295: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_48 = (if (if dat_datctl.cfail[1] != 4294967295: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_47 != 0) {
+                    if (__ci_expr_logic_48 != 0) {
                         prmsg((&mut msg__goto_4449_15 as *mut *const c_char), "callout_fail")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_48: c_int
+                    var __ci_expr_logic_49: c_int
                     if ((if dat_datctl.copy_numbers[0] >= 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_48 = (if true: 1 else: 0))
+                        (__ci_expr_logic_49 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_48 = (if (if dat_datctl.copy_names[0] != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_49 = (if (if dat_datctl.copy_names[0] != 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_48 != 0) {
+                    if (__ci_expr_logic_49 != 0) {
                         prmsg((&mut msg__goto_4449_15 as *mut *const c_char), "copy")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_49: c_int
+                    var __ci_expr_logic_50: c_int
                     if ((if dat_datctl.get_numbers[0] >= 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_49 = (if true: 1 else: 0))
+                        (__ci_expr_logic_50 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_49 = (if (if dat_datctl.get_names[0] != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_50 = (if (if dat_datctl.get_names[0] != 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_49 != 0) {
+                    if (__ci_expr_logic_50 != 0) {
                         prmsg((&mut msg__goto_4449_15 as *mut *const c_char), "get")
                     }
                     if (__goto_pending != 0) {
@@ -14510,13 +14538,13 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_50: c_int
+                    var __ci_expr_logic_51: c_int
                     if ((if (dat_datctl.control & (~(1 | 2))) != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_50 = (if true: 1 else: 0))
+                        (__ci_expr_logic_51 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_50 = (if (if (dat_datctl.control2 & (~8192)) != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_51 = (if (if (dat_datctl.control2 & (~8192)) != 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_50 != 0) {
+                    if (__ci_expr_logic_51 != 0) {
                         show_controls(31, (dat_datctl.control & (~(1 | 2))), (dat_datctl.control2 & (~8192)), msg__goto_4449_15)
                         if (__goto_pending != 0) {
                             continue
@@ -14570,13 +14598,13 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             continue
                         }
-                        var __ci_expr_ternary_51: c_int = 0
+                        var __ci_expr_ternary_52: c_int = 0
                         if ((if dat_datctl.startend[1] != 0: 1 else: 0) != 0) {
-                            (__ci_expr_ternary_51 = ((dat_datctl.startend[1] as c_int)))
+                            (__ci_expr_ternary_52 = ((dat_datctl.startend[1] as c_int)))
                         } else {
-                            (__ci_expr_ternary_51 = ((len__goto_3894_8 as c_int)))
+                            (__ci_expr_ternary_52 = ((len__goto_3894_8 as c_int)))
                         }
-                        ((unsafe: pmatch__goto_4447_15[0]).rm_eo = __ci_expr_ternary_51)
+                        ((unsafe: pmatch__goto_4447_15[0]).rm_eo = __ci_expr_ternary_52)
                         if (__goto_pending != 0) {
                             continue
                         }
@@ -14697,17 +14725,17 @@ fn process_data_8() -> c_int {
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        var __ci_expr_logic_53: c_int
-                                        var __ci_expr_logic_52: c_int = 0
+                                        var __ci_expr_logic_54: c_int
+                                        var __ci_expr_logic_53: c_int = 0
                                         if ((if i__goto_4517_12 == 0: 1 else: 0) != 0) {
-                                            (__ci_expr_logic_52 = (if (if (dat_datctl.control & 1) != 0: 1 else: 0) != 0: 1 else: 0))
-                                        }
-                                        if (__ci_expr_logic_52 != 0) {
-                                            (__ci_expr_logic_53 = (if true: 1 else: 0))
-                                        } else {
-                                            (__ci_expr_logic_53 = (if (if (dat_datctl.control & 2) != 0: 1 else: 0) != 0: 1 else: 0))
+                                            (__ci_expr_logic_53 = (if (if (dat_datctl.control & 1) != 0: 1 else: 0) != 0: 1 else: 0))
                                         }
                                         if (__ci_expr_logic_53 != 0) {
+                                            (__ci_expr_logic_54 = (if true: 1 else: 0))
+                                        } else {
+                                            (__ci_expr_logic_54 = (if (if (dat_datctl.control & 2) != 0: 1 else: 0) != 0: 1 else: 0))
+                                        }
+                                        if (__ci_expr_logic_54 != 0) {
                                             fprintf(outfile, "%2d+ ", (i__goto_4517_12 as c_int))
                                             if (__goto_pending != 0) {
                                                 break
@@ -14764,11 +14792,11 @@ fn process_data_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_logic_54: c_int = 0
+                var __ci_expr_logic_55: c_int = 0
                 if ((if (dat_datctl.control & (8 | 512)) == 8: 1 else: 0) != 0) {
-                    (__ci_expr_logic_54 = (if (if compiled_code_8.executable_jit != null: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_55 = (if (if compiled_code_8.executable_jit != null: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_54 != 0) {
+                if (__ci_expr_logic_55 != 0) {
                     colour_begin(31, outfile)
                     fprintf(outfile, "** Showing all consulted text is not supported by JIT: ignored\n")
                     colour_end(outfile)
@@ -14789,13 +14817,13 @@ fn process_data_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_ternary_55: *mut pcre2_real_match_context_8 = null
+                var __ci_expr_ternary_56: *mut pcre2_real_match_context_8 = null
                 if ((if (dat_datctl.control & 4194304) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_55 = ((null as *mut pcre2_real_match_context_8)))
+                    (__ci_expr_ternary_56 = ((null as *mut pcre2_real_match_context_8)))
                 } else {
-                    (__ci_expr_ternary_55 = dat_context_8)
+                    (__ci_expr_ternary_56 = dat_context_8)
                 }
-                (use_dat_context__goto_3896_22 = __ci_expr_ternary_55)
+                (use_dat_context__goto_3896_22 = __ci_expr_ternary_56)
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -14803,11 +14831,11 @@ fn process_data_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_logic_56: c_int = 0
+                var __ci_expr_logic_57: c_int = 0
                 if (show_memory != 0) {
-                    (__ci_expr_logic_56 = (if (if ((pat_patctl.control & dat_datctl.control) & 4194304) != 0: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_57 = (if (if ((pat_patctl.control & dat_datctl.control) & 4194304) != 0: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_56 != 0) {
+                if (__ci_expr_logic_57 != 0) {
                     colour_begin(31, outfile)
                     fprintf(outfile, "** \\=memory requires either a pattern or a subject context: ignored\n")
                     colour_end(outfile)
@@ -14860,11 +14888,11 @@ fn process_data_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_logic_57: c_int = 0
+                var __ci_expr_logic_58: c_int = 0
                 if ((if (pat_patctl.control & 524288) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_57 = (if (if jit_stack_8 == null: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_58 = (if (if jit_stack_8 == null: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_57 != 0) {
+                if (__ci_expr_logic_58 != 0) {
                     pcre2_jit_stack_assign_8(dat_context_8, jit_callback_8, null)
                     if (__goto_pending != 0) {
                         continue
@@ -14951,15 +14979,15 @@ fn process_data_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
+                var __ci_expr_logic_60: c_int = 0
                 var __ci_expr_logic_59: c_int = 0
-                var __ci_expr_logic_58: c_int = 0
                 if ((if dat_datctl.replacement[0] != 255: 1 else: 0) != 0) {
-                    (__ci_expr_logic_58 = (if (if (dat_datctl.control & 512) != 0: 1 else: 0) != 0: 1 else: 0))
-                }
-                if (__ci_expr_logic_58 != 0) {
-                    (__ci_expr_logic_59 = (if (if (dat_datctl.control2 & 8) == 0: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_59 = (if (if (dat_datctl.control & 512) != 0: 1 else: 0) != 0: 1 else: 0))
                 }
                 if (__ci_expr_logic_59 != 0) {
+                    (__ci_expr_logic_60 = (if (if (dat_datctl.control2 & 8) == 0: 1 else: 0) != 0: 1 else: 0))
+                }
+                if (__ci_expr_logic_60 != 0) {
                     colour_begin(31, outfile)
                     fprintf(outfile, "** Ignored for DFA matching: replace\n")
                     colour_end(outfile)
@@ -15002,13 +15030,13 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_ternary_60: c_uint = 0
+                    var __ci_expr_ternary_61: c_uint = 0
                     if ((if (dat_datctl.control2 & 8) == 0: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_60 = 0)
+                        (__ci_expr_ternary_61 = 0)
                     } else {
-                        (__ci_expr_ternary_60 = 65536)
+                        (__ci_expr_ternary_61 = 65536)
                     }
-                    (emoption__goto_4705_12 = __ci_expr_ternary_60)
+                    (emoption__goto_4705_12 = __ci_expr_ternary_61)
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -15052,49 +15080,49 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_ternary_61: c_uint = 0
-                    if ((if (dat_datctl.control & 32768) == 0: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_61 = 0)
-                    } else {
-                        (__ci_expr_ternary_61 = 256)
-                    }
                     var __ci_expr_ternary_62: c_uint = 0
-                    if ((if (dat_datctl.control2 & 2) == 0: 1 else: 0) != 0) {
+                    if ((if (dat_datctl.control & 32768) == 0: 1 else: 0) != 0) {
                         (__ci_expr_ternary_62 = 0)
                     } else {
-                        (__ci_expr_ternary_62 = 512)
+                        (__ci_expr_ternary_62 = 256)
                     }
                     var __ci_expr_ternary_63: c_uint = 0
-                    if ((if (dat_datctl.control2 & 4) == 0: 1 else: 0) != 0) {
+                    if ((if (dat_datctl.control2 & 2) == 0: 1 else: 0) != 0) {
                         (__ci_expr_ternary_63 = 0)
                     } else {
-                        (__ci_expr_ternary_63 = 32768)
+                        (__ci_expr_ternary_63 = 512)
                     }
                     var __ci_expr_ternary_64: c_uint = 0
-                    if ((if (dat_datctl.control2 & 16) == 0: 1 else: 0) != 0) {
+                    if ((if (dat_datctl.control2 & 4) == 0: 1 else: 0) != 0) {
                         (__ci_expr_ternary_64 = 0)
                     } else {
-                        (__ci_expr_ternary_64 = 4096)
+                        (__ci_expr_ternary_64 = 32768)
                     }
                     var __ci_expr_ternary_65: c_uint = 0
-                    if ((if (dat_datctl.control2 & 32) == 0: 1 else: 0) != 0) {
+                    if ((if (dat_datctl.control2 & 16) == 0: 1 else: 0) != 0) {
                         (__ci_expr_ternary_65 = 0)
                     } else {
-                        (__ci_expr_ternary_65 = 131072)
+                        (__ci_expr_ternary_65 = 4096)
                     }
                     var __ci_expr_ternary_66: c_uint = 0
-                    if ((if (dat_datctl.control2 & 64) == 0: 1 else: 0) != 0) {
+                    if ((if (dat_datctl.control2 & 32) == 0: 1 else: 0) != 0) {
                         (__ci_expr_ternary_66 = 0)
                     } else {
-                        (__ci_expr_ternary_66 = 2048)
+                        (__ci_expr_ternary_66 = 131072)
                     }
                     var __ci_expr_ternary_67: c_uint = 0
-                    if ((if (dat_datctl.control2 & 128) == 0: 1 else: 0) != 0) {
+                    if ((if (dat_datctl.control2 & 64) == 0: 1 else: 0) != 0) {
                         (__ci_expr_ternary_67 = 0)
                     } else {
-                        (__ci_expr_ternary_67 = 1024)
+                        (__ci_expr_ternary_67 = 2048)
                     }
-                    (xoptions__goto_4704_12 = ((((((emoption__goto_4705_12 | __ci_expr_ternary_61) | __ci_expr_ternary_62) | __ci_expr_ternary_63) | __ci_expr_ternary_64) | __ci_expr_ternary_65) | __ci_expr_ternary_66) | __ci_expr_ternary_67)
+                    var __ci_expr_ternary_68: c_uint = 0
+                    if ((if (dat_datctl.control2 & 128) == 0: 1 else: 0) != 0) {
+                        (__ci_expr_ternary_68 = 0)
+                    } else {
+                        (__ci_expr_ternary_68 = 1024)
+                    }
+                    (xoptions__goto_4704_12 = ((((((emoption__goto_4705_12 | __ci_expr_ternary_62) | __ci_expr_ternary_63) | __ci_expr_ternary_64) | __ci_expr_ternary_65) | __ci_expr_ternary_66) | __ci_expr_ternary_67) | __ci_expr_ternary_68)
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -15110,11 +15138,11 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_68: c_int = 0
+                    var __ci_expr_logic_69: c_int = 0
                     if ((if pr__goto_4700_12 < prend__goto_4700_17: 1 else: 0) != 0) {
-                        (__ci_expr_logic_68 = (if (if (unsafe: *pr__goto_4700_12) == 91: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_69 = (if (if (unsafe: *pr__goto_4700_12) == 91: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_68 != 0) {
+                    if (__ci_expr_logic_69 != 0) {
                         (n__goto_4776_16 = 0)
                         if (__goto_pending != 0) {
                             continue
@@ -15124,16 +15152,16 @@ fn process_data_8() -> c_int {
                             continue
                         }
                         while true {
+                            var __ci_expr_logic_71: c_int = 0
                             var __ci_expr_logic_70: c_int = 0
-                            var __ci_expr_logic_69: c_int = 0
                             if ((if pr__goto_4700_12 < prend__goto_4700_17: 1 else: 0) != 0) {
                                 (c__goto_3891_10 = (unsafe: *pr__goto_4700_12))
-                                (__ci_expr_logic_69 = (if (if c__goto_3891_10 >= 48: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_70 = (if (if c__goto_3891_10 >= 48: 1 else: 0) != 0: 1 else: 0))
                             }
-                            if (__ci_expr_logic_69 != 0) {
-                                (__ci_expr_logic_70 = (if (if c__goto_3891_10 <= 57: 1 else: 0) != 0: 1 else: 0))
+                            if (__ci_expr_logic_70 != 0) {
+                                (__ci_expr_logic_71 = (if (if c__goto_3891_10 <= 57: 1 else: 0) != 0: 1 else: 0))
                             }
-                            if (not (__ci_expr_logic_70 != 0)) {
+                            if (not (__ci_expr_logic_71 != 0)) {
                                 break
                             }
                             (n__goto_4776_16 = ((n__goto_4776_16 *% 10) +% (c__goto_3891_10 -% 48)))
@@ -15145,13 +15173,13 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             continue
                         }
-                        var __ci_expr_logic_71: c_int
+                        var __ci_expr_logic_72: c_int
                         if ((if pr__goto_4700_12 >= prend__goto_4700_17: 1 else: 0) != 0) {
-                            (__ci_expr_logic_71 = (if true: 1 else: 0))
+                            (__ci_expr_logic_72 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_71 = (if (if (unsafe: *pr__goto_4700_12) != 93: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_72 = (if (if (unsafe: *pr__goto_4700_12) != 93: 1 else: 0) != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_71 != 0) {
+                        if (__ci_expr_logic_72 != 0) {
                             colour_begin(31, outfile)
                             fprintf(outfile, "** Bad buffer size in replacement string\n")
                             colour_end(outfile)
@@ -15207,13 +15235,13 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_ternary_72: *mut u8 = null
+                    var __ci_expr_ternary_73: *mut u8 = null
                     if ((if (dat_datctl.control2 & 16384) == 0: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_72 = rep_in_buffer_8)
+                        (__ci_expr_ternary_73 = rep_in_buffer_8)
                     } else {
-                        (__ci_expr_ternary_72 = ((null as *mut u8)))
+                        (__ci_expr_ternary_73 = ((null as *mut u8)))
                     }
-                    (rbptr__goto_4702_16 = __ci_expr_ternary_72)
+                    (rbptr__goto_4702_16 = __ci_expr_ternary_73)
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -15270,13 +15298,13 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_ternary_73: *mut pcre2_real_match_data_8 = null
+                    var __ci_expr_ternary_74: *mut pcre2_real_match_data_8 = null
                     if ((if (131072 & dat_datctl.control2) == 0: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_73 = match_data_8)
+                        (__ci_expr_ternary_74 = match_data_8)
                     } else {
-                        (__ci_expr_ternary_73 = ((null as *mut pcre2_real_match_data_8)))
+                        (__ci_expr_ternary_74 = ((null as *mut pcre2_real_match_data_8)))
                     }
-                    (smatch_data__goto_4707_21 = __ci_expr_ternary_73)
+                    (smatch_data__goto_4707_21 = __ci_expr_ternary_74)
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -15345,11 +15373,11 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_74: c_int = 0
+                    var __ci_expr_logic_75: c_int = 0
                     if (malloc_testing != 0) {
-                        (__ci_expr_logic_74 = (if (if (dat_datctl.control2 & 1) == 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_75 = (if (if (dat_datctl.control2 & 1) == 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_74 != 0) {
+                    if (__ci_expr_logic_75 != 0) {
                         (i__goto_4895_14 = 0)
                         (target_mallocs__goto_4895_21 = mallocs_called)
                         while ((if i__goto_4895_14 <= target_mallocs__goto_4895_21: 1 else: 0) != 0) {
@@ -15408,11 +15436,11 @@ fn process_data_8() -> c_int {
                             if (__goto_pending != 0) {
                                 break
                             }
-                            var __ci_expr_logic_75: c_int = 0
+                            var __ci_expr_logic_76: c_int = 0
                             if ((if i__goto_4895_14 < target_mallocs__goto_4895_21: 1 else: 0) != 0) {
-                                (__ci_expr_logic_75 = (if (if rc__goto_4699_7 != -48: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_76 = (if (if rc__goto_4699_7 != -48: 1 else: 0) != 0: 1 else: 0))
                             }
-                            if (__ci_expr_logic_75 != 0) {
+                            if (__ci_expr_logic_76 != 0) {
                                 colour_begin(31, outfile)
                                 fprintf(outfile, "** malloc() Substitution test did not fail as expected (%d)\n", rc__goto_4699_7)
                                 colour_end(outfile)
@@ -15446,11 +15474,11 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             continue
                         }
-                        var __ci_expr_logic_76: c_int = 0
+                        var __ci_expr_logic_77: c_int = 0
                         if ((if rc__goto_4699_7 != -48: 1 else: 0) != 0) {
-                            (__ci_expr_logic_76 = (if (if nsize__goto_4706_34 != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_77 = (if (if nsize__goto_4706_34 != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_76 != 0) {
+                        if (__ci_expr_logic_77 != 0) {
                             colour_begin(35, outfile)
                             fprintf(outfile, " at offset %ld in replacement", (nsize__goto_4706_34 as c_long))
                             colour_end(outfile)
@@ -15470,11 +15498,11 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             continue
                         }
-                        var __ci_expr_logic_77: c_int = 0
+                        var __ci_expr_logic_78: c_int = 0
                         if ((if rc__goto_4699_7 == -48: 1 else: 0) != 0) {
-                            (__ci_expr_logic_77 = (if (if (xoptions__goto_4704_12 & 4096) != 0: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_78 = (if (if (xoptions__goto_4704_12 & 4096) != 0: 1 else: 0) != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_77 != 0) {
+                        if (__ci_expr_logic_78 != 0) {
                             colour_begin(35, outfile)
                             fprintf(outfile, ": %ld code units are needed", (nsize__goto_4706_34 as c_long))
                             colour_end(outfile)
@@ -15482,11 +15510,11 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             continue
                         }
-                        var __ci_expr_logic_78: c_int = 0
+                        var __ci_expr_logic_79: c_int = 0
                         if ((if rc__goto_4699_7 != -48: 1 else: 0) != 0) {
-                            (__ci_expr_logic_78 = (if (if nsize__goto_4706_34 != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_79 = (if (if nsize__goto_4706_34 != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_78 != 0) {
+                        if (__ci_expr_logic_79 != 0) {
                             colour_begin(35, outfile)
                             fprintf(outfile, "\n        here: ")
                             colour_end(outfile)
@@ -15558,11 +15586,11 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_79: c_int = 0
+                    var __ci_expr_logic_80: c_int = 0
                     if ((if (dat_datctl.control2 & 536870912) != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_79 = (if (if (dat_datctl.control & 512) == 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_80 = (if (if (dat_datctl.control & 512) == 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_79 != 0) {
+                    if (__ci_expr_logic_80 != 0) {
                         show_heapframes_size_8()
                     }
                     if (__goto_pending != 0) {
@@ -15715,17 +15743,17 @@ fn process_data_8() -> c_int {
                     continue
                 }
                 if ((if (dat_datctl.control & (2048 | 4096)) != 0: 1 else: 0) != 0) {
-                    var __ci_expr_logic_81: c_int = 0
+                    var __ci_expr_logic_82: c_int = 0
                     if ((if (dat_datctl.control & 4096) == 0: 1 else: 0) != 0) {
-                        var __ci_expr_logic_80: c_int
+                        var __ci_expr_logic_81: c_int
                         if ((if compiled_code_8.executable_jit == null: 1 else: 0) != 0) {
-                            (__ci_expr_logic_80 = (if true: 1 else: 0))
+                            (__ci_expr_logic_81 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_80 = (if (if (dat_datctl.options & 8192) != 0: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_81 = (if (if (dat_datctl.options & 8192) != 0: 1 else: 0) != 0: 1 else: 0))
                         }
-                        (__ci_expr_logic_81 = (if __ci_expr_logic_80 != 0: 1 else: 0))
+                        (__ci_expr_logic_82 = (if __ci_expr_logic_81 != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_81 != 0) {
+                    if (__ci_expr_logic_82 != 0) {
                         check_match_limit_8(pp__goto_3906_14, arg_ulen__goto_3889_18, -63, "heap")
                         if (__goto_pending != 0) {
                             continue
@@ -15738,19 +15766,19 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
+                    var __ci_expr_logic_84: c_int
                     var __ci_expr_logic_83: c_int
-                    var __ci_expr_logic_82: c_int
                     if ((if compiled_code_8.executable_jit == null: 1 else: 0) != 0) {
-                        (__ci_expr_logic_82 = (if true: 1 else: 0))
-                    } else {
-                        (__ci_expr_logic_82 = (if (if (dat_datctl.options & 8192) != 0: 1 else: 0) != 0: 1 else: 0))
-                    }
-                    if (__ci_expr_logic_82 != 0) {
                         (__ci_expr_logic_83 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_83 = (if (if (dat_datctl.control & 512) != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_83 = (if (if (dat_datctl.options & 8192) != 0: 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_83 != 0) {
+                        (__ci_expr_logic_84 = (if true: 1 else: 0))
+                    } else {
+                        (__ci_expr_logic_84 = (if (if (dat_datctl.control & 512) != 0: 1 else: 0) != 0: 1 else: 0))
+                    }
+                    if (__ci_expr_logic_84 != 0) {
                         (capcount__goto_4972_7 = check_match_limit_8(pp__goto_3906_14, arg_ulen__goto_3889_18, -53, "depth"))
                         if (__goto_pending != 0) {
                             continue
@@ -15811,9 +15839,9 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             continue
                         }
-                        var __ci_expr_old_84: c_uint = dfa_matched
+                        var __ci_expr_old_85: c_uint = dfa_matched
                         (dfa_matched = dfa_matched + 1)
-                        if ((if __ci_expr_old_84 == 0: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_85 == 0: 1 else: 0) != 0) {
                             ((unsafe: dfa_workspace[0]) = -1)
                         }
                         if (__goto_pending != 0) {
@@ -15866,11 +15894,11 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_85: c_int = 0
+                    var __ci_expr_logic_86: c_int = 0
                     if (malloc_testing != 0) {
-                        (__ci_expr_logic_85 = (if (if (dat_datctl.control & 256) != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_86 = (if (if (dat_datctl.control & 256) != 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_85 != 0) {
+                    if (__ci_expr_logic_86 != 0) {
                         (i__goto_5114_16 = 0)
                         (target_mallocs__goto_5114_23 = mallocs_called)
                         while ((if i__goto_5114_16 <= target_mallocs__goto_5114_23: 1 else: 0) != 0) {
@@ -15914,9 +15942,9 @@ fn process_data_8() -> c_int {
                                 break
                             }
                             if ((if (dat_datctl.control & 512) != 0: 1 else: 0) != 0) {
-                                var __ci_expr_old_86: c_uint = dfa_matched
+                                var __ci_expr_old_87: c_uint = dfa_matched
                                 (dfa_matched = dfa_matched + 1)
-                                if ((if __ci_expr_old_86 == 0: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_87 == 0: 1 else: 0) != 0) {
                                     ((unsafe: dfa_workspace[0]) = -1)
                                 }
                                 if (__goto_pending != 0) {
@@ -15953,11 +15981,11 @@ fn process_data_8() -> c_int {
                             if (__goto_pending != 0) {
                                 break
                             }
-                            var __ci_expr_logic_87: c_int = 0
+                            var __ci_expr_logic_88: c_int = 0
                             if ((if i__goto_5114_16 < target_mallocs__goto_5114_23: 1 else: 0) != 0) {
-                                (__ci_expr_logic_87 = (if (if capcount__goto_4972_7 != -48: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_88 = (if (if capcount__goto_4972_7 != -48: 1 else: 0) != 0: 1 else: 0))
                             }
-                            if (__ci_expr_logic_87 != 0) {
+                            if (__ci_expr_logic_88 != 0) {
                                 colour_begin(31, outfile)
                                 fprintf(outfile, "** malloc() match test did not fail as expected (%d)\n", capcount__goto_4972_7)
                                 colour_end(outfile)
@@ -15988,11 +16016,11 @@ fn process_data_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                var __ci_expr_logic_88: c_int = 0
+                var __ci_expr_logic_89: c_int = 0
                 if ((if capcount__goto_4972_7 < 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_88 = (if (if (dat_datctl.control & (16 | 32768)) != 0: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_89 = (if (if (dat_datctl.control & (16 | 32768)) != 0: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_88 != 0) {
+                if (__ci_expr_logic_89 != 0) {
                     (tmp_offset__goto_5163_18 = 205)
                     if (__goto_pending != 0) {
                         continue
@@ -16005,19 +16033,19 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
+                    var __ci_expr_logic_91: c_int
                     var __ci_expr_logic_90: c_int
-                    var __ci_expr_logic_89: c_int
                     if (rc_nextmatch__goto_5162_12 != 0) {
-                        (__ci_expr_logic_89 = (if true: 1 else: 0))
-                    } else {
-                        (__ci_expr_logic_89 = (if (if tmp_offset__goto_5163_18 != 205: 1 else: 0) != 0: 1 else: 0))
-                    }
-                    if (__ci_expr_logic_89 != 0) {
                         (__ci_expr_logic_90 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_90 = (if (if tmp_options__goto_5164_16 != 205: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_90 = (if (if tmp_offset__goto_5163_18 != 205: 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_90 != 0) {
+                        (__ci_expr_logic_91 = (if true: 1 else: 0))
+                    } else {
+                        (__ci_expr_logic_91 = (if (if tmp_options__goto_5164_16 != 205: 1 else: 0) != 0: 1 else: 0))
+                    }
+                    if (__ci_expr_logic_91 != 0) {
                         colour_begin(31, outfile)
                         fprintf(outfile, "** unexpected pcre2_next_match() for rc < 0\n")
                         colour_end(outfile)
@@ -16065,11 +16093,11 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_91: c_int = 0
+                    var __ci_expr_logic_92: c_int = 0
                     if ((if (dat_datctl.options & 16384) != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_91 = (if (if (pat_patctl.control & 262144) == 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_92 = (if (if (pat_patctl.control & 262144) == 0: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_91 != 0) {
+                    if (__ci_expr_logic_92 != 0) {
                         if ((if (match_data_8.flags & 1) == 0: 1 else: 0) != 0) {
                             colour_begin(31, outfile)
                             fprintf(outfile, "** PCRE2 error: flag not set after copy_matched_subject\n")
@@ -16098,23 +16126,23 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
+                    var __ci_expr_logic_96: c_int = 0
                     var __ci_expr_logic_95: c_int = 0
                     var __ci_expr_logic_94: c_int = 0
-                    var __ci_expr_logic_93: c_int = 0
                     if ((if gmatched__goto_3890_10 > 0: 1 else: 0) != 0) {
-                        var __ci_expr_logic_92: c_int = 0
+                        var __ci_expr_logic_93: c_int = 0
                         if ((if dat_datctl.offset <= (unsafe: ovector__goto_3900_13[0]): 1 else: 0) != 0) {
-                            (__ci_expr_logic_92 = (if (if (unsafe: ovector__goto_3900_13[0]) <= (unsafe: ovector__goto_3900_13[1]): 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_93 = (if (if (unsafe: ovector__goto_3900_13[0]) <= (unsafe: ovector__goto_3900_13[1]): 1 else: 0) != 0: 1 else: 0))
                         }
-                        (__ci_expr_logic_93 = (if (if not (__ci_expr_logic_92 != 0): 1 else: 0) != 0: 1 else: 0))
-                    }
-                    if (__ci_expr_logic_93 != 0) {
-                        (__ci_expr_logic_94 = (if (if (pp__goto_3906_14 + (unsafe: ovector__goto_3900_13[0])) == ovecsave__goto_3901_12[0]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_94 = (if (if not (__ci_expr_logic_93 != 0): 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_94 != 0) {
-                        (__ci_expr_logic_95 = (if (if (pp__goto_3906_14 + (unsafe: ovector__goto_3900_13[1])) == ovecsave__goto_3901_12[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_95 = (if (if (pp__goto_3906_14 + (unsafe: ovector__goto_3900_13[0])) == ovecsave__goto_3901_12[0]: 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_95 != 0) {
+                        (__ci_expr_logic_96 = (if (if (pp__goto_3906_14 + (unsafe: ovector__goto_3900_13[1])) == ovecsave__goto_3901_12[1]: 1 else: 0) != 0: 1 else: 0))
+                    }
+                    if (__ci_expr_logic_96 != 0) {
                         colour_begin(35, outfile)
                         fprintf(outfile, "global repeat returned the same match as previous\n")
                         colour_end(outfile)
@@ -16130,33 +16158,33 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_101: c_int = 0
-                    var __ci_expr_logic_97: c_int = 0
+                    var __ci_expr_logic_102: c_int = 0
+                    var __ci_expr_logic_98: c_int = 0
                     if ((if gmatched__goto_3890_10 > 0: 1 else: 0) != 0) {
-                        var __ci_expr_logic_96: c_int = 0
+                        var __ci_expr_logic_97: c_int = 0
                         if ((if dat_datctl.offset <= (unsafe: ovector__goto_3900_13[0]): 1 else: 0) != 0) {
-                            (__ci_expr_logic_96 = (if (if (unsafe: ovector__goto_3900_13[0]) <= (unsafe: ovector__goto_3900_13[1]): 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_97 = (if (if (unsafe: ovector__goto_3900_13[0]) <= (unsafe: ovector__goto_3900_13[1]): 1 else: 0) != 0: 1 else: 0))
                         }
-                        (__ci_expr_logic_97 = (if __ci_expr_logic_96 != 0: 1 else: 0))
+                        (__ci_expr_logic_98 = (if __ci_expr_logic_97 != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_97 != 0) {
-                        var __ci_expr_logic_100: c_int
+                    if (__ci_expr_logic_98 != 0) {
+                        var __ci_expr_logic_101: c_int
                         if ((if (pp__goto_3906_14 + (unsafe: ovector__goto_3900_13[1])) > ovecsave__goto_3901_12[1]: 1 else: 0) != 0) {
-                            (__ci_expr_logic_100 = (if true: 1 else: 0))
+                            (__ci_expr_logic_101 = (if true: 1 else: 0))
                         } else {
+                            var __ci_expr_logic_100: c_int = 0
                             var __ci_expr_logic_99: c_int = 0
-                            var __ci_expr_logic_98: c_int = 0
                             if ((if (unsafe: ovector__goto_3900_13[1]) == (unsafe: ovector__goto_3900_13[0]): 1 else: 0) != 0) {
-                                (__ci_expr_logic_98 = (if (if ovecsave__goto_3901_12[1] != ovecsave__goto_3901_12[0]: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_99 = (if (if ovecsave__goto_3901_12[1] != ovecsave__goto_3901_12[0]: 1 else: 0) != 0: 1 else: 0))
                             }
-                            if (__ci_expr_logic_98 != 0) {
-                                (__ci_expr_logic_99 = (if (if (pp__goto_3906_14 + (unsafe: ovector__goto_3900_13[1])) == ovecsave__goto_3901_12[1]: 1 else: 0) != 0: 1 else: 0))
+                            if (__ci_expr_logic_99 != 0) {
+                                (__ci_expr_logic_100 = (if (if (pp__goto_3906_14 + (unsafe: ovector__goto_3900_13[1])) == ovecsave__goto_3901_12[1]: 1 else: 0) != 0: 1 else: 0))
                             }
-                            (__ci_expr_logic_100 = (if __ci_expr_logic_99 != 0: 1 else: 0))
+                            (__ci_expr_logic_101 = (if __ci_expr_logic_100 != 0: 1 else: 0))
                         }
-                        (__ci_expr_logic_101 = (if (if not (__ci_expr_logic_100 != 0): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_102 = (if (if not (__ci_expr_logic_101 != 0): 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_101 != 0) {
+                    if (__ci_expr_logic_102 != 0) {
                         colour_begin(31, outfile)
                         fprintf(outfile, "** PCRE2 error: global repeat did not make progress\n")
                         colour_end(outfile)
@@ -16233,11 +16261,11 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             break
                         }
-                        var __ci_expr_logic_102: c_int = 0
+                        var __ci_expr_logic_103: c_int = 0
                         if ((if start__goto_5285_18 == (~(0 as c_ulong)): 1 else: 0) != 0) {
-                            (__ci_expr_logic_102 = (if (if end__goto_5286_18 == (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_103 = (if (if end__goto_5286_18 == (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_102 != 0) {
+                        if (__ci_expr_logic_103 != 0) {
                             fprintf(outfile, "<unset>\n")
                             if (__goto_pending != 0) {
                                 break
@@ -16251,28 +16279,28 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             break
                         }
-                        var __ci_expr_logic_103: c_int
+                        var __ci_expr_logic_104: c_int
                         if ((if start__goto_5285_18 > ulen__goto_3889_12: 1 else: 0) != 0) {
-                            (__ci_expr_logic_103 = (if true: 1 else: 0))
+                            (__ci_expr_logic_104 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_103 = (if (if end__goto_5286_18 > ulen__goto_3889_12: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_104 = (if (if end__goto_5286_18 > ulen__goto_3889_12: 1 else: 0) != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_103 != 0) {
+                        if (__ci_expr_logic_104 != 0) {
+                            var __ci_expr_logic_107: c_int = 0
                             var __ci_expr_logic_106: c_int = 0
-                            var __ci_expr_logic_105: c_int = 0
-                            var __ci_expr_logic_104: c_int
+                            var __ci_expr_logic_105: c_int
                             if ((if (dat_datctl.control & 512) != 0: 1 else: 0) != 0) {
-                                (__ci_expr_logic_104 = (if true: 1 else: 0))
+                                (__ci_expr_logic_105 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_104 = (if (if i__goto_5282_14 >= ((((2 *% maxcapcount) +% 2) as c_int)): 1 else: 0) != 0: 1 else: 0))
-                            }
-                            if (__ci_expr_logic_104 != 0) {
-                                (__ci_expr_logic_105 = (if (if start__goto_5285_18 == 3735928559: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_105 = (if (if i__goto_5282_14 >= ((((2 *% maxcapcount) +% 2) as c_int)): 1 else: 0) != 0: 1 else: 0))
                             }
                             if (__ci_expr_logic_105 != 0) {
-                                (__ci_expr_logic_106 = (if (if end__goto_5286_18 == 3735928559: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_106 = (if (if start__goto_5285_18 == 3735928559: 1 else: 0) != 0: 1 else: 0))
                             }
                             if (__ci_expr_logic_106 != 0) {
+                                (__ci_expr_logic_107 = (if (if end__goto_5286_18 == 3735928559: 1 else: 0) != 0: 1 else: 0))
+                            }
+                            if (__ci_expr_logic_107 != 0) {
                                 fprintf(outfile, "<unchanged>\n")
                             } else {
                                 colour_begin(31, outfile)
@@ -16301,17 +16329,17 @@ fn process_data_8() -> c_int {
                                 if (__goto_pending != 0) {
                                     break
                                 }
-                                var __ci_expr_logic_108: c_int = 0
+                                var __ci_expr_logic_109: c_int = 0
                                 if ((if i__goto_5282_14 == 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_107: c_int
+                                    var __ci_expr_logic_108: c_int
                                     if ((if leftchar__goto_5334_20 < start__goto_5285_18: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_107 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_107 = (if (if rightchar__goto_5334_30 > end__goto_5286_18: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_108 = (if (if rightchar__goto_5334_30 > end__goto_5286_18: 1 else: 0) != 0: 1 else: 0))
                                     }
-                                    (__ci_expr_logic_108 = (if __ci_expr_logic_107 != 0: 1 else: 0))
+                                    (__ci_expr_logic_109 = (if __ci_expr_logic_108 != 0: 1 else: 0))
                                 }
-                                (showallused__goto_5333_14 = __ci_expr_logic_108)
+                                (showallused__goto_5333_14 = __ci_expr_logic_109)
                                 if (__goto_pending != 0) {
                                     break
                                 }
@@ -16334,11 +16362,11 @@ fn process_data_8() -> c_int {
                                 if (__goto_pending != 0) {
                                     break
                                 }
-                                var __ci_expr_logic_109: c_int = 0
+                                var __ci_expr_logic_110: c_int = 0
                                 if ((if (pat_patctl.control & 524288) != 0: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_109 = (if jit_was_used != 0: 1 else: 0))
+                                    (__ci_expr_logic_110 = (if jit_was_used != 0: 1 else: 0))
                                 }
-                                if (__ci_expr_logic_109 != 0) {
+                                if (__ci_expr_logic_110 != 0) {
                                     fprintf(outfile, " (JIT)")
                                 }
                                 if (__goto_pending != 0) {
@@ -16395,11 +16423,11 @@ fn process_data_8() -> c_int {
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    var __ci_expr_logic_110: c_int = 0
+                                    var __ci_expr_logic_111: c_int = 0
                                     if ((if (pat_patctl.control & 524288) != 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_110 = (if jit_was_used != 0: 1 else: 0))
+                                        (__ci_expr_logic_111 = (if jit_was_used != 0: 1 else: 0))
                                     }
-                                    if (__ci_expr_logic_110 != 0) {
+                                    if (__ci_expr_logic_111 != 0) {
                                         fprintf(outfile, " (JIT)")
                                     }
                                     if (__goto_pending != 0) {
@@ -16430,11 +16458,11 @@ fn process_data_8() -> c_int {
                                     if (__goto_pending != 0) {
                                         break
                                     }
-                                    var __ci_expr_logic_111: c_int = 0
+                                    var __ci_expr_logic_112: c_int = 0
                                     if ((if (pat_patctl.control & 524288) != 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_111 = (if jit_was_used != 0: 1 else: 0))
+                                        (__ci_expr_logic_112 = (if jit_was_used != 0: 1 else: 0))
                                     }
-                                    if (__ci_expr_logic_111 != 0) {
+                                    if (__ci_expr_logic_112 != 0) {
                                         fprintf(outfile, " (JIT)")
                                     }
                                     if (__goto_pending != 0) {
@@ -16458,17 +16486,17 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             break
                         }
-                        var __ci_expr_logic_113: c_int
+                        var __ci_expr_logic_114: c_int
                         if ((if (dat_datctl.control & 2) != 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_113 = (if true: 1 else: 0))
+                            (__ci_expr_logic_114 = (if true: 1 else: 0))
                         } else {
-                            var __ci_expr_logic_112: c_int = 0
+                            var __ci_expr_logic_113: c_int = 0
                             if ((if i__goto_5282_14 == 0: 1 else: 0) != 0) {
-                                (__ci_expr_logic_112 = (if (if (dat_datctl.control & 1) != 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_113 = (if (if (dat_datctl.control & 1) != 0: 1 else: 0) != 0: 1 else: 0))
                             }
-                            (__ci_expr_logic_113 = (if __ci_expr_logic_112 != 0: 1 else: 0))
+                            (__ci_expr_logic_114 = (if __ci_expr_logic_113 != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_113 != 0) {
+                        if (__ci_expr_logic_114 != 0) {
                             fprintf(outfile, "%2d+ ", (i__goto_5282_14 / 2))
                             if (__goto_pending != 0) {
                                 break
@@ -16493,11 +16521,11 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    var __ci_expr_logic_114: c_int = 0
+                    var __ci_expr_logic_115: c_int = 0
                     if ((if (dat_datctl.control & 1048576) != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_114 = (if (if match_data_8.mark != null: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_115 = (if (if match_data_8.mark != null: 1 else: 0) != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_114 != 0) {
+                    if (__ci_expr_logic_115 != 0) {
                         fprintf(outfile, "MK: ")
                         if (__goto_pending != 0) {
                             continue
@@ -16543,11 +16571,11 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             continue
                         }
-                        var __ci_expr_logic_115: c_int = 0
+                        var __ci_expr_logic_116: c_int = 0
                         if ((if (dat_datctl.control & 1048576) != 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_115 = (if (if match_data_8.mark != null: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_116 = (if (if match_data_8.mark != null: 1 else: 0) != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_115 != 0) {
+                        if (__ci_expr_logic_116 != 0) {
                             fprintf(outfile, ", mark=")
                             if (__goto_pending != 0) {
                                 continue
@@ -16580,11 +16608,11 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             continue
                         }
-                        var __ci_expr_logic_116: c_int = 0
+                        var __ci_expr_logic_117: c_int = 0
                         if ((if (pat_patctl.control & 524288) != 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_116 = (if jit_was_used != 0: 1 else: 0))
+                            (__ci_expr_logic_117 = (if jit_was_used != 0: 1 else: 0))
                         }
-                        if (__ci_expr_logic_116 != 0) {
+                        if (__ci_expr_logic_117 != 0) {
                             fprintf(outfile, " (JIT)")
                         }
                         if (__goto_pending != 0) {
@@ -16647,127 +16675,130 @@ fn process_data_8() -> c_int {
                         }
                         break
                     } else {
-                        match capcount__goto_4972_7 {
-                            -1 => {
-                                if ((if gmatched__goto_3890_10 == 0: 1 else: 0) != 0) {
+                        while true {
+                            match capcount__goto_4972_7 {
+                                -1 => {
+                                    if ((if gmatched__goto_3890_10 == 0: 1 else: 0) != 0) {
+                                        colour_begin(35, outfile)
+
+                                        fprintf(outfile, "No match")
+
+                                        colour_end(outfile)
+
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        var __ci_expr_logic_118: c_int = 0
+
+                                        if ((if (dat_datctl.control & 1048576) != 0: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_118 = (if (if match_data_8.mark != null: 1 else: 0) != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_118 != 0) {
+                                            fprintf(outfile, ", mark = ")
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            pchars_8(-1, (match_data_8.mark - ((1 as isize) as usize)), -1, utf__goto_3897_6, outfile)
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                        }
+
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        var __ci_expr_logic_119: c_int = 0
+
+                                        if ((if (pat_patctl.control & 524288) != 0: 1 else: 0) != 0) {
+                                            (__ci_expr_logic_119 = (if jit_was_used != 0: 1 else: 0))
+                                        }
+
+                                        if (__ci_expr_logic_119 != 0) {
+                                            fprintf(outfile, " (JIT)")
+                                        }
+
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        fprintf(outfile, "\n")
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                        if ((if (dat_datctl.control2 & 2048) != 0: 1 else: 0) != 0) {
+                                            show_ovector(ovector__goto_3900_13, oveccount__goto_3902_10)
+                                        }
+
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+
+                                    }
+                                },
+                                -36 => {
                                     colour_begin(35, outfile)
 
-                                    fprintf(outfile, "No match")
+                                    fprintf(outfile, "Error %d (bad UTF-PCRE2_CODE_UNIT_WIDTH offset)\n", capcount__goto_4972_7)
+
+                                    colour_end(outfile)
+
+                                },
+                                _ => {
+                                    colour_begin(35, outfile)
+
+                                    fprintf(outfile, "Failed: error %d: ", capcount__goto_4972_7)
 
                                     colour_end(outfile)
 
 
-                                    if (__goto_pending != 0) {
-                                        continue
+                                    if ((if not (print_error_message_8(capcount__goto_4972_7, "", "") != 0): 1 else: 0) != 0) {
+                                        return PR_ABEND
                                     }
 
-                                    var __ci_expr_logic_117: c_int = 0
+                                    var __ci_expr_logic_120: c_int = 0
 
-                                    if ((if (dat_datctl.control & 1048576) != 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_117 = (if (if match_data_8.mark != null: 1 else: 0) != 0: 1 else: 0))
+                                    if ((if capcount__goto_4972_7 <= -3: 1 else: 0) != 0) {
+                                        (__ci_expr_logic_120 = (if (if capcount__goto_4972_7 >= -28: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_117 != 0) {
-                                        fprintf(outfile, ", mark = ")
+                                    if (__ci_expr_logic_120 != 0) {
+                                        (startchar__goto_5520_20 = pcre2_get_startchar_8(match_data_8))
 
                                         if (__goto_pending != 0) {
-                                            continue
+                                            break
                                         }
 
-                                        pchars_8(-1, (match_data_8.mark - ((1 as isize) as usize)), -1, utf__goto_3897_6, outfile)
+                                        colour_begin(35, outfile)
+
+                                        fprintf(outfile, " at offset %zu", startchar__goto_5520_20)
+
+                                        colour_end(outfile)
+
 
                                         if (__goto_pending != 0) {
-                                            continue
+                                            break
                                         }
 
                                     }
 
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    var __ci_expr_logic_118: c_int = 0
-
-                                    if ((if (pat_patctl.control & 524288) != 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_118 = (if jit_was_used != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_118 != 0) {
-                                        fprintf(outfile, " (JIT)")
-                                    }
-
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
 
                                     fprintf(outfile, "\n")
 
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    if ((if (dat_datctl.control2 & 2048) != 0: 1 else: 0) != 0) {
-                                        show_ovector(ovector__goto_3900_13, oveccount__goto_3902_10)
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                }
-                            },
-                            -36 => {
-                                colour_begin(35, outfile)
-
-                                fprintf(outfile, "Error %d (bad UTF-PCRE2_CODE_UNIT_WIDTH offset)\n", capcount__goto_4972_7)
-
-                                colour_end(outfile)
-
-                            },
-                            _ => {
-                                colour_begin(35, outfile)
-
-                                fprintf(outfile, "Failed: error %d: ", capcount__goto_4972_7)
-
-                                colour_end(outfile)
-
-
-                                if ((if not (print_error_message_8(capcount__goto_4972_7, "", "") != 0): 1 else: 0) != 0) {
-                                    return PR_ABEND
-                                }
-
-                                var __ci_expr_logic_119: c_int = 0
-
-                                if ((if capcount__goto_4972_7 <= -3: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_119 = (if (if capcount__goto_4972_7 >= -28: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_119 != 0) {
-                                    (startchar__goto_5520_20 = pcre2_get_startchar_8(match_data_8))
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    colour_begin(35, outfile)
-
-                                    fprintf(outfile, " at offset %zu", startchar__goto_5520_20)
-
-                                    colour_end(outfile)
-
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                }
-
-
-                                fprintf(outfile, "\n")
-
-                            },
+                                },
+                            }
+                            break
                         }
                         if (__goto_pending != 0) {
                             continue
@@ -16833,14 +16864,15 @@ fn process_data_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
+                (gmatched__goto_3890_10 = gmatched__goto_3890_10 + 1)
                 __pc = 3
                 __goto_pending = 1
                 continue
-                var __ci_expr_logic_120: c_int = 0
+                var __ci_expr_logic_122: c_int = 0
                 if ((if (dat_datctl.control2 & 536870912) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_120 = (if (if (dat_datctl.control & 512) == 0: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_122 = (if (if (dat_datctl.control & 512) == 0: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_120 != 0) {
+                if (__ci_expr_logic_122 != 0) {
                     show_heapframes_size_8()
                 }
                 if (__goto_pending != 0) {
@@ -22768,10 +22800,10 @@ fn main(__param_argc: c_int, argv: *mut *mut i8) -> c_int {
                     (__ci_expr_logic_1 = (if (if (unsafe: (unsafe: argv[op__goto_3644_10])[1]) != 0: 1 else: 0) != 0: 1 else: 0))
                 }
                 if (not (__ci_expr_logic_1 != 0)) {
-                    break
+                    __pc = 4
+                    __goto_pending = 1
+                    continue
                 }
-                __pc = 4
-                __goto_pending = 1
                 if (__goto_pending != 0) {
                     continue
                 }
