@@ -25,7 +25,6 @@ echo "=== Step 2: Run with migrate ==="
 rm -rf "$MIGRATE_OUT" && mkdir -p "$MIGRATE_OUT"
 $WITH migrate "$PCRE2_SRC/" -o "$MIGRATE_OUT/" \
     --prefer-brace \
-    --exclude pcre2test.c \
     --exclude pcre2demo.c \
     --exclude pcre2grep.c \
     --exclude pcre2posix.c \
@@ -44,7 +43,7 @@ rm -rf "$LIB_RE" && mkdir -p "$LIB_RE"
 for f in "$MIGRATE_OUT"/*.w; do
     base=$(basename "$f")
     case "$base" in
-        pcre2test.w|pcre2demo.w|pcre2grep.w|pcre2posix_test.w|\
+        pcre2demo.w|pcre2grep.w|pcre2posix_test.w|\
         pcre2_jit_test.w|pcre2_dftables.w|\
         pcre2_fuzzsupport.w)
             ;;
