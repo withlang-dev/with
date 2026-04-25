@@ -2218,6 +2218,244 @@ EOF
   echo "PASS(cli-selfhost-migrate) goto_label_scope"
 }
 
+expect_migrate_goto_switch_label_tail() {
+  local case_dir="$tmpdir/migrate_goto_switch_label_tail_case"
+  local src="$case_dir/goto_switch_label_tail.c"
+  local out_w="$case_dir/goto_switch_label_tail.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int f(int mode) {
+  int out = 0;
+  switch (mode) {
+    case 0:
+    L0:
+      out = out + 8;
+      break;
+    case 1:
+      goto L1;
+    case 2:
+      goto L2;
+    default:
+    L1:
+      out = out + 1;
+    L2:
+      out = out + 2;
+      out = out + 4;
+      break;
+  }
+  return out;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) goto_switch_label_tail"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! python3 - "$out_w" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text()
+if "match __pc {" not in text:
+    raise SystemExit(1)
+if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
+    raise SystemExit(1)
+PY
+  then
+    echo "FAIL(cli-selfhost-migrate-output) goto_switch_label_tail"
+    sed -n '1,180p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  cat >>"$out_w" <<'EOF'
+
+fn main() -> i32 {
+    if f(0) != 8 { return 4 }
+    if f(1) != 7 { return 1 }
+    if f(2) != 6 { return 2 }
+    if f(3) != 7 { return 3 }
+    0
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$out_w"; then
+    echo "FAIL(cli-selfhost-run) goto_switch_label_tail"
+    cat "$tmpdir/err" || true
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) goto_switch_label_tail"
+}
+
+expect_migrate_goto_loop_conditions() {
+  local case_dir="$tmpdir/migrate_goto_loop_conditions_case"
+  local src="$case_dir/goto_loop_conditions.c"
+  local out_w="$case_dir/goto_loop_conditions.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int while_sum(int n) {
+  int out = 0;
+  if (n < 0) goto L;
+L:
+  while (n > 0) {
+    out += n;
+    n--;
+  }
+  return out;
+}
+
+int for_sum(int n) {
+  int out = 0;
+  if (n < 0) goto L;
+L:
+  for (; n > 0; n--) {
+    out += n;
+  }
+  return out;
+}
+
+int for_no_cond_sum(int n) {
+  int out = 0;
+  int guard = 0;
+  if (n < 0) goto L;
+L:
+  for (;; n--) {
+    if (n <= 0) break;
+    out += n;
+    guard++;
+    if (guard > 10) return -99;
+  }
+  return out;
+}
+
+int for_switch_inc_sum(int n) {
+  int out = 0;
+  int guard = 0;
+  if (n < 0) goto L;
+L:
+  for (;; n--) {
+    switch (n) {
+      case 3:
+      S3:
+        out += 3;
+        break;
+      case 2:
+        goto S1;
+      case 1:
+      S1:
+        out += 1;
+        break;
+      default:
+        if (n <= 0) return out;
+        out += 10;
+        break;
+    }
+    guard++;
+    if (guard > 10) return -99;
+  }
+}
+
+int switch_label_scan_after_switch(int n) {
+  int out = 0;
+  int guard = 0;
+  if (n < 0) goto L8;
+  for (;; n--) {
+    switch (n) {
+      case 2:
+        out += 2;
+        break;
+      case 8:
+      L8:
+        out += 80;
+        break;
+      case 9:
+      L9:
+        out += 90;
+        break;
+      default:
+        if (n <= 0) return out;
+        out += 10;
+        break;
+    }
+    guard++;
+    if (guard > 10) return -99;
+  }
+}
+
+int do_sum(int n) {
+  int out = 0;
+  if (n < 0) goto L;
+L:
+  do {
+    out += 5;
+    n--;
+  } while (n > 0);
+  return out;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) goto_loop_conditions"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! python3 - "$out_w" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text()
+if "match __pc {" not in text:
+    raise SystemExit(1)
+if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
+    raise SystemExit(1)
+PY
+  then
+    echo "FAIL(cli-selfhost-migrate-output) goto_loop_conditions"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  cat >>"$out_w" <<'EOF'
+
+fn main() -> i32 {
+    if while_sum(3) != 6 { return 1 }
+    if for_sum(3) != 6 { return 2 }
+    if for_no_cond_sum(3) != 6 { return 3 }
+    if for_switch_inc_sum(3) != 5 { return 4 }
+    if switch_label_scan_after_switch(2) != 12 { return 5 }
+    if do_sum(3) != 15 { return 6 }
+    0
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$out_w"; then
+    echo "FAIL(cli-selfhost-run) goto_loop_conditions"
+    cat "$tmpdir/err" || true
+    sed -n '1,260p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) goto_loop_conditions"
+}
+
 expect_migrate_switch_macro_goto_terminators() {
   local case_dir="$tmpdir/migrate_switch_macro_goto_case"
   local src="$case_dir/switch_macro_goto.c"
@@ -3080,6 +3318,8 @@ expect_migrate_for_continue_switch_break_semantics
 expect_migrate_nested_switch_break
 expect_migrate_goto_shadowed_local
 expect_migrate_goto_label_preserves_block_scope
+expect_migrate_goto_switch_label_tail
+expect_migrate_goto_loop_conditions
 expect_migrate_switch_macro_goto_terminators
 expect_migrate_statement_macro_spelling_text
 expect_migrate_recursive_anonymous_records
