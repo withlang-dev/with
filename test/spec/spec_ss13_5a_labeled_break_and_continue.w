@@ -1,76 +1,96 @@
-//! skip
+//! expect-stdout: ok
+
 // Spec test: Section 13.5a — Labeled Break and Continue (formerly 25.46a)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
 
-// PASS: labeled break exits an outer for loop
-fn contains_negative(grid: [[i32]]) -> bool:
-    var found = false
-    'rows: for row in grid:
-        for cell in row:
-            if cell < 0:
-                found = true
-                break 'rows
-    found
+var TRACE: str = ""
 
-// PASS: labeled continue targets the outer loop
-fn count_until_negative(grid: [[i32]]) -> i32:
+type Guard {
+    id: str,
+}
+
+impl Drop for Guard:
+    fn drop(self: Self):
+        TRACE = TRACE ++ self.id
+
+fn test_labeled_for_break:
     var count = 0
-    'rows: for row in grid:
-        for cell in row:
-            if cell < 0:
-                continue 'rows
-            count += 1
-    count
-
-// PASS: brace-form labeled while
-fn test:
-    var i = 0
-    'outer: while i < 10 {
-        i += 1
-        while true {
-            continue 'outer
-        }
-    }
-
-// PASS: labeled block supports early exit
-fn parse_header(input: bytes) -> bool:
-    var ok = false
-    'parse:
-        if input.len() < 4: break 'parse
-        ok = true
-    ok
-
-// PASS: with blocks are transparent for labels
-fn process(lock: &Mutex[Vec[Item]]):
-    'outer: for i in 0..10:
-        with lock.lock() as items:
-            if items[i].is_done():
+    'outer for i in 0..5:
+        for j in 0..5:
+            if i == 2 and j == 2:
                 break 'outer
-            items[i].process()
+            count += 1
+    assert(count == 12)
 
-// FAIL: undefined label
-fn test:
-    while true:
-        break 'missing             // ERROR: no visible label 'missing
+fn test_labeled_for_continue:
+    var count = 0
+    'outer for i in 0..3:
+        for j in 0..3:
+            if j == 1:
+                continue 'outer
+            count += 1
+    assert(count == 3)
 
-// FAIL: continue cannot target a labeled block
-fn test:
-    'block:
-        continue 'block            // ERROR: cannot continue a block
+fn test_labeled_while_continue:
+    var i = 0
+    var hits = 0
+    'outer while i < 4:
+        i += 1
+        while true:
+            hits += 1
+            continue 'outer
+    assert(i == 4)
+    assert(hits == 4)
 
-// FAIL: nested labels may not shadow active labels
-fn test:
-    'l: for x in 0..10:
-        'l: for y in 0..10:        // ERROR: label 'l shadows enclosing 'l
-            break 'l
+fn test_labeled_blocks:
+    var n = 0
+    'colon:
+        n = 1
+        break 'colon
+        n = 99
+    assert(n == 1)
 
-// FAIL: label must target a loop or block
-fn test:
-    'l: let x = 1                  // ERROR
+    'brace {
+        n += 1
+        break 'brace
+        n = 99
+    }
+    assert(n == 2)
 
-// FAIL: labels do not cross async boundaries
-fn test(flag: bool):
-    'outer: while flag:
-        async:
-            break 'outer           // ERROR: label not visible in async block
+fn test_with_transparency:
+    var i = 0
+    'outer while i < 5:
+        i += 1
+        with i as value:
+            if value == 3:
+                break 'outer
+    assert(i == 3)
+
+fn test_cleanup_on_labeled_break:
+    TRACE = ""
+    'outer while true:
+        defer TRACE = TRACE ++ "A"
+        'inner:
+            defer TRACE = TRACE ++ "B"
+            errdefer TRACE = TRACE ++ "E"
+            break 'outer
+            TRACE = TRACE ++ "x"
+    assert(TRACE == "BA")
+
+fn test_drop_on_labeled_break:
+    TRACE = ""
+    'outer while true:
+        let a = Guard { id: "A" }
+        'inner:
+            let b = Guard { id: "B" }
+            break 'outer
+    assert(TRACE == "BA")
+
+fn main:
+    test_labeled_for_break()
+    test_labeled_for_continue()
+    test_labeled_while_continue()
+    test_labeled_blocks()
+    test_with_transparency()
+    test_cleanup_on_labeled_break()
+    test_drop_on_labeled_break()
+    print("ok")

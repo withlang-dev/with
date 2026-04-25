@@ -97,6 +97,14 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         )
         for_meta = for_meta + 3
 
+    var block_meta = 0
+    while block_meta < src.block_meta.len() as i32:
+        out.add_block_meta(
+            (src.block_meta.get(block_meta as i64)) as NodeId,
+            src.block_meta_label(block_meta)
+        )
+        block_meta = block_meta + 2
+
     for mi in 0..src.must_use_type_nodes.len() as i32:
         out.mark_must_use_type((src.must_use_type_nodes.get(mi as i64)) as NodeId)
     for si in 0..src.sealed_trait_nodes.len() as i32:
@@ -614,7 +622,11 @@ fn ct_clone_tree_with_subst(pool: &mut AstPool, node: i32, subst_sym: i32, subst
         for i in 0..stmt_nodes.len() as i32:
             pool.add_extra(stmt_nodes.get(i as i64))
         let tail = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), stmt_extra, stmt_count, tail, pool.literal_suffix(node))
+        let cloned = ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), stmt_extra, stmt_count, tail, pool.literal_suffix(node))
+        let block_meta = pool.find_block_meta(node)
+        if block_meta >= 0:
+            pool.add_block_meta(cloned as NodeId, pool.block_meta_label(block_meta))
+        return cloned
 
     if kind == NodeKind.NK_LET_BINDING:
         let value = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)

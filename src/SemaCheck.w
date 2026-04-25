@@ -336,10 +336,15 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     let body_expected_ret = self.current_return_type
     let saved_expected_et = self.expected_expr_type
     let saved_has_et = self.has_expected_type
+    let saved_loop_depth = self.loop_depth
+    self.loop_depth = 0
+    self.push_label_boundary()
     if body_expected_ret != 0 and body_expected_ret != self.ty_void:
         self.expected_expr_type = body_expected_ret
         self.has_expected_type = 1
     let body_ty = self.check_expr(body)
+    self.pop_label_frame()
+    self.loop_depth = saved_loop_depth
     self.expected_expr_type = saved_expected_et
     self.has_expected_type = saved_has_et
     self.typed_expr_types.insert(body, body_ty as i32)
@@ -381,6 +386,66 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     let fn_name = self.ast.get_data0(node)
     let sig_idx = self.get_sig(fn_name)
     self.check_fn_body_with_sig(node, sig_idx)
+
+fn Sema.label_name(self: Sema, sym: i32) -> str:
+    "'" ++ self.pool_resolve(sym)
+
+fn Sema.push_label_boundary(self: Sema):
+    self.label_syms.push(0)
+    self.label_kinds.push(LabelFrameKind.LFK_BOUNDARY)
+    self.label_nodes.push(0)
+
+fn Sema.push_label_frame(self: Sema, sym: i32, kind: i32, node: i32):
+    if sym != 0:
+        var i = self.label_syms.len() as i32 - 1
+        while i >= 0:
+            let frame_kind = self.label_kinds.get(i as i64)
+            if frame_kind == LabelFrameKind.LFK_BOUNDARY:
+                break
+            if self.label_syms.get(i as i64) == sym:
+                self.emit_error("nested duplicate active label " ++ self.label_name(sym), node)
+                break
+            i = i - 1
+    self.label_syms.push(sym)
+    self.label_kinds.push(kind)
+    self.label_nodes.push(node)
+
+fn Sema.pop_label_frame(self: Sema):
+    if self.label_syms.len() as i32 == 0:
+        return
+    self.label_syms.pop()
+    self.label_kinds.pop()
+    self.label_nodes.pop()
+
+fn Sema.resolve_labeled_control(self: Sema, label: i32, node: i32) -> i32:
+    var crossed_boundary = 0
+    var i = self.label_syms.len() as i32 - 1
+    while i >= 0:
+        let frame_kind = self.label_kinds.get(i as i64)
+        if frame_kind == LabelFrameKind.LFK_BOUNDARY:
+            crossed_boundary = 1
+            i = i - 1
+            continue
+        if self.label_syms.get(i as i64) == label:
+            if crossed_boundary != 0:
+                self.emit_error("label cannot cross function, closure, or async boundary", node)
+                return 0 - 1
+            return i
+        i = i - 1
+    self.emit_error("no enclosing loop or block labeled " ++ self.label_name(label), node)
+    0 - 1
+
+fn Sema.resolve_innermost_loop_control(self: Sema, node: i32, word: str) -> i32:
+    var i = self.label_syms.len() as i32 - 1
+    while i >= 0:
+        let frame_kind = self.label_kinds.get(i as i64)
+        if frame_kind == LabelFrameKind.LFK_BOUNDARY:
+            break
+        if frame_kind == LabelFrameKind.LFK_WHILE or frame_kind == LabelFrameKind.LFK_FOR:
+            return i
+        i = i - 1
+    self.emit_error(word ++ " outside of loop", node)
+    0 - 1
 
 // ── Reachable comptime_error validation ─────────────────────────
 
@@ -1043,26 +1108,22 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_WHILE:
         let cond = self.ast.get_data0(node)
         let body = self.ast.get_data1(node)
+        let label = self.ast.get_data2(node)
         self.check_expr(cond)
         self.loop_depth = self.loop_depth + 1
+        self.push_label_frame(label, LabelFrameKind.LFK_WHILE, node)
         self.check_expr(body)
+        self.pop_label_frame()
         self.loop_depth = self.loop_depth - 1
         return self.ty_void
 
     if kind == NodeKind.NK_LOOP:
-        let saved_break = self.break_value_type
-        let saved_has = self.has_break_value_type
-        self.break_value_type = 0 as TypeId
-        self.has_break_value_type = 0
         self.loop_depth = self.loop_depth + 1
+        self.push_label_frame(0, LabelFrameKind.LFK_WHILE, node)
         self.check_expr(self.ast.get_data0(node))
+        self.pop_label_frame()
         self.loop_depth = self.loop_depth - 1
-        var result = self.ty_void
-        if self.has_break_value_type != 0:
-            result = self.break_value_type
-        self.break_value_type = saved_break
-        self.has_break_value_type = saved_has
-        return result
+        return self.ty_void
 
     if kind == NodeKind.NK_FOR:
         return self.check_for(node) as TypeId
@@ -1070,31 +1131,27 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_BREAK:
         if self.in_defer != 0:
             self.emit_error("break not allowed in defer", node)
-        if self.loop_depth == 0:
-            self.emit_error("break outside of loop", node)
         let val = self.ast.get_data0(node)
         if val != 0:
-            let vt = self.check_expr(val)
-            if vt != 0:
-                if self.has_break_value_type == 0:
-                    self.break_value_type = vt
-                    self.has_break_value_type = 1
-                else:
-                    if self.types_compatible(self.break_value_type, vt) == 0:
-                        let widened = self.arithmetic_result_type(self.break_value_type, vt)
-                        if widened == 0:
-                            self.emit_error("type mismatch in break value", node)
-                        else:
-                            self.break_value_type = widened
-                    else:
-                        self.break_value_type = vt
+            self.emit_error("break with a value is not supported", node)
+            self.check_expr(val)
+        let label = self.ast.get_data1(node)
+        if label != 0:
+            let _ = self.resolve_labeled_control(label, node)
+        else:
+            let _ = self.resolve_innermost_loop_control(node, "break")
         return self.ty_void
 
     if kind == NodeKind.NK_CONTINUE:
         if self.in_defer != 0:
             self.emit_error("continue not allowed in defer", node)
-        if self.loop_depth == 0:
-            self.emit_error("continue outside of loop", node)
+        let label = self.ast.get_data0(node)
+        if label != 0:
+            let target = self.resolve_labeled_control(label, node)
+            if target >= 0 and self.label_kinds.get(target as i64) == LabelFrameKind.LFK_BLOCK:
+                self.emit_error("cannot continue a labeled block; only loops support continue", node)
+        else:
+            let _ = self.resolve_innermost_loop_control(node, "continue")
         return self.ty_void
 
     if kind == NodeKind.NK_FIELD_ACCESS:
@@ -1273,7 +1330,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_ASYNC_BLOCK:
         if self.in_comptime_fn != 0:
             self.emit_error("async is not allowed in comptime", node)
+        self.push_label_boundary()
         let ab_body_ty = self.check_expr(self.ast.get_data0(node))
+        self.pop_label_frame()
         // Wrap in Task[T] — async blocks spawn a fiber and return a Task
         let ab_task_args: Vec[i32] = Vec.new()
         ab_task_args.push(ab_body_ty as i32)
@@ -1312,7 +1371,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         self.push_scope()
         self.scope_put(name, self.ty_void, 0)
         self.async_scope_names.push(name)
+        self.push_label_boundary()
         let result = self.check_expr(body)
+        self.pop_label_frame()
         self.async_scope_names.pop()
         self.pop_scope()
         return result
@@ -1771,14 +1832,21 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data0(node)
     let stmt_count = self.ast.get_data1(node)
     let tail = self.ast.get_data2(node)
+    let block_meta = self.ast.find_block_meta(node)
+    let block_label = if block_meta >= 0: self.ast.block_meta_label(block_meta) else: 0
 
     self.push_scope()
+    if block_label != 0:
+        self.push_label_frame(block_label, LabelFrameKind.LFK_BLOCK, node)
 
     for i in 0..stmt_count:
         let stmt = self.ast.get_extra(extra_start + i)
         let saved_stmt_pos = self.match_in_stmt_pos
+        let saved_label_stmt_pos = self.stmt_pos_depth
         self.match_in_stmt_pos = 1
+        self.stmt_pos_depth = self.stmt_pos_depth + 1
         let stmt_ty = self.check_expr(stmt)
+        self.stmt_pos_depth = saved_label_stmt_pos
         self.match_in_stmt_pos = saved_stmt_pos
         self.typed_expr_types.insert(stmt, stmt_ty as i32)
         let stmt_kind = self.ast.kind(stmt)
@@ -1801,6 +1869,8 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         self.typed_expr_types.insert(tail, result as i32)
     self.expire_dead_borrows_in_block(extra_start, stmt_count, stmt_count, 0)
 
+    if block_label != 0:
+        self.pop_label_frame()
     self.pop_scope()
     if result != 0 and result != self.ty_void:
         self.typed_expr_types.insert(node, result as i32)
@@ -1815,6 +1885,10 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     let value = self.ast.get_data1(node)
     let flags = self.ast.get_data2(node)
     let is_mut = flags % 2
+    if value != 0 and self.ast.kind(value) == NodeKind.NK_BLOCK:
+        let value_block_meta = self.ast.find_block_meta(value)
+        if value_block_meta >= 0 and self.ast.block_meta_label(value_block_meta) != 0:
+            self.emit_error("labeled block used as an expression", value)
 
     let ann_extra = self.local_let_type_ann_extra(flags)
     var ann_type: TypeId = 0 as TypeId
@@ -2056,12 +2130,16 @@ fn Sema.check_for(self: Sema, node: i32) -> i32:
     else:
         self.scope_put(binding, elem_type, 0)
     let for_meta = self.ast.find_for_meta(node)
+    var label = 0
     if for_meta >= 0:
         let index_binding = self.ast.for_meta_index_binding(for_meta)
+        label = self.ast.for_meta_label(for_meta)
         if index_binding != 0:
             self.scope_put(index_binding, self.ty_i64 as i32, 0)
     self.loop_depth = self.loop_depth + 1
+    self.push_label_frame(label, LabelFrameKind.LFK_FOR, node)
     self.check_expr(body)
+    self.pop_label_frame()
     self.loop_depth = self.loop_depth - 1
     self.pop_scope()
     self.ty_void as i32
@@ -3199,7 +3277,9 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
                         break
         self.scope_put(p_sym, p_ty, 0)
         self.type_extra.push(p_ty)
+    self.push_label_boundary()
     self.check_expr(body)
+    self.pop_label_frame()
 
     // Phase 1 ephemerality rule: closures cannot capture ephemeral refs/values.
     var bi = 0

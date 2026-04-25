@@ -53,6 +53,12 @@ enum BorrowKind: i32:
     SHARED = 0
     EXCLUSIVE = 1
 
+enum LabelFrameKind: i32:
+    LFK_BOUNDARY = 0
+    LFK_WHILE = 1
+    LFK_FOR = 2
+    LFK_BLOCK = 3
+
 enum DeriveReq: i32:
     COPY = 0
     CLONE = 1
@@ -275,6 +281,9 @@ type Sema {
     pending_generic_binding_call: HashMap[i32, i32],
     pending_generic_binding_decl: HashMap[i32, i32],
     async_scope_names: Vec[i32],
+    label_syms: Vec[i32],
+    label_kinds: Vec[i32],
+    label_nodes: Vec[i32],
 
     // Borrow tracking
     borrow_kinds: Vec[i32],
@@ -340,6 +349,7 @@ type Sema {
     break_value_type: TypeId,
     has_break_value_type: i32,
     loop_depth: i32,
+    stmt_pos_depth: i32,
     closure_direct_arg_depth: i32,
     expected_expr_type: TypeId,
     has_expected_type: i32,
@@ -714,6 +724,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         pending_generic_binding_call: sema_new_map_i32_i32(),
         pending_generic_binding_decl: sema_new_map_i32_i32(),
         async_scope_names: Vec.new(),
+        label_syms: Vec.new(),
+        label_kinds: Vec.new(),
+        label_nodes: Vec.new(),
         borrow_kinds: Vec.new(),
         borrow_places: Vec.new(),
         borrow_fields: Vec.new(),
@@ -757,6 +770,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         break_value_type: 0,
         has_break_value_type: 0,
         loop_depth: 0,
+        stmt_pos_depth: 0,
         closure_direct_arg_depth: 0,
         expected_expr_type: 0,
         has_expected_type: 0,

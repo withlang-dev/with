@@ -1184,6 +1184,15 @@ fn ComptimeEvaluator.signal_matches_loop(self: ComptimeEvaluator, signal: Compti
         return 1
     0
 
+fn ComptimeEvaluator.signal_matches_block(self: ComptimeEvaluator, signal: ComptimeControl, block_label: i32) -> i32:
+    if signal.kind != ComptimeControlKind.CTL_BREAK:
+        return 0
+    if block_label == 0:
+        return 0
+    if signal.label == block_label:
+        return 1
+    0
+
 fn ComptimeEvaluator.eval_loop(self: ComptimeEvaluator, diags: &mut DiagnosticList, node: i32) -> ComptimeControl:
     let loop_label = self.ast.get_data1(node)
     self.loop_labels.push(loop_label)
@@ -1415,15 +1424,21 @@ fn ComptimeEvaluator.eval_block(self: ComptimeEvaluator, diags: &mut DiagnosticL
     let extra_start = self.ast.get_data0(node)
     let stmt_count = self.ast.get_data1(node)
     let tail = self.ast.get_data2(node)
+    let block_meta = self.ast.find_block_meta(node)
+    let block_label = if block_meta >= 0: self.ast.block_meta_label(block_meta) else: 0
     self.push_scope()
     for i in 0..stmt_count:
         let stmt_signal = self.eval_expr(diags, self.ast.get_extra(extra_start + i))
         if stmt_signal.kind != ComptimeControlKind.CTL_VALUE:
             self.pop_scope()
+            if self.signal_matches_block(stmt_signal, block_label) != 0:
+                return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
             return stmt_signal
     if tail != 0:
         let tail_signal = self.eval_expr(diags, tail)
         self.pop_scope()
+        if self.signal_matches_block(tail_signal, block_label) != 0:
+            return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
         return tail_signal
     self.pop_scope()
     comptime_control_value(comptime_value_void(self.sema.ty_void as i32))

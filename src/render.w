@@ -388,10 +388,16 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let stmt_count = pool.get_data1(node)
         let tail = pool.get_data2(node)
         var out = ""
+        let block_meta = pool.find_block_meta(node)
+        let block_label = if block_meta >= 0: pool.block_meta_label(block_meta) else: 0
+        var body_indent = indent
+        if block_label != 0:
+            out = out ++ make_indent(indent) ++ "'" ++ intern.resolve(block_label) ++ ":\n"
+            body_indent = indent + 2
         for i in 0..stmt_count:
-            out = out ++ render_expr(pool, intern, (pool.get_extra(extra_start + i)) as NodeId, indent) ++ "\n"
+            out = out ++ render_expr(pool, intern, (pool.get_extra(extra_start + i)) as NodeId, body_indent) ++ "\n"
         if tail != 0:
-            out = out ++ render_expr(pool, intern, (tail) as NodeId, indent)
+            out = out ++ render_expr(pool, intern, (tail) as NodeId, body_indent)
         return out
 
     if kind == NodeKind.NK_IF_EXPR:
@@ -554,7 +560,12 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let binding = pool.get_data0(node)
         let iterable = pool.get_data1(node)
         let body = pool.get_data2(node)
-        var out = prefix ++ "for "
+        let for_meta = pool.find_for_meta(node)
+        let label = if for_meta >= 0: pool.for_meta_label(for_meta) else: 0
+        var out = prefix
+        if label != 0:
+            out = out ++ "'" ++ intern.resolve(label) ++ " "
+        out = out ++ "for "
         if pool.for_binding_is_pattern(node):
             out = out ++ render_pattern(pool, intern, (binding) as NodeId)
         else:
@@ -566,7 +577,11 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
     if kind == NodeKind.NK_WHILE:
         let cond = pool.get_data0(node)
         let body = pool.get_data1(node)
-        return prefix ++ "while " ++ render_expr(pool, intern, (cond) as NodeId, 0) ++ ":\n" ++ render_expr(pool, intern, (body) as NodeId, indent + 2)
+        let label = pool.get_data2(node)
+        var out = prefix
+        if label != 0:
+            out = out ++ "'" ++ intern.resolve(label) ++ " "
+        return out ++ "while " ++ render_expr(pool, intern, (cond) as NodeId, 0) ++ ":\n" ++ render_expr(pool, intern, (body) as NodeId, indent + 2)
 
     if kind == NodeKind.NK_ARRAY_LIT:
         let extra_start = pool.get_data0(node)
