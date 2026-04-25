@@ -194,6 +194,9 @@ With prioritizes joy. The common case should be effortless:
 - **Pattern `for` loops** — `for (key, value) in map:` and
   `for Some(item) in optional_items:` destructure directly in the
   loop header. (§13.5)
+- **Labeled break and continue** — `'outer: for ...` plus
+  `break 'outer` or `continue 'outer` targets outer loops and
+  labeled blocks without flag-variable cascades. (§13.5a)
 - **Iterators just work** — hold two items, zip, peek. The compiler
   is smart about stdlib iterators. (§13.2)
 - **`with` infers guards** — `with lock.read() as data:` — the
@@ -425,10 +428,11 @@ fn process(path: str) -> Result[Unit, IoError]:
 
 `defer` statements execute in LIFO order.
 
-**Control flow restriction:** `return`, `break`, `continue`, and
-`?` are **compile errors** inside `defer` blocks. Defer runs during
-scope cleanup — non-local control flow would silently swallow the
-function's actual return value or jump to unexpected locations:
+**Control flow restriction:** `return`, labeled or unlabeled `break`,
+labeled or unlabeled `continue`, and `?` are **compile errors**
+inside `defer` blocks. Defer runs during scope cleanup — non-local
+control flow would silently swallow the function's actual return value
+or jump to unexpected locations:
 
 ```
 // ERROR: return inside defer
@@ -2475,6 +2479,9 @@ inline lambdas or non-escaping closures):
   function**, not from the desugared closure.
 - **`break`** and **`continue`** inside a `with` block within a loop
   affect the **enclosing loop**.
+- Labeled `break 'label` and `continue 'label` inside a `with`
+  block may target any visible label in the enclosing function;
+  `with` does not create a label-scope boundary.
 - **`?`** propagates errors to the **enclosing function**.
 
 ```
@@ -2492,6 +2499,12 @@ fn process_all(lock: &Mutex[Vec[Item]]) -> Result[Unit, AppError]:
                 continue                 // continues enclosing for loop
             validate(item)?              // propagates to process_all
     // implicit Ok(())
+
+fn process_until_done(lock: &Mutex[Vec[Item]]):
+    'outer: for i in 0..10:
+        with lock.lock() as items:
+            if items[i].is_terminal():
+                break 'outer             // exits the labeled outer loop
 ```
 
 This is possible because `with` blocks are always non-escaping and
@@ -3819,12 +3832,14 @@ The right-hand side is lazily evaluated (only computed if left is
 `None`).
 
 **Early exit form:** `??` can be followed by `return`, `break`, or
-`continue` for early exit on `None`:
+`continue` for early exit on `None`. The `break` and `continue`
+forms may include labels (§13.5a):
 
 ```
 let user = find_user(id) ?? return Err(.NotFound)
 let item = stack.pop() ?? break
 let next = iter.next() ?? continue
+let token = lexer.peek() ?? break 'scan
 ```
 
 This replaces the need for `if let` / `let-else` in the most common
@@ -5052,6 +5067,143 @@ allowed; elements that do not match are skipped and iteration
 continues. Reference-pattern ergonomics (§9.7) apply here too, so
 patterns over `.iter()` output usually bind references without
 explicit `&`.
+
+### 13.5a Labeled Loops and Blocks
+
+Labels provide named structured control-flow targets for nested loops
+and early-exit blocks. A label is an identifier prefixed with a single
+quote and followed immediately by a colon before the construct it
+labels:
+
+```
+'outer: while running:
+    ...
+
+'rows: for row in grid {
+    ...
+}
+
+'parse:
+    ...
+
+'cleanup: {
+    ...
+}
+```
+
+The colon belongs to the label. Labeled `while` and `for` loops may
+use either colon-form or brace-form bodies. A bare labeled block may
+also use either body style. In colon-form labeled blocks, the label
+colon is also the block-body introducer.
+
+The existing unlabeled forms are unchanged:
+
+```
+break       // exits the innermost enclosing loop
+continue    // continues the innermost enclosing loop
+```
+
+`break` and `continue` also accept an optional label operand:
+
+```
+break 'outer       // exits the loop or block labeled 'outer
+continue 'outer    // continues the loop labeled 'outer
+```
+
+`break 'label` transfers control to the statement immediately after
+the construct labeled `'label`. The target may be a labeled `while`,
+a labeled `for`, or a labeled block.
+
+`continue 'label` transfers control to the next iteration of the
+loop labeled `'label`. For a `while` loop, this means the condition
+check. For a `for` loop, this means the iterator-advance or
+next-element step. `continue 'label` is a compile error if the label
+names a block rather than a loop.
+
+Labeled blocks are statement-position only. They are not expressions,
+and they do not produce a value. This is valid:
+
+```
+fn parse_header(input: bytes) -> Result[Header]:
+    'parse:
+        if input.len() < 4: break 'parse
+        let magic = input[0..4]
+        if magic != EXPECTED_MAGIC: break 'parse
+        return Ok(read_header(input))
+    Err("malformed header")
+```
+
+This is not valid:
+
+```
+let result = 'parse:          // ERROR: labeled block is not an expression
+    ...
+```
+
+Labels are in scope throughout the labeled construct's body,
+including nested constructs. For brace-form constructs, the body
+starts at the opening brace. For colon-form `while` and `for` loops,
+the body starts at the loop-body colon, not the label colon. For
+colon-form labeled blocks, the label colon is the body introducer.
+Labels live in a separate namespace from ordinary identifiers, types,
+and keywords, so a variable named `outer` and a label named `'outer`
+do not collide.
+
+Labels are function-local control-flow targets. They are not visible
+inside a nested `fn`, closure, `async:` block, or `gen fn` body.
+`with` blocks are transparent for label scoping: a label declared
+outside a `with` block remains visible inside the `with` body.
+
+```
+'outer: for item in items:
+    with item.acquire() as guard:
+        if guard.is_done():
+            break 'outer       // valid: with is label-transparent
+```
+
+Nested active labels must have distinct names:
+
+```
+'l: while a:
+    'l: while b:               // ERROR: label 'l shadows enclosing 'l
+        break 'l
+```
+
+The same label name may be reused after the earlier labeled construct
+has gone out of scope:
+
+```
+'l: while a: ...
+'l: while b: ...               // OK: sibling label, first 'l is gone
+```
+
+A label declaration must be followed immediately by a `while`, `for`,
+or block body. A label before any other statement is a syntax error:
+
+```
+'l: let x = 1                  // ERROR: label must target loop or block
+```
+
+A labeled `break` or `continue` exits every intervening scope between
+the statement and the target. Cleanup is the same as for ordinary
+structured control flow, repeated across each exited scope in reverse
+entry order:
+
+- `defer` blocks run.
+- `Drop` destructors for owned values run.
+- `with` guards are released.
+
+`errdefer` blocks do not run for labeled `break` or `continue`,
+because these are normal control transfers, not error returns.
+
+The compiler must diagnose at least these errors:
+
+- Undefined label: no visible enclosing loop or block has that label.
+- `continue` targeting a labeled block.
+- Nested label collision with an already-active label of the same name.
+- Label not followed immediately by a loop or block.
+- Label use across a nested function, closure, `async:`, or `gen fn`
+  boundary.
 
 ### 13.6 Collection Comprehensions
 
@@ -8648,9 +8800,9 @@ See §4.2.
 
 ### 20b.6 Unreachable Code
 
-Code after an unconditional `return`, `break`, `continue`, or
-diverging expression is dead. It is always either a bug or
-leftover from refactoring.
+Code after an unconditional `return`, labeled or unlabeled `break`,
+labeled or unlabeled `continue`, or diverging expression is dead. It
+is always either a bug or leftover from refactoring.
 
 ```
 // ERROR:
@@ -8667,8 +8819,9 @@ for x in items:
 
 The compiler detects unreachable code via control flow analysis and
 rejects it. This applies to all code after unconditional control
-flow transfers, including `return`, `break`, `continue`, and calls
-to functions with return type `Never` (e.g., `exit()`, `panic()`).
+flow transfers, including `return`, labeled or unlabeled `break`,
+labeled or unlabeled `continue`, and calls to functions with return
+type `Never` (e.g., `exit()`, `panic()`).
 
 **Exception for `comptime if`:** The unreachable code check runs
 **after** comptime evaluation. Branches eliminated by `comptime if`
@@ -8865,6 +9018,9 @@ observable behaviors are required:
 - `return` inside a `with` block returns from the **enclosing function**.
 - `break` inside a `with` block breaks the **enclosing loop**.
 - `continue` inside a `with` block continues the **enclosing loop**.
+- Labeled `break 'label` and `continue 'label` inside a `with` block
+  may target visible labels in the enclosing function; `with` blocks
+  do not hide labels.
 - `?` inside a `with` block propagates to the **enclosing function**.
 
 The mechanism by which the compiler achieves this is unspecified.
@@ -10479,6 +10635,82 @@ fn test:
     for x in items.iter_mut():
         *x *= 2
     assert(items == vec![2, 4, 6])
+```
+
+### 25.46a Labeled Break and Continue (Section 13.5a)
+
+```
+// PASS: labeled break exits an outer for loop
+fn contains_negative(grid: [[i32]]) -> bool:
+    var found = false
+    'rows: for row in grid:
+        for cell in row:
+            if cell < 0:
+                found = true
+                break 'rows
+    found
+
+// PASS: labeled continue targets the outer loop
+fn count_until_negative(grid: [[i32]]) -> i32:
+    var count = 0
+    'rows: for row in grid:
+        for cell in row:
+            if cell < 0:
+                continue 'rows
+            count += 1
+    count
+
+// PASS: brace-form labeled while
+fn test:
+    var i = 0
+    'outer: while i < 10 {
+        i += 1
+        while true {
+            continue 'outer
+        }
+    }
+
+// PASS: labeled block supports early exit
+fn parse_header(input: bytes) -> bool:
+    var ok = false
+    'parse:
+        if input.len() < 4: break 'parse
+        ok = true
+    ok
+
+// PASS: with blocks are transparent for labels
+fn process(lock: &Mutex[Vec[Item]]):
+    'outer: for i in 0..10:
+        with lock.lock() as items:
+            if items[i].is_done():
+                break 'outer
+            items[i].process()
+
+// FAIL: undefined label
+fn test:
+    while true:
+        break 'missing             // ERROR: no visible label 'missing
+
+// FAIL: continue cannot target a labeled block
+fn test:
+    'block:
+        continue 'block            // ERROR: cannot continue a block
+
+// FAIL: nested labels may not shadow active labels
+fn test:
+    'l: for x in 0..10:
+        'l: for y in 0..10:        // ERROR: label 'l shadows enclosing 'l
+            break 'l
+
+// FAIL: label must target a loop or block
+fn test:
+    'l: let x = 1                  // ERROR
+
+// FAIL: labels do not cross async boundaries
+fn test(flag: bool):
+    'outer: while flag:
+        async:
+            break 'outer           // ERROR: label not visible in async block
 ```
 
 ### 25.47 Collection Length Methods (Section 18.6)
@@ -12110,6 +12342,26 @@ Raw strings disable escape and interpolation parsing in the lexer/parser path; d
 
 Bootstrap lowering treats character and byte literals as integer literal values during AST construction; type-checking follows normal integer coercion rules.
 
+### 29.5a Labels
+
+A label token is a single quote followed immediately by an identifier,
+with no whitespace between the quote and the identifier:
+
+```
+'outer
+'search
+'L0
+```
+
+The identifier part follows the ordinary identifier spelling rules:
+it starts with a letter or underscore and may contain letters,
+digits, and underscores. Labels are syntactically distinct from
+ordinary identifiers because of the leading quote and live in a
+separate namespace.
+
+Single-quote-prefixed identifiers are reserved for labels. Byte
+literals use the `b'X'` spelling and are not label tokens.
+
 ### 29.6 Unused bindings
 
 `_` is an explicit discard binding. It is legal in binding positions (for example `let _ = expr`, parameter bindings, pattern bindings) and does not introduce a usable name.
@@ -12160,8 +12412,8 @@ The following keywords are reserved and cannot be used as identifiers:
 | `while` | Conditional loop |
 | `yield` | Generator / comprehension yield |
 | `return` | Early return |
-| `break` | Break from loop |
-| `continue` | Continue to next iteration |
+| `break` | Break from loop or labeled block |
+| `continue` | Continue to next loop iteration |
 | `true`, `false` | Boolean literals |
 | `and`, `or`, `not` | Logical operators |
 | `in` | Membership/iteration operator |
@@ -12185,7 +12437,7 @@ The following keywords are reserved and cannot be used as identifiers:
 
 | Code | Description |
 |------|-------------|
-| E0901 | Non-local control flow (`return`, `break`, `?`) inside `defer`/`errdefer` |
+| E0901 | Non-local control flow (`return`, `break`, `continue`, `?`) inside `defer`/`errdefer` |
 | E0951 | Nested implicit `it` is ambiguous — use explicit `param => expr` for inner closure |
 | E0952 | `it` used in context expecting N != 1 parameters |
 | E0953 | `it` is a reserved keyword and cannot be used as an identifier |
@@ -12251,6 +12503,32 @@ block-introducer.
 - Mixed colon + brace: `fn main: { body }` — syntax error.
 - Brace + colon: `fn main { : body }` — syntax error.
 - Empty colon body: `fn main:` with nothing following — syntax error.
+
+**Labeled bodies:**
+
+Labels use the uniform label-colon rule (§13.5a). The label colon is
+separate from the labeled construct's body syntax:
+
+```
+'outer: while running:
+    tick()
+
+'outer: while running { tick() }
+
+'scan: for item in list:
+    process(item)
+
+'scan: for item in list { process(item) }
+
+'early:
+    maybe_exit()
+
+'early: { maybe_exit() }
+```
+
+For labeled `while` and `for`, the loop still has its own body
+introducer. For colon-form labeled blocks, the label colon is also
+the block-body introducer.
 
 **Applies uniformly to all block-introducers:**
 
