@@ -340,6 +340,9 @@ type AstPool {
     // Auxiliary for-loop metadata: [node, index_binding(sym,0=none), label(sym,0=none)]*
     for_meta: Vec[i32],
 
+    // Auxiliary block metadata: [node, label(sym,0=none)]*
+    block_meta: Vec[i32],
+
     // Must-use type declaration nodes
     must_use_type_nodes: Vec[i32],
 
@@ -377,6 +380,7 @@ type AstPool {
     impl_trait_type_args_map: HashMap[i32, i32],
     fn_param_pattern_meta_map: HashMap[i32, i32],
     for_meta_map: HashMap[i32, i32],
+    block_meta_map: HashMap[i32, i32],
     // Default value nodes for function parameters: key = param_start * 1000 + param_idx
     fn_param_defaults: HashMap[i32, i32],
     must_use_type_set: HashMap[i32, i32],
@@ -419,6 +423,7 @@ fn AstPool.new -> AstPool:
         fn_param_patterns: Vec.new(),
         fn_param_pattern_meta: Vec.new(),
         for_meta: Vec.new(),
+        block_meta: Vec.new(),
         must_use_type_nodes: Vec.new(),
         sealed_trait_nodes: Vec.new(),
         comptime_decl_nodes: Vec.new(),
@@ -437,6 +442,7 @@ fn AstPool.new -> AstPool:
         impl_trait_type_args_map: HashMap.new(),
         fn_param_pattern_meta_map: HashMap.new(),
         for_meta_map: HashMap.new(),
+        block_meta_map: HashMap.new(),
         fn_param_defaults: HashMap.new(),
         must_use_type_set: HashMap.new(),
         sealed_trait_set: HashMap.new(),
@@ -1205,6 +1211,21 @@ fn AstPool.for_meta_index_binding(self: &AstPool, meta: i32) -> i32:
 
 fn AstPool.for_meta_label(self: &AstPool, meta: i32) -> i32:
     self.for_meta.get((meta + 2) as i64)
+
+fn AstPool.add_block_meta(self: &mut AstPool, node: NodeId, label: i32):
+    let idx = self.block_meta.len() as i32
+    self.block_meta.push(node as i32)
+    self.block_meta.push(label)
+    self.block_meta_map.insert(node as i32, idx)
+
+fn AstPool.find_block_meta(self: &AstPool, node: NodeId) -> i32:
+    let opt = self.block_meta_map.get(node as i32)
+    if opt.is_some():
+        return opt.unwrap()
+    0 - 1
+
+fn AstPool.block_meta_label(self: &AstPool, meta: i32) -> i32:
+    self.block_meta.get((meta + 1) as i64)
 
 fn ast_is_pattern_kind(kind: i32) -> bool:
     kind == NodeKind.NK_PAT_WILDCARD or

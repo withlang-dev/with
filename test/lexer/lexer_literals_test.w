@@ -32,4 +32,15 @@ fn main:
     assert(t2.get_tag(8) == TokenKind.TK_CHAR_LIT())
     assert(t2.get_tag(9) == TokenKind.TK_EOF())
 
+    var lexer3 = Lexer.init("'a' '@' '\\n' b'X' b'\\n' 'outer \"apostrophe ' inside\"", 0)
+    let t3 = lexer3.tokenize()
+    assert(t3.get_tag(0) == TokenKind.TK_CHAR_LIT())
+    assert(t3.get_tag(1) == TokenKind.TK_CHAR_LIT())
+    assert(t3.get_tag(2) == TokenKind.TK_CHAR_LIT())
+    assert(t3.get_tag(3) == TokenKind.TK_CHAR_LIT())
+    assert(t3.get_tag(4) == TokenKind.TK_CHAR_LIT())
+    assert(t3.get_tag(5) == TokenKind.TK_LABEL())
+    assert(t3.get_tag(6) == TokenKind.TK_STRING_LIT())
+    assert(t3.get_tag(7) == TokenKind.TK_EOF())
+
     print("ok")

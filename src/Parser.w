@@ -2507,7 +2507,7 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
     if t == TokenKind.TK_KW_RETURN: return self.parse_return()
     if t == TokenKind.TK_KW_BREAK: return self.parse_break()
     if t == TokenKind.TK_KW_CONTINUE: return self.parse_continue()
-    if t == TokenKind.TK_LABEL: return self.parse_labeled_loop()
+    if t == TokenKind.TK_LABEL: return self.parse_labeled_statement()
     if t == TokenKind.TK_KW_UNSAFE: return self.parse_unsafe()
     if t == TokenKind.TK_KW_ASM: return self.parse_asm_expr()
     if t == TokenKind.TK_KW_DEFER: return self.parse_defer()
@@ -4591,24 +4591,35 @@ fn Parser.parse_for_comprehension(self: Parser, start: i32, first_binding: i32, 
         bi = bi - 1
     inner
 
-fn Parser.parse_labeled_loop(self: Parser) -> NodeId:
+fn Parser.finish_labeled_block(self: Parser, start: i32, label_sym: i32, body: NodeId) -> NodeId:
+    if body != 0 and self.pool.kind(body) == NodeKind.NK_BLOCK:
+        self.pool.set_start(body, start)
+        self.pool.add_block_meta(body, label_sym)
+        return body
+    let block = self.pool.add_node(NodeKind.NK_BLOCK, start, self.prev_end(), self.pool.extra_len(), 0, body as i32)
+    self.pool.add_block_meta(block, label_sym)
+    block
+
+fn Parser.parse_labeled_statement(self: Parser) -> NodeId:
     let start = self.current_start()
     let label_end = self.current_end()
     let label_text = self.source.slice((start + 1) as i64, label_end as i64)
     let label_sym = self.intern.intern(label_text)
     self.advance()
 
-    if self.peek() != TokenKind.TK_COLON:
-        self.emit_error("expected ':' after loop label")
-        return self.poisoned_expr()
-    self.advance()
-    self.skip_newlines()
-
     let t = self.peek()
     if t == TokenKind.TK_KW_FOR: return self.parse_for(label_sym)
     if t == TokenKind.TK_KW_WHILE: return self.parse_while(label_sym)
-    if t == TokenKind.TK_KW_LOOP: return self.parse_loop(label_sym)
-    self.emit_error("expected 'for', 'while', or 'loop' after label")
+    if t == TokenKind.TK_L_BRACE:
+        self.advance()
+        let body = self.parse_braced_body()
+        return self.finish_labeled_block(start, label_sym, body)
+    if t == TokenKind.TK_COLON:
+        self.advance()
+        let body = self.parse_block_or_expr()
+        return self.finish_labeled_block(start, label_sym, body)
+
+    self.emit_error("label must be followed by 'while', 'for', '{', or ':'")
     self.poisoned_expr()
 
 fn Parser.parse_break(self: Parser) -> NodeId:

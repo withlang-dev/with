@@ -19,10 +19,18 @@ type DropScope {
 }
 
 type LoopInfo {
+    label: i32,
+    target_kind: i32,
     continue_bb: i32,
     break_bb: i32,
     break_drop_depth: i32,
+    break_defer_depth: i32,
+    break_scope_depth: i32,
 }
+
+enum ControlTargetKind: i32:
+    CT_LOOP = 1
+    CT_BLOCK = 2
 
 type MirBuilder {
     body: MirBody,
@@ -49,10 +57,14 @@ type MirBuilder {
     errdefer_nodes: Vec[i32],
     errdefer_scope_starts: Vec[i32],
 
-    // Loop stack.
+    // Structured control target stack.
     loop_continue_bbs: Vec[i32],
     loop_break_bbs: Vec[i32],
     loop_break_drop_depths: Vec[i32],
+    loop_break_defer_depths: Vec[i32],
+    loop_break_scope_depths: Vec[i32],
+    loop_labels: Vec[i32],
+    loop_target_kinds: Vec[i32],
 
     next_temp: i32,
     cur_node: i32,
@@ -86,6 +98,10 @@ fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> M
         loop_continue_bbs: Vec.new(),
         loop_break_bbs: Vec.new(),
         loop_break_drop_depths: Vec.new(),
+        loop_break_defer_depths: Vec.new(),
+        loop_break_scope_depths: Vec.new(),
+        loop_labels: Vec.new(),
+        loop_target_kinds: Vec.new(),
         next_temp: 0,
         cur_node: 0,
         expected_type: 0,
@@ -111,6 +127,8 @@ fn MirBuilder.push_scope(self: MirBuilder):
     self.drop_scope_starts.push(self.drop_local_ids.len() as i32)
     self.bind_scope_starts.push(self.bind_syms.len() as i32)
     self.alias_scope_starts.push(self.alias_syms.len() as i32)
+    self.defer_scope_starts.push(self.defer_nodes.len() as i32)
+    self.errdefer_scope_starts.push(self.errdefer_nodes.len() as i32)
 
 fn MirBuilder.schedule_drop(self: MirBuilder, local_id: i32, drop_kind: i32):
     self.drop_local_ids.push(local_id)
@@ -139,6 +157,8 @@ fn MirBuilder.pop_scope_with_goto(self: MirBuilder, target_bb: i32):
         self.drop_local_ids.pop()
         self.drop_kinds.pop()
     self.drop_scope_starts.pop()
+    self.defer_scope_starts.pop()
+    self.errdefer_scope_starts.pop()
 
     let bind_start = self.bind_scope_starts.get(scope_idx as i64)
     while self.bind_syms.len() as i32 > bind_start:
@@ -170,6 +190,8 @@ fn MirBuilder.pop_scope_inline(self: MirBuilder):
         self.drop_local_ids.pop()
         self.drop_kinds.pop()
     self.drop_scope_starts.pop()
+    self.defer_scope_starts.pop()
+    self.errdefer_scope_starts.pop()
 
     let bind_start = self.bind_scope_starts.get(scope_idx as i64)
     while self.bind_syms.len() as i32 > bind_start:
@@ -189,6 +211,42 @@ fn MirBuilder.emit_drops_for_break(self: MirBuilder, loop_info: LoopInfo):
     while i >= loop_info.break_drop_depth:
         self.emit_drop_entry(self.drop_local_ids.get(i as i64), self.drop_kinds.get(i as i64))
         i = i - 1
+
+fn MirBuilder.emit_defers_for_range(self: MirBuilder, start: i32, end: i32):
+    var i = end - 1
+    while i >= start:
+        let defer_body = self.defer_nodes.get(i as i64)
+        let _ = self.lower_expr(defer_body)
+        i = i - 1
+
+fn MirBuilder.emit_drops_for_range(self: MirBuilder, start: i32, end: i32):
+    var i = end - 1
+    while i >= start:
+        self.emit_drop_entry(self.drop_local_ids.get(i as i64), self.drop_kinds.get(i as i64))
+        i = i - 1
+
+fn MirBuilder.emit_cleanup_to_target(self: MirBuilder, target: LoopInfo):
+    var scope_idx = self.drop_scope_starts.len() as i32 - 1
+    var lowest_drop_start = self.drop_local_ids.len() as i32
+    var lowest_defer_start = self.defer_nodes.len() as i32
+    while scope_idx >= target.break_scope_depth:
+        let defer_start = self.defer_scope_starts.get(scope_idx as i64)
+        let defer_end = if scope_idx + 1 < self.defer_scope_starts.len() as i32: self.defer_scope_starts.get((scope_idx + 1) as i64) else: self.defer_nodes.len() as i32
+        lowest_defer_start = defer_start
+        self.emit_defers_for_range(defer_start, defer_end)
+
+        let bind_start = self.bind_scope_starts.get(scope_idx as i64)
+        let bind_end = if scope_idx + 1 < self.bind_scope_starts.len() as i32: self.bind_scope_starts.get((scope_idx + 1) as i64) else: self.bind_syms.len() as i32
+        self.emit_auto_defers_for_bind_range(bind_start, bind_end)
+
+        let drop_start = self.drop_scope_starts.get(scope_idx as i64)
+        let drop_end = if scope_idx + 1 < self.drop_scope_starts.len() as i32: self.drop_scope_starts.get((scope_idx + 1) as i64) else: self.drop_local_ids.len() as i32
+        lowest_drop_start = drop_start
+        self.emit_drops_for_range(drop_start, drop_end)
+        scope_idx = scope_idx - 1
+
+    self.emit_defers_for_range(target.break_defer_depth, lowest_defer_start)
+    self.emit_drops_for_range(target.break_drop_depth, lowest_drop_start)
 
 fn MirBuilder.emit_drops_for_return(self: MirBuilder):
     var i = self.drop_local_ids.len() as i32 - 1
@@ -216,8 +274,13 @@ fn MirBuilder.emit_auto_defers(self: MirBuilder):
     if self.sema.ci_auto_defer_bindings.len() == 0:
         return
     let scope_start = if self.bind_scope_starts.len() > 0: self.bind_scope_starts.get(self.bind_scope_starts.len() - 1) else: 0
-    var bi = scope_start
-    while bi < self.bind_syms.len() as i32:
+    self.emit_auto_defers_for_bind_range(scope_start, self.bind_syms.len() as i32)
+
+fn MirBuilder.emit_auto_defers_for_bind_range(self: MirBuilder, start: i32, end: i32):
+    if self.sema.ci_auto_defer_bindings.len() == 0:
+        return
+    var bi = start
+    while bi < end:
         let bind_sym = self.bind_syms.get(bi as i64)
         if self.sema.ci_auto_defer_bindings.contains(bind_sym):
             let local = self.bind_local_ids.get(bi as i64)
@@ -236,28 +299,54 @@ fn MirBuilder.emit_auto_defers(self: MirBuilder):
                 self.switch_to(next_bb)
         bi = bi + 1
 
-fn MirBuilder.push_loop(self: MirBuilder, continue_bb: i32, break_bb: i32):
+fn MirBuilder.push_control_target(self: MirBuilder, label: i32, target_kind: i32, continue_bb: i32, break_bb: i32):
     self.loop_continue_bbs.push(continue_bb)
     self.loop_break_bbs.push(break_bb)
     self.loop_break_drop_depths.push(self.drop_local_ids.len() as i32)
+    self.loop_break_defer_depths.push(self.defer_nodes.len() as i32)
+    self.loop_break_scope_depths.push(self.drop_scope_starts.len() as i32)
+    self.loop_labels.push(label)
+    self.loop_target_kinds.push(target_kind)
 
-fn MirBuilder.pop_loop(self: MirBuilder):
+fn MirBuilder.pop_control_target(self: MirBuilder):
     if self.loop_continue_bbs.len() as i32 == 0:
         return
     self.loop_continue_bbs.pop()
     self.loop_break_bbs.pop()
     self.loop_break_drop_depths.pop()
+    self.loop_break_defer_depths.pop()
+    self.loop_break_scope_depths.pop()
+    self.loop_labels.pop()
+    self.loop_target_kinds.pop()
 
-fn MirBuilder.current_loop(self: MirBuilder) -> LoopInfo:
+fn MirBuilder.find_control_target(self: MirBuilder, label: i32, want_continue: i32) -> LoopInfo:
     if self.loop_continue_bbs.len() as i32 == 0:
-        return LoopInfo { continue_bb: 0 - 1, break_bb: 0 - 1, break_drop_depth: 0 }
+        return LoopInfo { label: 0, target_kind: 0, continue_bb: 0 - 1, break_bb: 0 - 1, break_drop_depth: 0, break_defer_depth: 0, break_scope_depth: 0 }
 
-    let i = self.loop_continue_bbs.len() as i32 - 1
-    LoopInfo {
-        continue_bb: self.loop_continue_bbs.get(i as i64),
-        break_bb: self.loop_break_bbs.get(i as i64),
-        break_drop_depth: self.loop_break_drop_depths.get(i as i64),
-    }
+    var i = self.loop_continue_bbs.len() as i32 - 1
+    while i >= 0:
+        let target_kind = self.loop_target_kinds.get(i as i64)
+        let target_label = self.loop_labels.get(i as i64)
+        var matches = 0
+        if label != 0:
+            if target_label == label:
+                matches = 1
+        else if target_kind == ControlTargetKind.CT_LOOP:
+            matches = 1
+        if matches != 0:
+            if want_continue != 0 and target_kind != ControlTargetKind.CT_LOOP:
+                return LoopInfo { label: target_label, target_kind, continue_bb: 0 - 1, break_bb: self.loop_break_bbs.get(i as i64), break_drop_depth: self.loop_break_drop_depths.get(i as i64), break_defer_depth: self.loop_break_defer_depths.get(i as i64), break_scope_depth: self.loop_break_scope_depths.get(i as i64) }
+            return LoopInfo {
+                label: target_label,
+                target_kind,
+                continue_bb: self.loop_continue_bbs.get(i as i64),
+                break_bb: self.loop_break_bbs.get(i as i64),
+                break_drop_depth: self.loop_break_drop_depths.get(i as i64),
+                break_defer_depth: self.loop_break_defer_depths.get(i as i64),
+                break_scope_depth: self.loop_break_scope_depths.get(i as i64),
+            }
+        i = i - 1
+    LoopInfo { label: 0, target_kind: 0, continue_bb: 0 - 1, break_bb: 0 - 1, break_drop_depth: 0, break_defer_depth: 0, break_scope_depth: 0 }
 
 fn MirBuilder.bind_local(self: MirBuilder, sym: i32, local_id: i32):
     self.bind_syms.push(sym)
@@ -2098,7 +2187,12 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
     let stmt_start = self.ast.get_data0(node)
     let stmt_count = self.ast.get_data1(node)
     let tail_expr = self.ast.get_data2(node)
+    let block_meta = self.ast.find_block_meta(node)
+    let block_label = if block_meta >= 0: self.ast.block_meta_label(block_meta) else: 0
+    let labeled_after_bb = if block_label != 0: self.new_block() else: 0
 
+    if block_label != 0:
+        self.push_control_target(block_label, ControlTargetKind.CT_BLOCK, 0 - 1, labeled_after_bb)
     self.push_scope()
     let defer_start = self.defer_nodes.len() as i32
 
@@ -2157,6 +2251,11 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
     self.emit_auto_defers()
 
     self.pop_scope_inline()
+    if block_label != 0:
+        self.terminate(TermKind.TK_GOTO, labeled_after_bb, 0, 0, 0)
+        self.pop_control_target()
+        self.switch_to(labeled_after_bb)
+        return self.unit_operand()
     result
 
 fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_expr_opt: i32, node: i32) -> i32:
@@ -2239,25 +2338,25 @@ fn MirBuilder.lower_loop(self: MirBuilder, body_expr: i32, node: i32) -> i32:
     self.switch_to(header_bb)
     self.terminate(TermKind.TK_GOTO, body_bb, 0, 0, 0)
 
-    self.push_loop(header_bb, break_bb)
+    self.push_control_target(self.ast.get_data1(node), ControlTargetKind.CT_LOOP, header_bb, break_bb)
 
     self.switch_to(body_bb)
     let _ = self.lower_expr(body_expr)
     // Back-edge when body does not diverge.
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
-    self.pop_loop()
+    self.pop_control_target()
     self.switch_to(break_bb)
     self.unit_operand()
 
-fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32) -> i32:
+fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32, node: i32) -> i32:
     let cond_bb = self.new_block()
     let body_bb = self.new_block()
     let exit_bb = self.new_block()
 
     self.terminate(TermKind.TK_GOTO, cond_bb, 0, 0, 0)
 
-    self.push_loop(cond_bb, exit_bb)
+    self.push_control_target(self.ast.get_data2(node), ControlTargetKind.CT_LOOP, cond_bb, exit_bb)
 
     self.switch_to(cond_bb)
     let cond_op = self.lower_expr(cond_expr)
@@ -2272,7 +2371,7 @@ fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32) -> i
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, cond_bb, 0, 0, 0)
 
-    self.pop_loop()
+    self.pop_control_target()
     self.switch_to(exit_bb)
     self.unit_operand()
 
@@ -2336,7 +2435,7 @@ fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
     let exit_bb = self.new_block()
 
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
-    self.push_loop(header_bb, exit_bb)
+    self.push_control_target(self.for_label(for_node), ControlTargetKind.CT_LOOP, header_bb, exit_bb)
 
     self.switch_to(header_bb)
     let next_args: Vec[i32] = Vec.new()
@@ -2367,9 +2466,15 @@ fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
-    self.pop_loop()
+    self.pop_control_target()
     self.switch_to(exit_bb)
     self.unit_operand()
+
+fn MirBuilder.for_label(self: MirBuilder, for_node: i32) -> i32:
+    let for_meta = self.ast.find_for_meta(for_node)
+    if for_meta >= 0:
+        return self.ast.for_meta_label(for_meta)
+    0
 
 fn MirBuilder.bind_for_element(self: MirBuilder, for_node: i32, pat_or_sym: i32, item_place: i32, elem_ty: i32, body_expr: i32):
     // Bind loop variable: supports both simple identifiers and pattern destructuring
@@ -2425,7 +2530,7 @@ fn MirBuilder.lower_for_range_var(self: MirBuilder, for_node: i32, pat_or_sym: i
     let exit_bb = self.new_block()
 
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
-    self.push_loop(inc_bb, exit_bb)
+    self.push_control_target(self.for_label(for_node), ControlTargetKind.CT_LOOP, inc_bb, exit_bb)
 
     // Header: compare counter < end (use LTE since we can't branch on inclusive at MIR level;
     // for simplicity, use LTE and rely on the sema-level inclusive flag from the range type)
@@ -2461,7 +2566,7 @@ fn MirBuilder.lower_for_range_var(self: MirBuilder, for_node: i32, pat_or_sym: i
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
-    self.pop_loop()
+    self.pop_control_target()
     self.switch_to(exit_bb)
     self.unit_operand()
 
@@ -2494,7 +2599,7 @@ fn MirBuilder.lower_for_range(self: MirBuilder, for_node: i32, pat_or_sym: i32, 
     let exit_bb = self.new_block()
 
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
-    self.push_loop(inc_bb, exit_bb)
+    self.push_control_target(self.for_label(for_node), ControlTargetKind.CT_LOOP, inc_bb, exit_bb)
 
     // Header: compare counter < end (or <=)
     self.switch_to(header_bb)
@@ -2528,7 +2633,7 @@ fn MirBuilder.lower_for_range(self: MirBuilder, for_node: i32, pat_or_sym: i32, 
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(range_node))
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
-    self.pop_loop()
+    self.pop_control_target()
     self.switch_to(exit_bb)
     self.unit_operand()
 
@@ -2560,7 +2665,7 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, for_node: i32, pat_or_sym: i32, 
     let exit_bb = self.new_block()
 
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
-    self.push_loop(inc_bb, exit_bb)
+    self.push_control_target(self.for_label(for_node), ControlTargetKind.CT_LOOP, inc_bb, exit_bb)
 
     // Header: counter < len
     self.switch_to(header_bb)
@@ -2600,7 +2705,7 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, for_node: i32, pat_or_sym: i32, 
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
-    self.pop_loop()
+    self.pop_control_target()
     self.switch_to(exit_bb)
     self.unit_operand()
 
@@ -2637,7 +2742,7 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, for_node: i32, pat_or_sym: i32, it
     let exit_bb = self.new_block()
 
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
-    self.push_loop(inc_bb, exit_bb)
+    self.push_control_target(self.for_label(for_node), ControlTargetKind.CT_LOOP, inc_bb, exit_bb)
 
     // Header: counter < len
     self.switch_to(header_bb)
@@ -2682,12 +2787,12 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, for_node: i32, pat_or_sym: i32, it
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
-    self.pop_loop()
+    self.pop_control_target()
     self.switch_to(exit_bb)
     self.unit_operand()
 
 fn MirBuilder.lower_break(self: MirBuilder, node: i32) -> i32:
-    let loop_info = self.current_loop()
+    let loop_info = self.find_control_target(self.ast.get_data1(node), 0)
     if loop_info.break_bb < 0:
         return self.unit_operand()
 
@@ -2695,19 +2800,19 @@ fn MirBuilder.lower_break(self: MirBuilder, node: i32) -> i32:
     if value_expr != 0:
         let _ = self.lower_expr(value_expr)
 
-    self.emit_drops_for_break(loop_info)
+    self.emit_cleanup_to_target(loop_info)
     self.terminate(TermKind.TK_GOTO, loop_info.break_bb, 0, 0, 0)
 
     // Continue lowering in a fresh detached block to keep pass total.
     self.switch_to(self.new_block())
     self.unit_operand()
 
-fn MirBuilder.lower_continue(self: MirBuilder, _node: i32) -> i32:
-    let loop_info = self.current_loop()
+fn MirBuilder.lower_continue(self: MirBuilder, node: i32) -> i32:
+    let loop_info = self.find_control_target(self.ast.get_data0(node), 1)
     if loop_info.continue_bb < 0:
         return self.unit_operand()
 
-    self.emit_drops_for_break(loop_info)
+    self.emit_cleanup_to_target(loop_info)
     self.terminate(TermKind.TK_GOTO, loop_info.continue_bb, 0, 0, 0)
     self.switch_to(self.new_block())
     self.unit_operand()
@@ -4340,7 +4445,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.lower_if(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node)
 
     if kind == NodeKind.NK_WHILE:
-        return self.lower_while(self.ast.get_data0(node), self.ast.get_data1(node))
+        return self.lower_while(self.ast.get_data0(node), self.ast.get_data1(node), node)
 
     if kind == NodeKind.NK_LOOP:
         return self.lower_loop(self.ast.get_data0(node), node)
