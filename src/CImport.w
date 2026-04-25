@@ -7235,7 +7235,7 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
                 let cnc = with_ci_num_children(session, chain)
                 if cnc < 2:
                     return 0 as CiStmtId
-                let val_id = ci_lower_expr_ir(session, with_ci_child(session, chain, 0), exprs, types, scope)
+                let val_id = ci_lower_case_value_ir(session, with_ci_child(session, chain, 0), exprs, types, scope)
                 if (val_id as i32) == 0:
                     return 0 as CiStmtId
                 value_ids.push(val_id as i32)
@@ -7356,6 +7356,12 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
         ri = ri + 1
     let match_id = stmts.add(CiStmtKind.CIS_MATCH, subject_id as i32, arms_start, arm_count, 0)
     ci_stmt_merge_ir(stmts, prepared_subject.setup_stmt, match_id)
+
+fn ci_lower_case_value_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
+    if with_ci_eval_int_valid(session, cursor) != 0:
+        let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
+        return exprs.int_lit(text_idx, 0 as CiTypeId)
+    ci_lower_expr_ir(session, cursor, exprs, types, scope)
 
 // Recursive statement lowering helper: produces a CiStmtId from a
 // cursor. Specific handlers build real CIS_* nodes for kinds we
@@ -7933,7 +7939,7 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
                 let case_nc = with_ci_num_children(session, child)
                 if case_nc < 2:
                     return 0 as CiStmtId
-                let case_val_id = ci_lower_expr_ir(session, with_ci_child(session, child, 0), exprs, types, scope)
+                let case_val_id = ci_lower_case_value_ir(session, with_ci_child(session, child, 0), exprs, types, scope)
                 let case_body = with_ci_child(session, child, 1)
                 var case_body_id: CiStmtId = 0 as CiStmtId
                 if with_ci_cursor_kind(session, case_body) == CXK_COMPOUND_STMT:
@@ -7982,7 +7988,7 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
                     if chain_kind == CXK_CASE_STMT:
                         let chain_nc = with_ci_num_children(session, chain_cur)
                         if chain_nc >= 1:
-                            let case_val_id = ci_lower_expr_ir(session, with_ci_child(session, chain_cur, 0), exprs, types, scope)
+                            let case_val_id = ci_lower_case_value_ir(session, with_ci_child(session, chain_cur, 0), exprs, types, scope)
                             if (case_val_id as i32) == 0:
                                 return 0 as CiStmtId
                             arm_records.push(1)
@@ -8025,7 +8031,7 @@ fn ci_lower_switch_body_goto_ir(session: i64, body_cursor: i32, subject_id: CiEx
                         if nested_kind == CXK_CASE_STMT:
                             let nnc = with_ci_num_children(session, nested)
                             if nnc >= 1:
-                                let case_val_id = ci_lower_expr_ir(session, with_ci_child(session, nested, 0), exprs, types, scope)
+                                let case_val_id = ci_lower_case_value_ir(session, with_ci_child(session, nested, 0), exprs, types, scope)
                                 if (case_val_id as i32) == 0:
                                     return 0 as CiStmtId
                                 arm_records.push(1)
