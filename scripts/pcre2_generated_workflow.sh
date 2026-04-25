@@ -104,6 +104,10 @@ ensure_generated_dependencies() {
     fi
 }
 
+module_defines_main() {
+    grep -Eq '^[[:space:]]*fn[[:space:]]+main([[:space:]]|[(:{]|->|$)' "$1"
+}
+
 usage() {
     cat >&2 <<'EOF'
 usage:
@@ -144,7 +148,9 @@ count_generated_errors() {
             head -48 "$raw_dir/pcre2_tables.w" > "$tf"
         fi
         awk 'NR <= 2 { next } /^use std\.re\./ { next } { print }' "$generated_dir/$mod.w" >> "$tf"
-        printf '\nfn main { print("ok") }\n' >> "$tf"
+        if ! module_defines_main "$generated_dir/$mod.w"; then
+            printf '\nfn main { print("ok") }\n' >> "$tf"
+        fi
         check_out="$(mktemp "${TMPDIR:-/tmp}/pcre2-check-output.XXXXXX")"
         CLEANUP_FILES+=("$check_out")
         set +e

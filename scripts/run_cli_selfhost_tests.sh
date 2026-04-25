@@ -1111,6 +1111,55 @@ EOF
   echo "PASS(cli-selfhost-regex) shared_lets"
 }
 
+expect_pcre2_check_existing_main() {
+  local case_dir="$tmpdir/pcre2_check_existing_main_case"
+  local raw_dir="$case_dir/raw"
+  local generated_dir="$case_dir/generated"
+  local summary
+  mkdir -p "$raw_dir" "$generated_dir"
+
+  cat >"$generated_dir/defs.w" <<'EOF'
+// std.re.defs
+type c_int = i32
+EOF
+
+  cat >"$generated_dir/pcre2_helper.w" <<'EOF'
+// Migrated from PCRE2
+use std.re.defs
+
+fn helper_value() -> c_int {
+    7
+}
+EOF
+
+  cat >"$generated_dir/pcre2test.w" <<'EOF'
+// Migrated from PCRE2
+use std.re.defs
+
+fn main() -> i32 {
+    0
+}
+EOF
+
+  if ! summary="$(PCRE2_CHECK_TIMEOUT_SECS=25 bash "$ROOT_DIR/scripts/pcre2_generated_workflow.sh" check "$SELFHOST_BIN" "$raw_dir" "$generated_dir" 2>"$tmpdir/err")"; then
+    echo "FAIL(cli-selfhost-regex) pcre2_check_existing_main"
+    cat "$tmpdir/err" || true
+    printf '%s\n' "$summary"
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! printf '%s\n' "$summary" | grep -Fq 'OK=2 TOTAL_ERRORS=0'; then
+    echo "FAIL(cli-selfhost-regex-output) pcre2_check_existing_main"
+    cat "$tmpdir/err" || true
+    printf '%s\n' "$summary"
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-regex) pcre2_check_existing_main"
+}
+
 expect_std_re_shared_dependency_imports() {
   local case_dir="$tmpdir/std_re_shared_dependency_case"
   local src="$case_dir/main.w"
@@ -2924,6 +2973,7 @@ expect_pcre2_defs_prune_ebcdic_tables
 expect_pcre2_prepare_shared_externs
 expect_pcre2_prepare_width_prunes_whole_decls
 expect_pcre2_prepare_shared_lets
+expect_pcre2_check_existing_main
 expect_std_re_shared_dependency_imports
 expect_migrate_initializer_regressions
 expect_migrate_tentative_global_owner
