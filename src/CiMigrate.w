@@ -308,6 +308,7 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ "extern fn with_ctzll(x: i64) -> i32\n"
     p = p ++ "extern fn with_abs(x: i32) -> i32\n"
     p = p ++ "extern fn with_alloc(size: i64) -> *i8\n"
+    p = p ++ "extern fn with_realloc(ptr: *i8, old_size: i64, new_size: i64) -> *i8\n"
     p = p ++ "extern fn with_free(ptr: *i8) -> void\n"
     p = p ++ "extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> void\n"
     p = p ++ "extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> void\n"
