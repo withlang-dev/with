@@ -309,34 +309,20 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
     with_memset((captures as *i8), 0, (size as i64))
 
     while (1 != 0) {
-        match ((unsafe: *pptr) & (4294901760 as c_uint)) {
-            2148925440 => {
-                (pptr = pptr + 1)
+        var __ci_expr_switch_continue_0: i32 = 0
 
-                (pptr = pptr + 2)
+        while true {
+            match ((unsafe: *pptr) & (4294901760 as c_uint)) {
+                2148925440 => {
+                    (pptr = pptr + 1)
 
-                continue
+                    (pptr = pptr + 2)
 
-                (ng = cb.named_groups + (unsafe: pptr[1]))
+                    continue
 
-                while true {
-                    if (not (0 != 0)) {
-                        break
-                    }
-                }
-
-                (pptr = pptr + 2)
-
-                (name = ng.name)
-
-                (all_found = 1)
-
-                while true {
-                    if ((if ng.name != name: 1 else: 0) != 0) {
-                        continue
-                    }
-
-                    (capture_ptr = captures + ((ng.number as c_uint) >> (3 as c_uint)))
+                },
+                2149056512 => {
+                    (ng = cb.named_groups + (unsafe: pptr[1]))
 
                     while true {
                         if (not (0 != 0)) {
@@ -344,59 +330,60 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
                         }
                     }
 
-                    (bit = ((((1 as c_int) << ((ng.number & 7) as c_uint)) as u8)))
+                    (pptr = pptr + 2)
 
-                    if ((if ((unsafe: *capture_ptr) & bit) == 0: 1 else: 0) != 0) {
-                        ((unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit)
+                    (name = ng.name)
 
-                        (all_found = 0)
+                    (all_found = 1)
+
+                    while true {
+                        if ((if ng.name != name: 1 else: 0) != 0) {
+                            continue
+                        }
+
+                        (capture_ptr = captures + ((ng.number as c_uint) >> (3 as c_uint)))
+
+                        while true {
+                            if (not (0 != 0)) {
+                                break
+                            }
+                        }
+
+                        (bit = ((((1 as c_int) << ((ng.number & 7) as c_uint)) as u8)))
+
+                        if ((if ((unsafe: *capture_ptr) & bit) == 0: 1 else: 0) != 0) {
+                            ((unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit)
+
+                            (all_found = 0)
+
+                        }
+
+                        (ng = ng + 1)
+
+                        if (not ((if ng < end: 1 else: 0) != 0)) {
+                            break
+                        }
 
                     }
 
-                    (ng = ng + 1)
+                    if ((if not (all_found != 0): 1 else: 0) != 0) {
+                        ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 5)
 
-                    if (not ((if ng < end: 1 else: 0) != 0)) {
-                        break
+                        continue
+
                     }
 
-                }
+                    ((unsafe: pptr[-2]) = 2149122048)
 
-                if ((if not (all_found != 0): 1 else: 0) != 0) {
-                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 5)
+                    ((unsafe: pptr[-1]) = 0)
 
                     continue
 
-                }
+                },
+                2149122048 => {
+                    (pptr = pptr + 2)
 
-                ((unsafe: pptr[-2]) = 2149122048)
-
-                ((unsafe: pptr[-1]) = 0)
-
-                continue
-
-
-            },
-            2149056512 => {
-                (ng = cb.named_groups + (unsafe: pptr[1]))
-
-                while true {
-                    if (not (0 != 0)) {
-                        break
-                    }
-                }
-
-                (pptr = pptr + 2)
-
-                (name = ng.name)
-
-                (all_found = 1)
-
-                while true {
-                    if ((if ng.name != name: 1 else: 0) != 0) {
-                        continue
-                    }
-
-                    (capture_ptr = captures + ((ng.number as c_uint) >> (3 as c_uint)))
+                    (capture_ptr = captures + (((unsafe: pptr[-1]) as c_uint) >> (3 as c_uint)))
 
                     while true {
                         if (not (0 != 0)) {
@@ -404,94 +391,35 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
                         }
                     }
 
-                    (bit = ((((1 as c_int) << ((ng.number & 7) as c_uint)) as u8)))
+                    (bit = ((((1 as c_int) << (((unsafe: pptr[-1]) & 7) as c_uint)) as u8)))
 
-                    if ((if ((unsafe: *capture_ptr) & bit) == 0: 1 else: 0) != 0) {
-                        ((unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit)
+                    if ((if ((unsafe: *capture_ptr) & bit) != 0: 1 else: 0) != 0) {
+                        ((unsafe: pptr[-1]) = 0)
 
-                        (all_found = 0)
+                        continue
 
                     }
 
-                    (ng = ng + 1)
+                    ((unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit)
 
-                    if (not ((if ng < end: 1 else: 0) != 0)) {
-                        break
-                    }
-
-                }
-
-                if ((if not (all_found != 0): 1 else: 0) != 0) {
-                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 5)
+                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 3)
 
                     continue
 
-                }
+                },
+                _ => {
+                    0
+                },
+            }
 
-                ((unsafe: pptr[-2]) = 2149122048)
+            break
 
-                ((unsafe: pptr[-1]) = 0)
-
-                continue
-
-                (pptr = pptr + 2)
-
-                (capture_ptr = captures + (((unsafe: pptr[-1]) as c_uint) >> (3 as c_uint)))
-
-                while true {
-                    if (not (0 != 0)) {
-                        break
-                    }
-                }
-
-                (bit = ((((1 as c_int) << (((unsafe: pptr[-1]) & 7) as c_uint)) as u8)))
-
-                if ((if ((unsafe: *capture_ptr) & bit) != 0: 1 else: 0) != 0) {
-                    ((unsafe: pptr[-1]) = 0)
-
-                    continue
-
-                }
-
-                ((unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit)
-
-                ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 3)
-
-                continue
-
-
-            },
-            2149122048 => {
-                (pptr = pptr + 2)
-
-                (capture_ptr = captures + (((unsafe: pptr[-1]) as c_uint) >> (3 as c_uint)))
-
-                while true {
-                    if (not (0 != 0)) {
-                        break
-                    }
-                }
-
-                (bit = ((((1 as c_int) << (((unsafe: pptr[-1]) & 7) as c_uint)) as u8)))
-
-                if ((if ((unsafe: *capture_ptr) & bit) != 0: 1 else: 0) != 0) {
-                    ((unsafe: pptr[-1]) = 0)
-
-                    continue
-
-                }
-
-                ((unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit)
-
-                ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 3)
-
-                continue
-
-            },
-            _ => {
-                0
-            },
         }
+
+        if (__ci_expr_switch_continue_0 != 0) {
+            continue
+        }
+
 
         break
 
@@ -561,125 +489,84 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
     while (1 != 0) {
         (pptr = pptr + 1)
 
-        match ((unsafe: *pptr) & (4294901760 as c_uint)) {
-            2148925440 => {
-                (pptr = pptr + 2)
+        var __ci_expr_switch_continue_3: i32 = 0
 
-                continue
+        while true {
+            match ((unsafe: *pptr) & (4294901760 as c_uint)) {
+                2148925440 => {
+                    (pptr = pptr + 2)
 
-                (pptr = pptr + 1)
+                    continue
 
-                (ng = cb.named_groups + (unsafe: *pptr))
+                },
+                2149056512 => {
+                    (pptr = pptr + 1)
 
-
-                while true {
-                    if (not (0 != 0)) {
-                        break
-                    }
-                }
-
-                var __ci_expr_old_0: *mut c_ushort = captures
-
-                (captures = captures + 1)
-
-                ((unsafe: *__ci_expr_old_0) = ((ng.number as c_ushort)))
+                    (ng = cb.named_groups + (unsafe: *pptr))
 
 
-                (name = ng.name)
-
-                while true {
-                    (ng = ng + 1)
-
-                    if (not ((if ng < end: 1 else: 0) != 0)) {
-                        break
+                    while true {
+                        if (not (0 != 0)) {
+                            break
+                        }
                     }
 
-                    if ((if ng.name == name: 1 else: 0) != 0) {
-                        var __ci_expr_old_1: *mut c_ushort = captures
+                    var __ci_expr_old_0: *mut c_ushort = captures
 
-                        (captures = captures + 1)
+                    (captures = captures + 1)
 
-                        ((unsafe: *__ci_expr_old_1) = ((ng.number as c_ushort)))
-
-                    }
-
-                }
-
-                continue
+                    ((unsafe: *__ci_expr_old_0) = ((ng.number as c_ushort)))
 
 
-            },
-            2149056512 => {
-                (pptr = pptr + 1)
+                    (name = ng.name)
 
-                (ng = cb.named_groups + (unsafe: *pptr))
+                    while true {
+                        (ng = ng + 1)
 
+                        if (not ((if ng < end: 1 else: 0) != 0)) {
+                            break
+                        }
 
-                while true {
-                    if (not (0 != 0)) {
-                        break
-                    }
-                }
+                        if ((if ng.name == name: 1 else: 0) != 0) {
+                            var __ci_expr_old_1: *mut c_ushort = captures
 
-                var __ci_expr_old_0: *mut c_ushort = captures
+                            (captures = captures + 1)
 
-                (captures = captures + 1)
+                            ((unsafe: *__ci_expr_old_1) = ((ng.number as c_ushort)))
 
-                ((unsafe: *__ci_expr_old_0) = ((ng.number as c_ushort)))
-
-
-                (name = ng.name)
-
-                while true {
-                    (ng = ng + 1)
-
-                    if (not ((if ng < end: 1 else: 0) != 0)) {
-                        break
-                    }
-
-                    if ((if ng.name == name: 1 else: 0) != 0) {
-                        var __ci_expr_old_1: *mut c_ushort = captures
-
-                        (captures = captures + 1)
-
-                        ((unsafe: *__ci_expr_old_1) = ((ng.number as c_ushort)))
+                        }
 
                     }
 
-                }
+                    continue
 
-                continue
+                },
+                2149122048 => {
+                    var __ci_expr_old_2: *mut c_ushort = captures
 
-                var __ci_expr_old_2: *mut c_ushort = captures
+                    (captures = captures + 1)
 
-                (captures = captures + 1)
+                    (pptr = pptr + 1)
 
-                (pptr = pptr + 1)
-
-                ((unsafe: *__ci_expr_old_2) = (unsafe: *pptr))
-
-
-                continue
+                    ((unsafe: *__ci_expr_old_2) = (unsafe: *pptr))
 
 
-            },
-            2149122048 => {
-                var __ci_expr_old_2: *mut c_ushort = captures
+                    continue
 
-                (captures = captures + 1)
+                },
+                _ => {
+                    0
+                },
+            }
 
-                (pptr = pptr + 1)
+            break
 
-                ((unsafe: *__ci_expr_old_2) = (unsafe: *pptr))
-
-
-                continue
-
-            },
-            _ => {
-                0
-            },
         }
+
+        if (__ci_expr_switch_continue_3 != 0) {
+            continue
+        }
+
 
         break
 
@@ -731,11 +618,11 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
 
     (captures_end = captures + size)
 
-    var __ci_expr_old_3: *mut c_ushort = captures
+    var __ci_expr_old_4: *mut c_ushort = captures
 
     (captures = captures + 1)
 
-    (tmp = (unsafe: *__ci_expr_old_3))
+    (tmp = (unsafe: *__ci_expr_old_4))
 
 
     (current = captures)
@@ -744,11 +631,11 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
         if ((if (unsafe: *current) != tmp: 1 else: 0) != 0) {
             (tmp = (unsafe: *current))
 
-            var __ci_expr_old_4: *mut c_ushort = captures
+            var __ci_expr_old_5: *mut c_ushort = captures
 
             (captures = captures + 1)
 
-            ((unsafe: *__ci_expr_old_4) = tmp)
+            ((unsafe: *__ci_expr_old_5) = tmp)
 
 
         }
@@ -782,182 +669,114 @@ fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset
     while (1 != 0) {
         (pptr = pptr + 1)
 
-        match ((unsafe: *pptr) & (4294901760 as c_uint)) {
-            2148925440 => {
-                (offset = ((((unsafe: pptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr[2]) as c_ulong))
+        var __ci_expr_switch_continue_0: i32 = 0
 
-                (pptr = pptr + 2)
+        while true {
+            match ((unsafe: *pptr) & (4294901760 as c_uint)) {
+                2148925440 => {
+                    (offset = ((((unsafe: pptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr[2]) as c_ulong))
 
-
-                continue
-
-                (offset = offset + ((unsafe: *pptr) & 65535))
-
-                (pptr = pptr + 1)
-
-                (length = (unsafe: *pptr))
+                    (pptr = pptr + 2)
 
 
-                (name = cb.start_pattern + offset)
+                    continue
 
-                (ng = _pcre2_compile_find_named_group8(name, length, cb))
+                },
+                2149056512 => {
+                    (offset = offset + ((unsafe: *pptr) & 65535))
 
-                if ((if ng == null: 1 else: 0) != 0) {
-                    ((unsafe: *errorcodeptr) = ERR15)
+                    (pptr = pptr + 1)
 
-                    (cb.erroroffset = offset)
+                    (length = (unsafe: *pptr))
 
-                    return 0
 
-                }
+                    (name = cb.start_pattern + offset)
 
-                if ((if (ng.hash_dup & 32768) == 0: 1 else: 0) != 0) {
-                    ((unsafe: pptr[-1]) = 2149122048)
+                    (ng = _pcre2_compile_find_named_group8(name, length, cb))
 
-                    ((unsafe: pptr[0]) = ng.number)
+                    if ((if ng == null: 1 else: 0) != 0) {
+                        ((unsafe: *errorcodeptr) = ERR15)
+
+                        (cb.erroroffset = offset)
+
+                        return 0
+
+                    }
+
+                    if ((if (ng.hash_dup & 32768) == 0: 1 else: 0) != 0) {
+                        ((unsafe: pptr[-1]) = 2149122048)
+
+                        ((unsafe: pptr[0]) = ng.number)
+
+                        (size = size + 1)
+
+                        continue
+
+                    }
+
+                    ((unsafe: pptr[-1]) = 2149056512)
+
+                    ((unsafe: pptr[0]) = (((((ng as usize) -% (cb.named_groups as usize)) / sizeof[named_group_8]()) as c_uint)))
+
+                    (size = size + 1)
+
+                    (name = ng.name)
+
+                    while true {
+                        (ng = ng + 1)
+
+                        if (not ((if ng < end: 1 else: 0) != 0)) {
+                            break
+                        }
+
+                        if ((if ng.name == name: 1 else: 0) != 0) {
+                            (size = size + 1)
+                        }
+
+                    }
+
+                    continue
+
+                },
+                2149122048 => {
+                    (offset = offset + ((unsafe: *pptr) & 65535))
+
+                    (pptr = pptr + 1)
+
+                    (i = (unsafe: *pptr))
+
+
+                    if ((if i > cb.bracount: 1 else: 0) != 0) {
+                        ((unsafe: *errorcodeptr) = ERR15)
+
+                        (cb.erroroffset = offset)
+
+                        return 0
+
+                    }
+
+                    if ((if i > cb.top_backref: 1 else: 0) != 0) {
+                        (cb.top_backref = ((i as c_ushort)))
+                    }
 
                     (size = size + 1)
 
                     continue
 
-                }
+                },
+                _ => {
+                    0
+                },
+            }
 
-                ((unsafe: pptr[-1]) = 2149056512)
+            break
 
-                ((unsafe: pptr[0]) = (((((ng as usize) -% (cb.named_groups as usize)) / sizeof[named_group_8]()) as c_uint)))
-
-                (size = size + 1)
-
-                (name = ng.name)
-
-                while true {
-                    (ng = ng + 1)
-
-                    if (not ((if ng < end: 1 else: 0) != 0)) {
-                        break
-                    }
-
-                    if ((if ng.name == name: 1 else: 0) != 0) {
-                        (size = size + 1)
-                    }
-
-                }
-
-                continue
-
-
-            },
-            2149056512 => {
-                (offset = offset + ((unsafe: *pptr) & 65535))
-
-                (pptr = pptr + 1)
-
-                (length = (unsafe: *pptr))
-
-
-                (name = cb.start_pattern + offset)
-
-                (ng = _pcre2_compile_find_named_group8(name, length, cb))
-
-                if ((if ng == null: 1 else: 0) != 0) {
-                    ((unsafe: *errorcodeptr) = ERR15)
-
-                    (cb.erroroffset = offset)
-
-                    return 0
-
-                }
-
-                if ((if (ng.hash_dup & 32768) == 0: 1 else: 0) != 0) {
-                    ((unsafe: pptr[-1]) = 2149122048)
-
-                    ((unsafe: pptr[0]) = ng.number)
-
-                    (size = size + 1)
-
-                    continue
-
-                }
-
-                ((unsafe: pptr[-1]) = 2149056512)
-
-                ((unsafe: pptr[0]) = (((((ng as usize) -% (cb.named_groups as usize)) / sizeof[named_group_8]()) as c_uint)))
-
-                (size = size + 1)
-
-                (name = ng.name)
-
-                while true {
-                    (ng = ng + 1)
-
-                    if (not ((if ng < end: 1 else: 0) != 0)) {
-                        break
-                    }
-
-                    if ((if ng.name == name: 1 else: 0) != 0) {
-                        (size = size + 1)
-                    }
-
-                }
-
-                continue
-
-                (offset = offset + ((unsafe: *pptr) & 65535))
-
-                (pptr = pptr + 1)
-
-                (i = (unsafe: *pptr))
-
-
-                if ((if i > cb.bracount: 1 else: 0) != 0) {
-                    ((unsafe: *errorcodeptr) = ERR15)
-
-                    (cb.erroroffset = offset)
-
-                    return 0
-
-                }
-
-                if ((if i > cb.top_backref: 1 else: 0) != 0) {
-                    (cb.top_backref = ((i as c_ushort)))
-                }
-
-                (size = size + 1)
-
-                continue
-
-
-            },
-            2149122048 => {
-                (offset = offset + ((unsafe: *pptr) & 65535))
-
-                (pptr = pptr + 1)
-
-                (i = (unsafe: *pptr))
-
-
-                if ((if i > cb.bracount: 1 else: 0) != 0) {
-                    ((unsafe: *errorcodeptr) = ERR15)
-
-                    (cb.erroroffset = offset)
-
-                    return 0
-
-                }
-
-                if ((if i > cb.top_backref: 1 else: 0) != 0) {
-                    (cb.top_backref = ((i as c_ushort)))
-                }
-
-                (size = size + 1)
-
-                continue
-
-            },
-            _ => {
-                0
-            },
         }
+
+        if (__ci_expr_switch_continue_0 != 0) {
+            continue
+        }
+
 
         while true {
             if (not (0 != 0)) {
