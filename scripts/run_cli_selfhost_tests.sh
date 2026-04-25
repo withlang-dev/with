@@ -2519,6 +2519,28 @@ int h(int x) {
 RETURN_SWITCH:
   return rrc;
 }
+
+int k(int x) {
+  int rrc = 0;
+  if (x < 0) goto RETURN_SWITCH;
+  switch (x) {
+    case 1:
+      switch (x) {
+        case 1:
+          if (x) break;
+          rrc = 101;
+          break;
+        default:
+          rrc = 102;
+          break;
+      }
+      RRETURN(77);
+    default:
+      RRETURN(88);
+  }
+RETURN_SWITCH:
+  return rrc;
+}
 EOF
 
   if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
@@ -2613,6 +2635,9 @@ fn main() -> i32 {
     if h(1) != 44 { return 7 }
     if h(2) != 55 { return 8 }
     if h(3) != 66 { return 9 }
+    if k(1) != 77 { return 10 }
+    if k(2) != 88 { return 11 }
+    if k(-1) != 0 { return 12 }
     0
 }
 EOF
