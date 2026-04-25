@@ -2008,6 +2008,70 @@ PY
   echo "PASS(cli-selfhost-migrate) for_continue_switch_break"
 }
 
+expect_migrate_switch_continue_reloads_outer_loop_subject() {
+  local case_dir="$tmpdir/migrate_switch_continue_reloads_case"
+  local src="$case_dir/switch_continue_reloads.c"
+  local out_w="$case_dir/switch_continue_reloads.w"
+  local bin="$case_dir/switch_continue_reloads"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int switch_continue_reloads(unsigned int *p) {
+  int acc = 0;
+  for (;;) {
+    unsigned int op = *p;
+    switch (op) {
+    case 1u:
+      p++;
+      if (*p == 2u) continue;
+      return -10;
+    case 2u:
+      acc += 7;
+      p++;
+      return acc;
+    default:
+      return -1;
+    }
+  }
+}
+
+int main(void) {
+  unsigned int values[3] = { 1u, 2u, 0u };
+  return switch_continue_reloads(values) == 7 ? 0 : 1;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) switch_continue_reloads"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$out_w" "__ci_expr_switch_continue_" || ! file_has_literal "$out_w" "if (__ci_expr_switch_continue_"; then
+    echo "FAIL(cli-selfhost-migrate-output) switch_continue_reloads"
+    cat "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$out_w" -o "$bin"; then
+    echo "FAIL(cli-selfhost-build) switch_continue_reloads"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! "$bin"; then
+    echo "FAIL(cli-selfhost-run) switch_continue_reloads"
+    "$bin" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) switch_continue_reloads"
+}
+
 expect_migrate_nested_switch_break() {
   local case_dir="$tmpdir/migrate_nested_switch_break_case"
   local src="$case_dir/nested_switch_break.c"
@@ -3486,6 +3550,7 @@ expect_migrate_split_multi_value_match_arms
 expect_migrate_realloc_runtime_helper
 expect_migrate_sizeof_pointer_type_syntax
 expect_migrate_for_continue_switch_break_semantics
+expect_migrate_switch_continue_reloads_outer_loop_subject
 expect_migrate_nested_switch_break
 expect_migrate_goto_shadowed_local
 expect_migrate_goto_label_preserves_block_scope

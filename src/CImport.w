@@ -4125,6 +4125,33 @@ fn ci_rewrite_switch_continues_ir(stmts: &mut CiStmtPool, exprs: &mut CiExprPool
         let then_id = ci_rewrite_switch_continues_ir(stmts, exprs, (stmts.get_d1(stmt_id)) as CiStmtId, flag_expr_sym, flag_ty)
         let else_id = ci_rewrite_switch_continues_ir(stmts, exprs, (stmts.get_d2(stmt_id)) as CiStmtId, flag_expr_sym, flag_ty)
         return stmts.if_stmt(cond, then_id, else_id)
+    if kind == CiStmtKind.CIS_MATCH:
+        let subject_id = stmts.get_d0(stmt_id)
+        let arms_start = stmts.get_d1(stmt_id)
+        let arm_count = stmts.get_d2(stmt_id)
+        var rewritten_records: Vec[i32] = Vec.new()
+        var cursor = arms_start
+        var ai: i32 = 0
+        while ai < arm_count:
+            let value_count = stmts.get_extra(cursor)
+            rewritten_records.push(value_count)
+            cursor = cursor + 1
+            var vi: i32 = 0
+            while vi < value_count:
+                rewritten_records.push(stmts.get_extra(cursor))
+                cursor = cursor + 1
+                vi = vi + 1
+            let body_id = (stmts.get_extra(cursor)) as CiStmtId
+            cursor = cursor + 1
+            let rewritten_body = ci_rewrite_switch_continues_ir(stmts, exprs, body_id, flag_expr_sym, flag_ty)
+            rewritten_records.push(rewritten_body as i32)
+            ai = ai + 1
+        let new_start = stmts.extra.len() as i32
+        var ri: i64 = 0
+        while ri < rewritten_records.len():
+            let _ = stmts.add_extra(rewritten_records.get(ri))
+            ri = ri + 1
+        return stmts.add(CiStmtKind.CIS_MATCH, subject_id, new_start, arm_count, 0)
     stmt_id
 
 fn ci_wrap_switch_match_breaks_ir(session: i64, body_cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, match_id: CiStmtId, loop_depth: i32) -> CiStmtId:
