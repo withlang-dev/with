@@ -5040,9 +5040,9 @@ explicit `&`.
 ### 13.5a Labeled Loops and Blocks
 
 Labels provide named structured control-flow targets for nested loops
-and early-exit blocks. A label is an identifier prefixed with a single
-quote. It appears as the first token of a statement and is followed
-immediately by the construct it labels:
+and early-exit blocks. A label declaration is an identifier prefixed
+with a single quote. It appears as the first token of a statement and
+is followed immediately by the construct it labels:
 
 ```
 'outer while running:
@@ -5099,7 +5099,7 @@ Labeled blocks are statement-position only. They are not expressions,
 and they do not produce a value. This is valid:
 
 ```
-fn parse_header(input: bytes) -> Result[Header]:
+fn parse_header(input: bytes) -> Result[Header, Error]:
     'parse:
         if input.len() < 4: break 'parse
         let magic = input[0..4]
@@ -8780,7 +8780,7 @@ Bootstrap lowering treats character and byte literals as integer literal values 
 
 ### 29.5a Labels
 
-A label token is a single quote followed immediately by an identifier,
+A `LABEL` token is a single quote followed immediately by an identifier,
 with no whitespace between the quote and the identifier:
 
 ```
@@ -8795,8 +8795,25 @@ digits, and underscores. Labels are syntactically distinct from
 ordinary identifiers because of the leading quote and live in a
 separate namespace.
 
-Single-quote-prefixed identifiers are reserved for labels. Byte
-literals use the `b'X'` spelling and are not label tokens.
+Single-quoted character literals are also valid syntax. A character
+literal is a single quote, followed by one character or escape
+sequence, followed by a closing single quote:
+
+```
+'a'
+'@'
+'\n'
+```
+
+Lexer priority for apostrophe-related tokens is:
+
+1. Byte literals such as `b'X'` or `b'\n'`.
+2. Closed character literals such as `'a'`, `'@'`, or `'\n'`.
+3. Labels such as `'outer`, `'L0`, or `'scan`.
+
+A label has no closing quote. A character literal must have a closing
+quote. Inside string literals, apostrophe is ordinary string content
+and never starts a label or character literal.
 
 ### 29.6 Unused bindings
 
@@ -9096,9 +9113,13 @@ STR_LIT     := '"' { CHAR | ESCAPE } '"'
 RAW_STR     := 'r' HASHES '"' { CHAR } '"' HASHES
 FSTRING     := 'f"' { CHAR | ESCAPE | '{' EXPR [ ':' FMT_SPEC ] '}' } '"'
 CSTR_LIT    := 'c"' { CHAR | ESCAPE } '"'
-BYTE_LIT    := "b'" BYTE "'"
+CHAR_LIT    := "'" ( CHAR | ESCAPE ) "'"
+BYTE_LIT    := "b'" BYTE_OR_ESCAPE "'"
 HASHES      := { '#' }
 ```
+
+When the lexer sees a bare apostrophe, it tries `CHAR_LIT` before
+`LABEL`. A label has no closing apostrophe.
 
 **Labels** (§13.5a, §29.5a):
 
@@ -9181,7 +9202,7 @@ WHILE_STMT  := [ LABEL ] 'while' EXPR BODY
 LABELED_BLOCK := LABEL ( COLON_BODY | BRACE_BODY )
 WITH_STMT   := 'with' EXPR 'as' [ 'mut' ] IDENT BODY
 RETURN_STMT := 'return' [ EXPR ]
-BREAK_STMT  := 'break' ( LABEL | [ EXPR ] )
+BREAK_STMT  := 'break' [ LABEL ]
 CONTINUE_STMT := 'continue' [ LABEL ]
 DEFER_STMT  := 'defer' EXPR
 ```
