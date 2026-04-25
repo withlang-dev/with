@@ -39,7 +39,6 @@ REGEX_RAW_DIR := $(OUT)/pcre2_migrate_raw
 REGEX_GENERATED_DIR := $(OUT)/pcre2_generated
 REGEX_PROMOTE_DIR := lib/std/re
 REGEX_EXCLUDED_C_SOURCES := \
-	pcre2test.c \
 	pcre2demo.c \
 	pcre2grep.c \
 	pcre2posix.c \
@@ -326,7 +325,17 @@ __regex-check: $(REGEX_PREPARE_STAMP) scripts/pcre2_generated_workflow.sh
 		"$(ROOT_DIR)/$(REGEX_RAW_DIR)" \
 		"$(ROOT_DIR)/$(REGEX_GENERATED_DIR)"
 
-__regex-promote: $(REGEX_PREPARE_STAMP) scripts/pcre2_generated_workflow.sh
+__regex-promote: scripts/pcre2_generated_workflow.sh
+	@if [ ! -x "$(ROOT_DIR)/$(CANONICAL_BIN)" ]; then \
+		echo "error: missing compiler binary: $(ROOT_DIR)/$(CANONICAL_BIN)" >&2; \
+		echo "run make build before regex-promote" >&2; \
+		exit 1; \
+	fi
+	@if [ ! -d "$(ROOT_DIR)/$(REGEX_GENERATED_DIR)" ]; then \
+		echo "error: missing generated PCRE2 directory: $(ROOT_DIR)/$(REGEX_GENERATED_DIR)" >&2; \
+		echo "run make regex-prepare or make regex-check before regex-promote" >&2; \
+		exit 1; \
+	fi
 	@bash "$(ROOT_DIR)/scripts/pcre2_generated_workflow.sh" promote \
 		"$(ROOT_DIR)/$(CANONICAL_BIN)" \
 		"$(ROOT_DIR)/$(REGEX_RAW_DIR)" \

@@ -36,14 +36,17 @@ run_capture_with_timeout() {
     "$@" >"$out_file" 2>&1 &
     child="$!"
     (
-        sleep "$timeout_secs"
+        sleep "$timeout_secs" &
+        sleep_pid="$!"
+        trap 'kill "$sleep_pid" 2>/dev/null || true; wait "$sleep_pid" 2>/dev/null || true; exit 0' TERM INT
+        wait "$sleep_pid" 2>/dev/null || exit 0
         if kill -0 "$child" 2>/dev/null; then
             touch "$marker"
             kill -TERM "$child" 2>/dev/null || true
             sleep 2
             kill -KILL "$child" 2>/dev/null || true
         fi
-    ) &
+    ) >/dev/null 2>&1 &
     watchdog="$!"
 
     wait "$child"
@@ -141,7 +144,7 @@ count_generated_errors() {
             head -48 "$raw_dir/pcre2_tables.w" > "$tf"
         fi
         awk 'NR <= 2 { next } /^use std\.re\./ { next } { print }' "$generated_dir/$mod.w" >> "$tf"
-        printf '\nfn main: print("ok")\n' >> "$tf"
+        printf '\nfn main { print("ok") }\n' >> "$tf"
         check_out="$(mktemp "${TMPDIR:-/tmp}/pcre2-check-output.XXXXXX")"
         CLEANUP_FILES+=("$check_out")
         set +e
