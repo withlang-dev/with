@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposal, v2. Targets a near-term With release. Driven by the
+Proposal, v5. Targets a near-term With release. Driven by the
 migrator's need to express multi-level control transfers cleanly
 when porting the Beyond Relooper algorithm (Ramsey 2022) for
 C-to-With goto lowering.
@@ -35,14 +35,21 @@ loop level.
 
 The feature is small, additive, and well-understood. Rust, Java,
 JavaScript, Kotlin, and Swift all have variants. We adopt a syntax
-close to Rust's because it is the closest language to With in style
-and reads naturally next to the existing structured constructs.
+inspired by Rust but adapted to With's syntactic conventions —
+specifically, With's strict rule that a colon introduces a block
+body. Rust's `'label:` form would put two colons close together
+in colon-form constructs (`'outer: while cond:`), with the first
+colon doing label-attachment and the second doing body-introduction.
+That breaks With's colon rule. We drop the post-label colon and
+require labels to appear as the first token of a statement, which
+preserves the colon rule while keeping the apostrophe-label
+convention.
 
 ## Syntax
 
 ### Labels
 
-A label is an identifier prefixed with a single quote.
+A label is an identifier prefixed with a single quote (apostrophe).
 
 ```
 'outer
@@ -52,66 +59,63 @@ A label is an identifier prefixed with a single quote.
 
 Labels share the regular identifier namespace rules (alphanumeric
 and underscore, starting with a letter or underscore) but are
-syntactically distinct because of the leading quote. They cannot
-collide with ordinary identifiers, types, or keywords.
+syntactically distinct because of the leading apostrophe. They
+cannot collide with ordinary identifiers, types, or keywords.
 
-### Uniform label-colon rule
+A label is a single token. There is no colon or other punctuation
+following the label; the next token begins the construct the label
+attaches to.
 
-A label always carries its colon. The form is:
+### Where labels may appear
 
-```
-LABEL ':' construct
-```
+A label declaration must be the first token of a statement, immediately
+followed by one of:
 
-The colon belongs to the label, not to whatever follows. This rule
-is uniform regardless of which block style the construct uses.
-There are no bare-label spellings.
+- `while` (labels a while loop)
+- `for` (labels a for loop)
+- `{` (labels a brace-form block)
+- `:` (labels a colon-form block)
+
+"First token of a statement" is determined by the parser, not by
+physical line position. In brace-form contexts where statements
+may share a line, the rule still applies — `'outer` must be
+positioned where any other statement could begin.
 
 ### Labeled loops
 
-The `while` and `for` loops may be prefixed with a label. Both block
-styles are supported — colon-form and brace-form.
-
-Brace form:
-
-```
-'outer: while cond {
-    ...
-}
-
-'search: for x in xs {
-    ...
-}
-```
+The `while` and `for` loops may be prefixed with a label. Both
+block styles are supported.
 
 Colon form:
 
 ```
-'outer: while cond:
+'outer while cond:
     ...
 
-'search: for x in xs:
+'search for x in xs:
     ...
 ```
 
-In the colon form, the first colon belongs to the label and the
-second introduces the loop body. The two colons are at different
-syntactic levels and unambiguous to the parser, even if visually
-adjacent.
+Brace form:
+
+```
+'outer while cond {
+    ...
+}
+
+'search for x in xs {
+    ...
+}
+```
+
+The colon in the colon-form examples is the loop-body introducer,
+unchanged from any other With colon-form loop. The label simply
+prefixes the loop.
 
 ### Labeled blocks
 
 A bare block may carry a label. This permits early exit from a
 non-loop scope. Both block styles are supported.
-
-Brace form:
-
-```
-'find: {
-    if quick_check() { break 'find }
-    ...
-}
-```
 
 Colon form:
 
@@ -120,6 +124,19 @@ Colon form:
     if quick_check(): break 'find
     ...
 ```
+
+Brace form:
+
+```
+'find {
+    if quick_check() { break 'find }
+    ...
+}
+```
+
+In the colon-form labeled block, the colon is still the body
+introducer — the label is followed directly by the body's opening
+colon, and the indented stmts form the block body.
 
 Labeled blocks are not a new statement form. They are an existing
 block with an attached label. `break 'label` exits the block;
@@ -152,10 +169,8 @@ A label is in scope throughout the labeled construct's body,
 including all nested constructs. The body begins at:
 
 - The opening brace, for brace-form constructs.
-- The loop-body colon, for colon-form `while` and `for` loops
-  (not the label colon).
-- The label colon itself, for colon-form labeled blocks (where
-  the label colon is the body introducer).
+- The body colon, for colon-form `while` and `for` loops, and
+  for colon-form labeled blocks.
 
 A `break` or `continue` with a label is valid if and only if the
 label is in scope at the point of use.
@@ -181,8 +196,8 @@ control-flow constructs in With, not function boundaries. Closures
 and nested functions are boundaries; `with` bodies are not.
 
 ```
-'outer: while cond:
-    with guard:
+'outer while cond:
+    with acquire_resource() as guard:
         if done: break 'outer    // valid; 'outer visible through with
 ```
 
@@ -192,8 +207,8 @@ Two labeled constructs in the same lexical scope, where one nests
 inside the other, must use distinct labels. The compiler rejects:
 
 ```
-'l: while a:
-    'l: while b:                // error: label 'l shadows enclosing 'l
+'l while a:
+    'l while b:                 // error: label 'l shadows enclosing 'l
         break 'l                // ambiguous: which 'l?
 ```
 
@@ -201,8 +216,8 @@ Labels in disjoint scopes may reuse names. This is fine:
 
 ```
 fn f():
-    'l: while a: ...
-    'l: while b: ...            // ok: previous 'l is out of scope
+    'l while a: ...
+    'l while b: ...             // ok: previous 'l is out of scope
 ```
 
 ### break with a label
@@ -292,20 +307,31 @@ of the same name.
 error: label 'l shadows enclosing label 'l
   --> file.w:N:M
    |
-   |     'l: while ...
+   |     'l while ...
    |     ^^
 note: enclosing 'l is at file.w:K:L
 ```
 
-**Label without target.** A label declaration not immediately
-followed by a `while`, `for`, or block.
+**Label not at statement start.** A label token appearing somewhere
+other than as the first token of a statement.
 
 ```
-error: label 'l must be followed by a loop or block
+error: a label must appear at the start of a statement
   --> file.w:N:M
    |
-   |     'l: x = 1
-   |     ^^^
+   |     if cond: 'outer while true:
+   |              ^^^^^^
+```
+
+**Label without a valid target.** A label not immediately followed
+by `while`, `for`, `{`, or `:`.
+
+```
+error: a label must be followed by 'while', 'for', '{', or ':'
+  --> file.w:N:M
+   |
+   |     'l x = 1
+   |     ^^
 ```
 
 **Label crossing function boundary.** A `break` or `continue` whose
@@ -329,7 +355,7 @@ note: labels do not cross function, closure, async, or gen boundaries
 ```
 fn find(grid: [[i32]], target: i32) -> bool:
     var found = false
-    'rows: for row in grid:
+    'rows for row in grid:
         for cell in row:
             if cell == target:
                 found = true
@@ -341,7 +367,7 @@ fn find(grid: [[i32]], target: i32) -> bool:
 
 ```
 fn pairwise_skip(xs: [i32], ys: [i32]):
-    'outer: for x in xs:
+    'outer for x in xs:
         for y in ys:
             if y > x: continue 'outer
             process(x, y)
@@ -350,7 +376,7 @@ fn pairwise_skip(xs: [i32], ys: [i32]):
 ### Labeled block for early exit
 
 ```
-fn parse_header(input: bytes) -> Result[Header]:
+fn parse_header(input: bytes) -> Result[Header, Error]:
     'parse:
         if input.len() < 4: break 'parse
         let magic = input[0..4]
@@ -366,7 +392,7 @@ The same examples in brace form, to make the duality concrete:
 ```
 fn find(grid: [[i32]], target: i32) -> bool {
     var found = false
-    'rows: for row in grid {
+    'rows for row in grid {
         for cell in row {
             if cell == target {
                 found = true
@@ -378,7 +404,7 @@ fn find(grid: [[i32]], target: i32) -> bool {
 }
 
 fn pairwise_skip(xs: [i32], ys: [i32]) {
-    'outer: for x in xs {
+    'outer for x in xs {
         for y in ys {
             if y > x { continue 'outer }
             process(x, y)
@@ -392,13 +418,13 @@ fn pairwise_skip(xs: [i32], ys: [i32]) {
 A label declared outside a `with` block is visible inside it:
 
 ```
-fn process(items: [Item]) -> Result[()]:
-    'outer: for item in items:
-        with lock = item.acquire():
+fn process(items: [Item]) -> Result[Unit, Error]:
+    'outer for item in items:
+        with item.acquire() as lock:
             if item.is_terminal():
                 break 'outer        // valid; 'outer crosses the with body
             do_work(item)
-    Ok(())
+    Ok(unit)
 ```
 
 ### Migrator output (representative)
@@ -408,7 +434,7 @@ lowering a C function with non-trivial goto structure:
 
 ```
 'L_function_body:
-    'L_outer_loop: while true:
+    'L_outer_loop while true:
         if cond1: break 'L_outer_loop
         'L_inner_block:
             if cond2: break 'L_inner_block
@@ -447,56 +473,66 @@ and the identifier.
 The token kind is `Label` with the identifier text (without the
 leading apostrophe) as its value.
 
-Single-quote-prefixed identifiers are reserved exclusively for
-labels. Character literals, if introduced later, will use a
-different syntax (e.g., `c'a'` or `char('a')`). This avoids the
-lexer ambiguity that Rust inherited and matches the constraint
-that we have no historical char-literal syntax to preserve.
+**Disambiguation from char literals.** If With ever adopts char
+literal syntax of the form `'a'` (apostrophe, single character or
+escape, apostrophe), the lexer disambiguates by lookahead: an
+apostrophe followed by an identifier is a label; an apostrophe
+followed by a single character or escape and then a closing
+apostrophe is a char literal. The same lookahead handles byte
+literals (`b'X'`) — there the leading `b` distinguishes at the
+prefix level, and the `'X'` body parses as a char-literal-like
+token.
+
+This is the same disambiguation Rust performs. It is well-tested
+and produces no real ambiguity in practice.
+
+**String content.** Inside string literals, apostrophe is a
+content character. The label rule applies only outside string
+literals. This is the universal carve-out for sigils and does
+not require special spec treatment beyond noting it here.
 
 ### Frontend (parser)
 
-The label prefix is uniform across constructs but interacts with
-brace-form and colon-form bodies differently. The grammar makes
-each case explicit:
+A label is a prefix on a `while` statement, a `for` statement, a
+brace block, or a colon block. The label has no following colon;
+the next token after the label is the construct it attaches to.
+
+A label may only appear as the first token of a statement. The
+parser rejects labels appearing elsewhere with the
+"label-not-at-statement-start" diagnostic.
+
+Grammar:
 
 ```
 label           := LABEL_TOKEN
 
-while_stmt      := [label ':'] 'while' expr loop_body
-for_stmt        := [label ':'] 'for' pat 'in' expr loop_body
+while_stmt      := [label] 'while' expr loop_body
+for_stmt        := [label] 'for' pat 'in' expr loop_body
 
 loop_body       := brace_body | colon_body
 brace_body      := '{' stmts '}'
 colon_body      := ':' NEWLINE INDENT stmts DEDENT
 
-labeled_block   := label ':' block_tail
-block_tail      := brace_body | NEWLINE INDENT stmts DEDENT
+labeled_block   := label block_tail
+block_tail      := brace_body | colon_body
 
 break_stmt      := 'break' [label]
 continue_stmt   := 'continue' [label]
 ```
 
-Three notes on the grammar.
+Notes on the grammar.
 
-First, `loop_body` is the existing With construct — a `while` or
-`for` loop body in either brace form or colon form. The label
-prefix on `while_stmt` and `for_stmt` is independent of which
-body style the loop uses.
+`loop_body` is the existing With construct — a `while` or `for`
+loop body in either brace form or colon form. The label prefix on
+`while_stmt` and `for_stmt` is independent of which body style the
+loop uses.
 
-Second, `labeled_block` is the new construct introduced by this
-proposal. The label is required, never optional. There is no
-unlabeled colon-form bare block in With — without a label there
-would be nothing syntactically marking the start of the block.
-Unlabeled brace blocks remain whatever they already are in With;
-this proposal does not redefine them.
-
-Third, in colon-form contexts, the label colon plays different
-roles depending on what follows. For colon-form `while` and `for`
-loops, the label colon and the loop-body colon are distinct — the
-label colon ends the label, the loop-body colon (in `colon_body`)
-introduces the body. For colon-form labeled blocks, there is only
-one colon: the label colon is also the body introducer, because
-there is no construct keyword between the label and the body.
+`labeled_block` is the new construct introduced by this proposal.
+The label is required, never optional. There is no unlabeled
+colon-form bare block in With — without a label there would be
+nothing syntactically marking the start of the block. Unlabeled
+brace blocks remain whatever they already are in With; this
+proposal does not redefine them.
 
 The parser collapses the label prefix onto the target AST node
 during construction. Existing AST nodes for `while`, `for`, and
@@ -591,8 +627,12 @@ returns.
 
 Phase 1: lexer and parser.
 - Add Label token (apostrophe + identifier, no whitespace).
-- Add label syntax to `while`, `for`, and block statements, in
+- Add char-literal lookahead disambiguation if/when char literals
+  are introduced (no work needed now since With does not yet have
+  char literals).
+- Add label prefix to `while`, `for`, and block statements, in
   both brace-form and colon-form.
+- Enforce first-token-of-statement positioning.
 - Add optional label operand to `break` and `continue`.
 - AST nodes carry label fields.
 
@@ -600,7 +640,7 @@ Phase 2: semantic analysis.
 - LabelEnvironment with function/closure/async/gen boundary
   sentinels and `with`-transparent scoping.
 - Resolution for labeled break and continue.
-- Diagnostics for the five error cases.
+- Diagnostics for the six error cases.
 
 Phase 3: IR lowering.
 - Translate AST labels to scope IDs.
@@ -646,7 +686,7 @@ code continues to work without changes.
 
 The feature is considered complete when:
 
-1. Each of the five error diagnostics fires correctly with the
+1. Each of the six error diagnostics fires correctly with the
    specified message structure.
 2. The selfhost regression suite includes at least one test per
    syntactic form, in both colon-form and brace-form:
@@ -660,6 +700,8 @@ The feature is considered complete when:
      a `with` body
    - Function-boundary opacity: a `break` or `continue` inside a
      nested function or closure that fails to find an outer label
+   - Label not at statement start: rejected with the appropriate
+     diagnostic
 3. `make build`, `make fixpoint`, and `make test` all pass at each
    phase boundary.
 4. The compiler emits correct LLVM IR for nested labeled loops,
